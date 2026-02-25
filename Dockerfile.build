@@ -1,0 +1,55 @@
+FROM rust:1.87-bookworm
+
+# Install cross-compilation toolchains
+#   - x86_64-unknown-linux-gnu    : native (no extra packages needed)
+#   - aarch64-unknown-linux-gnu   : gcc-aarch64-linux-gnu
+#   - x86_64-pc-windows-gnu       : gcc-mingw-w64-x86-64
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc-aarch64-linux-gnu \
+        gcc-mingw-w64-x86-64 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Rust cross-compilation targets
+RUN rustup target add \
+        aarch64-unknown-linux-gnu \
+        x86_64-pc-windows-gnu
+
+# Configure Cargo linkers for each cross target
+RUN mkdir -p /root/.cargo && printf '\
+[target.aarch64-unknown-linux-gnu]\n\
+linker = "aarch64-linux-gnu-gcc"\n\
+\n\
+[target.x86_64-pc-windows-gnu]\n\
+linker = "x86_64-w64-mingw32-gcc"\n\
+' >> /root/.cargo/config.toml
+
+WORKDIR /src
+COPY . .
+
+# Embedded build script:
+#   1. Read APP_NAME and VERSION from Cargo.toml
+#   2. Build for each target
+#   3. Copy artefacts to /output (volume-mounted from host)
+CMD set -e && \
+    APP_NAME=$(grep '^name' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/') && \
+    VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/') && \
+    echo "==> Building ${APP_NAME} v${VERSION}" && \
+    \
+    echo "--- [1/3] x86_64-unknown-linux-gnu ---" && \
+    cargo build --release --target x86_64-unknown-linux-gnu && \
+    \
+    echo "--- [2/3] aarch64-unknown-linux-gnu ---" && \
+    CC=aarch64-linux-gnu-gcc \
+    cargo build --release --target aarch64-unknown-linux-gnu && \
+    \
+    echo "--- [3/3] x86_64-pc-windows-gnu ---" && \
+    CC=x86_64-w64-mingw32-gcc \
+    cargo build --release --target x86_64-pc-windows-gnu && \
+    \
+    mkdir -p /output && \
+    cp target/x86_64-unknown-linux-gnu/release/${APP_NAME}   /output/${APP_NAME}-${VERSION}-linux-amd64 && \
+    cp target/aarch64-unknown-linux-gnu/release/${APP_NAME}  /output/${APP_NAME}-${VERSION}-linux-arm64 && \
+    cp target/x86_64-pc-windows-gnu/release/${APP_NAME}.exe  /output/${APP_NAME}-${VERSION}-windows-amd64.exe && \
+    \
+    echo "==> Build complete. Artefacts in /output:" && \
+    ls -lh /output/
