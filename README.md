@@ -1,55 +1,105 @@
 # unic
 
-## 한국어
+`unic` is a Rust-based TUI (Terminal User Interface) tool for browsing and managing AWS resources in the terminal.
 
-`unic` 프로젝트의 오픈소스 저장소입니다.
+It manages authentication contexts (SSO or STS AssumeRole) via `~/.config/unic/config.yaml` and provides drill-down exploration of AWS services registered in the catalog.
 
-### 라이선스
+## Tech Stack
 
-이 프로젝트는 [LICENSE](LICENSE) 조건을 따릅니다.
+- Rust (Edition 2024)
+- TUI: ratatui 0.30 + crossterm 0.29
+- CLI: clap 4.5 (derive)
+- AWS SDK: aws-sdk-ec2, aws-sdk-sts
+- Config: serde_yaml
+- Async: tokio
+- Error handling: anyhow
 
-### 커뮤니티 가이드
+## Installation & Build
 
-- 행동 강령: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- 기여 가이드: [CONTRIBUTING.md](CONTRIBUTING.md)
-- 보안 정책: [SECURITY.md](SECURITY.md)
+```bash
+git clone <repository-url>
+cargo build --release
+```
 
-### 시작하기
+## Usage
 
-현재 저장소는 초기 구성(bootstrap) 단계입니다.
+```bash
+# Enter TUI mode
+unic
 
-1. 저장소를 클론합니다.
-2. 기능 브랜치를 생성합니다.
-3. PR 템플릿에 맞춰 Pull Request를 생성합니다.
+# Specify context/profile/region
+unic --context dev-sso
+unic --profile my-profile
+unic --region ap-northeast-2
 
-### 메인테이너
+# Context management
+unic context list              # List contexts
+unic context current           # Show current context
+unic context use [name]        # Switch context
+```
 
-- 메인테이너 정보를 여기에 추가하세요.
+## Configuration
 
----
+`~/.config/unic/config.yaml` (auto-generated on first run)
 
-## English
+```yaml
+version: 1
+current: dev-sso
 
-Open-source repository for the `unic` project.
+defaults:
+  region: us-east-1
 
-### License
+contexts:
+  - name: dev-sso
+    profile: dev-sso
+
+  - name: prod-admin
+    profile: base-user
+    role_arn: arn:aws:iam::111111111111:role/AdministratorAccess
+```
+
+## Authentication Methods
+
+| Method | Condition | Behavior |
+|--------|-----------|----------|
+| STS AssumeRole | `role_arn` is set | Issue temporary credentials via STS |
+| SSO | Profile has `sso_session` | Run `aws sso login` |
+| Profile | Otherwise | Set AWS profile env vars |
+
+## Currently Implemented Features
+
+| Service | Feature | Status |
+|---------|---------|--------|
+| VPC | RemainPrivateIP (subnet available IP query) | ✅ Implemented |
+| RDS | ListDBInstances | 🚧 Coming Soon |
+| Route53 | ListHostedZones | 🚧 Coming Soon |
+| IAM | ListUsers | 🚧 Coming Soon |
+
+## TUI Key Bindings
+
+| Key | Action |
+|-----|--------|
+| `j`/`k` or `↑`/`↓` | Navigate |
+| `Enter` | Select |
+| `Backspace`/`Esc` | Go back |
+| `r` | Refresh |
+| `g`/`G` | Top/Bottom |
+| `q` | Quit |
+
+## Documentation
+
+- [Architecture](.kiro/docs/architecture-en.md)
+
+## License
 
 This project is licensed under the terms in [LICENSE](LICENSE).
 
-### Community Standards
+## Community Standards
 
 - Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - Contributing Guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security Policy: [SECURITY.md](SECURITY.md)
 
-### Getting Started
-
-This repository is currently in bootstrap stage.
-
-1. Clone the repository.
-2. Create a feature branch.
-3. Open a Pull Request using the PR template.
-
-### Maintainers
+## Maintainers
 
 - Add maintainers here.
