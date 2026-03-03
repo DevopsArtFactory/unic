@@ -138,6 +138,7 @@ async fn main() -> io::Result<()> {
         &config.region,
         config.role_arn.as_deref(),
         config.external_id.as_deref(),
+        config.auth_type.as_deref(),
     )
     .await;
 

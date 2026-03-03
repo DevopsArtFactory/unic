@@ -4,6 +4,8 @@ use aws_credential_types::{Credentials, provider::SharedCredentialsProvider};
 use aws_sdk_ec2::Client;
 use aws_sdk_sts::Client as StsClient;
 use aws_types::region::Region;
+use serde::Deserialize;
+use std::process::Command;
 
 use super::env::{build_debug_lines, read_env_credentials, read_env_region};
 
@@ -20,8 +22,9 @@ impl AwsRepository {
         region: &str,
         role_arn: Option<&str>,
         external_id: Option<&str>,
+        auth_type: Option<&str>,
     ) -> Result<Self> {
-        let base_config = load_base_config(profile, region).await;
+        let base_config = load_base_config(profile, region, auth_type).await?;
         let effective_region = base_config
             .region()
             .map(|r| r.as_ref().to_string())
@@ -56,12 +59,29 @@ impl AwsRepository {
     }
 }
 
-async fn load_base_config(profile: &str, region: &str) -> aws_config::SdkConfig {
+async fn load_base_config(
+    profile: &str,
+    region: &str,
+    auth_type: Option<&str>,
+) -> Result<aws_config::SdkConfig> {
     let mut loader = aws_config::defaults(BehaviorVersion::latest());
-    let env_creds = read_env_credentials();
+    let env_creds = if auth_type == Some("login") {
+        None
+    } else {
+        read_env_credentials()
+    };
     let env_region = read_env_region();
 
-    if let Some(credentials) = env_creds {
+    if auth_type == Some("login") {
+        let creds = ensure_login_credentials(profile)?;
+        loader = loader.credentials_provider(SharedCredentialsProvider::new(Credentials::new(
+            creds.access_key_id,
+            creds.secret_access_key,
+            Some(creds.session_token),
+            None,
+            "aws-login",
+        )));
+    } else if let Some(credentials) = env_creds {
         loader = loader.credentials_provider(SharedCredentialsProvider::new(credentials));
     } else {
         loader = loader.profile_name(profile);
@@ -73,7 +93,7 @@ async fn load_base_config(profile: &str, region: &str) -> aws_config::SdkConfig 
         loader = loader.region(Region::new(region.to_string()));
     }
 
-    loader.load().await
+    Ok(loader.load().await)
 }
 
 async fn build_assumed_role_config(
@@ -136,4 +156,103 @@ async fn resolve_account_id(config: &aws_config::SdkConfig) -> String {
             .unwrap_or_else(|| "unknown-account".to_string()),
         Err(_) => "unknown-account".to_string(),
     }
+}
+
+#[derive(Deserialize)]
+struct ExportedCredentials {
+    #[serde(rename = "AccessKeyId")]
+    access_key_id: String,
+    #[serde(rename = "SecretAccessKey")]
+    secret_access_key: String,
+    #[serde(rename = "SessionToken")]
+    session_token: Option<String>,
+}
+
+struct LoginSession {
+    access_key_id: String,
+    secret_access_key: String,
+    session_token: String,
+}
+
+fn run_aws_login(profile: &str) -> Result<()> {
+    let status = Command::new("aws")
+        .args(["login", "--profile", profile])
+        .status()
+        .with_context(|| "Failed to execute `aws login`")?;
+
+    if !status.success() {
+        return Err(anyhow!("`aws login --profile {profile}` failed"));
+    }
+    Ok(())
+}
+
+fn ensure_login_credentials(profile: &str) -> Result<LoginSession> {
+    if let Some(creds) = try_export_login_credentials(profile)? {
+        return Ok(creds);
+    }
+    run_aws_login(profile)?;
+    export_login_credentials(profile)
+}
+
+fn try_export_login_credentials(profile: &str) -> Result<Option<LoginSession>> {
+    let output = Command::new("aws")
+        .args([
+            "configure",
+            "export-credentials",
+            "--profile",
+            profile,
+            "--format",
+            "process",
+        ])
+        .output()
+        .with_context(|| "Failed to execute `aws configure export-credentials`")?;
+
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let creds: ExportedCredentials = serde_json::from_slice(&output.stdout)
+        .with_context(|| "Failed to parse exported credentials JSON")?;
+    if creds.access_key_id.is_empty() || creds.secret_access_key.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(LoginSession {
+        access_key_id: creds.access_key_id,
+        secret_access_key: creds.secret_access_key,
+        session_token: creds.session_token.unwrap_or_default(),
+    }))
+}
+
+fn export_login_credentials(profile: &str) -> Result<LoginSession> {
+    let output = Command::new("aws")
+        .args([
+            "configure",
+            "export-credentials",
+            "--profile",
+            profile,
+            "--format",
+            "process",
+        ])
+        .output()
+        .with_context(|| "Failed to execute `aws configure export-credentials`")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!(
+            "`aws configure export-credentials --profile {profile}` failed: {stderr}"
+        ));
+    }
+
+    let creds: ExportedCredentials = serde_json::from_slice(&output.stdout)
+        .with_context(|| "Failed to parse exported credentials JSON")?;
+    if creds.access_key_id.is_empty() || creds.secret_access_key.is_empty() {
+        return Err(anyhow!("Exported credentials are missing required fields"));
+    }
+
+    Ok(LoginSession {
+        access_key_id: creds.access_key_id,
+        secret_access_key: creds.secret_access_key,
+        session_token: creds.session_token.unwrap_or_default(),
+    })
 }

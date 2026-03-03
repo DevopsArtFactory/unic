@@ -29,6 +29,7 @@ struct ContextEntry {
     region: Option<String>,
     role_arn: Option<String>,
     external_id: Option<String>,
+    auth_type: Option<String>,
 }
 
 pub struct Config {
@@ -37,6 +38,7 @@ pub struct Config {
     pub region: String,
     pub role_arn: Option<String>,
     pub external_id: Option<String>,
+    pub auth_type: Option<String>,
 }
 
 pub struct MigrationOptions {
@@ -95,6 +97,7 @@ impl Config {
                 region: None,
                 role_arn: None,
                 external_id: None,
+                auth_type: None,
             },
         };
 
@@ -114,6 +117,7 @@ impl Config {
             region,
             role_arn: selected_context.role_arn,
             external_id: selected_context.external_id,
+            auth_type: selected_context.auth_type,
         })
     }
 
@@ -360,6 +364,7 @@ fn parse_aws_ini_contexts(path: &Path) -> Result<Vec<ContextEntry>> {
             region,
             role_arn,
             external_id,
+            auth_type: None,
         });
     };
 
@@ -447,6 +452,7 @@ fn parse_legacy_aws_yaml_contexts(path: &Path) -> Result<Vec<ContextEntry>> {
             region: region.clone(),
             role_arn: None,
             external_id: None,
+            auth_type: None,
         });
 
         let Some(assume_roles) = map
@@ -469,6 +475,7 @@ fn parse_legacy_aws_yaml_contexts(path: &Path) -> Result<Vec<ContextEntry>> {
                 region: region.clone(),
                 role_arn: Some(role_arn.to_string()),
                 external_id: None,
+                auth_type: None,
             });
         }
     }

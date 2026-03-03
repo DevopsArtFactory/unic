@@ -67,6 +67,7 @@ contexts:
     profile: base-user
     role_arn: arn:aws:iam::123456789012:role/Admin
     external_id: ext-123
+    auth_type: login
 "#,
     );
 
@@ -79,6 +80,7 @@ contexts:
         Some("arn:aws:iam::123456789012:role/Admin")
     );
     assert_eq!(config.external_id.as_deref(), Some("ext-123"));
+    assert_eq!(config.auth_type.as_deref(), Some("login"));
 }
 
 #[test]

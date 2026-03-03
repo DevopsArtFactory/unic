@@ -216,15 +216,10 @@ fn has_static_credentials_profile_in(credentials_path: &Path, profile: &str) -> 
     Ok(has_access_key && has_secret_key)
 }
 
-pub(super) fn should_auto_sso_login(profile: &str) -> Result<bool> {
+pub(super) fn has_static_credentials(profile: &str) -> Result<bool> {
     let home = dirs::home_dir().ok_or_else(|| anyhow!("Could not determine home directory"))?;
-    let aws_dir = home.join(".aws");
-    let credentials_path = aws_dir.join("credentials");
-
-    if has_static_credentials_profile_in(&credentials_path, profile)? {
-        return Ok(false);
-    }
-    is_sso_profile_in(&aws_dir, profile)
+    let credentials_path = home.join(".aws").join("credentials");
+    has_static_credentials_profile_in(&credentials_path, profile)
 }
 
 #[cfg(test)]

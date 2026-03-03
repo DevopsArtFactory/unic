@@ -26,8 +26,9 @@ impl App {
         region: &str,
         role_arn: Option<&str>,
         external_id: Option<&str>,
+        auth_type: Option<&str>,
     ) -> Self {
-        let repository = match AwsRepository::new(profile, region, role_arn, external_id).await {
+        let repository = match AwsRepository::new(profile, region, role_arn, external_id, auth_type).await {
             Ok(repo) => RepositoryState::Ready(repo),
             Err(err) => RepositoryState::Failed(err.to_string()),
         };
