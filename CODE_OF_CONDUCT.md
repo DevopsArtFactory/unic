@@ -1,24 +1,4 @@
-# Code of Conduct / 행동 강령
-
-## 한국어 안내
-
-이 프로젝트는 Contributor Covenant 2.1을 행동 강령으로 채택합니다.
-
-- 본 문서의 공식 기준은 아래 English 원문입니다.
-- 한국어 안내는 이해를 돕기 위한 요약이며, 해석 충돌 시 English 원문이 우선합니다.
-- 위반 신고는 프로젝트에서 지정한 행동 강령 연락 채널로 제출해주세요.
-
-핵심 원칙 요약:
-
-- 모든 참여자를 존중하고, 혐오/괴롭힘/모욕적 언행을 금지합니다.
-- 건설적인 피드백과 책임 있는 커뮤니케이션을 지향합니다.
-- 위반 발생 시 운영진은 경고, 일시적 제한, 영구 제한 등의 조치를 취할 수 있습니다.
-
----
-
-## English (Official Text)
-
-## Contributor Covenant Code of Conduct
+# Contributor Covenant Code of Conduct
 
 ## Our Pledge
 
