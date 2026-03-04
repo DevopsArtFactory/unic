@@ -12,7 +12,8 @@ Thanks for your interest in contributing.
 1. Fork or branch from `main`.
 2. Create a focused branch: `feat/...`, `fix/...`, `docs/...`.
 3. Keep commits small and descriptive.
-4. Open a Pull Request with context and testing notes.
+4. Run `go test ./...` before pushing.
+5. Open a Pull Request with context and testing notes.
 
 ## Pull Request Checklist
 

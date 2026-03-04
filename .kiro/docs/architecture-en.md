@@ -2,44 +2,44 @@
 
 ## Overview
 
-UNIC (Unified Infrastructure Console) is a Rust TUI tool for browsing AWS resources in the terminal.
+UNIC (Unified Infrastructure Console) is a Go TUI tool for browsing AWS resources in the terminal.
 It manages authentication contexts via `~/.config/unic/config.yaml` and provides drill-down exploration of AWS services registered in the catalog.
 
 ## Tech Stack
 
 | Area | Technology | Version |
 |------|-----------|---------|
-| Language | Rust | Edition 2024 |
-| TUI | ratatui + crossterm | 0.30 / 0.29 |
-| CLI | clap (derive) | 4.5 |
-| AWS | aws-sdk-ec2, aws-sdk-sts | 1.183 / 1.99 |
-| Config | serde_yaml | 0.9 |
-| Async | tokio | 1.49 |
-| Error | anyhow | 1.0 |
+| Language | Go | 1.22+ |
+| TUI | Bubbletea + Lipgloss + Bubbles | latest |
+| CLI | Cobra | latest |
+| AWS | aws-sdk-go-v2 (ec2, sts) | latest |
+| Config | gopkg.in/yaml.v3 | 0.9 |
+| Concurrency | goroutines + errgroup | stdlib |
+| Error | fmt.Errorf / errors | stdlib |
 
 ## Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                     main.rs                         │
-│  CLI parsing (clap) → subcommand branch or TUI      │
+│                   cmd/unic/main.go                  │
+│  CLI parsing (Cobra) → subcommand branch or TUI     │
 └──────────┬──────────────────────┬───────────────────┘
            │                      │
     ┌──────▼──────┐        ┌──────▼──────┐
     │  CLI Mode   │        │  TUI Mode   │
-    │  (context)  │        │  (ratatui)  │
+    │  (context)  │        │ (bubbletea) │
     └──────┬──────┘        └──────┬──────┘
            │                      │
     ┌──────▼──────────────────────▼──────┐
-    │              auth/                 │
+    │           internal/auth/           │
     │  config.yaml → SSO or STS branch   │
     │  ┌─────────┐  ┌─────────┐         │
-    │  │ sso.rs  │  │ sts.rs  │         │
+    │  │ sso.go  │  │ sts.go  │         │
     │  └─────────┘  └─────────┘         │
     └──────────────────┬────────────────┘
                        │
     ┌──────────────────▼────────────────┐
-    │        app/ (state machine)       │
+    │    internal/app/ (Bubbletea)      │
     │  Stack-based screen navigation    │
     │  ┌──────────────────────────┐     │
     │  │ ServiceList              │     │
@@ -51,20 +51,20 @@ It manages authentication contexts via `~/.config/unic/config.yaml` and provides
     └──────────────────┬────────────────┘
                        │
     ┌──────────────────▼────────────────┐
-    │       domain/ (pure models)       │
-    │  catalog.rs: service/feature reg  │
-    │  model.rs: AwsService, FeatureKind│
+    │   internal/domain/ (pure models)  │
+    │  catalog.go: service/feature reg  │
+    │  model.go: AwsService, FeatureKind│
     └──────────────────┬────────────────┘
                        │
     ┌──────────────────▼────────────────┐
-    │     services/aws/ (API calls)     │
+    │  internal/services/aws/ (API)     │
     │  AwsRepository                    │
-    │  ├─ vpc.rs   (VPC/Subnet/IP)      │
-    │  ├─ rds.rs   (not implemented)    │
-    │  ├─ iam.rs   (not implemented)    │
-    │  ├─ ssm.rs   (not implemented)    │
-    │  ├─ ipcalc.rs (CIDR calculation)  │
-    │  └─ env.rs   (env var handling)   │
+    │  ├─ vpc.go   (VPC/Subnet/IP)      │
+    │  ├─ rds.go   (not implemented)    │
+    │  ├─ iam.go   (not implemented)    │
+    │  ├─ ssm.go   (not implemented)    │
+    │  ├─ ipcalc.go (CIDR calculation)  │
+    │  └─ env.go   (env var handling)   │
     └───────────────────────────────────┘
 ```
 
@@ -89,7 +89,7 @@ contexts:
     external_id: optional-id
 ```
 
-### Authentication Branching Logic (`auth/mod.rs`)
+### Authentication Branching Logic (`internal/auth/auth.go`)
 
 ```
 Load config.yaml
@@ -119,14 +119,14 @@ A profile is identified as SSO if its section in `~/.aws/config` or `~/.aws/conf
 
 ## TUI Screen Structure
 
-Screens are managed as a `Vec<Screen>` stack:
+Screens are managed as a stack of Bubbletea `Model` implementations:
 
 | Screen | Description | Data Source |
 |--------|-------------|-------------|
-| ServiceList | AWS service list | `catalog::list_services()` |
-| FeatureList | Features for the selected service | `catalog::list_features()` |
-| VpcList | VPC list | `AwsRepository::list_vpcs()` |
-| SubnetList | Subnet list | `AwsRepository::list_subnets()` |
+| ServiceList | AWS service list | `catalog.ListServices()` |
+| FeatureList | Features for the selected service | `catalog.ListFeatures()` |
+| VpcList | VPC list | `AwsRepository.ListVpcs()` |
+| SubnetList | Subnet list | `AwsRepository.ListSubnets()` |
 | ResultView | Scrollable result display | Per-feature API results |
 
 ### Key Bindings
@@ -166,21 +166,20 @@ unic context use [name]       # Switch context (interactive selection if name om
 
 ## New Feature Addition Checklist
 
-1. `src/domain/model.rs` → Add variant to `AwsService` / `FeatureKind` enums
-2. `src/domain/catalog.rs` → Add mapping in `list_services()` / `list_features()`
-3. `src/services/aws/` → Create new file, add `AwsRepository` impl
-4. `src/services/aws/mod.rs` → Register the module
-5. `src/app/actions.rs` → Add new `FeatureKind` branch in `enter()`
-6. If needed: `src/app/types.rs` → Add new `Screen` enum variant
-7. If needed: `Cargo.toml` → Add new AWS SDK crate
-8. Write tests
+1. `internal/domain/model.go` → Add constant to `AwsService` / `FeatureKind` types
+2. `internal/domain/catalog.go` → Add mapping in `ListServices()` / `ListFeatures()`
+3. `internal/services/aws/` → Create new file, add `AwsRepository` method
+4. `internal/app/actions.go` → Add new `FeatureKind` branch in screen transition
+5. If needed: `internal/app/screens.go` → Add new screen model
+6. If needed: `go.mod` → Add new AWS SDK module via `go get`
+7. Write tests
 
 ## Build & Run
 
 ```bash
-cargo build --release     # Release build
-cargo run                 # Development run
-cargo test                # Run tests
+go build -o unic ./cmd/unic   # Build
+go run ./cmd/unic              # Development run
+go test ./...                  # Run tests
 ```
 
 Docker builds are also supported (see `Dockerfile.build`).

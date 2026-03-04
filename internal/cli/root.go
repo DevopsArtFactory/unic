@@ -1,0 +1,39 @@
+package cli
+
+import (
+	"github.com/spf13/cobra"
+)
+
+var (
+	profile string
+	region  string
+)
+
+func NewRootCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "unic",
+		Short: "AWS DevOps TUI tool",
+		Long:  "unic is a TUI tool for browsing and managing AWS resources in the terminal.",
+	}
+
+	cmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "AWS profile to use")
+	cmd.PersistentFlags().StringVar(&region, "region", "", "AWS region to use")
+
+	return cmd
+}
+
+// Profile returns the CLI profile flag value, or nil if not set.
+func Profile() *string {
+	if profile == "" {
+		return nil
+	}
+	return &profile
+}
+
+// Region returns the CLI region flag value, or nil if not set.
+func Region() *string {
+	if region == "" {
+		return nil
+	}
+	return &region
+}
