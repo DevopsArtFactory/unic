@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build -ldflags="-s -w" -o unic ./cmd/unic
