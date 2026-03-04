@@ -4,18 +4,18 @@ inclusion: auto
 
 # UNIC 프로젝트 개요
 
-UNIC은 Rust 기반 TUI(Terminal User Interface) 도구로, AWS 리소스를 탐색하고 관리하기 위한 CLI/TUI 애플리케이션이다.
+UNIC은 Go 기반 TUI(Terminal User Interface) 도구로, AWS 리소스를 탐색하고 관리하기 위한 CLI/TUI 애플리케이션이다.
 
 ## 기술 스택
 
-- 언어: Rust (Edition 2024)
-- TUI 프레임워크: ratatui 0.30 + crossterm 0.29
-- CLI 파서: clap 4.5 (derive 모드)
-- AWS SDK: aws-sdk-ec2, aws-sdk-sts, aws-config, aws-credential-types
-- 설정 파일: serde + serde_yaml (YAML 기반)
-- 비동기 런타임: tokio (macros, rt-multi-thread)
-- 에러 처리: anyhow
-- 테스트: tempfile (dev-dependency)
+- 언어: Go (1.22+)
+- TUI 프레임워크: Bubbletea + Lipgloss + Bubbles
+- CLI 파서: Cobra
+- AWS SDK: aws-sdk-go-v2 (ec2, sts, config, credentials)
+- 설정 파일: gopkg.in/yaml.v3 (YAML 기반)
+- 동시성: goroutines + errgroup
+- 에러 처리: fmt.Errorf 래핑 / 표준 errors 패키지
+- 테스트: testing + t.TempDir()
 
 ## 설정 파일 위치
 
@@ -54,35 +54,45 @@ contexts:
 ## 프로젝트 구조
 
 ```
-src/
-├── main.rs          # 진입점, CLI 파싱 + TUI 루프
-├── lib.rs           # config 모듈 re-export (외부 crate용)
-├── config/          # ~/.config/unic/config.yaml 로드/저장
-├── cli/             # clap 기반 CLI 정의
-├── auth/            # SSO/STS 인증 로직
-│   ├── mod.rs       # apply_context_side_effects (인증 분기)
-│   ├── sso.rs       # aws sso login 실행
-│   ├── sts.rs       # STS AssumeRole
-│   ├── aws_files.rs # ~/.aws/config, credentials 파일 관리
-│   └── session_env.rs # 환경변수 설정 + session.env 파일 생성
-├── domain/          # 비즈니스 도메인 모델
-│   ├── catalog.rs   # 서비스/기능 카탈로그 정의
-│   └── model.rs     # AwsService, FeatureKind, ResourceItem 등
-├── app/             # TUI 애플리케이션 상태 관리
-│   ├── mod.rs       # App 구조체, 초기화, 키 핸들링
-│   ├── types.rs     # Screen, MenuState, ViewMode 등 타입
-│   ├── actions.rs   # enter/refresh 등 화면 전환 로직
-│   └── navigation.rs # 커서 이동, 스크롤
-├── tui/             # ratatui 렌더링
-│   └── tui.rs       # render 함수
-└── services/        # AWS API 호출 구현
+cmd/
+└── unic/
+    └── main.go              # 진입점
+
+internal/
+├── cli/                     # Cobra 기반 CLI 정의
+│   ├── root.go              # 루트 커맨드, 글로벌 플래그
+│   └── context.go           # Context 서브커맨드
+├── config/                  # ~/.config/unic/config.yaml 로드/저장
+│   └── config.go
+├── auth/                    # SSO/STS 인증 로직
+│   ├── auth.go              # ApplyContextSideEffects (인증 분기)
+│   ├── sso.go               # aws sso login 실행
+│   ├── sts.go               # STS AssumeRole
+│   ├── aws_files.go         # ~/.aws/config, credentials 파일 관리
+│   └── session_env.go       # 환경변수 설정 + session.env 파일 생성
+├── domain/                  # 비즈니스 도메인 모델
+│   ├── catalog.go           # 서비스/기능 카탈로그 정의
+│   └── model.go             # AwsService, FeatureKind, ResourceItem 등
+├── app/                     # Bubbletea TUI 애플리케이션
+│   ├── app.go               # 루트 모델, 초기화, 키 핸들링
+│   ├── screens.go           # 화면 타입 및 네비게이션 스택
+│   ├── actions.go           # 화면 전환 로직
+│   └── navigation.go        # 커서 이동, 스크롤
+├── tui/                     # 재사용 가능한 Bubbletea 컴포넌트
+│   ├── components.go        # 필터 리스트, 다이얼로그, 스피너 등
+│   └── styles.go            # Lipgloss 스타일 정의
+└── services/                # AWS API 호출 구현
     └── aws/
-        ├── repository.rs # AwsRepository (EC2 Client 초기화)
-        ├── vpc.rs        # VPC/Subnet/IP 조회
-        ├── rds.rs        # RDS (미구현)
-        ├── iam.rs        # IAM (미구현)
-        ├── ssm.rs        # SSM (미구현)
-        ├── env.rs        # 환경변수 읽기 + 디버그 라인
-        ├── ipcalc.rs     # CIDR 기반 가용 IP 계산
-        └── model.rs      # SubnetIpAvailability
+        ├── repository.go    # AwsRepository (클라이언트 초기화)
+        ├── vpc.go           # VPC/Subnet/IP 조회
+        ├── rds.go           # RDS (미구현)
+        ├── iam.go           # IAM (미구현)
+        ├── ssm.go           # SSM (미구현)
+        ├── env.go           # 환경변수 읽기 + 디버그 라인
+        ├── ipcalc.go        # CIDR 기반 가용 IP 계산
+        └── model.go         # SubnetIpAvailability
+
+go.mod
+go.sum
+Makefile
 ```

@@ -1,24 +1,24 @@
 # unic
 
-`unic` is a Rust-based TUI (Terminal User Interface) tool for browsing and managing AWS resources in the terminal.
+`unic` is a Go-based TUI (Terminal User Interface) tool for browsing and managing AWS resources in the terminal.
 
 It manages authentication contexts (SSO or STS AssumeRole) via `~/.config/unic/config.yaml` and provides drill-down exploration of AWS services registered in the catalog.
 
 ## Tech Stack
 
-- Rust (Edition 2024)
-- TUI: ratatui 0.30 + crossterm 0.29
-- CLI: clap 4.5 (derive)
-- AWS SDK: aws-sdk-ec2, aws-sdk-sts
-- Config: serde_yaml
-- Async: tokio
-- Error handling: anyhow
+- Go (1.22+)
+- TUI: Bubbletea + Lipgloss + Bubbles
+- CLI: Cobra
+- AWS SDK: aws-sdk-go-v2
+- Config: gopkg.in/yaml.v3
+- Concurrency: goroutines + errgroup
+- Error handling: fmt.Errorf / errors
 
 ## Installation & Build
 
 ```bash
 git clone <repository-url>
-cargo build --release
+go build -o unic ./cmd/unic
 ```
 
 ## Usage

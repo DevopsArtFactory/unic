@@ -4,18 +4,18 @@ inclusion: auto
 
 # UNIC Project Overview
 
-UNIC is a Rust-based TUI (Terminal User Interface) tool for browsing and managing AWS resources via a CLI/TUI application.
+UNIC is a Go-based TUI (Terminal User Interface) tool for browsing and managing AWS resources via a CLI/TUI application.
 
 ## Tech Stack
 
-- Language: Rust (Edition 2024)
-- TUI Framework: ratatui 0.30 + crossterm 0.29
-- CLI Parser: clap 4.5 (derive mode)
-- AWS SDK: aws-sdk-ec2, aws-sdk-sts, aws-config, aws-credential-types
-- Config: serde + serde_yaml (YAML-based)
-- Async Runtime: tokio (macros, rt-multi-thread)
-- Error Handling: anyhow
-- Testing: tempfile (dev-dependency)
+- Language: Go (1.22+)
+- TUI Framework: Bubbletea + Lipgloss + Bubbles
+- CLI Parser: Cobra
+- AWS SDK: aws-sdk-go-v2 (ec2, sts, config, credentials)
+- Config: gopkg.in/yaml.v3 (YAML-based)
+- Concurrency: goroutines + errgroup
+- Error Handling: fmt.Errorf wrapping / standard errors package
+- Testing: testing + t.TempDir()
 
 ## Config File Location
 
@@ -54,35 +54,45 @@ contexts:
 ## Project Structure
 
 ```
-src/
-├── main.rs          # Entry point, CLI parsing + TUI loop
-├── lib.rs           # config module re-export (for external crate use)
-├── config/          # Load/save ~/.config/unic/config.yaml
-├── cli/             # clap-based CLI definitions
-├── auth/            # SSO/STS authentication logic
-│   ├── mod.rs       # apply_context_side_effects (auth branching)
-│   ├── sso.rs       # Run aws sso login
-│   ├── sts.rs       # STS AssumeRole
-│   ├── aws_files.rs # ~/.aws/config & credentials file management
-│   └── session_env.rs # Env var setup + session.env file generation
-├── domain/          # Business domain models
-│   ├── catalog.rs   # Service/feature catalog definitions
-│   └── model.rs     # AwsService, FeatureKind, ResourceItem, etc.
-├── app/             # TUI application state management
-│   ├── mod.rs       # App struct, initialization, key handling
-│   ├── types.rs     # Screen, MenuState, ViewMode types
-│   ├── actions.rs   # enter/refresh screen transition logic
-│   └── navigation.rs # Cursor movement, scrolling
-├── tui/             # ratatui rendering
-│   └── tui.rs       # render function
-└── services/        # AWS API call implementations
+cmd/
+└── unic/
+    └── main.go              # Entry point
+
+internal/
+├── cli/                     # Cobra-based CLI definitions
+│   ├── root.go              # Root command, global flags
+│   └── context.go           # Context subcommands
+├── config/                  # Load/save ~/.config/unic/config.yaml
+│   └── config.go
+├── auth/                    # SSO/STS authentication logic
+│   ├── auth.go              # ApplyContextSideEffects (auth branching)
+│   ├── sso.go               # Run aws sso login
+│   ├── sts.go               # STS AssumeRole
+│   ├── aws_files.go         # ~/.aws/config & credentials file management
+│   └── session_env.go       # Env var setup + session.env file generation
+├── domain/                  # Business domain models
+│   ├── catalog.go           # Service/feature catalog definitions
+│   └── model.go             # AwsService, FeatureKind, ResourceItem, etc.
+├── app/                     # Bubbletea TUI application
+│   ├── app.go               # Root model, initialization, key handling
+│   ├── screens.go           # Screen types and navigation stack
+│   ├── actions.go           # Screen transition logic
+│   └── navigation.go        # Cursor movement, scrolling
+├── tui/                     # Reusable Bubbletea components
+│   ├── components.go        # Filterable list, dialog, spinner, etc.
+│   └── styles.go            # Lipgloss style definitions
+└── services/                # AWS API call implementations
     └── aws/
-        ├── repository.rs # AwsRepository (EC2 Client initialization)
-        ├── vpc.rs        # VPC/Subnet/IP queries
-        ├── rds.rs        # RDS (not yet implemented)
-        ├── iam.rs        # IAM (not yet implemented)
-        ├── ssm.rs        # SSM (not yet implemented)
-        ├── env.rs        # Env var reading + debug lines
-        ├── ipcalc.rs     # CIDR-based available IP calculation
-        └── model.rs      # SubnetIpAvailability
+        ├── repository.go    # AwsRepository (client initialization)
+        ├── vpc.go           # VPC/Subnet/IP queries
+        ├── rds.go           # RDS (not yet implemented)
+        ├── iam.go           # IAM (not yet implemented)
+        ├── ssm.go           # SSM (not yet implemented)
+        ├── env.go           # Env var reading + debug lines
+        ├── ipcalc.go        # CIDR-based available IP calculation
+        └── model.go         # SubnetIpAvailability
+
+go.mod
+go.sum
+Makefile
 ```

@@ -2,45 +2,45 @@
 
 ## 개요
 
-UNIC(Unified Infrastructure Console)은 AWS 리소스를 터미널에서 탐색하는 Rust TUI 도구이다.
+UNIC(Unified Infrastructure Console)은 AWS 리소스를 터미널에서 탐색하는 Go TUI 도구이다.
 `~/.config/unic/config.yaml` 설정 파일을 기반으로 인증 컨텍스트를 관리하고, 카탈로그에 등록된 AWS 서비스를 drill-down 방식으로 탐색한다.
 
 ## 기술 스택
 
 | 영역 | 기술 | 버전 |
 |------|------|------|
-| 언어 | Rust | Edition 2024 |
-| TUI | ratatui + crossterm | 0.30 / 0.29 |
-| CLI | clap (derive) | 4.5 |
-| AWS | aws-sdk-ec2, aws-sdk-sts | 1.183 / 1.99 |
-| 설정 | serde_yaml | 0.9 |
-| 비동기 | tokio | 1.49 |
-| 에러 | anyhow | 1.0 |
+| 언어 | Go | 1.22+ |
+| TUI | Bubbletea + Lipgloss + Bubbles | latest |
+| CLI | Cobra | latest |
+| AWS | aws-sdk-go-v2 (ec2, sts) | latest |
+| 설정 | gopkg.in/yaml.v3 | 0.9 |
+| 동시성 | goroutines + errgroup | stdlib |
+| 에러 | fmt.Errorf / errors | stdlib |
 
 ## 아키텍처 다이어그램
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                     main.rs                         │
-│  CLI 파싱 (clap) → subcommand 분기 or TUI 진입      │
+│                   cmd/unic/main.go                  │
+│  CLI 파싱 (Cobra) → subcommand 분기 or TUI 진입     │
 └──────────┬──────────────────────┬───────────────────┘
            │                      │
     ┌──────▼──────┐        ┌──────▼──────┐
     │  CLI Mode   │        │  TUI Mode   │
-    │  (context)  │        │  (ratatui)  │
+    │  (context)  │        │ (bubbletea) │
     └──────┬──────┘        └──────┬──────┘
            │                      │
     ┌──────▼──────────────────────▼──────┐
-    │              auth/                 │
+    │           internal/auth/           │
     │  config.yaml → SSO or STS 분기     │
     │  ┌─────────┐  ┌─────────┐         │
-    │  │ sso.rs  │  │ sts.rs  │         │
+    │  │ sso.go  │  │ sts.go  │         │
     │  └─────────┘  └─────────┘         │
     └──────────────────┬────────────────┘
                        │
     ┌──────────────────▼────────────────┐
-    │           app/ (상태 머신)          │
-    │  Screen 스택 기반 네비게이션        │
+    │    internal/app/ (Bubbletea)      │
+    │  스택 기반 화면 네비게이션          │
     │  ┌──────────────────────────┐     │
     │  │ ServiceList              │     │
     │  │  └─ FeatureList          │     │
@@ -51,20 +51,20 @@ UNIC(Unified Infrastructure Console)은 AWS 리소스를 터미널에서 탐색�
     └──────────────────┬────────────────┘
                        │
     ┌──────────────────▼────────────────┐
-    │         domain/ (순수 모델)         │
-    │  catalog.rs: 서비스/기능 등록       │
-    │  model.rs: AwsService, FeatureKind│
+    │   internal/domain/ (순수 모델)     │
+    │  catalog.go: 서비스/기능 등록      │
+    │  model.go: AwsService, FeatureKind│
     └──────────────────┬────────────────┘
                        │
     ┌──────────────────▼────────────────┐
-    │       services/aws/ (API 호출)     │
+    │  internal/services/aws/ (API 호출) │
     │  AwsRepository                    │
-    │  ├─ vpc.rs   (VPC/Subnet/IP)      │
-    │  ├─ rds.rs   (미구현)              │
-    │  ├─ iam.rs   (미구현)              │
-    │  ├─ ssm.rs   (미구현)              │
-    │  ├─ ipcalc.rs (CIDR 계산)         │
-    │  └─ env.rs   (환경변수 처리)       │
+    │  ├─ vpc.go   (VPC/Subnet/IP)      │
+    │  ├─ rds.go   (미구현)              │
+    │  ├─ iam.go   (미구현)              │
+    │  ├─ ssm.go   (미구현)              │
+    │  ├─ ipcalc.go (CIDR 계산)         │
+    │  └─ env.go   (환경변수 처리)       │
     └───────────────────────────────────┘
 ```
 
@@ -89,7 +89,7 @@ contexts:
     external_id: optional-id
 ```
 
-### 인증 분기 로직 (`auth/mod.rs`)
+### 인증 분기 로직 (`internal/auth/auth.go`)
 
 ```
 config.yaml 로드
@@ -119,14 +119,14 @@ config.yaml 로드
 
 ## TUI 화면 구조
 
-화면은 `Vec<Screen>` 스택으로 관리된다:
+화면은 Bubbletea `Model` 구현체의 스택으로 관리된다:
 
 | 화면 | 설명 | 데이터 소스 |
 |------|------|------------|
-| ServiceList | AWS 서비스 목록 | `catalog::list_services()` |
-| FeatureList | 선택한 서비스의 기능 목록 | `catalog::list_features()` |
-| VpcList | VPC 목록 | `AwsRepository::list_vpcs()` |
-| SubnetList | Subnet 목록 | `AwsRepository::list_subnets()` |
+| ServiceList | AWS 서비스 목록 | `catalog.ListServices()` |
+| FeatureList | 선택한 서비스의 기능 목록 | `catalog.ListFeatures()` |
+| VpcList | VPC 목록 | `AwsRepository.ListVpcs()` |
+| SubnetList | Subnet 목록 | `AwsRepository.ListSubnets()` |
 | ResultView | 결과 표시 (스크롤 가능) | 각 기능별 API 결과 |
 
 ### 키 바인딩
@@ -166,21 +166,20 @@ unic context use [name]       # 컨텍스트 전환 (이름 생략 시 대화형
 
 ## 새 기능 추가 체크리스트
 
-1. `src/domain/model.rs` → `AwsService` / `FeatureKind` enum에 variant 추가
-2. `src/domain/catalog.rs` → `list_services()` / `list_features()` 매핑 추가
-3. `src/services/aws/` → 새 파일 생성, `AwsRepository` impl 추가
-4. `src/services/aws/mod.rs` → 모듈 등록
-5. `src/app/actions.rs` → `enter()` 에서 새 FeatureKind 분기 추가
-6. 필요 시 `src/app/types.rs` → `Screen` enum에 새 화면 variant 추가
-7. 필요 시 `Cargo.toml` → 새 AWS SDK crate 추가
-8. 테스트 작성
+1. `internal/domain/model.go` → `AwsService` / `FeatureKind` 타입에 상수 추가
+2. `internal/domain/catalog.go` → `ListServices()` / `ListFeatures()` 매핑 추가
+3. `internal/services/aws/` → 새 파일 생성, `AwsRepository` 메서드 추가
+4. `internal/app/actions.go` → 화면 전환에서 새 `FeatureKind` 분기 추가
+5. 필요 시 `internal/app/screens.go` → 새 화면 모델 추가
+6. 필요 시 `go.mod` → `go get`으로 새 AWS SDK 모듈 추가
+7. 테스트 작성
 
 ## 빌드 및 실행
 
 ```bash
-cargo build --release     # 릴리스 빌드
-cargo run                 # 개발 실행
-cargo test                # 테스트
+go build -o unic ./cmd/unic   # 빌드
+go run ./cmd/unic              # 개발 실행
+go test ./...                  # 테스트
 ```
 
 Docker 빌드도 지원한다 (`Dockerfile.build` 참조).
