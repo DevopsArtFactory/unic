@@ -15,6 +15,9 @@ import (
 // Verify *ssm.Client satisfies SSMClientAPI at compile time.
 var _ SSMClientAPI = (*ssm.Client)(nil)
 
+// Verify *ec2.Client satisfies EC2ClientAPI at compile time.
+var _ EC2ClientAPI = (*ec2.Client)(nil)
+
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
 	ssm.DescribeInstanceInformationAPIClient
@@ -22,9 +25,17 @@ type SSMClientAPI interface {
 	TerminateSession(ctx context.Context, params *ssm.TerminateSessionInput, optFns ...func(*ssm.Options)) (*ssm.TerminateSessionOutput, error)
 }
 
+// EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
+type EC2ClientAPI interface {
+	ec2.DescribeInstancesAPIClient
+	DescribeVpcs(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
+	DescribeSubnets(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
+	DescribeNetworkInterfaces(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
+}
+
 // AwsRepository holds AWS SDK clients for EC2 and SSM.
 type AwsRepository struct {
-	EC2Client *ec2.Client
+	EC2Client EC2ClientAPI
 	SSMClient SSMClientAPI
 	Region    string
 	Profile   string

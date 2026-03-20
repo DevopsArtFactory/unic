@@ -68,11 +68,11 @@ func TestViewEmptyWhenQuitting(t *testing.T) {
 
 func TestServiceListNavigation(t *testing.T) {
 	m := New(testConfig())
-	// Press down — should not panic (only one service)
+	// Press down — should move to index 1 (now 2 services: EC2, VPC)
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
-	if model.svcIdx != 0 {
-		t.Error("should stay at 0 with only one service")
+	if model.svcIdx != 1 {
+		t.Errorf("expected svcIdx 1 after pressing j, got %d", model.svcIdx)
 	}
 }
 
