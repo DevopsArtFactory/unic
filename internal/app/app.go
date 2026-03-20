@@ -87,7 +87,10 @@ type Model struct {
 	selectedVPC    *awsservice.VPC
 	selectedSubnet *awsservice.Subnet
 	availableIPs   []string
+	filteredIPs    []string
 	ipScrollOffset int
+	ipFilter       string
+	ipFilterActive bool
 
 	// Error display
 	errMsg string
@@ -140,7 +143,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case availableIPsLoadedMsg:
 		m.availableIPs = msg.ips
+		m.filteredIPs = msg.ips
 		m.ipScrollOffset = 0
+		m.ipFilter = ""
+		m.ipFilterActive = false
 		m.screen = screenSubnetDetail
 		return m, nil
 
@@ -164,6 +170,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			m.quitting = true
 			return m, tea.Quit
+		}
+		// Global home — return to service list from any screen
+		if msg.String() == "H" && m.screen != screenServiceList {
+			m.screen = screenServiceList
+			return m, nil
 		}
 
 		switch m.screen {
@@ -335,7 +346,27 @@ func (m Model) updateSubnetList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateSubnetDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	key := msg.String()
+
+	if m.ipFilterActive {
+		switch key {
+		case "esc", "enter":
+			m.ipFilterActive = false
+		case "backspace":
+			if len(m.ipFilter) > 0 {
+				m.ipFilter = m.ipFilter[:len(m.ipFilter)-1]
+				m.applyIPFilter()
+			}
+		default:
+			if len(key) == 1 {
+				m.ipFilter += key
+				m.applyIPFilter()
+			}
+		}
+		return m, nil
+	}
+
+	switch key {
 	case "q", "esc":
 		m.screen = screenSubnetList
 	case "up", "k":
@@ -344,11 +375,28 @@ func (m Model) updateSubnetDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "down", "j":
 		visibleLines := max(m.height-12, 5)
-		if m.ipScrollOffset < len(m.availableIPs)-visibleLines {
+		if m.ipScrollOffset < len(m.filteredIPs)-visibleLines {
 			m.ipScrollOffset++
 		}
+	case "/":
+		m.ipFilterActive = true
 	}
 	return m, nil
+}
+
+func (m *Model) applyIPFilter() {
+	if m.ipFilter == "" {
+		m.filteredIPs = m.availableIPs
+	} else {
+		var result []string
+		for _, ip := range m.availableIPs {
+			if strings.Contains(ip, m.ipFilter) {
+				result = append(result, ip)
+			}
+		}
+		m.filteredIPs = result
+	}
+	m.ipScrollOffset = 0
 }
 
 func (m Model) updateError(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -627,7 +675,7 @@ func (m Model) viewInstanceList() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: connect • esc: back"))
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: connect • esc: back • H: home"))
 	return b.String()
 }
 
@@ -677,7 +725,7 @@ func (m Model) viewVPCList() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • esc: back"))
+	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • esc: back • H: home"))
 	return b.String()
 }
 
@@ -717,7 +765,7 @@ func (m Model) viewSubnetList() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: detail • esc: back"))
+	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 
@@ -740,23 +788,31 @@ func (m Model) viewSubnetDetail() string {
 	b.WriteString(normalStyle.Render(fmt.Sprintf("  Available IPs : %d", len(m.availableIPs))))
 	b.WriteString("\n\n")
 
-	if len(m.availableIPs) == 0 {
-		b.WriteString(dimStyle.Render("  No available IPs"))
+	// Filter bar
+	if m.ipFilterActive {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.ipFilter)))
+	} else if m.ipFilter != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.ipFilter)))
+	}
+	b.WriteString("\n")
+
+	if len(m.filteredIPs) == 0 {
+		b.WriteString(dimStyle.Render("  No matching IPs"))
 		b.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-12, 5)
+		visibleLines := max(m.height-14, 5)
 		start := m.ipScrollOffset
-		end := min(start+visibleLines, len(m.availableIPs))
+		end := min(start+visibleLines, len(m.filteredIPs))
 
-		for _, ip := range m.availableIPs[start:end] {
+		for _, ip := range m.filteredIPs[start:end] {
 			b.WriteString(normalStyle.Render(fmt.Sprintf("  %s", ip)))
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d-%d of %d IPs", start+1, end, len(m.availableIPs))))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d-%d of %d IPs", start+1, end, len(m.filteredIPs))))
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: scroll • esc: back"))
+	b.WriteString(dimStyle.Render("↑/↓: scroll • /: filter • esc: back • H: home"))
 	return b.String()
 }
