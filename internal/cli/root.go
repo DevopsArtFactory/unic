@@ -5,19 +5,25 @@ import (
 )
 
 var (
+	// Version is set via ldflags at build time.
+	Version = "dev"
+
 	profile string
 	region  string
 )
 
 func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "unic",
-		Short: "AWS DevOps TUI tool",
-		Long:  "unic is a TUI tool for browsing and managing AWS resources in the terminal.",
+		Use:     "unic",
+		Short:   "AWS DevOps TUI tool",
+		Long:    "unic is a TUI tool for browsing and managing AWS resources in the terminal.",
+		Version: Version,
 	}
 
 	cmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "AWS profile to use")
 	cmd.PersistentFlags().StringVar(&region, "region", "", "AWS region to use")
+
+	cmd.AddCommand(newInitCmd())
 
 	return cmd
 }

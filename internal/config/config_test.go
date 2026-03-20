@@ -59,8 +59,8 @@ func TestFallsBackToHardcodedDefaultsWhenNothingSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Profile != "default" {
-		t.Errorf("expected profile 'default', got '%s'", cfg.Profile)
+	if cfg.Profile != "" {
+		t.Errorf("expected empty profile, got '%s'", cfg.Profile)
 	}
 	if cfg.Region != "us-east-1" {
 		t.Errorf("expected region 'us-east-1', got '%s'", cfg.Region)
@@ -124,6 +124,77 @@ func TestCreatesDefaultConfigFileWhenMissing(t *testing.T) {
 	}
 	if len(content) == 0 {
 		t.Error("config file should not be empty")
+	}
+}
+
+func TestContextBasedConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev-sso
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev-sso
+    profile: dev-sso
+  - name: prod-admin
+    profile: base-user
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Profile != "dev-sso" {
+		t.Errorf("expected profile 'dev-sso', got '%s'", cfg.Profile)
+	}
+	if cfg.Region != "us-east-1" {
+		t.Errorf("expected region 'us-east-1', got '%s'", cfg.Region)
+	}
+}
+
+func TestContextWithRegionOverride(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: tokyo
+defaults:
+  region: us-east-1
+contexts:
+  - name: tokyo
+    profile: tokyo-profile
+    region: ap-northeast-1
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Profile != "tokyo-profile" {
+		t.Errorf("expected profile 'tokyo-profile', got '%s'", cfg.Profile)
+	}
+	if cfg.Region != "ap-northeast-1" {
+		t.Errorf("expected region 'ap-northeast-1', got '%s'", cfg.Region)
+	}
+}
+
+func TestCLIFlagsOverrideContext(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev-sso
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev-sso
+    profile: dev-sso
+`)
+	profile := "override-profile"
+	region := "eu-west-1"
+	cfg, err := Load(&profile, &region, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Profile != "override-profile" {
+		t.Errorf("expected profile 'override-profile', got '%s'", cfg.Profile)
+	}
+	if cfg.Region != "eu-west-1" {
+		t.Errorf("expected region 'eu-west-1', got '%s'", cfg.Region)
 	}
 }
 
