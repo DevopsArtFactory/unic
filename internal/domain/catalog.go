@@ -12,5 +12,14 @@ func Catalog() []Service {
 				},
 			},
 		},
+		{
+			Name: ServiceVPC,
+			Features: []Feature{
+				{
+					Kind:        FeatureVPCBrowser,
+					Description: "Browse VPCs, subnets, and available IP counts",
+				},
+			},
+		},
 	}
 }
