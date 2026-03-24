@@ -28,6 +28,7 @@ brews:
   - repository:
       owner: DevopsArtFactory
       name: homebrew-unic
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     name: unic
     homepage: "https://github.com/DevopsArtFactory/unic"
     description: "Go-based TUI tool for browsing and managing AWS resources in the terminal"
