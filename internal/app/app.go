@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"unic/internal/auth"
 	"unic/internal/config"
 	"unic/internal/domain"
 	awsservice "unic/internal/services/aws"
@@ -23,6 +24,8 @@ const (
 	screenVPCList
 	screenSubnetList
 	screenSubnetDetail
+	screenContextPicker
+	screenContextAdd
 	screenLoading
 	screenError
 )
@@ -43,6 +46,23 @@ type subnetsLoadedMsg struct {
 type availableIPsLoadedMsg struct {
 	subnet awsservice.Subnet
 	ips    []string
+}
+
+type callerIdentityMsg struct {
+	identity *awsservice.CallerIdentity
+}
+
+type contextsLoadedMsg struct {
+	contexts []config.ContextInfo
+}
+
+type contextSwitchedMsg struct {
+	cfg      *config.Config
+	identity *awsservice.CallerIdentity
+}
+
+type ssoLoginDoneMsg struct {
+	err error
 }
 
 type errMsg struct {
@@ -92,6 +112,24 @@ type Model struct {
 	ipFilter       string
 	ipFilterActive bool
 
+	// Context picker
+	configPath         string
+	ctxList            []config.ContextInfo
+	ctxIdx             int
+	ctxPrevScreen      screen
+	pendingContextName string
+
+	// Context add wizard
+	addStep      int // 0=auth_type select, 1+=field input, -1=confirm
+	addAuthIdx   int
+	addFields    []fieldDef
+	addFieldIdx  int
+	addInput     string
+	addValues    map[string]string
+
+	// Caller identity (loaded at startup)
+	callerIdentity *awsservice.CallerIdentity
+
 	// Error display
 	errMsg string
 
@@ -101,17 +139,35 @@ type Model struct {
 }
 
 // New creates a new app Model.
-func New(cfg *config.Config) Model {
+func New(cfg *config.Config, configPath string) Model {
 	services := domain.Catalog()
 	return Model{
-		cfg:      cfg,
-		screen:   screenServiceList,
-		services: services,
+		cfg:           cfg,
+		configPath:    configPath,
+		screen:        screenContextPicker,
+		ctxPrevScreen: screenServiceList,
+		services:      services,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return m.loadContexts()
+}
+
+func (m Model) loadCallerIdentity() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
+			// Non-fatal: just skip identity display
+			return callerIdentityMsg{}
+		}
+		identity, err := repo.GetCallerIdentity(ctx)
+		if err != nil {
+			return callerIdentityMsg{}
+		}
+		return callerIdentityMsg{identity: identity}
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -119,6 +175,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		return m, nil
+
+	case callerIdentityMsg:
+		m.callerIdentity = msg.identity
 		return m, nil
 
 	case instancesLoadedMsg:
@@ -165,6 +225,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenInstanceList
 		return m, nil
 
+	case contextsLoadedMsg:
+		m.ctxList = msg.contexts
+		m.ctxIdx = 0
+		for i, ctx := range m.ctxList {
+			if ctx.Current {
+				m.ctxIdx = i
+				break
+			}
+		}
+		m.screen = screenContextPicker
+		return m, nil
+
+	case ssoLoginDoneMsg:
+		if msg.err != nil {
+			m.errMsg = fmt.Sprintf("SSO login failed: %s", msg.err)
+			m.screen = screenError
+			return m, tea.ClearScreen
+		}
+		// SSO login done, now finalize the context switch
+		return m, m.finalizeContextSwitch()
+
+	case contextSwitchedMsg:
+		m.cfg = msg.cfg
+		m.callerIdentity = msg.identity
+		m.awsRepo = nil // reset so next AWS call uses new credentials
+		m.screen = m.ctxPrevScreen
+		return m, tea.ClearScreen
+
 	case tea.KeyMsg:
 		// Global quit
 		if msg.String() == "ctrl+c" {
@@ -172,9 +260,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		// Global home — return to service list from any screen
-		if msg.String() == "H" && m.screen != screenServiceList {
+		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker {
 			m.screen = screenServiceList
 			return m, nil
+		}
+		// Global context switch — C key opens context picker
+		if msg.String() == "C" && m.screen != screenContextPicker {
+			m.ctxPrevScreen = m.screen
+			return m, m.loadContexts()
 		}
 
 		switch m.screen {
@@ -190,6 +283,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSubnetList(msg)
 		case screenSubnetDetail:
 			return m.updateSubnetDetail(msg)
+		case screenContextPicker:
+			return m.updateContextPicker(msg)
+		case screenContextAdd:
+			return m.updateContextAdd(msg)
 		case screenError:
 			return m.updateError(msg)
 		}
@@ -203,6 +300,9 @@ func (m Model) updateServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		m.quitting = true
 		return m, tea.Quit
+	case "esc":
+		m.ctxPrevScreen = screenServiceList
+		return m, m.loadContexts()
 	case "up", "k":
 		if m.svcIdx > 0 {
 			m.svcIdx--
@@ -568,6 +668,10 @@ func (m Model) View() string {
 		return m.viewSubnetList()
 	case screenSubnetDetail:
 		return m.viewSubnetDetail()
+	case screenContextPicker:
+		return m.viewContextPicker()
+	case screenContextAdd:
+		return m.viewContextAdd()
 	case screenLoading:
 		return m.viewLoading()
 	case screenError:
@@ -578,16 +682,208 @@ func (m Model) View() string {
 }
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
-	normalStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	dimStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	errorStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
-	filterStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	selectedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
+	normalStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	dimStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	filterStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	statusBarStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("236"))
 )
+
+func (m Model) loadContexts() tea.Cmd {
+	return func() tea.Msg {
+		contexts, err := config.Contexts(m.configPath)
+		if err != nil || len(contexts) == 0 {
+			return contextsLoadedMsg{}
+		}
+		return contextsLoadedMsg{contexts: contexts}
+	}
+}
+
+func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q":
+		m.quitting = true
+		return m, tea.Quit
+	case "esc":
+		// If we have a valid config (mid-session C key), go back.
+		// If initial launch, quit.
+		if m.cfg.ContextName != "" {
+			m.screen = m.ctxPrevScreen
+		} else {
+			m.quitting = true
+			return m, tea.Quit
+		}
+	case "up", "k":
+		if m.ctxIdx > 0 {
+			m.ctxIdx--
+		}
+	case "down", "j":
+		if m.ctxIdx < len(m.ctxList)-1 {
+			m.ctxIdx++
+		}
+	case "enter":
+		if len(m.ctxList) > 0 && m.ctxIdx < len(m.ctxList) {
+			selected := m.ctxList[m.ctxIdx]
+			m.pendingContextName = selected.Name
+			m.screen = screenLoading
+			return m, m.switchContext(selected.Name)
+		}
+	case "a":
+		m.addStep = 0
+		m.addAuthIdx = 0
+		m.addFields = nil
+		m.addFieldIdx = 0
+		m.addInput = ""
+		m.addValues = make(map[string]string)
+		m.screen = screenContextAdd
+	}
+	return m, nil
+}
+
+func (m Model) switchContext(name string) tea.Cmd {
+	return func() tea.Msg {
+		if err := config.SetCurrent(m.configPath, name); err != nil {
+			return errMsg{err: err}
+		}
+
+		cfg, err := config.Load(nil, nil, m.configPath)
+		if err != nil {
+			return errMsg{err: err}
+		}
+
+		// SSO needs interactive terminal — hand off via tea.ExecProcess
+		if cfg.AuthType == config.AuthTypeSSO {
+			cmd, cleanup, err := awsservice.BuildSSOLoginCmd(cfg)
+			if err != nil {
+				return errMsg{err: err}
+			}
+			return tea.ExecProcess(cmd, func(err error) tea.Msg {
+				cleanup()
+				return ssoLoginDoneMsg{err: err}
+			})()
+		}
+
+		// Non-SSO: perform auth + finalize in one shot
+		return m.doFinalizeContextSwitch()()
+	}
+}
+
+func (m Model) finalizeContextSwitch() tea.Cmd {
+	return m.doFinalizeContextSwitch()
+}
+
+func (m Model) doFinalizeContextSwitch() tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := config.Load(nil, nil, m.configPath)
+		if err != nil {
+			return errMsg{err: err}
+		}
+
+		// Perform non-SSO auth action (credential check, assume role, etc.)
+		if cfg.AuthType != config.AuthTypeSSO {
+			if _, err := auth.PostSwitch(cfg); err != nil {
+				return errMsg{err: err}
+			}
+		}
+
+		// Get caller identity with new credentials
+		ctx := context.Background()
+		var identity *awsservice.CallerIdentity
+		repo, err := awsservice.NewAwsRepository(ctx, cfg)
+		if err == nil {
+			identity, _ = repo.GetCallerIdentity(ctx)
+		}
+
+		return contextSwitchedMsg{
+			cfg:      cfg,
+			identity: identity,
+		}
+	}
+}
+
+func (m Model) viewContextPicker() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("Select Context"))
+	b.WriteString("\n\n")
+
+	if len(m.ctxList) == 0 {
+		b.WriteString(normalStyle.Render("  No contexts defined."))
+		b.WriteString("\n\n")
+		b.WriteString(dimStyle.Render("  Press 'a' to add your first context."))
+		b.WriteString("\n")
+	} else {
+		// Measure max widths for alignment
+		maxName, maxRegion := 4, 6 // "NAME", "REGION"
+		for _, ctx := range m.ctxList {
+			if len(ctx.Name) > maxName {
+				maxName = len(ctx.Name)
+			}
+			if len(ctx.Region) > maxRegion {
+				maxRegion = len(ctx.Region)
+			}
+		}
+
+		nameCol := lipgloss.NewStyle().Width(maxName + 2)
+		regionCol := lipgloss.NewStyle().Width(maxRegion + 2)
+
+		// Header
+		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + regionCol.Render("REGION") + "AUTH"))
+		b.WriteString("\n")
+
+		for i, ctx := range m.ctxList {
+			cursor := "  "
+			style := normalStyle
+			if i == m.ctxIdx {
+				cursor = "> "
+				style = selectedStyle
+			}
+
+			row := cursor + nameCol.Inherit(style).Render(ctx.Name) + regionCol.Inherit(style).Render(ctx.Region) + style.Render(ctx.AuthType)
+			if ctx.Current {
+				row += dimStyle.Render(" *")
+			}
+			b.WriteString(row)
+			b.WriteString("\n")
+		}
+	}
+
+	b.WriteString("\n")
+	if m.cfg.ContextName != "" {
+		b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • a: add • esc: back • q: quit"))
+	} else {
+		b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • a: add • q: quit"))
+	}
+	return b.String()
+}
+
+func (m Model) renderStatusBar() string {
+	var parts []string
+
+	if m.cfg.ContextName != "" {
+		parts = append(parts, fmt.Sprintf("[%s]", m.cfg.ContextName))
+	}
+	parts = append(parts, fmt.Sprintf("region:%s", m.cfg.Region))
+	if m.cfg.AuthType != "" {
+		parts = append(parts, fmt.Sprintf("auth:%s", m.cfg.AuthType))
+	}
+	if m.callerIdentity != nil && m.callerIdentity.Account != "" {
+		parts = append(parts, fmt.Sprintf("account:%s", m.callerIdentity.Account))
+	}
+
+	bar := strings.Join(parts, "  ")
+	if m.width > 0 {
+		if len(bar) < m.width {
+			bar += strings.Repeat(" ", m.width-len(bar))
+		}
+	}
+	return statusBarStyle.Render(bar) + "\n\n"
+}
 
 func (m Model) viewServiceList() string {
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Select AWS Service"))
 	b.WriteString("\n\n")
 
@@ -603,12 +899,13 @@ func (m Model) viewServiceList() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • q: quit"))
+	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • esc: context • q: quit"))
 	return b.String()
 }
 
 func (m Model) viewFeatureList() string {
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	svcName := m.services[m.svcIdx].Name
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s > Select Feature", svcName)))
 	b.WriteString("\n\n")
@@ -635,6 +932,7 @@ func (m Model) viewFeatureList() string {
 
 func (m Model) viewInstanceList() string {
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("EC2 Instances (Running)"))
 	b.WriteString("\n")
 
@@ -685,6 +983,7 @@ func (m Model) viewLoading() string {
 
 func (m Model) viewError() string {
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	b.WriteString(errorStyle.Render("Error"))
 	b.WriteString("\n\n")
 	b.WriteString(normalStyle.Render(m.errMsg))
@@ -695,6 +994,7 @@ func (m Model) viewError() string {
 
 func (m Model) viewVPCList() string {
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("VPCs"))
 	b.WriteString("\n\n")
 
@@ -731,6 +1031,7 @@ func (m Model) viewVPCList() string {
 
 func (m Model) viewSubnetList() string {
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	vpcName := ""
 	if m.selectedVPC != nil {
 		vpcName = fmt.Sprintf(" (%s)", m.selectedVPC.Name)
@@ -775,6 +1076,7 @@ func (m Model) viewSubnetDetail() string {
 	}
 	s := m.selectedSubnet
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Subnet Detail"))
 	b.WriteString("\n\n")
 	b.WriteString(normalStyle.Render(fmt.Sprintf("  Subnet ID  : %s", s.SubnetID)))

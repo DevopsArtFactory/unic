@@ -198,6 +198,182 @@ contexts:
 	}
 }
 
+func TestContextWithRoleArn(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: prod-admin
+defaults:
+  region: us-east-1
+contexts:
+  - name: prod-admin
+    profile: base-user
+    role_arn: arn:aws:iam::111111111111:role/AdministratorAccess
+    external_id: my-ext-id
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Profile != "base-user" {
+		t.Errorf("expected profile 'base-user', got '%s'", cfg.Profile)
+	}
+	if cfg.ContextName != "prod-admin" {
+		t.Errorf("expected context 'prod-admin', got '%s'", cfg.ContextName)
+	}
+	if cfg.RoleArn != "arn:aws:iam::111111111111:role/AdministratorAccess" {
+		t.Errorf("expected role_arn, got '%s'", cfg.RoleArn)
+	}
+	if cfg.ExternalID != "my-ext-id" {
+		t.Errorf("expected external_id 'my-ext-id', got '%s'", cfg.ExternalID)
+	}
+}
+
+func TestContextsList(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev
+contexts:
+  - name: dev
+    profile: dev-profile
+  - name: prod
+    profile: prod-profile
+    role_arn: arn:aws:iam::222222222222:role/Admin
+`)
+	infos, err := Contexts(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 2 {
+		t.Fatalf("expected 2 contexts, got %d", len(infos))
+	}
+	if !infos[0].Current {
+		t.Error("expected first context to be current")
+	}
+	if infos[1].Current {
+		t.Error("expected second context to not be current")
+	}
+	if infos[1].RoleArn != "arn:aws:iam::222222222222:role/Admin" {
+		t.Errorf("expected role_arn on prod context, got '%s'", infos[1].RoleArn)
+	}
+}
+
+func TestSetCurrent(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev
+contexts:
+  - name: dev
+    profile: dev-profile
+  - name: prod
+    profile: prod-profile
+`)
+	if err := SetCurrent(path, "prod"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Profile != "prod-profile" {
+		t.Errorf("expected profile 'prod-profile' after SetCurrent, got '%s'", cfg.Profile)
+	}
+	if cfg.ContextName != "prod" {
+		t.Errorf("expected context 'prod', got '%s'", cfg.ContextName)
+	}
+}
+
+func TestContextWithSSOAuthType(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev-sso
+contexts:
+  - name: dev-sso
+    auth_type: sso
+    sso_start_url: https://my-org.awsapps.com/start
+    sso_account_id: "111111111111"
+    sso_role_name: AdministratorAccess
+    region: us-east-1
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuthType != AuthTypeSSO {
+		t.Errorf("expected auth_type 'sso', got '%s'", cfg.AuthType)
+	}
+	if cfg.SSOStartURL != "https://my-org.awsapps.com/start" {
+		t.Errorf("expected sso_start_url, got '%s'", cfg.SSOStartURL)
+	}
+	if cfg.SSOAccountID != "111111111111" {
+		t.Errorf("expected sso_account_id '111111111111', got '%s'", cfg.SSOAccountID)
+	}
+	if cfg.SSORoleName != "AdministratorAccess" {
+		t.Errorf("expected sso_role_name 'AdministratorAccess', got '%s'", cfg.SSORoleName)
+	}
+}
+
+func TestContextWithCredentialAuthType(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev-creds
+contexts:
+  - name: dev-creds
+    auth_type: credential
+    profile: dev-user
+    region: ap-northeast-2
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuthType != AuthTypeCredential {
+		t.Errorf("expected auth_type 'credential', got '%s'", cfg.AuthType)
+	}
+	if cfg.Profile != "dev-user" {
+		t.Errorf("expected profile 'dev-user', got '%s'", cfg.Profile)
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Errorf("expected region 'ap-northeast-2', got '%s'", cfg.Region)
+	}
+}
+
+func TestContextWithAssumeRoleAuthType(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: prod
+contexts:
+  - name: prod
+    auth_type: assume_role
+    profile: base-user
+    role_arn: arn:aws:iam::333333333333:role/Admin
+    region: us-west-2
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuthType != AuthTypeAssumeRole {
+		t.Errorf("expected auth_type 'assume_role', got '%s'", cfg.AuthType)
+	}
+	if cfg.RoleArn != "arn:aws:iam::333333333333:role/Admin" {
+		t.Errorf("expected role_arn, got '%s'", cfg.RoleArn)
+	}
+}
+
+func TestSetCurrentInvalidContext(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+contexts:
+  - name: dev
+    profile: dev-profile
+`)
+	err := SetCurrent(path, "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent context")
+	}
+}
+
 func TestMalformedConfigReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `this is not valid yaml: [[[`)

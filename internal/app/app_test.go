@@ -13,21 +13,21 @@ func testConfig() *config.Config {
 }
 
 func TestNewModelNotQuitting(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	if m.quitting {
 		t.Error("new model should not be quitting")
 	}
 }
 
-func TestNewModelStartsOnServiceList(t *testing.T) {
-	m := New(testConfig())
-	if m.screen != screenServiceList {
-		t.Error("new model should start on service list screen")
+func TestNewModelStartsOnContextPicker(t *testing.T) {
+	m := New(testConfig(), "")
+	if m.screen != screenContextPicker {
+		t.Error("new model should start on context picker screen")
 	}
 }
 
 func TestQuitOnCtrlC(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	model := updated.(Model)
 	if !model.quitting {
@@ -39,7 +39,8 @@ func TestQuitOnCtrlC(t *testing.T) {
 }
 
 func TestQuitOnQ(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
+	m.screen = screenServiceList
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	model := updated.(Model)
 	if !model.quitting {
@@ -51,7 +52,7 @@ func TestQuitOnQ(t *testing.T) {
 }
 
 func TestViewNotEmpty(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	v := m.View()
 	if v == "" {
 		t.Error("view should not be empty when not quitting")
@@ -67,7 +68,8 @@ func TestViewEmptyWhenQuitting(t *testing.T) {
 }
 
 func TestServiceListNavigation(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
+	m.screen = screenServiceList
 	// Press down — should move to index 1 (now 2 services: EC2, VPC)
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
@@ -77,7 +79,8 @@ func TestServiceListNavigation(t *testing.T) {
 }
 
 func TestServiceListEnterGoesToFeatures(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
+	m.screen = screenServiceList
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 	if model.screen != screenFeatureList {
@@ -86,7 +89,7 @@ func TestServiceListEnterGoesToFeatures(t *testing.T) {
 }
 
 func TestFeatureListEscGoesBack(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenFeatureList
 	m.features = m.services[0].Features
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
