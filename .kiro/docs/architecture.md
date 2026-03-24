@@ -12,7 +12,7 @@ UNIC(Unified Infrastructure Console)은 AWS 리소스를 터미널에서 탐색�
 | 언어 | Go | 1.22+ |
 | TUI | Bubbletea + Lipgloss + Bubbles | latest |
 | CLI | Cobra | latest |
-| AWS | aws-sdk-go-v2 (ec2, sts) | latest |
+| AWS | aws-sdk-go-v2 (ec2, ssm, sts) | latest |
 | 설정 | gopkg.in/yaml.v3 | 0.9 |
 | 동시성 | goroutines + errgroup | stdlib |
 | 에러 | fmt.Errorf / errors | stdlib |
@@ -44,9 +44,10 @@ UNIC(Unified Infrastructure Console)은 AWS 리소스를 터미널에서 탐색�
     │  ┌──────────────────────────┐     │
     │  │ ServiceList              │     │
     │  │  └─ FeatureList          │     │
+    │  │      ├─ InstanceList     │     │
     │  │      └─ VpcList          │     │
     │  │          └─ SubnetList   │     │
-    │  │              └─ Result   │     │
+    │  │              └─ Detail   │     │
     │  └──────────────────────────┘     │
     └──────────────────┬────────────────┘
                        │
@@ -59,12 +60,13 @@ UNIC(Unified Infrastructure Console)은 AWS 리소스를 터미널에서 탐색�
     ┌──────────────────▼────────────────┐
     │  internal/services/aws/ (API 호출) │
     │  AwsRepository                    │
+    │  ├─ repository.go (클라이언트 초기화) │
+    │  ├─ ec2.go   (EC2 인스턴스)        │
+    │  ├─ ec2_model.go (EC2Instance)    │
     │  ├─ vpc.go   (VPC/Subnet/IP)      │
-    │  ├─ rds.go   (미구현)              │
-    │  ├─ iam.go   (미구현)              │
-    │  ├─ ssm.go   (미구현)              │
-    │  ├─ ipcalc.go (CIDR 계산)         │
-    │  └─ env.go   (환경변수 처리)       │
+    │  ├─ vpc_model.go (VPC, Subnet)    │
+    │  ├─ ssm.go   (세션 관리)           │
+    │  └─ ssm_exec.go (플러그인 실행)    │
     └───────────────────────────────────┘
 ```
 
@@ -123,11 +125,14 @@ config.yaml 로드
 
 | 화면 | 설명 | 데이터 소스 |
 |------|------|------------|
-| ServiceList | AWS 서비스 목록 | `catalog.ListServices()` |
-| FeatureList | 선택한 서비스의 기능 목록 | `catalog.ListFeatures()` |
-| VpcList | VPC 목록 | `AwsRepository.ListVpcs()` |
-| SubnetList | Subnet 목록 | `AwsRepository.ListSubnets()` |
-| ResultView | 결과 표시 (스크롤 가능) | 각 기능별 API 결과 |
+| ServiceList | AWS 서비스 목록 | `domain.Catalog()` |
+| FeatureList | 선택한 서비스의 기능 목록 | `domain.Catalog()` |
+| InstanceList | SSM 대상 EC2 인스턴스 (필터 지원) | `AwsRepository.ListRunningInstances()` |
+| VPCList | VPC 목록 | `AwsRepository.ListVPCs()` |
+| SubnetList | 선택한 VPC의 서브넷 목록 | `AwsRepository.ListSubnets()` |
+| SubnetDetail | 선택한 서브넷의 가용 IP | `AwsRepository.ListAvailableIPs()` |
+| Loading | 로딩 표시 | — |
+| Error | 에러 표시 | — |
 
 ### 키 바인딩
 
@@ -135,44 +140,42 @@ config.yaml 로드
 |----|------|
 | `j` / `↓` | 아래로 이동 |
 | `k` / `↑` | 위로 이동 |
-| `g` / `Home` | 맨 위로 |
-| `G` / `End` | 맨 아래로 |
 | `Enter` | 선택 (다음 화면) |
-| `Backspace` / `Esc` / `←` | 이전 화면 |
-| `r` | 현재 화면 새로고침 |
-| `q` | 종료 |
+| `Esc` / `q` | 이전 화면 |
+| `H` | 홈 (서비스 목록)으로 이동 |
+| `/` | 필터 토글 (인스턴스 목록, IP 목록) |
+| `q` (서비스 목록에서) | 종료 |
 
 ## CLI 서브커맨드
 
 ```
 unic                          # TUI 모드 진입
-unic --context dev-sso        # 특정 컨텍스트로 TUI 진입
 unic --profile my-profile     # 특정 프로파일 사용
 unic --region ap-northeast-2  # 특정 리전 사용
 
-unic context list             # 컨텍스트 목록 출력
-unic context current          # 현재 컨텍스트 출력
-unic context use [name]       # 컨텍스트 전환 (이름 생략 시 대화형 선택)
+unic init                     # 기본 설정 파일 생성
+unic init --force             # 기존 설정 파일 덮어쓰기
 ```
 
 ## 현재 구현된 기능
 
 | 서비스 | 기능 | 상태 |
 |--------|------|------|
-| VPC | RemainPrivateIP (서브넷 가용 IP 조회) | ✅ 구현 완료 |
+| EC2 | SSM Session Manager (EC2 인스턴스 접속) | ✅ 구현 완료 |
+| VPC | VPC Browser (VPC → 서브넷 → 가용 IP) | ✅ 구현 완료 |
 | RDS | ListDBInstances | 🚧 Coming Soon |
 | Route53 | ListHostedZones | 🚧 Coming Soon |
 | IAM | ListUsers | 🚧 Coming Soon |
 
 ## 새 기능 추가 체크리스트
 
-1. `internal/domain/model.go` → `AwsService` / `FeatureKind` 타입에 상수 추가
-2. `internal/domain/catalog.go` → `ListServices()` / `ListFeatures()` 매핑 추가
-3. `internal/services/aws/` → 새 파일 생성, `AwsRepository` 메서드 추가
-4. `internal/app/actions.go` → 화면 전환에서 새 `FeatureKind` 분기 추가
-5. 필요 시 `internal/app/screens.go` → 새 화면 모델 추가
+1. `internal/domain/model.go` → `AwsService`, `FeatureKind` 문자열 상수 추가
+2. `internal/domain/catalog.go` → `Catalog()`에 `Service` 항목 추가
+3. `internal/services/aws/` → 새 파일 생성, `AwsRepository` 메서드 + 모델 파일 추가
+4. `internal/services/aws/repository.go` → 클라이언트 인터페이스 및 `AwsRepository` 필드 추가
+5. `internal/app/app.go` → 새 화면 상수 및 `Update()`에서 기능 처리 추가
 6. 필요 시 `go.mod` → `go get`으로 새 AWS SDK 모듈 추가
-7. 테스트 작성
+7. mock 클라이언트로 테스트 작성
 
 ## 빌드 및 실행
 

@@ -16,40 +16,33 @@ unic/
 │   └── main.go               # Entry point
 ├── internal/
 │   ├── cli/                   # Cobra command definitions
-│   ├── auth/                  # Login / credential management
-│   │   ├── auth.go            # Unified credential provider logic
-│   │   ├── saml.go            # Okta SAML federation
-│   │   ├── sso.go             # IAM Identity Center
-│   │   ├── iam.go             # Access Key / Secret Key
-│   │   └── sts.go             # Assume Role, role chaining
-│   ├── services/              # AWS service modules
-│   │   └── aws/
-│   │       ├── vpc.go
-│   │       ├── rds.go
-│   │       ├── iam.go
-│   │       ├── ssm.go
-│   │       ├── ec2.go
-│   │       ├── r53.go
-│   │       ├── cloudwatch_logs.go
-│   │       └── cloudwatch_metrics.go
-│   ├── app/                   # Bubbletea TUI application
-│   │   ├── app.go             # Root model
-│   │   ├── screens.go         # Screen navigation stack
-│   │   ├── actions.go         # Screen transitions
-│   │   └── navigation.go      # Cursor/scroll
-│   ├── tui/                   # Reusable Bubbletea components
-│   │   ├── components.go      # Lists, dialogs, spinners
-│   │   └── styles.go          # Lipgloss styles
+│   │   ├── root.go            # Root command, global flags
+│   │   └── init.go            # unic init subcommand
+│   ├── config/                # Profile / account / region management
+│   │   └── config.go
 │   ├── domain/                # Pure business models
-│   │   ├── model.go
-│   │   └── catalog.go
-│   └── config/                # Profile / account / region management
-│       └── config.go
+│   │   ├── model.go           # AwsService, FeatureKind, Service, Feature
+│   │   └── catalog.go         # Service/feature catalog
+│   ├── app/                   # Bubbletea TUI application
+│   │   └── app.go             # Root model, screens, navigation, rendering
+│   └── services/              # AWS service modules
+│       └── aws/
+│           ├── repository.go  # AwsRepository (client initialization)
+│           ├── ec2.go         # EC2 instance listing (SSM-managed)
+│           ├── ec2_model.go   # EC2Instance model
+│           ├── vpc.go         # VPC/Subnet/IP queries
+│           ├── vpc_model.go   # VPC, Subnet models
+│           ├── ssm.go         # SSM session start/terminate
+│           └── ssm_exec.go    # session-manager-plugin subprocess
 ├── go.mod
 ├── go.sum
 ├── Makefile
+├── .goreleaser.yaml
 └── PLAN.md
 ```
+
+> **Note**: `internal/auth/` and `internal/tui/` are planned but not yet implemented.
+> The TUI screens, navigation, and styles are currently consolidated in `internal/app/app.go`.
 
 ---
 
@@ -67,19 +60,21 @@ unic/
 
 ## Milestones
 
-### M1 — Core Foundation
+### M1 — Core Foundation ✅
 
-**M1.1 — Config & Profile Management**
+**M1.1 — Config & Profile Management** ✅
 - Read/write `~/.aws/config` and `~/.aws/credentials` (shared with AWS CLI)
 - unic app config at `~/.config/unic/config.yaml` (UI prefs, default profile)
 - Multi-account profile support
 - CLI flags: `--profile <name>`, `--region <region>`
+- `unic init` command for config file creation
 
-**M1.2 — TUI Shell**
+**M1.2 — TUI Shell** ✅
 - Main menu: service list navigation
 - Screen router with back navigation stack (Bubbletea model stack)
 - Shared layout: header (profile / region / account), body, footer (keybindings)
-- Reusable components: filterable list, confirmation dialog, notification bar, loading spinner
+- Reusable components: filterable list, loading spinner, error display
+- 8 screens: ServiceList, FeatureList, InstanceList, VPCList, SubnetList, SubnetDetail, Loading, Error
 
 ---
 
@@ -112,7 +107,7 @@ unic/
 
 ### M3 — AWS Services
 
-**M3.1 — VPC**
+**M3.1 — VPC** ✅
 - List VPCs → subnets → show available IP count per subnet
 - Reachability Analysis: create/run `NetworkInsights` path, display results
 
@@ -126,7 +121,7 @@ unic/
 - List access keys, show key age/status
 - Rotate: create new key → display once → deactivate old (with confirmation)
 
-**M3.4 — Systems Manager (Sessions Manager)**
+**M3.4 — Systems Manager (Sessions Manager)** ✅
 - List SSM-eligible EC2 instances (agent status check)
 - Select instance → open interactive session
 - Implementation: suspend Bubbletea program → spawn `session-manager-plugin` process → resume on exit
@@ -171,9 +166,9 @@ unic/
 - Debug log file (`~/.config/unic/logs/`)
 - `--verbose` flag
 
-**M4.3 — Distribution**
-- GitHub Actions CI/CD
-- Prebuilt binaries (Linux, macOS, Windows)
+**M4.3 — Distribution** 🟡
+- GitHub Actions CI/CD ✅
+- Prebuilt binaries (Linux, macOS, Windows) ✅ (GoReleaser configured)
 - Homebrew formula
 - Install script
 
@@ -189,10 +184,10 @@ M1.1 → M1.2 → M2.1 → M2.2 → M2.3 → M2.4
                                   M4.1 → M4.2 → M4.3
 ```
 
-- M1 + M2 are sequential — prerequisites for everything else
+- M1 is complete; M2 is deferred (relying on AWS SDK default credential chain)
 - M3 services are independent of each other, build in any order
-- M3.4 (SSM Sessions) has highest complexity (TUI ↔ child process handoff) — consider doing last in M3
-- M4 after all features are functional
+- M3.1 (VPC) and M3.4 (SSM Sessions) are complete
+- M4.3 (Distribution) is partially done (GoReleaser + GitHub Actions)
 
 ---
 

@@ -1,44 +1,45 @@
-# Current Ticket: UNIC-2
+# Current Ticket: UNIC-3
 
-## TUI Shell
+## Add RDS ListDBInstances Support
 
 **Status**: Not Started
-**Milestone**: M1.2
-**Priority**: Highest
+**Milestone**: M3.2
+**Priority**: High
 
 ---
 
 ### Summary
 
-Implement a Ratatui + Crossterm TUI shell that serves as the interactive foundation for all AWS service modules.
+Add support for listing RDS DB instances in the TUI.
 
 ### Tasks
 
-- [ ] Implement screen router with back navigation stack (`src/tui/router.rs`)
-- [ ] Build main menu view with service list navigation (`src/tui/views/`)
-- [ ] Create shared layout: header (profile/region/account), body, footer (keybindings)
-- [ ] Build reusable widgets: filterable list, confirmation dialog, notification bar, loading spinner (`src/tui/widgets/`)
+- [ ] Add `ServiceRDS` constant to `AwsService` in `internal/domain/model.go`
+- [ ] Add `FeatureListDBInstances` constant to `FeatureKind` in `internal/domain/model.go`
+- [ ] Register RDS service and feature in `internal/domain/catalog.go`
+- [ ] Implement `AwsRepository.ListDBInstances()` in `internal/services/aws/rds.go`
+- [ ] Add RDS model types in `internal/services/aws/rds_model.go`
+- [ ] Add RDS client interface and initialization in `internal/services/aws/repository.go`
+- [ ] Add screen transition for RDS feature in `internal/app/app.go`
+- [ ] Add `rds` SDK dependency in `go.mod`
+- [ ] Write tests
 
 ### Acceptance Criteria
 
-- Main menu displays a navigable list of services
-- Screen router supports push/pop navigation with back key
-- Header shows current profile, region, and account info
-- Footer displays context-sensitive keybindings
-- Reusable widgets work across different views
-
-### Tech Notes
-
-- Prerequisite: M1.1 (Config & Profile Management) is complete
-- All auth (M2) and service modules (M3) will be built on top of this TUI shell
-- Dependencies: `ratatui`, `crossterm` (already in Cargo.toml)
-
-### Files
-
-- `src/tui/router.rs` — screen navigation
-- `src/tui/views/` — per-service TUI screens
-- `src/tui/widgets/` — reusable components
+- RDS appears as a selectable service in the TUI service list
+- Selecting "ListDBInstances" shows a list of RDS instances with identifier, engine, status, endpoint, and instance class
+- Loading and error states work correctly
+- Tests cover the RDS listing logic with mock clients
 
 ### Related Issue
 
-Closes #4
+Closes #12
+
+---
+
+## Previous Tickets
+
+| Ticket | Title | Status |
+|--------|-------|--------|
+| UNIC-1 | Config & Profile Management (M1.1) | ✅ Done |
+| UNIC-2 | TUI Shell (M1.2) | ✅ Done |

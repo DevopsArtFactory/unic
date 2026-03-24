@@ -27,50 +27,47 @@ go build -o unic ./cmd/unic
 # Enter TUI mode
 unic
 
-# Specify context/profile/region
-unic --context dev-sso
+# Specify profile/region
 unic --profile my-profile
 unic --region ap-northeast-2
 
-# Context management
-unic context list              # List contexts
-unic context current           # Show current context
-unic context use [name]        # Switch context
+# Initialize config file
+unic init                      # Create default config
+unic init --force              # Overwrite existing config
 ```
 
 ## Configuration
 
-`~/.config/unic/config.yaml` (auto-generated on first run)
+`~/.config/unic/config.yaml` (created via `unic init` or auto-generated on first run)
 
 ```yaml
-version: 1
-current: dev-sso
+# Simple format
+default_profile: my-profile
+default_region: ap-northeast-2
+```
 
-defaults:
-  region: us-east-1
+```yaml
+# Context-based format
+current: dev-sso
 
 contexts:
   - name: dev-sso
     profile: dev-sso
+    region: ap-northeast-2
 
   - name: prod-admin
-    profile: base-user
-    role_arn: arn:aws:iam::111111111111:role/AdministratorAccess
+    profile: prod-admin
+    region: us-east-1
 ```
 
-## Authentication Methods
-
-| Method | Condition | Behavior |
-|--------|-----------|----------|
-| STS AssumeRole | `role_arn` is set | Issue temporary credentials via STS |
-| SSO | Profile has `sso_session` | Run `aws sso login` |
-| Profile | Otherwise | Set AWS profile env vars |
+**Priority**: CLI flags (`--profile`, `--region`) > context settings > config defaults > hardcoded defaults (`us-east-1`)
 
 ## Currently Implemented Features
 
 | Service | Feature | Status |
 |---------|---------|--------|
-| VPC | RemainPrivateIP (subnet available IP query) | ✅ Implemented |
+| EC2 | SSM Session Manager (connect to EC2 instances) | ✅ Implemented |
+| VPC | VPC Browser (VPCs → subnets → available IPs) | ✅ Implemented |
 | RDS | ListDBInstances | 🚧 Coming Soon |
 | Route53 | ListHostedZones | 🚧 Coming Soon |
 | IAM | ListUsers | 🚧 Coming Soon |
@@ -81,10 +78,10 @@ contexts:
 |-----|--------|
 | `j`/`k` or `↑`/`↓` | Navigate |
 | `Enter` | Select |
-| `Backspace`/`Esc` | Go back |
-| `r` | Refresh |
-| `g`/`G` | Top/Bottom |
-| `q` | Quit |
+| `Esc`/`q` | Go back |
+| `H` | Go to home (service list) |
+| `/` | Filter (instances, IPs) |
+| `q` (on service list) | Quit |
 
 ## Documentation
 
@@ -93,6 +90,14 @@ contexts:
 ## License
 
 This project is licensed under the terms in [LICENSE](LICENSE).
+
+## Issue Bot
+
+Comment on any issue to interact with `@unic-bot`:
+
+| Command | Action |
+|---------|--------|
+| `@unic-bot: assign me` | Assign the issue to yourself |
 
 ## Community Standards
 
