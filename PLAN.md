@@ -111,11 +111,13 @@ unic/
 - List VPCs → subnets → show available IP count per subnet
 - Reachability Analysis: create/run `NetworkInsights` path, display results
 
-**M3.2 — RDS**
+**M3.2 — RDS** ✅
 - List DB instances/clusters with status
 - Start / Stop (with confirmation)
 - Failover for Multi-AZ (with confirmation)
 - Real-time status polling after action
+- Aurora cluster-level stop/start/failover
+- Type-to-confirm for destructive actions (stop, failover)
 
 **M3.3 — IAM Credentials**
 - List access keys, show key age/status
@@ -184,9 +186,9 @@ M1.1 → M1.2 → M2.1 → M2.2 → M2.3 → M2.4
                                   M4.1 → M4.2 → M4.3
 ```
 
-- M1 is complete; M2 is deferred (relying on AWS SDK default credential chain)
+- M1 is complete; M2 is partially complete (SSO, credential, assume role done; Okta deferred)
 - M3 services are independent of each other, build in any order
-- M3.1 (VPC) and M3.4 (SSM Sessions) are complete
+- M3.1 (VPC), M3.2 (RDS), and M3.4 (SSM Sessions) are complete
 - M4.3 (Distribution) is partially done (GoReleaser + GitHub Actions)
 
 ---
