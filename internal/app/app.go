@@ -143,6 +143,7 @@ type Model struct {
 	rdsFilterActive bool
 	selectedRDS     *awsservice.RDSInstance
 	rdsAction       string // "start", "stop", "failover"
+	rdsConfirmInput string // typed input for destructive action confirmation
 	rdsPolling      bool
 
 	// Context picker
@@ -652,16 +653,19 @@ func (m Model) updateRDSDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		if m.selectedRDS != nil && m.selectedRDS.CanStart() {
 			m.rdsAction = "start"
+			m.rdsConfirmInput = ""
 			m.screen = screenRDSConfirm
 		}
 	case "x":
 		if m.selectedRDS != nil && m.selectedRDS.CanStop() {
 			m.rdsAction = "stop"
+			m.rdsConfirmInput = ""
 			m.screen = screenRDSConfirm
 		}
 	case "f":
 		if m.selectedRDS != nil && m.selectedRDS.CanFailover() {
 			m.rdsAction = "failover"
+			m.rdsConfirmInput = ""
 			m.screen = screenRDSConfirm
 		}
 	case "r":
@@ -673,14 +677,46 @@ func (m Model) updateRDSDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateRDSConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Start action uses simple y/n confirmation
+	if m.rdsAction == "start" {
+		switch msg.String() {
+		case "y", "enter":
+			if m.selectedRDS != nil {
+				m.screen = screenRDSDetail
+				return m, m.executeRDSAction(m.rdsAction, m.selectedRDS.DBInstanceID)
+			}
+		case "n", "esc":
+			m.screen = screenRDSDetail
+		}
+		return m, nil
+	}
+
+	// Stop/failover require typing the identifier to confirm
+	// For Aurora cluster members, confirm with cluster ID; for standalone, instance ID
+	confirmTarget := ""
+	if m.selectedRDS != nil {
+		if m.selectedRDS.IsClusterMember() {
+			confirmTarget = m.selectedRDS.ClusterID
+		} else {
+			confirmTarget = m.selectedRDS.DBInstanceID
+		}
+	}
 	switch msg.String() {
-	case "y", "enter":
-		if m.selectedRDS != nil {
+	case "esc":
+		m.screen = screenRDSDetail
+	case "enter":
+		if m.selectedRDS != nil && m.rdsConfirmInput == confirmTarget {
 			m.screen = screenRDSDetail
 			return m, m.executeRDSAction(m.rdsAction, m.selectedRDS.DBInstanceID)
 		}
-	case "n", "esc":
-		m.screen = screenRDSDetail
+	case "backspace":
+		if len(m.rdsConfirmInput) > 0 {
+			m.rdsConfirmInput = m.rdsConfirmInput[:len(m.rdsConfirmInput)-1]
+		}
+	default:
+		if runes := msg.Runes; len(runes) > 0 {
+			m.rdsConfirmInput += string(runes)
+		}
 	}
 	return m, nil
 }
@@ -826,6 +862,10 @@ func (m Model) loadRDSInstances() tea.Cmd {
 }
 
 func (m Model) executeRDSAction(action, dbInstanceID string) tea.Cmd {
+	clusterID := ""
+	if m.selectedRDS != nil {
+		clusterID = m.selectedRDS.ClusterID
+	}
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -838,13 +878,26 @@ func (m Model) executeRDSAction(action, dbInstanceID string) tea.Cmd {
 		}
 
 		var err error
-		switch action {
-		case "start":
-			err = repo.StartDBInstance(ctx, dbInstanceID)
-		case "stop":
-			err = repo.StopDBInstance(ctx, dbInstanceID)
-		case "failover":
-			err = repo.RebootDBInstance(ctx, dbInstanceID, true)
+		if clusterID != "" {
+			// Aurora cluster-level actions
+			switch action {
+			case "start":
+				err = repo.StartDBCluster(ctx, clusterID)
+			case "stop":
+				err = repo.StopDBCluster(ctx, clusterID)
+			case "failover":
+				err = repo.FailoverDBCluster(ctx, clusterID)
+			}
+		} else {
+			// Standalone instance actions
+			switch action {
+			case "start":
+				err = repo.StartDBInstance(ctx, dbInstanceID)
+			case "stop":
+				err = repo.StopDBInstance(ctx, dbInstanceID)
+			case "failover":
+				err = repo.RebootDBInstance(ctx, dbInstanceID, true)
+			}
 		}
 		return rdsActionDoneMsg{action: action, instanceID: dbInstanceID, err: err}
 	}
@@ -908,42 +961,77 @@ func (m Model) startSSMSession(inst awsservice.EC2Instance) tea.Cmd {
 	}
 }
 
+// fitToHeight ensures the rendered output is exactly m.height lines.
+// It pads short content with blank lines and truncates long content,
+// keeping both the header (top) and footer (bottom) visible by trimming
+// from the middle of the content area.
+func (m Model) fitToHeight(s string) string {
+	if m.height <= 0 {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	// Remove trailing empty line if present (common from trailing \n)
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	if len(lines) <= m.height {
+		// Pad to exact height so the terminal doesn't shift
+		for len(lines) < m.height {
+			lines = append(lines, "")
+		}
+		return strings.Join(lines, "\n")
+	}
+	// Content overflows: keep first (height-2) lines + last 1 line (footer)
+	// with a "..." indicator
+	footerLines := 1
+	headerLines := m.height - footerLines - 1 // -1 for the "..." line
+	if headerLines < 1 {
+		headerLines = 1
+	}
+	result := make([]string, 0, m.height)
+	result = append(result, lines[:headerLines]...)
+	result = append(result, dimStyle.Render("  ..."))
+	result = append(result, lines[len(lines)-footerLines:]...)
+	return strings.Join(result, "\n")
+}
+
 // View renders the current screen.
 func (m Model) View() string {
 	if m.quitting {
 		return ""
 	}
 
+	var v string
 	switch m.screen {
 	case screenServiceList:
-		return m.viewServiceList()
+		v = m.viewServiceList()
 	case screenFeatureList:
-		return m.viewFeatureList()
+		v = m.viewFeatureList()
 	case screenInstanceList:
-		return m.viewInstanceList()
+		v = m.viewInstanceList()
 	case screenVPCList:
-		return m.viewVPCList()
+		v = m.viewVPCList()
 	case screenSubnetList:
-		return m.viewSubnetList()
+		v = m.viewSubnetList()
 	case screenSubnetDetail:
-		return m.viewSubnetDetail()
+		v = m.viewSubnetDetail()
 	case screenRDSList:
-		return m.viewRDSList()
+		v = m.viewRDSList()
 	case screenRDSDetail:
-		return m.viewRDSDetail()
+		v = m.viewRDSDetail()
 	case screenRDSConfirm:
-		return m.viewRDSConfirm()
+		v = m.viewRDSConfirm()
 	case screenContextPicker:
-		return m.viewContextPicker()
+		v = m.viewContextPicker()
 	case screenContextAdd:
-		return m.viewContextAdd()
+		v = m.viewContextAdd()
 	case screenLoading:
-		return m.viewLoading()
+		v = m.viewLoading()
 	case screenError:
-		return m.viewError()
+		v = m.viewError()
 	}
 
-	return ""
+	return m.fitToHeight(v)
 }
 
 var (
@@ -1097,7 +1185,16 @@ func (m Model) viewContextPicker() string {
 		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + regionCol.Render("REGION") + "AUTH"))
 		b.WriteString("\n")
 
-		for i, ctx := range m.ctxList {
+		// overhead: title (1) + blank (1) + table header (1) + blank (1) + footer (1) = 5
+		visibleLines := max(m.height-5, 3)
+		start := 0
+		if m.ctxIdx >= visibleLines {
+			start = m.ctxIdx - visibleLines + 1
+		}
+		end := min(start+visibleLines, len(m.ctxList))
+
+		for i := start; i < end; i++ {
+			ctx := m.ctxList[i]
 			cursor := "  "
 			style := normalStyle
 			if i == m.ctxIdx {
@@ -1152,7 +1249,16 @@ func (m Model) viewServiceList() string {
 	b.WriteString(titleStyle.Render("Select AWS Service"))
 	b.WriteString("\n\n")
 
-	for i, svc := range m.services {
+	// overhead: status bar (2 lines) + title (1) + blank (1) + blank (1) + footer (1) = 6
+	visibleLines := max(m.height-6, 3)
+	start := 0
+	if m.svcIdx >= visibleLines {
+		start = m.svcIdx - visibleLines + 1
+	}
+	end := min(start+visibleLines, len(m.services))
+
+	for i := start; i < end; i++ {
+		svc := m.services[i]
 		cursor := "  "
 		style := normalStyle
 		if i == m.svcIdx {
@@ -1175,7 +1281,44 @@ func (m Model) viewFeatureList() string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s > Select Feature", svcName)))
 	b.WriteString("\n\n")
 
-	for i, feat := range m.features {
+	// Each selected item takes 2 lines (name + description), others take 1.
+	// overhead: status bar (2) + title (1) + blank (1) + blank (1) + footer (1) = 6
+	visibleLines := max(m.height-6, 3)
+	start := 0
+	// Count lines from start to cursor to determine if we need to scroll
+	linesFromStart := 0
+	for i := 0; i <= m.featIdx && i < len(m.features); i++ {
+		linesFromStart++
+		if i == m.featIdx {
+			linesFromStart++ // selected item has description line
+		}
+	}
+	if linesFromStart > visibleLines {
+		// Scroll forward: find start index that fits cursor in view
+		linesFromStart = 0
+		for i := m.featIdx; i >= 0; i-- {
+			needed := 1
+			if i == m.featIdx {
+				needed = 2
+			}
+			if linesFromStart+needed > visibleLines {
+				start = i + 1
+				break
+			}
+			linesFromStart += needed
+		}
+	}
+
+	linesUsed := 0
+	for i := start; i < len(m.features); i++ {
+		feat := m.features[i]
+		needed := 1
+		if i == m.featIdx {
+			needed = 2
+		}
+		if linesUsed+needed > visibleLines {
+			break
+		}
 		cursor := "  "
 		style := normalStyle
 		if i == m.featIdx {
@@ -1188,6 +1331,7 @@ func (m Model) viewFeatureList() string {
 			b.WriteString(dimStyle.Render(fmt.Sprintf("    %s", feat.Description)))
 			b.WriteString("\n")
 		}
+		linesUsed += needed
 	}
 
 	b.WriteString("\n")
@@ -1481,27 +1625,31 @@ func (m Model) viewRDSDetail() string {
 	}
 
 	b.WriteString("\n")
+	suffix := ""
+	if r.IsClusterMember() {
+		suffix = " Cluster"
+	}
 	b.WriteString(titleStyle.Render("Actions"))
 	b.WriteString("\n")
 	if r.CanStart() {
-		b.WriteString(normalStyle.Render("  [s] Start"))
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  [s] Start%s", suffix)))
 		b.WriteString("\n")
 	} else {
-		b.WriteString(dimStyle.Render("  [s] Start"))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  [s] Start%s", suffix)))
 		b.WriteString("\n")
 	}
 	if r.CanStop() {
-		b.WriteString(normalStyle.Render("  [x] Stop"))
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  [x] Stop%s", suffix)))
 		b.WriteString("\n")
 	} else {
-		b.WriteString(dimStyle.Render("  [x] Stop"))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  [x] Stop%s", suffix)))
 		b.WriteString("\n")
 	}
 	if r.CanFailover() {
-		b.WriteString(normalStyle.Render("  [f] Failover"))
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  [f] Failover%s", suffix)))
 		b.WriteString("\n")
 	} else {
-		b.WriteString(dimStyle.Render("  [f] Failover"))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  [f] Failover%s", suffix)))
 		b.WriteString("\n")
 	}
 	b.WriteString(normalStyle.Render("  [r] Refresh"))
@@ -1516,13 +1664,37 @@ func (m Model) viewRDSConfirm() string {
 	if m.selectedRDS == nil {
 		return ""
 	}
+	r := m.selectedRDS
+
+	// For Aurora cluster members, show cluster-level info
+	targetLabel := "instance"
+	targetID := r.DBInstanceID
+	if r.IsClusterMember() {
+		targetLabel = "cluster"
+		targetID = r.ClusterID
+	}
+
 	var b strings.Builder
 	b.WriteString(errorStyle.Render("Confirm Action"))
 	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Are you sure you want to %s instance %s?",
-		m.rdsAction, m.selectedRDS.DBInstanceID)))
-	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render("  [y] Yes  [n] No"))
-	b.WriteString("\n")
+
+	if m.rdsAction == "start" {
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  Are you sure you want to start %s %s?",
+			targetLabel, targetID)))
+		b.WriteString("\n\n")
+		b.WriteString(normalStyle.Render("  [y] Yes  [n] No"))
+		b.WriteString("\n")
+	} else {
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  You are about to %s %s:", m.rdsAction, targetLabel)))
+		b.WriteString("\n")
+		b.WriteString(selectedStyle.Render(fmt.Sprintf("  %s", targetID)))
+		b.WriteString("\n\n")
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  Type the %s identifier to confirm:", targetLabel)))
+		b.WriteString("\n")
+		b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.rdsConfirmInput)))
+		b.WriteString("\n\n")
+		b.WriteString(dimStyle.Render("  enter: confirm • esc: cancel"))
+		b.WriteString("\n")
+	}
 	return b.String()
 }

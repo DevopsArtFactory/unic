@@ -30,19 +30,30 @@ func (r RDSInstance) FilterText() string {
 		r.DBInstanceID, r.Engine, r.EngineVersion, r.Status, r.InstanceClass, r.ClusterID))
 }
 
-// CanStop returns true if the instance can be stopped.
-// Aurora cluster members cannot be stopped individually.
-func (r RDSInstance) CanStop() bool {
-	return r.Status == "available" && r.ClusterID == ""
+// IsClusterMember returns true if this instance belongs to an Aurora cluster.
+func (r RDSInstance) IsClusterMember() bool {
+	return r.ClusterID != ""
 }
 
-// CanStart returns true if the instance can be started.
+// CanStop returns true if the instance (or its cluster) can be stopped.
+func (r RDSInstance) CanStop() bool {
+	if r.IsClusterMember() {
+		return r.Status == "available"
+	}
+	return r.Status == "available"
+}
+
+// CanStart returns true if the instance (or its cluster) can be started.
 func (r RDSInstance) CanStart() bool {
 	return r.Status == "stopped"
 }
 
-// CanFailover returns true if the instance supports Multi-AZ failover.
+// CanFailover returns true if the instance supports failover.
+// Aurora cluster members use cluster-level failover; standalone instances need Multi-AZ.
 func (r RDSInstance) CanFailover() bool {
+	if r.IsClusterMember() {
+		return r.Status == "available"
+	}
 	return r.Status == "available" && r.MultiAZ
 }
 

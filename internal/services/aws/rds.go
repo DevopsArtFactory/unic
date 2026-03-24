@@ -102,3 +102,36 @@ func (r *AwsRepository) RebootDBInstance(ctx context.Context, dbInstanceID strin
 	}
 	return nil
 }
+
+// StopDBCluster stops an Aurora DB cluster.
+func (r *AwsRepository) StopDBCluster(ctx context.Context, clusterID string) error {
+	_, err := r.RDSClient.StopDBCluster(ctx, &rds.StopDBClusterInput{
+		DBClusterIdentifier: awssdk.String(clusterID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to stop DB cluster %s: %w", clusterID, err)
+	}
+	return nil
+}
+
+// StartDBCluster starts a stopped Aurora DB cluster.
+func (r *AwsRepository) StartDBCluster(ctx context.Context, clusterID string) error {
+	_, err := r.RDSClient.StartDBCluster(ctx, &rds.StartDBClusterInput{
+		DBClusterIdentifier: awssdk.String(clusterID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to start DB cluster %s: %w", clusterID, err)
+	}
+	return nil
+}
+
+// FailoverDBCluster triggers a failover for an Aurora DB cluster.
+func (r *AwsRepository) FailoverDBCluster(ctx context.Context, clusterID string) error {
+	_, err := r.RDSClient.FailoverDBCluster(ctx, &rds.FailoverDBClusterInput{
+		DBClusterIdentifier: awssdk.String(clusterID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to failover DB cluster %s: %w", clusterID, err)
+	}
+	return nil
+}

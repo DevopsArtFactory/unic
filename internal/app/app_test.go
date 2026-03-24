@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -215,24 +216,28 @@ func TestRDSDetailFailoverGoesToConfirm(t *testing.T) {
 	}
 }
 
-func TestRDSDetailNoStopForClusterMember(t *testing.T) {
+func TestRDSDetailStopClusterMember(t *testing.T) {
 	m := New(testConfig(), "")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: "my-cluster"}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	model := updated.(Model)
-	// Should stay on detail screen since CanStop() is false
-	if model.screen != screenRDSDetail {
-		t.Errorf("expected to stay on detail screen, got %d", model.screen)
+	// Aurora cluster members can be stopped (cluster-level stop)
+	if model.screen != screenRDSConfirm {
+		t.Errorf("expected confirm screen for cluster stop, got %d", model.screen)
+	}
+	if model.rdsAction != "stop" {
+		t.Errorf("expected action 'stop', got %q", model.rdsAction)
 	}
 }
 
 func TestRDSConfirmNoGoesBack(t *testing.T) {
+	// For start action, 'n' cancels back to detail
 	m := New(testConfig(), "")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
-	m.rdsAction = "stop"
+	m.rdsAction = "start"
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	model := updated.(Model)
@@ -376,5 +381,210 @@ func TestRDSConfirmViewNotEmpty(t *testing.T) {
 	v := m.View()
 	if v == "" {
 		t.Error("RDS confirm view should not be empty")
+	}
+}
+
+func TestRDSConfirmStopRequiresTypedInput(t *testing.T) {
+	// Test with standalone instance (confirm target = instance ID)
+	m := New(testConfig(), "")
+	m.screen = screenRDSConfirm
+	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", ClusterID: ""}
+	m.rdsAction = "stop"
+	m.rdsConfirmInput = ""
+
+	// Enter without typing anything — should stay on confirm screen
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenRDSConfirm {
+		t.Error("enter without input should stay on confirm screen")
+	}
+	if cmd != nil {
+		t.Error("should not execute action without correct input")
+	}
+
+	// Type wrong text + enter — should stay on confirm screen
+	model.rdsConfirmInput = "wrong-name"
+	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenRDSConfirm {
+		t.Error("enter with wrong input should stay on confirm screen")
+	}
+	if cmd != nil {
+		t.Error("should not execute action with wrong input")
+	}
+
+	// Type correct instance ID + enter — should execute
+	model.rdsConfirmInput = "db-1"
+	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenRDSDetail {
+		t.Errorf("expected detail screen after correct input, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Error("expected action command after correct input")
+	}
+}
+
+func TestRDSConfirmStopClusterRequiresClusterID(t *testing.T) {
+	// Test with Aurora cluster member (confirm target = cluster ID)
+	m := New(testConfig(), "")
+	m.screen = screenRDSConfirm
+	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "inst-1", ClusterID: "my-cluster", Status: "available"}
+	m.rdsAction = "stop"
+	m.rdsConfirmInput = ""
+
+	// Type instance ID (wrong target) — should stay
+	m.rdsConfirmInput = "inst-1"
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenRDSConfirm {
+		t.Error("typing instance ID for cluster member should not confirm")
+	}
+	if cmd != nil {
+		t.Error("should not execute action with instance ID for cluster action")
+	}
+
+	// Type cluster ID (correct target) — should execute
+	model.rdsConfirmInput = "my-cluster"
+	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenRDSDetail {
+		t.Errorf("expected detail screen after typing cluster ID, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Error("expected action command after correct cluster ID input")
+	}
+}
+
+func TestRDSConfirmFailoverRequiresTypedInput(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenRDSConfirm
+	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "prod-db", MultiAZ: true}
+	m.rdsAction = "failover"
+	m.rdsConfirmInput = ""
+
+	// Enter without typing — should stay
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenRDSConfirm {
+		t.Error("enter without input should stay on confirm screen")
+	}
+	if cmd != nil {
+		t.Error("should not execute action without correct input")
+	}
+
+	// Type correct instance ID + enter — should execute
+	model.rdsConfirmInput = "prod-db"
+	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenRDSDetail {
+		t.Errorf("expected detail screen after correct input, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Error("expected action command after correct input")
+	}
+}
+
+func TestRDSConfirmStartUsesSimpleYN(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenRDSConfirm
+	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "stopped"}
+	m.rdsAction = "start"
+
+	// Pressing 'y' should execute immediately (no typing required)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	model := updated.(Model)
+	if model.screen != screenRDSDetail {
+		t.Errorf("expected detail screen after 'y' on start, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Error("expected action command after 'y' on start")
+	}
+}
+
+func TestRDSConfirmInputBackspace(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenRDSConfirm
+	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
+	m.rdsAction = "stop"
+	m.rdsConfirmInput = ""
+
+	// Type "abc"
+	for _, ch := range "abc" {
+		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		m = updated.(Model)
+	}
+	if m.rdsConfirmInput != "abc" {
+		t.Errorf("expected 'abc', got %q", m.rdsConfirmInput)
+	}
+
+	// Backspace
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	m = updated.(Model)
+	if m.rdsConfirmInput != "ab" {
+		t.Errorf("expected 'ab' after backspace, got %q", m.rdsConfirmInput)
+	}
+}
+
+func TestRDSConfirmInputResetOnEntry(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenRDSDetail
+	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: ""}
+	m.rdsConfirmInput = "leftover"
+
+	// Press 'x' to go to confirm screen
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	model := updated.(Model)
+	if model.screen != screenRDSConfirm {
+		t.Errorf("expected confirm screen, got %d", model.screen)
+	}
+	if model.rdsConfirmInput != "" {
+		t.Errorf("expected empty confirm input on entry, got %q", model.rdsConfirmInput)
+	}
+}
+
+func TestFitToHeight(t *testing.T) {
+	m := New(testConfig(), "")
+
+	// height=0 → no change
+	m.height = 0
+	input := "line1\nline2\nline3"
+	if got := m.fitToHeight(input); got != input {
+		t.Errorf("height=0 should not change output, got %q", got)
+	}
+
+	// Content fits → padded to exact height
+	m.height = 5
+	input = "line1\nline2\nline3"
+	got := m.fitToHeight(input)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 5 {
+		t.Errorf("expected 5 lines (padded), got %d", len(lines))
+	}
+
+	// Content exceeds → trimmed to height with footer preserved
+	m.height = 4
+	input = "line1\nline2\nline3\nline4\nline5\nfooter"
+	got = m.fitToHeight(input)
+	lines = strings.Split(got, "\n")
+	if len(lines) != 4 {
+		t.Errorf("expected 4 lines, got %d", len(lines))
+	}
+}
+
+func TestViewFitsTerminalHeight(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenRDSDetail
+	m.height = 10
+	m.selectedRDS = &awsservice.RDSInstance{
+		DBInstanceID: "db-1", Engine: "mysql", EngineVersion: "8.0",
+		Status: "available", InstanceClass: "db.t3.micro", MultiAZ: true, StorageGB: 20,
+		Endpoint: "db-1.abc.us-east-1.rds.amazonaws.com:3306",
+	}
+
+	v := m.View()
+	lines := strings.Split(v, "\n")
+	if len(lines) > m.height {
+		t.Errorf("view output has %d lines, exceeds terminal height %d", len(lines), m.height)
 	}
 }
