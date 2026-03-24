@@ -15,21 +15,21 @@ func testConfig() *config.Config {
 }
 
 func TestNewModelNotQuitting(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	if m.quitting {
 		t.Error("new model should not be quitting")
 	}
 }
 
-func TestNewModelStartsOnServiceList(t *testing.T) {
-	m := New(testConfig())
-	if m.screen != screenServiceList {
-		t.Error("new model should start on service list screen")
+func TestNewModelStartsOnContextPicker(t *testing.T) {
+	m := New(testConfig(), "")
+	if m.screen != screenContextPicker {
+		t.Error("new model should start on context picker screen")
 	}
 }
 
 func TestQuitOnCtrlC(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	model := updated.(Model)
 	if !model.quitting {
@@ -41,7 +41,8 @@ func TestQuitOnCtrlC(t *testing.T) {
 }
 
 func TestQuitOnQ(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
+	m.screen = screenServiceList
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	model := updated.(Model)
 	if !model.quitting {
@@ -53,7 +54,7 @@ func TestQuitOnQ(t *testing.T) {
 }
 
 func TestViewNotEmpty(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	v := m.View()
 	if v == "" {
 		t.Error("view should not be empty when not quitting")
@@ -69,7 +70,8 @@ func TestViewEmptyWhenQuitting(t *testing.T) {
 }
 
 func TestServiceListNavigation(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
+	m.screen = screenServiceList
 	// Press down — should move to index 1 (now 2 services: EC2, VPC)
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
@@ -79,7 +81,8 @@ func TestServiceListNavigation(t *testing.T) {
 }
 
 func TestServiceListEnterGoesToFeatures(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
+	m.screen = screenServiceList
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 	if model.screen != screenFeatureList {
@@ -88,7 +91,7 @@ func TestServiceListEnterGoesToFeatures(t *testing.T) {
 }
 
 func TestFeatureListEscGoesBack(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenFeatureList
 	m.features = m.services[0].Features
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -101,7 +104,7 @@ func TestFeatureListEscGoesBack(t *testing.T) {
 // --- RDS screen tests ---
 
 func TestRDSListNavigation(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
@@ -125,7 +128,7 @@ func TestRDSListNavigation(t *testing.T) {
 }
 
 func TestRDSListEnterGoesToDetail(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
@@ -143,7 +146,7 @@ func TestRDSListEnterGoesToDetail(t *testing.T) {
 }
 
 func TestRDSListEscGoesBack(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{}
 	m.filteredRDS = m.rdsInstances
@@ -156,7 +159,7 @@ func TestRDSListEscGoesBack(t *testing.T) {
 }
 
 func TestRDSDetailEscGoesBack(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available"}
 
@@ -168,7 +171,7 @@ func TestRDSDetailEscGoesBack(t *testing.T) {
 }
 
 func TestRDSDetailStopGoesToConfirm(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: ""}
 
@@ -183,7 +186,7 @@ func TestRDSDetailStopGoesToConfirm(t *testing.T) {
 }
 
 func TestRDSDetailStartGoesToConfirm(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "stopped"}
 
@@ -198,7 +201,7 @@ func TestRDSDetailStartGoesToConfirm(t *testing.T) {
 }
 
 func TestRDSDetailFailoverGoesToConfirm(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", MultiAZ: true}
 
@@ -213,7 +216,7 @@ func TestRDSDetailFailoverGoesToConfirm(t *testing.T) {
 }
 
 func TestRDSDetailNoStopForClusterMember(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: "my-cluster"}
 
@@ -226,7 +229,7 @@ func TestRDSDetailNoStopForClusterMember(t *testing.T) {
 }
 
 func TestRDSConfirmNoGoesBack(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 	m.rdsAction = "stop"
@@ -239,7 +242,7 @@ func TestRDSConfirmNoGoesBack(t *testing.T) {
 }
 
 func TestRDSConfirmEscGoesBack(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 	m.rdsAction = "stop"
@@ -252,7 +255,7 @@ func TestRDSConfirmEscGoesBack(t *testing.T) {
 }
 
 func TestRDSListFilter(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{
 		{DBInstanceID: "prod-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
@@ -282,7 +285,7 @@ func TestRDSListFilter(t *testing.T) {
 }
 
 func TestRDSActionDoneMsg_Success(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 
@@ -300,7 +303,7 @@ func TestRDSActionDoneMsg_Success(t *testing.T) {
 }
 
 func TestRDSInstancesLoadedMsg(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenLoading
 
 	instances := []awsservice.RDSInstance{
@@ -317,7 +320,7 @@ func TestRDSInstancesLoadedMsg(t *testing.T) {
 }
 
 func TestFeatureListRDSBrowserGoesToLoading(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenFeatureList
 	m.features = []domain.Feature{
 		{Kind: domain.FeatureRDSBrowser, Description: "Browse RDS instances"},
@@ -335,7 +338,7 @@ func TestFeatureListRDSBrowserGoesToLoading(t *testing.T) {
 }
 
 func TestRDSViewNotEmpty(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro", EngineVersion: "8.0"},
@@ -350,7 +353,7 @@ func TestRDSViewNotEmpty(t *testing.T) {
 }
 
 func TestRDSDetailViewNotEmpty(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{
 		DBInstanceID: "db-1", Engine: "mysql", EngineVersion: "8.0",
@@ -365,7 +368,7 @@ func TestRDSDetailViewNotEmpty(t *testing.T) {
 }
 
 func TestRDSConfirmViewNotEmpty(t *testing.T) {
-	m := New(testConfig())
+	m := New(testConfig(), "")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 	m.rdsAction = "stop"

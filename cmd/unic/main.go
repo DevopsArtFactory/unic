@@ -30,7 +30,7 @@ func main() {
 			return fmt.Errorf("config load error: %w", err)
 		}
 
-		p := tea.NewProgram(app.New(cfg), tea.WithAltScreen())
+		p := tea.NewProgram(app.New(cfg, configPath), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("TUI error: %w", err)
 		}
