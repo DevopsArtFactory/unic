@@ -50,3 +50,37 @@ func TestAllServicesHaveFeatures(t *testing.T) {
 		}
 	}
 }
+
+func TestCatalogContainsRDS(t *testing.T) {
+	services := Catalog()
+
+	found := false
+	for _, svc := range services {
+		if svc.Name == ServiceRDS {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("catalog should contain RDS service")
+	}
+}
+
+func TestRDSHasBrowserFeature(t *testing.T) {
+	services := Catalog()
+
+	for _, svc := range services {
+		if svc.Name == ServiceRDS {
+			for _, feat := range svc.Features {
+				if feat.Kind == FeatureRDSBrowser {
+					return
+				}
+			}
+			t.Error("RDS service should have RDS Browser feature")
+			return
+		}
+	}
+
+	t.Error("RDS service not found in catalog")
+}

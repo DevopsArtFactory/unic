@@ -21,5 +21,14 @@ func Catalog() []Service {
 				},
 			},
 		},
+		{
+			Name: ServiceRDS,
+			Features: []Feature{
+				{
+					Kind:        FeatureRDSBrowser,
+					Description: "Browse RDS instances, start/stop, failover",
+				},
+			},
+		},
 	}
 }
