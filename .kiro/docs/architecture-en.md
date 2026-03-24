@@ -12,7 +12,7 @@ It manages authentication contexts via `~/.config/unic/config.yaml` and provides
 | Language | Go | 1.22+ |
 | TUI | Bubbletea + Lipgloss + Bubbles | latest |
 | CLI | Cobra | latest |
-| AWS | aws-sdk-go-v2 (ec2, sts) | latest |
+| AWS | aws-sdk-go-v2 (ec2, ssm, sts) | latest |
 | Config | gopkg.in/yaml.v3 | 0.9 |
 | Concurrency | goroutines + errgroup | stdlib |
 | Error | fmt.Errorf / errors | stdlib |
@@ -44,9 +44,10 @@ It manages authentication contexts via `~/.config/unic/config.yaml` and provides
     │  ┌──────────────────────────┐     │
     │  │ ServiceList              │     │
     │  │  └─ FeatureList          │     │
+    │  │      ├─ InstanceList     │     │
     │  │      └─ VpcList          │     │
     │  │          └─ SubnetList   │     │
-    │  │              └─ Result   │     │
+    │  │              └─ Detail   │     │
     │  └──────────────────────────┘     │
     └──────────────────┬────────────────┘
                        │
@@ -59,12 +60,13 @@ It manages authentication contexts via `~/.config/unic/config.yaml` and provides
     ┌──────────────────▼────────────────┐
     │  internal/services/aws/ (API)     │
     │  AwsRepository                    │
+    │  ├─ repository.go (client init)   │
+    │  ├─ ec2.go   (EC2 instances)      │
+    │  ├─ ec2_model.go (EC2Instance)    │
     │  ├─ vpc.go   (VPC/Subnet/IP)      │
-    │  ├─ rds.go   (not implemented)    │
-    │  ├─ iam.go   (not implemented)    │
-    │  ├─ ssm.go   (not implemented)    │
-    │  ├─ ipcalc.go (CIDR calculation)  │
-    │  └─ env.go   (env var handling)   │
+    │  ├─ vpc_model.go (VPC, Subnet)    │
+    │  ├─ ssm.go   (session mgmt)       │
+    │  └─ ssm_exec.go (plugin exec)     │
     └───────────────────────────────────┘
 ```
 
@@ -123,11 +125,14 @@ Screens are managed as a stack of Bubbletea `Model` implementations:
 
 | Screen | Description | Data Source |
 |--------|-------------|-------------|
-| ServiceList | AWS service list | `catalog.ListServices()` |
-| FeatureList | Features for the selected service | `catalog.ListFeatures()` |
-| VpcList | VPC list | `AwsRepository.ListVpcs()` |
-| SubnetList | Subnet list | `AwsRepository.ListSubnets()` |
-| ResultView | Scrollable result display | Per-feature API results |
+| ServiceList | AWS service list | `domain.Catalog()` |
+| FeatureList | Features for the selected service | `domain.Catalog()` |
+| InstanceList | SSM-eligible EC2 instances (with filter) | `AwsRepository.ListRunningInstances()` |
+| VPCList | VPC list | `AwsRepository.ListVPCs()` |
+| SubnetList | Subnets for selected VPC | `AwsRepository.ListSubnets()` |
+| SubnetDetail | Available IPs in selected subnet | `AwsRepository.ListAvailableIPs()` |
+| Loading | Loading indicator | — |
+| Error | Error display | — |
 
 ### Key Bindings
 
@@ -135,44 +140,42 @@ Screens are managed as a stack of Bubbletea `Model` implementations:
 |-----|--------|
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
-| `g` / `Home` | Scroll to top |
-| `G` / `End` | Scroll to bottom |
 | `Enter` | Select (next screen) |
-| `Backspace` / `Esc` / `←` | Previous screen |
-| `r` | Refresh current screen |
-| `q` | Quit |
+| `Esc` / `q` | Previous screen |
+| `H` | Go to home (service list) |
+| `/` | Toggle filter (instance list, IP list) |
+| `q` (on service list) | Quit |
 
 ## CLI Subcommands
 
 ```
 unic                          # Enter TUI mode
-unic --context dev-sso        # Enter TUI with a specific context
 unic --profile my-profile     # Use a specific profile
 unic --region ap-northeast-2  # Use a specific region
 
-unic context list             # List configured contexts
-unic context current          # Print current context
-unic context use [name]       # Switch context (interactive selection if name omitted)
+unic init                     # Create default config file
+unic init --force             # Overwrite existing config file
 ```
 
 ## Currently Implemented Features
 
 | Service | Feature | Status |
 |---------|---------|--------|
-| VPC | RemainPrivateIP (subnet available IP query) | ✅ Implemented |
+| EC2 | SSM Session Manager (connect to EC2 instances) | ✅ Implemented |
+| VPC | VPC Browser (VPCs → subnets → available IPs) | ✅ Implemented |
 | RDS | ListDBInstances | 🚧 Coming Soon |
 | Route53 | ListHostedZones | 🚧 Coming Soon |
 | IAM | ListUsers | 🚧 Coming Soon |
 
 ## New Feature Addition Checklist
 
-1. `internal/domain/model.go` → Add constant to `AwsService` / `FeatureKind` types
-2. `internal/domain/catalog.go` → Add mapping in `ListServices()` / `ListFeatures()`
-3. `internal/services/aws/` → Create new file, add `AwsRepository` method
-4. `internal/app/actions.go` → Add new `FeatureKind` branch in screen transition
-5. If needed: `internal/app/screens.go` → Add new screen model
+1. `internal/domain/model.go` → Add `AwsService` and `FeatureKind` string constants
+2. `internal/domain/catalog.go` → Add `Service` entry in `Catalog()`
+3. `internal/services/aws/` → Create new file with `AwsRepository` method + model file
+4. `internal/services/aws/repository.go` → Add client interface and field to `AwsRepository`
+5. `internal/app/app.go` → Add new screen constant and feature handling in `Update()`
 6. If needed: `go.mod` → Add new AWS SDK module via `go get`
-7. Write tests
+7. Write tests with mock client
 
 ## Build & Run
 

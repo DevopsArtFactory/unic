@@ -11,7 +11,7 @@ UNIC is a Go-based TUI (Terminal User Interface) tool for browsing and managing 
 - Language: Go (1.22+)
 - TUI Framework: Bubbletea + Lipgloss + Bubbles
 - CLI Parser: Cobra
-- AWS SDK: aws-sdk-go-v2 (ec2, sts, config, credentials)
+- AWS SDK: aws-sdk-go-v2 (ec2, ssm, sts)
 - Config: gopkg.in/yaml.v3 (YAML-based)
 - Concurrency: goroutines + errgroup
 - Error Handling: fmt.Errorf wrapping / standard errors package
@@ -60,39 +60,30 @@ cmd/
 
 internal/
 ├── cli/                     # Cobra-based CLI definitions
-│   ├── root.go              # Root command, global flags
-│   └── context.go           # Context subcommands
+│   ├── root.go              # Root command, global flags (--profile, --region)
+│   └── init.go              # unic init subcommand
 ├── config/                  # Load/save ~/.config/unic/config.yaml
 │   └── config.go
-├── auth/                    # SSO/STS authentication logic
-│   ├── auth.go              # ApplyContextSideEffects (auth branching)
-│   ├── sso.go               # Run aws sso login
-│   ├── sts.go               # STS AssumeRole
-│   ├── aws_files.go         # ~/.aws/config & credentials file management
-│   └── session_env.go       # Env var setup + session.env file generation
 ├── domain/                  # Business domain models
-│   ├── catalog.go           # Service/feature catalog definitions
-│   └── model.go             # AwsService, FeatureKind, ResourceItem, etc.
+│   ├── model.go             # AwsService, FeatureKind, Service, Feature
+│   └── catalog.go           # Service/feature catalog (Catalog())
 ├── app/                     # Bubbletea TUI application
-│   ├── app.go               # Root model, initialization, key handling
-│   ├── screens.go           # Screen types and navigation stack
-│   ├── actions.go           # Screen transition logic
-│   └── navigation.go        # Cursor movement, scrolling
-├── tui/                     # Reusable Bubbletea components
-│   ├── components.go        # Filterable list, dialog, spinner, etc.
-│   └── styles.go            # Lipgloss style definitions
+│   └── app.go               # Root model, screens, navigation, rendering
 └── services/                # AWS API call implementations
     └── aws/
-        ├── repository.go    # AwsRepository (client initialization)
+        ├── repository.go    # AwsRepository (EC2/SSM client initialization)
+        ├── ec2.go           # EC2 instance listing (SSM-managed)
+        ├── ec2_model.go     # EC2Instance model
         ├── vpc.go           # VPC/Subnet/IP queries
-        ├── rds.go           # RDS (not yet implemented)
-        ├── iam.go           # IAM (not yet implemented)
-        ├── ssm.go           # SSM (not yet implemented)
-        ├── env.go           # Env var reading + debug lines
-        ├── ipcalc.go        # CIDR-based available IP calculation
-        └── model.go         # SubnetIpAvailability
+        ├── vpc_model.go     # VPC, Subnet models
+        ├── ssm.go           # SSM session start/terminate
+        └── ssm_exec.go      # session-manager-plugin subprocess execution
 
+.goreleaser.yaml             # Release configuration
 go.mod
 go.sum
 Makefile
 ```
+
+> **Note**: `internal/auth/` and `internal/tui/` are planned but not yet implemented.
+> TUI screens, navigation, and styles are currently consolidated in `internal/app/app.go`.

@@ -7,55 +7,49 @@ inclusion: auto
 ## Module Structure Principles
 
 - `internal/domain/` must not depend on the AWS SDK. It defines pure business models only.
-- `internal/services/aws/` handles actual AWS API calls. Add methods to the `AwsRepository` struct.
-- `internal/app/` is the Bubbletea TUI application. Screens are managed via the Bubbletea `Model` interface.
-- `internal/auth/` contains authentication logic only. It does not couple directly with the TUI.
-- `internal/tui/` holds reusable Bubbletea components and Lipgloss styles.
+- `internal/services/aws/` handles actual AWS API calls. Add methods to the `AwsRepository` struct. Uses interface-based clients for testability.
+- `internal/app/` is the Bubbletea TUI application. Contains all screens, navigation, styles, and rendering in `app.go`.
 - `internal/cli/` defines Cobra commands and flag parsing.
 
 ## How to Add a New AWS Service
 
 ### Step 1: Register the Domain Model
 
-Add a new constant to the `AwsService` type in `internal/domain/model.go`:
+Add new constants to `internal/domain/model.go`:
 ```go
-type AwsService int
+type AwsService string
 
 const (
-    ServiceVpc AwsService = iota
-    ServiceRds
-    ServiceRoute53
-    ServiceIam
-    ServiceNewService // add here
+    ServiceEC2 AwsService = "EC2"
+    ServiceVPC AwsService = "VPC"
+    ServiceNewService AwsService = "NewService" // add here
+)
+
+type FeatureKind string
+
+const (
+    FeatureSSMSession FeatureKind = "SSM Sessions Manager"
+    FeatureVPCBrowser FeatureKind = "VPC Browser"
+    FeatureNewFeature FeatureKind = "New Feature" // add here
 )
 ```
-
-Update the `Label()` and `String()` methods accordingly.
 
 ### Step 2: Register in the Feature Catalog
 
-Add a feature constant to `internal/domain/model.go`:
+Add the service with its features in `internal/domain/catalog.go`:
 ```go
-type FeatureKind int
-
-const (
-    FeatureRemainPrivateIp FeatureKind = iota
-    FeatureListDbInstances
-    FeatureNewFeature // add here
-)
-```
-
-Add the service-to-feature mapping in `internal/domain/catalog.go`:
-```go
-func ListServices() []AwsService {
-    return []AwsService{..., ServiceNewService}
-}
-
-func ListFeatures(service AwsService) []FeatureKind {
-    switch service {
-    ...
-    case ServiceNewService:
-        return []FeatureKind{FeatureNewFeature}
+func Catalog() []Service {
+    return []Service{
+        // ... existing services ...
+        {
+            Name: ServiceNewService,
+            Features: []Feature{
+                {
+                    Kind:        FeatureNewFeature,
+                    Description: "Description of the new feature",
+                },
+            },
+        },
     }
 }
 ```
@@ -74,50 +68,60 @@ Add any required AWS SDK modules to `go.mod` via `go get`.
 
 ### Step 4: Wire Up the TUI Screen
 
-Add a new `FeatureKind` branch in the screen transition logic in `internal/app/actions.go`:
+Add a new screen constant and handle the feature in the `Update()` method of `internal/app/app.go`:
 ```go
-case FeatureNewFeature:
-    items, err := repo.ListNewResources(ctx)
-    if err != nil {
-        return newErrorScreen("Load Failed", err)
-    }
-    return newResultScreen(items)
+const (
+    screenNewFeature screen = iota + ... // add new screen
+)
 ```
 
-If an intermediate selection screen is needed, create a new Bubbletea model implementing `tea.Model` in `internal/app/`.
-
-### Step 5: Add a New SDK Client (if needed)
-
-Add a new client field to `AwsRepository`:
+Handle the feature selection in the feature list's `Enter` key handler, and add a `tea.Cmd` function to load data asynchronously:
 ```go
-type AwsRepository struct {
-    ec2Client    *ec2.Client
-    newClient    *newsvc.Client // add here
-    // ...
+func (m Model) loadNewResources() tea.Msg {
+    items, err := m.repo.ListNewResources(context.Background())
+    if err != nil {
+        return errMsg{err: err}
+    }
+    return newResourcesLoadedMsg{items: items}
 }
 ```
 
-Initialize it in the constructor function.
+### Step 5: Add a New SDK Client (if needed)
 
-## Authentication Branching Logic
+Add a new client interface and field to `AwsRepository` in `repository.go`:
+```go
+type NewServiceClientAPI interface {
+    // methods needed from the SDK client
+}
 
-The core function is `ApplyContextSideEffects` in `internal/auth/auth.go`:
-- `RoleArn` present → STS AssumeRole (`sts.go`)
-- SSO profile → run `aws sso login` (`sso.go`)
-- Otherwise → set profile-based env vars
+type AwsRepository struct {
+    EC2Client EC2ClientAPI
+    SSMClient SSMClientAPI
+    NewClient NewServiceClientAPI // add here
+    Region    string
+    Profile   string
+}
+```
+
+Initialize it in `NewAwsRepository()`. Add a compile-time interface check:
+```go
+var _ NewServiceClientAPI = (*newsvc.Client)(nil)
+```
 
 ## TUI Screen Structure
 
-Screens use the Bubbletea `Model` interface with a stack-based navigation pattern:
-- `Enter` → push a new model onto the stack
-- `Backspace/Esc` → pop to return to the previous model
-- `r` → send a refresh message to the current model
+Screens are represented as `screen` integer constants in `internal/app/app.go`. Navigation uses a state-machine pattern:
+- `Enter` → transition to the next screen based on current selection
+- `Esc` / `q` → return to the previous screen
+- `H` → return to the service list from any screen
+- `/` → toggle filter input on supported screens (instance list, IP list)
 
 ## Writing Tests
 
-- Tests that call `AwsRepository` use a test configuration or mock clients
+- Tests that call `AwsRepository` use mock clients implementing the `*ClientAPI` interfaces (e.g., `EC2ClientAPI`, `SSMClientAPI`)
 - File system tests are isolated with `t.TempDir()`
 - Internal functions accept path parameters to allow test-path injection instead of real paths
+- Compile-time interface checks ensure mock clients satisfy the required interfaces
 
 ## Adding CLI Subcommands
 
