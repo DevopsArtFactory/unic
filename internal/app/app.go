@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -24,6 +25,9 @@ const (
 	screenVPCList
 	screenSubnetList
 	screenSubnetDetail
+	screenRDSList
+	screenRDSDetail
+	screenRDSConfirm
 	screenContextPicker
 	screenContextAdd
 	screenLoading
@@ -73,6 +77,25 @@ type ssmSessionDoneMsg struct {
 	err error
 }
 
+type rdsInstancesLoadedMsg struct {
+	instances []awsservice.RDSInstance
+}
+
+type rdsActionDoneMsg struct {
+	action     string
+	instanceID string
+	err        error
+}
+
+type rdsStatusRefreshedMsg struct {
+	instance *awsservice.RDSInstance
+	err      error
+}
+
+type rdsTickMsg struct {
+	instanceID string
+}
+
 // Model is the root Bubbletea model.
 type Model struct {
 	cfg      *config.Config
@@ -111,6 +134,16 @@ type Model struct {
 	ipScrollOffset int
 	ipFilter       string
 	ipFilterActive bool
+
+	// RDS browser state
+	rdsInstances    []awsservice.RDSInstance
+	filteredRDS     []awsservice.RDSInstance
+	rdsIdx          int
+	rdsFilter       string
+	rdsFilterActive bool
+	selectedRDS     *awsservice.RDSInstance
+	rdsAction       string // "start", "stop", "failover"
+	rdsPolling      bool
 
 	// Context picker
 	configPath         string
@@ -210,6 +243,49 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenSubnetDetail
 		return m, nil
 
+	case rdsInstancesLoadedMsg:
+		m.rdsInstances = msg.instances
+		m.filteredRDS = msg.instances
+		m.rdsIdx = 0
+		m.screen = screenRDSList
+		return m, nil
+
+	case rdsActionDoneMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil
+		}
+		m.rdsPolling = true
+		m.screen = screenRDSDetail
+		return m, m.tickRDSPoll(msg.instanceID)
+
+	case rdsStatusRefreshedMsg:
+		if msg.err != nil {
+			m.rdsPolling = false
+			return m, nil
+		}
+		m.selectedRDS = msg.instance
+		// Update the instance in the list
+		for i, inst := range m.rdsInstances {
+			if inst.DBInstanceID == msg.instance.DBInstanceID {
+				m.rdsInstances[i] = *msg.instance
+				break
+			}
+		}
+		m.applyRDSFilter()
+		if awsservice.IsTransitionalStatus(msg.instance.Status) {
+			return m, m.tickRDSPoll(msg.instance.DBInstanceID)
+		}
+		m.rdsPolling = false
+		return m, nil
+
+	case rdsTickMsg:
+		if m.rdsPolling {
+			return m, m.pollRDSStatus(msg.instanceID)
+		}
+		return m, nil
+
 	case errMsg:
 		m.errMsg = msg.err.Error()
 		m.screen = screenError
@@ -283,6 +359,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSubnetList(msg)
 		case screenSubnetDetail:
 			return m.updateSubnetDetail(msg)
+		case screenRDSList:
+			return m.updateRDSList(msg)
+		case screenRDSDetail:
+			return m.updateRDSDetail(msg)
+		case screenRDSConfirm:
+			return m.updateRDSConfirm(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -343,6 +425,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureVPCBrowser:
 				m.screen = screenLoading
 				return m, m.loadVPCs()
+			case domain.FeatureRDSBrowser:
+				m.screen = screenLoading
+				return m, m.loadRDSInstances()
 			}
 		}
 	}
@@ -510,6 +595,112 @@ func (m Model) updateError(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) updateRDSList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	if m.rdsFilterActive {
+		switch key {
+		case "esc":
+			m.rdsFilterActive = false
+		case "enter":
+			m.rdsFilterActive = false
+		case "backspace":
+			if len(m.rdsFilter) > 0 {
+				m.rdsFilter = m.rdsFilter[:len(m.rdsFilter)-1]
+				m.applyRDSFilter()
+			}
+		default:
+			if len(key) == 1 {
+				m.rdsFilter += key
+				m.applyRDSFilter()
+			}
+		}
+		return m, nil
+	}
+
+	switch key {
+	case "q", "esc":
+		m.screen = screenFeatureList
+		m.rdsFilter = ""
+		m.filteredRDS = m.rdsInstances
+		m.rdsIdx = 0
+	case "up", "k":
+		if m.rdsIdx > 0 {
+			m.rdsIdx--
+		}
+	case "down", "j":
+		if m.rdsIdx < len(m.filteredRDS)-1 {
+			m.rdsIdx++
+		}
+	case "/":
+		m.rdsFilterActive = true
+	case "enter":
+		if len(m.filteredRDS) > 0 && m.rdsIdx < len(m.filteredRDS) {
+			selected := m.filteredRDS[m.rdsIdx]
+			m.selectedRDS = &selected
+			m.screen = screenRDSDetail
+		}
+	}
+	return m, nil
+}
+
+func (m Model) updateRDSDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.rdsPolling = false
+		m.screen = screenRDSList
+	case "s":
+		if m.selectedRDS != nil && m.selectedRDS.CanStart() {
+			m.rdsAction = "start"
+			m.screen = screenRDSConfirm
+		}
+	case "x":
+		if m.selectedRDS != nil && m.selectedRDS.CanStop() {
+			m.rdsAction = "stop"
+			m.screen = screenRDSConfirm
+		}
+	case "f":
+		if m.selectedRDS != nil && m.selectedRDS.CanFailover() {
+			m.rdsAction = "failover"
+			m.screen = screenRDSConfirm
+		}
+	case "r":
+		if m.selectedRDS != nil {
+			return m, m.pollRDSStatus(m.selectedRDS.DBInstanceID)
+		}
+	}
+	return m, nil
+}
+
+func (m Model) updateRDSConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "enter":
+		if m.selectedRDS != nil {
+			m.screen = screenRDSDetail
+			return m, m.executeRDSAction(m.rdsAction, m.selectedRDS.DBInstanceID)
+		}
+	case "n", "esc":
+		m.screen = screenRDSDetail
+	}
+	return m, nil
+}
+
+func (m *Model) applyRDSFilter() {
+	if m.rdsFilter == "" {
+		m.filteredRDS = m.rdsInstances
+	} else {
+		query := strings.ToLower(m.rdsFilter)
+		var result []awsservice.RDSInstance
+		for _, inst := range m.rdsInstances {
+			if strings.Contains(inst.FilterText(), query) {
+				result = append(result, inst)
+			}
+		}
+		m.filteredRDS = result
+	}
+	m.rdsIdx = 0
+}
+
 func (m *Model) applyFilter() {
 	if m.filterInput == "" {
 		m.filtered = m.instances
@@ -614,6 +805,74 @@ func (m Model) loadInstances() tea.Cmd {
 	}
 }
 
+func (m Model) loadRDSInstances() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		m.awsRepo = repo
+
+		instances, err := repo.ListDBInstances(ctx)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		if len(instances) == 0 {
+			return errMsg{err: fmt.Errorf("no RDS instances found")}
+		}
+		return rdsInstancesLoadedMsg{instances: instances}
+	}
+}
+
+func (m Model) executeRDSAction(action, dbInstanceID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo := m.awsRepo
+		if repo == nil {
+			var err error
+			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
+			if err != nil {
+				return rdsActionDoneMsg{action: action, instanceID: dbInstanceID, err: err}
+			}
+		}
+
+		var err error
+		switch action {
+		case "start":
+			err = repo.StartDBInstance(ctx, dbInstanceID)
+		case "stop":
+			err = repo.StopDBInstance(ctx, dbInstanceID)
+		case "failover":
+			err = repo.RebootDBInstance(ctx, dbInstanceID, true)
+		}
+		return rdsActionDoneMsg{action: action, instanceID: dbInstanceID, err: err}
+	}
+}
+
+func (m Model) pollRDSStatus(dbInstanceID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo := m.awsRepo
+		if repo == nil {
+			var err error
+			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
+			if err != nil {
+				return rdsStatusRefreshedMsg{err: err}
+			}
+		}
+
+		inst, err := repo.DescribeDBInstance(ctx, dbInstanceID)
+		return rdsStatusRefreshedMsg{instance: inst, err: err}
+	}
+}
+
+func (m Model) tickRDSPoll(dbInstanceID string) tea.Cmd {
+	return tea.Tick(5*time.Second, func(_ time.Time) tea.Msg {
+		return rdsTickMsg{instanceID: dbInstanceID}
+	})
+}
+
 func (m Model) startSSMSession(inst awsservice.EC2Instance) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -668,6 +927,12 @@ func (m Model) View() string {
 		return m.viewSubnetList()
 	case screenSubnetDetail:
 		return m.viewSubnetDetail()
+	case screenRDSList:
+		return m.viewRDSList()
+	case screenRDSDetail:
+		return m.viewRDSDetail()
+	case screenRDSConfirm:
+		return m.viewRDSConfirm()
 	case screenContextPicker:
 		return m.viewContextPicker()
 	case screenContextAdd:
@@ -1116,5 +1381,148 @@ func (m Model) viewSubnetDetail() string {
 
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("↑/↓: scroll • /: filter • esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) viewRDSList() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("RDS Instances"))
+	b.WriteString("\n")
+
+	// Filter bar
+	if m.rdsFilterActive {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.rdsFilter)))
+	} else if m.rdsFilter != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.rdsFilter)))
+	}
+	b.WriteString("\n\n")
+
+	if len(m.filteredRDS) == 0 {
+		b.WriteString(dimStyle.Render("  No matching instances"))
+		b.WriteString("\n")
+	} else {
+		visibleLines := max(m.height-8, 5)
+		start := 0
+		if m.rdsIdx >= visibleLines {
+			start = m.rdsIdx - visibleLines + 1
+		}
+		end := min(start+visibleLines, len(m.filteredRDS))
+
+		for i := start; i < end; i++ {
+			inst := m.filteredRDS[i]
+			cursor := "  "
+			style := normalStyle
+			if i == m.rdsIdx {
+				cursor = "> "
+				style = selectedStyle
+			}
+			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, inst.DisplayTitle())))
+			b.WriteString("\n")
+		}
+
+		b.WriteString("\n")
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d instances", len(m.filteredRDS), len(m.rdsInstances))))
+	}
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) viewRDSDetail() string {
+	if m.selectedRDS == nil {
+		return ""
+	}
+	r := m.selectedRDS
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("RDS Instance Detail"))
+	b.WriteString("\n\n")
+
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Identifier : %s", r.DBInstanceID)))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Engine     : %s %s", r.Engine, r.EngineVersion)))
+	b.WriteString("\n")
+
+	// Color-code status
+	statusStr := r.Status
+	if r.Status == "available" {
+		statusStr = selectedStyle.Render(r.Status)
+	} else if awsservice.IsTransitionalStatus(r.Status) {
+		statusStr = filterStyle.Render(r.Status)
+	} else if r.Status == "stopped" || r.Status == "failed" {
+		statusStr = errorStyle.Render(r.Status)
+	}
+	pollingIndicator := ""
+	if m.rdsPolling {
+		pollingIndicator = filterStyle.Render(" (polling...)")
+	}
+	b.WriteString(fmt.Sprintf("  Status     : %s%s", statusStr, pollingIndicator))
+	b.WriteString("\n")
+
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Class      : %s", r.InstanceClass)))
+	b.WriteString("\n")
+	multiAZStr := "No"
+	if r.MultiAZ {
+		multiAZStr = "Yes"
+	}
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Multi-AZ   : %s", multiAZStr)))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Storage    : %d GB", r.StorageGB)))
+	b.WriteString("\n")
+	endpoint := r.Endpoint
+	if endpoint == "" {
+		endpoint = dimStyle.Render("(unavailable)")
+	}
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Endpoint   : %s", endpoint)))
+	b.WriteString("\n")
+	if r.ClusterID != "" {
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  Cluster    : %s", r.ClusterID)))
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(titleStyle.Render("Actions"))
+	b.WriteString("\n")
+	if r.CanStart() {
+		b.WriteString(normalStyle.Render("  [s] Start"))
+		b.WriteString("\n")
+	} else {
+		b.WriteString(dimStyle.Render("  [s] Start"))
+		b.WriteString("\n")
+	}
+	if r.CanStop() {
+		b.WriteString(normalStyle.Render("  [x] Stop"))
+		b.WriteString("\n")
+	} else {
+		b.WriteString(dimStyle.Render("  [x] Stop"))
+		b.WriteString("\n")
+	}
+	if r.CanFailover() {
+		b.WriteString(normalStyle.Render("  [f] Failover"))
+		b.WriteString("\n")
+	} else {
+		b.WriteString(dimStyle.Render("  [f] Failover"))
+		b.WriteString("\n")
+	}
+	b.WriteString(normalStyle.Render("  [r] Refresh"))
+	b.WriteString("\n")
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) viewRDSConfirm() string {
+	if m.selectedRDS == nil {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(errorStyle.Render("Confirm Action"))
+	b.WriteString("\n\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Are you sure you want to %s instance %s?",
+		m.rdsAction, m.selectedRDS.DBInstanceID)))
+	b.WriteString("\n\n")
+	b.WriteString(normalStyle.Render("  [y] Yes  [n] No"))
+	b.WriteString("\n")
 	return b.String()
 }

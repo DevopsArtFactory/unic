@@ -9,6 +9,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
@@ -21,11 +22,22 @@ var _ SSMClientAPI = (*ssm.Client)(nil)
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
 
+// Verify *rds.Client satisfies RDSClientAPI at compile time.
+var _ RDSClientAPI = (*rds.Client)(nil)
+
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
 	ssm.DescribeInstanceInformationAPIClient
 	StartSession(ctx context.Context, params *ssm.StartSessionInput, optFns ...func(*ssm.Options)) (*ssm.StartSessionOutput, error)
 	TerminateSession(ctx context.Context, params *ssm.TerminateSessionInput, optFns ...func(*ssm.Options)) (*ssm.TerminateSessionOutput, error)
+}
+
+// RDSClientAPI is the interface for RDS operations used by AwsRepository.
+type RDSClientAPI interface {
+	DescribeDBInstances(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error)
+	StopDBInstance(ctx context.Context, params *rds.StopDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StopDBInstanceOutput, error)
+	StartDBInstance(ctx context.Context, params *rds.StartDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StartDBInstanceOutput, error)
+	RebootDBInstance(ctx context.Context, params *rds.RebootDBInstanceInput, optFns ...func(*rds.Options)) (*rds.RebootDBInstanceOutput, error)
 }
 
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
@@ -43,10 +55,11 @@ type CallerIdentity struct {
 	UserID  string
 }
 
-// AwsRepository holds AWS SDK clients for EC2 and SSM.
+// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, and STS.
 type AwsRepository struct {
 	EC2Client EC2ClientAPI
 	SSMClient SSMClientAPI
+	RDSClient RDSClientAPI
 	STSClient *sts.Client
 	Region    string
 	Profile   string
@@ -109,6 +122,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 	return &AwsRepository{
 		EC2Client: ec2.NewFromConfig(awsCfg),
 		SSMClient: ssm.NewFromConfig(awsCfg),
+		RDSClient: rds.NewFromConfig(awsCfg),
 		STSClient: sts.NewFromConfig(awsCfg),
 		Region:    cfg.Region,
 		Profile:   cfg.Profile,
