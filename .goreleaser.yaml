@@ -18,9 +18,25 @@ builds:
         goarch: arm64
 
 archives:
-  - format: binary
+  - format: tar.gz
     name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
 
+brews:
+  - repository:
+      owner: DevopsArtFactory
+      name: homebrew-unic
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    name: unic
+    homepage: "https://github.com/DevopsArtFactory/unic"
+    description: "Go-based TUI tool for browsing and managing AWS resources in the terminal"
+    license: "MIT"
+    install: |
+      bin.install "unic"
+    test: |
+      system "#{bin}/unic", "--version"
 
 changelog:
   sort: asc

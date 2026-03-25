@@ -111,11 +111,13 @@ unic/
 - List VPCs → subnets → show available IP count per subnet
 - Reachability Analysis: create/run `NetworkInsights` path, display results
 
-**M3.2 — RDS**
+**M3.2 — RDS** ✅
 - List DB instances/clusters with status
 - Start / Stop (with confirmation)
 - Failover for Multi-AZ (with confirmation)
 - Real-time status polling after action
+- Aurora cluster-level stop/start/failover
+- Type-to-confirm for destructive actions (stop, failover)
 
 **M3.3 — IAM Credentials**
 - List access keys, show key age/status

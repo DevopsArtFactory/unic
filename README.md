@@ -68,7 +68,7 @@ contexts:
 |---------|---------|--------|
 | EC2 | SSM Session Manager (connect to EC2 instances) | ✅ Implemented |
 | VPC | VPC Browser (VPCs → subnets → available IPs) | ✅ Implemented |
-| RDS | ListDBInstances | 🚧 Coming Soon |
+| RDS | RDS Browser (list, start/stop, failover, Aurora cluster support) | ✅ Implemented |
 | Route53 | ListHostedZones | 🚧 Coming Soon |
 | IAM | ListUsers | 🚧 Coming Soon |
 
@@ -81,6 +81,8 @@ contexts:
 | `Esc`/`q` | Go back |
 | `H` | Go to home (service list) |
 | `/` | Filter (instances, IPs) |
+| `C` | Context switcher |
+| `s`/`x`/`f` | Start/Stop/Failover (RDS detail) |
 | `q` (on service list) | Quit |
 
 ## Documentation
