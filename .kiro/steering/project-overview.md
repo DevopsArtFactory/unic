@@ -9,9 +9,10 @@ UNIC은 Go 기반 TUI(Terminal User Interface) 도구로, AWS 리소스를 탐�
 ## 기술 스택
 
 - 언어: Go (1.22+)
-- TUI 프레임워크: Bubbletea + Lipgloss + Bubbles
+- TUI 프레임워크: Bubbletea + Lipgloss + Bubbles (계획: bubbles/textinput, bubbles/spinner, bubbles/table)
+- 검색: sahilm/fuzzy (계획 — M6 퍼지 검색/필터)
 - CLI 파서: Cobra
-- AWS SDK: aws-sdk-go-v2 (ec2, ssm, sts)
+- AWS SDK: aws-sdk-go-v2 (ec2, rds, ssm, sts, sso, ssooidc)
 - 설정 파일: gopkg.in/yaml.v3 (YAML 기반)
 - 동시성: goroutines + errgroup
 - 에러 처리: fmt.Errorf 래핑 / 표준 errors 패키지

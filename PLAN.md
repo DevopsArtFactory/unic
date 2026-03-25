@@ -159,9 +159,9 @@ unic/
 
 **M4.1 — UX**
 - Keyboard shortcut help screen (`?` key)
-- Fuzzy search/filter on all list views
-- Loading spinners for async operations
 - Color theme (respect terminal colors via Lipgloss)
+- ~~Fuzzy search/filter on all list views~~ → moved to M6
+- ~~Loading spinners for async operations~~ → moved to M5.3
 
 **M4.2 — Error Handling & Logging**
 - Structured error messages with actionable hints
@@ -176,6 +176,66 @@ unic/
 
 ---
 
+### M5 — UI Beautification (Charmbracelet Ecosystem)
+
+Prerequisite: `go get github.com/charmbracelet/bubbles`
+
+**M5.1 — File Extraction (no behavior change)**
+- Split `internal/app/app.go` (~1700 lines) into focused files:
+  - `styles.go` — all lipgloss style vars + new styles
+  - `views.go` — all `view*()` methods + `renderStatusBar()`
+  - `commands.go` — all `tea.Cmd` functions (`load*`, `execute*`, `poll*`, etc.)
+  - `filter.go` — filter logic (`applyFilter`, `applyRDSFilter`, `applyIPFilter`)
+- `app.go` retains: Model struct, `New()`, `Init()`, `Update()`, and all `update*()` methods
+
+**M5.2 — bubbles/textinput for Filter**
+- Replace manual character-by-character filter input with a single shared `textinput.Model`
+- On "/" key → `filterTI.Focus()`, on esc/enter → `filterTI.Blur()`
+- Check `filterTI.Focused()` instead of `filterActive` booleans
+- Remove: `filterInput`, `filterActive`, `rdsFilter`, `rdsFilterActive`, `ipFilter`, `ipFilterActive`
+
+**M5.3 — bubbles/spinner for Loading**
+- Replace static `"Loading..."` with animated spinner (`spinner.MiniDot`)
+- Start spinner tick on entering `screenLoading`, ignore ticks elsewhere
+
+**M5.4 — bubbles/table for Context Picker**
+- Convert manual column-aligned context picker to `bubbles/table`
+- Columns: Name, Region, Auth, Current (*)
+- Keep "a" key shortcut for adding contexts
+
+**M5.5 — Enhanced Lipgloss Styles**
+- Status bar: full-width via `lipgloss.Width(m.width)`, left/right split with `JoinHorizontal`
+- List views: wrap content in `lipgloss.RoundedBorder()` box
+- Detail views: consistent label alignment with `lipgloss.NewStyle().Width(14)`
+- Help bar: consistent `helpStyle` across all screens
+
+---
+
+### M6 — Search/Filter for Long Lists
+
+Prerequisite: `go get github.com/sahilm/fuzzy`
+
+**M6.1 — Fuzzy Matching**
+- Replace `strings.Contains` filter logic with `sahilm/fuzzy` scored fuzzy matching
+- Match against `DisplayTitle()` for both filtering and highlighting
+- Sort results by score descending
+
+**M6.2 — Match Highlighting**
+- Highlight matched characters with bold + orange (color 214) style
+- Use match indices from fuzzy library to render per-character styling
+
+**M6.3 — Filter on All List Views**
+- Add "/" filter to VPC list and subnet list (currently missing)
+- All filterable items already implement `FilterText()` and `DisplayTitle()`
+
+**M6.4 — Unified Filter Architecture**
+- Define `Filterable` interface: `FilterText() string`, `DisplayTitle() string`
+- Implement generic `applyFuzzyFilter[T Filterable](items []T, query string) []filterMatch[T]`
+- Store `matchIndices [][]int` parallel to filtered slices for highlighting
+- Eliminate per-screen filter state duplication
+
+---
+
 ## Implementation Order
 
 ```
@@ -184,12 +244,20 @@ M1.1 → M1.2 → M2.1 → M2.2 → M2.3 → M2.4
                         M3.1 ~ M3.8 (independent, any order)
                                         ↓
                                   M4.1 → M4.2 → M4.3
+                                        ↓
+                              M5.1 → M5.2 ~ M5.5
+                                        ↓
+                                  M6.1 ~ M6.4
 ```
 
-- M1 is complete; M2 is partially complete (SSO, credential, assume role done; Okta deferred)
+Note: M5.2 (textinput) provides the foundation for M6 (enhanced search) — they converge naturally.
+
+- M1 is complete; M2 is deferred (relying on AWS SDK default credential chain)
+- M2.1 (Context-based auth with SSO, credential, assume-role) is complete
 - M3 services are independent of each other, build in any order
 - M3.1 (VPC), M3.2 (RDS), and M3.4 (SSM Sessions) are complete
 - M4.3 (Distribution) is partially done (GoReleaser + GitHub Actions)
+- M5 and M6 can begin independently of remaining M3/M4 work
 
 ---
 

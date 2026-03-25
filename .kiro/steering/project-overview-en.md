@@ -9,9 +9,10 @@ UNIC is a Go-based TUI (Terminal User Interface) tool for browsing and managing 
 ## Tech Stack
 
 - Language: Go (1.22+)
-- TUI Framework: Bubbletea + Lipgloss + Bubbles
+- TUI Framework: Bubbletea + Lipgloss + Bubbles (planned: bubbles/textinput, bubbles/spinner, bubbles/table)
+- Search: sahilm/fuzzy (planned — M6 fuzzy search/filter)
 - CLI Parser: Cobra
-- AWS SDK: aws-sdk-go-v2 (ec2, ssm, sts)
+- AWS SDK: aws-sdk-go-v2 (ec2, rds, ssm, sts, sso, ssooidc)
 - Config: gopkg.in/yaml.v3 (YAML-based)
 - Concurrency: goroutines + errgroup
 - Error Handling: fmt.Errorf wrapping / standard errors package
