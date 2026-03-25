@@ -17,6 +17,9 @@ type mockRDSClient struct {
 	stopDBInstanceFunc      func(ctx context.Context, params *rds.StopDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StopDBInstanceOutput, error)
 	startDBInstanceFunc     func(ctx context.Context, params *rds.StartDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StartDBInstanceOutput, error)
 	rebootDBInstanceFunc    func(ctx context.Context, params *rds.RebootDBInstanceInput, optFns ...func(*rds.Options)) (*rds.RebootDBInstanceOutput, error)
+	stopDBClusterFunc       func(ctx context.Context, params *rds.StopDBClusterInput, optFns ...func(*rds.Options)) (*rds.StopDBClusterOutput, error)
+	startDBClusterFunc      func(ctx context.Context, params *rds.StartDBClusterInput, optFns ...func(*rds.Options)) (*rds.StartDBClusterOutput, error)
+	failoverDBClusterFunc   func(ctx context.Context, params *rds.FailoverDBClusterInput, optFns ...func(*rds.Options)) (*rds.FailoverDBClusterOutput, error)
 }
 
 func (m *mockRDSClient) DescribeDBInstances(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {
@@ -42,6 +45,27 @@ func (m *mockRDSClient) RebootDBInstance(ctx context.Context, params *rds.Reboot
 		return m.rebootDBInstanceFunc(ctx, params, optFns...)
 	}
 	return &rds.RebootDBInstanceOutput{}, nil
+}
+
+func (m *mockRDSClient) StopDBCluster(ctx context.Context, params *rds.StopDBClusterInput, optFns ...func(*rds.Options)) (*rds.StopDBClusterOutput, error) {
+	if m.stopDBClusterFunc != nil {
+		return m.stopDBClusterFunc(ctx, params, optFns...)
+	}
+	return &rds.StopDBClusterOutput{}, nil
+}
+
+func (m *mockRDSClient) StartDBCluster(ctx context.Context, params *rds.StartDBClusterInput, optFns ...func(*rds.Options)) (*rds.StartDBClusterOutput, error) {
+	if m.startDBClusterFunc != nil {
+		return m.startDBClusterFunc(ctx, params, optFns...)
+	}
+	return &rds.StartDBClusterOutput{}, nil
+}
+
+func (m *mockRDSClient) FailoverDBCluster(ctx context.Context, params *rds.FailoverDBClusterInput, optFns ...func(*rds.Options)) (*rds.FailoverDBClusterOutput, error) {
+	if m.failoverDBClusterFunc != nil {
+		return m.failoverDBClusterFunc(ctx, params, optFns...)
+	}
+	return &rds.FailoverDBClusterOutput{}, nil
 }
 
 // --- ListDBInstances tests ---
@@ -384,8 +408,8 @@ func TestCanStop_RunningInstance(t *testing.T) {
 
 func TestCanStop_ClusterMember(t *testing.T) {
 	inst := RDSInstance{Status: "available", ClusterID: "my-cluster"}
-	if inst.CanStop() {
-		t.Error("cluster member should not be stoppable individually")
+	if !inst.CanStop() {
+		t.Error("available cluster member should be stoppable (cluster-level stop)")
 	}
 }
 
@@ -404,9 +428,18 @@ func TestCanFailover_MultiAZ(t *testing.T) {
 }
 
 func TestCanFailover_SingleAZ(t *testing.T) {
-	inst := RDSInstance{Status: "available", MultiAZ: false}
+	// Standalone single-AZ instance cannot failover
+	inst := RDSInstance{Status: "available", MultiAZ: false, ClusterID: ""}
 	if inst.CanFailover() {
-		t.Error("single-AZ instance should not support failover")
+		t.Error("standalone single-AZ instance should not support failover")
+	}
+}
+
+func TestCanFailover_ClusterMember(t *testing.T) {
+	// Aurora cluster member can failover even without MultiAZ on the instance
+	inst := RDSInstance{Status: "available", MultiAZ: false, ClusterID: "my-cluster"}
+	if !inst.CanFailover() {
+		t.Error("Aurora cluster member should support failover")
 	}
 }
 
