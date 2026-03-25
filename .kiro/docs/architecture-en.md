@@ -163,9 +163,28 @@ unic init --force             # Overwrite existing config file
 |---------|---------|--------|
 | EC2 | SSM Session Manager (connect to EC2 instances) | ✅ Implemented |
 | VPC | VPC Browser (VPCs → subnets → available IPs) | ✅ Implemented |
-| RDS | ListDBInstances | 🚧 Coming Soon |
+| RDS | RDS Browser (list, detail, start/stop/failover) | ✅ Implemented |
 | Route53 | ListHostedZones | 🚧 Coming Soon |
 | IAM | ListUsers | 🚧 Coming Soon |
+
+## Planned Improvements
+
+### M5 — UI Beautification (Charmbracelet Ecosystem)
+
+- **File extraction**: Split `internal/app/app.go` (~1700 lines) into `styles.go`, `views.go`, `commands.go`, `filter.go`
+- **bubbles components**: Add `bubbles/textinput` (filter input), `bubbles/spinner` (loading), `bubbles/table` (context picker)
+- **Enhanced styles**: Bordered list views, full-width status bar, consistent label alignment, styled help bar
+- Dependency: `github.com/charmbracelet/bubbles`
+
+### M6 — Search/Filter for Long Lists
+
+- **Fuzzy matching**: Replace `strings.Contains` with `sahilm/fuzzy` for scored fuzzy search
+- **Match highlighting**: Bold + orange on matched characters in list items
+- **Universal filter**: Add "/" filter to all list views (VPC list and subnet list currently missing)
+- **Unified architecture**: `Filterable` interface + generic `applyFuzzyFilter[T]()` to eliminate per-screen duplication
+- Dependency: `github.com/sahilm/fuzzy`
+
+See `PLAN.md` for full milestone details and implementation order.
 
 ## New Feature Addition Checklist
 

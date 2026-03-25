@@ -163,9 +163,28 @@ unic init --force             # 기존 설정 파일 덮어쓰기
 |--------|------|------|
 | EC2 | SSM Session Manager (EC2 인스턴스 접속) | ✅ 구현 완료 |
 | VPC | VPC Browser (VPC → 서브넷 → 가용 IP) | ✅ 구현 완료 |
-| RDS | ListDBInstances | 🚧 Coming Soon |
+| RDS | RDS Browser (목록, 상세, 시작/중지/장애조치) | ✅ 구현 완료 |
 | Route53 | ListHostedZones | 🚧 Coming Soon |
 | IAM | ListUsers | 🚧 Coming Soon |
+
+## 계획된 개선 사항
+
+### M5 — UI 개선 (Charmbracelet 생태계)
+
+- **파일 분리**: `internal/app/app.go` (~1700줄)를 `styles.go`, `views.go`, `commands.go`, `filter.go`로 분리
+- **bubbles 컴포넌트**: `bubbles/textinput` (필터 입력), `bubbles/spinner` (로딩), `bubbles/table` (컨텍스트 선택기) 추가
+- **스타일 강화**: 테두리가 있는 목록 뷰, 전체 너비 상태 바, 일관된 레이블 정렬, 스타일 적용된 도움말 바
+- 의존성: `github.com/charmbracelet/bubbles`
+
+### M6 — 긴 목록 검색/필터
+
+- **퍼지 매칭**: `strings.Contains`를 `sahilm/fuzzy`로 교체하여 점수 기반 퍼지 검색 구현
+- **매칭 하이라이트**: 매칭된 문자에 굵은체 + 주황색 스타일 적용
+- **전체 필터 지원**: 모든 목록 뷰에 "/" 필터 추가 (현재 VPC 목록, 서브넷 목록에 미지원)
+- **통합 아키텍처**: `Filterable` 인터페이스 + 제네릭 `applyFuzzyFilter[T]()` 로 화면별 중복 제거
+- 의존성: `github.com/sahilm/fuzzy`
+
+자세한 마일스톤 및 구현 순서는 `PLAN.md` 참조.
 
 ## 새 기능 추가 체크리스트
 
