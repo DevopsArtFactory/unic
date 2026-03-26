@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"unic/internal/config"
 	"unic/internal/domain"
@@ -28,6 +29,8 @@ const (
 	screenRoute53ZoneList
 	screenRoute53RecordList
 	screenRoute53RecordDetail
+	screenSecretList
+	screenSecretDetail
 	screenContextPicker
 	screenContextAdd
 	screenLoading
@@ -97,6 +100,14 @@ type Model struct {
 	route53RecordFilter       string
 	route53RecordFilterActive bool
 	selectedRoute53Record     *awsservice.DNSRecord
+
+	// Secrets Manager browser state
+	secrets             []awsservice.Secret
+	filteredSecrets     []awsservice.Secret
+	secretIdx           int
+	secretFilter        string
+	secretFilterActive  bool
+	selectedSecret      *awsservice.SecretDetail
 
 	// Context picker
 	configPath         string
@@ -215,6 +226,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filteredRDS = msg.instances
 		m.rdsIdx = 0
 		m.screen = screenRDSList
+		return m, nil
+
+	case secretsLoadedMsg:
+		m.secrets = msg.secrets
+		m.filteredSecrets = msg.secrets
+		m.secretIdx = 0
+		m.screen = screenSecretList
+		return m, nil
+
+	case secretDetailLoadedMsg:
+		m.selectedSecret = msg.detail
+		m.screen = screenSecretDetail
 		return m, nil
 
 	case rdsActionDoneMsg:
@@ -338,6 +361,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateRoute53RecordList(msg)
 		case screenRoute53RecordDetail:
 			return m.updateRoute53RecordDetail(msg)
+		case screenSecretList:
+			return m.updateSecretList(msg)
+		case screenSecretDetail:
+			return m.updateSecretDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -404,6 +431,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureRoute53Browser:
 				m.screen = screenLoading
 				return m, m.loadRoute53Zones()
+			case domain.FeatureSecretsBrowser:
+				m.screen = screenLoading
+				return m, m.loadSecrets()
 			}
 		}
 	}
@@ -453,6 +483,10 @@ func (m Model) View() string {
 		v = m.viewRoute53RecordList()
 	case screenRoute53RecordDetail:
 		v = m.viewRoute53RecordDetail()
+	case screenSecretList:
+		v = m.viewSecretList()
+	case screenSecretDetail:
+		v = m.viewSecretDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:
@@ -559,5 +593,210 @@ func (m Model) viewFeatureList() string {
 
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • esc: back"))
+	return b.String()
+}
+func (m Model) loadSecrets() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		secrets, err := repo.ListSecrets(ctx)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		if len(secrets) == 0 {
+			return errMsg{err: fmt.Errorf("no secrets found")}
+		}
+		return secretsLoadedMsg{secrets: secrets}
+	}
+}
+
+func (m Model) loadSecretDetail(name string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo := m.awsRepo
+		if repo == nil {
+			var err error
+			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
+			if err != nil {
+				return errMsg{err: err}
+			}
+		}
+		detail, err := repo.GetSecretDetail(ctx, name)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return secretDetailLoadedMsg{detail: detail}
+	}
+}
+
+func (m Model) updateSecretList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	if m.secretFilterActive {
+		switch key {
+		case "esc":
+			m.secretFilterActive = false
+		case "enter":
+			m.secretFilterActive = false
+		case "backspace":
+			if len(m.secretFilter) > 0 {
+				m.secretFilter = m.secretFilter[:len(m.secretFilter)-1]
+				m.applySecretFilter()
+			}
+		default:
+			if len(key) == 1 {
+				m.secretFilter += key
+				m.applySecretFilter()
+			}
+		}
+		return m, nil
+	}
+
+	switch key {
+	case "q", "esc":
+		m.screen = screenFeatureList
+		m.secretFilter = ""
+		m.filteredSecrets = m.secrets
+		m.secretIdx = 0
+	case "up", "k":
+		if m.secretIdx > 0 {
+			m.secretIdx--
+		}
+	case "down", "j":
+		if m.secretIdx < len(m.filteredSecrets)-1 {
+			m.secretIdx++
+		}
+	case "/":
+		m.secretFilterActive = true
+	case "enter":
+		if len(m.filteredSecrets) > 0 && m.secretIdx < len(m.filteredSecrets) {
+			selected := m.filteredSecrets[m.secretIdx]
+			m.screen = screenLoading
+			return m, m.loadSecretDetail(selected.Name)
+		}
+	}
+	return m, nil
+}
+
+func (m Model) updateSecretDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.selectedSecret = nil
+		m.screen = screenSecretList
+	}
+	return m, nil
+}
+
+func (m *Model) applySecretFilter() {
+	if m.secretFilter == "" {
+		m.filteredSecrets = m.secrets
+	} else {
+		query := strings.ToLower(m.secretFilter)
+		var result []awsservice.Secret
+		for _, s := range m.secrets {
+			if strings.Contains(s.FilterText(), query) {
+				result = append(result, s)
+			}
+		}
+		m.filteredSecrets = result
+	}
+	m.secretIdx = 0
+}
+
+func (m Model) viewSecretList() string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render("Secrets Manager"))
+	b.WriteString("\n")
+
+	if m.secretFilterActive {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.secretFilter)))
+	} else if m.secretFilter != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.secretFilter)))
+	}
+	b.WriteString("\n\n")
+
+	if len(m.filteredSecrets) == 0 {
+		b.WriteString(dimStyle.Render("  No matching secrets"))
+		b.WriteString("\n")
+	} else {
+		visibleLines := max(m.height-8, 5)
+		start := 0
+		if m.secretIdx >= visibleLines {
+			start = m.secretIdx - visibleLines + 1
+		}
+		end := min(start+visibleLines, len(m.filteredSecrets))
+
+		for i := start; i < end; i++ {
+			s := m.filteredSecrets[i]
+			cursor := "  "
+			style := normalStyle
+			if i == m.secretIdx {
+				cursor = "> "
+				style = selectedStyle
+			}
+			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
+			b.WriteString("\n")
+		}
+
+		b.WriteString("\n")
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d secrets", len(m.filteredSecrets), len(m.secrets))))
+	}
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) viewSecretDetail() string {
+	if m.selectedSecret == nil {
+		return ""
+	}
+	d := m.selectedSecret
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render("Secret Detail"))
+	b.WriteString("\n\n")
+
+	labelStyle := lipgloss.NewStyle().Width(14)
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Name"), d.Name)))
+	b.WriteString("\n")
+
+	kmsKey := d.KMSKeyID
+	if kmsKey == "" {
+		kmsKey = dimStyle.Render("(aws/secretsmanager)")
+	}
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Encryption Key"), kmsKey)))
+	b.WriteString("\n\n")
+
+	if len(d.Values) > 0 {
+		b.WriteString(titleStyle.Render("Key / Value"))
+		b.WriteString("\n\n")
+
+		keys := make([]string, 0, len(d.Values))
+		for k := range d.Values {
+			keys = append(keys, k)
+		}
+		for i := 1; i < len(keys); i++ {
+			for j := i; j > 0 && keys[j] < keys[j-1]; j-- {
+				keys[j], keys[j-1] = keys[j-1], keys[j]
+			}
+		}
+
+		for _, k := range keys {
+			b.WriteString(fmt.Sprintf("  %s  %s\n", dimStyle.Render(k), normalStyle.Render(d.Values[k])))
+		}
+	} else if d.Raw != "" {
+		b.WriteString(titleStyle.Render("Value"))
+		b.WriteString("\n\n")
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s", d.Raw)))
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("esc: back • H: home"))
 	return b.String()
 }

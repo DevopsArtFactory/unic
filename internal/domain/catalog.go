@@ -39,5 +39,14 @@ func Catalog() []Service {
 				},
 			},
 		},
+		{
+			Name: ServiceSecretsManager,
+			Features: []Feature{
+				{
+					Kind:        FeatureSecretsBrowser,
+					Description: "Browse secrets and view key/value pairs",
+				},
+			},
+		},
 	}
 }

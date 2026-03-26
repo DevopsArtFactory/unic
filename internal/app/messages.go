@@ -74,3 +74,11 @@ type route53ZonesLoadedMsg struct {
 type route53RecordsLoadedMsg struct {
 	records []awsservice.DNSRecord
 }
+
+type secretsLoadedMsg struct {
+	secrets []awsservice.Secret
+}
+
+type secretDetailLoadedMsg struct {
+	detail *awsservice.SecretDetail
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
@@ -28,6 +29,9 @@ var _ RDSClientAPI = (*rds.Client)(nil)
 
 // Verify *route53.Client satisfies Route53ClientAPI at compile time.
 var _ Route53ClientAPI = (*route53.Client)(nil)
+
+// Verify *secretsmanager.Client satisfies SecretsManagerClientAPI at compile time.
+var _ SecretsManagerClientAPI = (*secretsmanager.Client)(nil)
 
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
@@ -53,6 +57,12 @@ type Route53ClientAPI interface {
 	ListResourceRecordSets(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
 }
 
+// SecretsManagerClientAPI is the interface for Secrets Manager operations used by AwsRepository.
+type SecretsManagerClientAPI interface {
+	ListSecrets(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error)
+	GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
+}
+
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
 	ec2.DescribeInstancesAPIClient
@@ -68,15 +78,16 @@ type CallerIdentity struct {
 	UserID  string
 }
 
-// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, and STS.
+// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, Route53, STS, and Secrets Manager.
 type AwsRepository struct {
-	EC2Client     EC2ClientAPI
-	SSMClient     SSMClientAPI
-	RDSClient     RDSClientAPI
-	Route53Client Route53ClientAPI
-	STSClient     *sts.Client
-	Region    string
-	Profile   string
+	EC2Client            EC2ClientAPI
+	SSMClient            SSMClientAPI
+	RDSClient            RDSClientAPI
+	Route53Client        Route53ClientAPI
+	SecretsManagerClient SecretsManagerClientAPI
+	STSClient            *sts.Client
+	Region               string
+	Profile              string
 }
 
 // NewAwsRepository creates a new AwsRepository with configured EC2 and SSM clients.
@@ -134,13 +145,14 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 	}
 
 	return &AwsRepository{
-		EC2Client:     ec2.NewFromConfig(awsCfg),
-		SSMClient:     ssm.NewFromConfig(awsCfg),
-		RDSClient:     rds.NewFromConfig(awsCfg),
-		Route53Client: route53.NewFromConfig(awsCfg),
-		STSClient:     sts.NewFromConfig(awsCfg),
-		Region:        cfg.Region,
-		Profile:       cfg.Profile,
+		EC2Client:            ec2.NewFromConfig(awsCfg),
+		SSMClient:            ssm.NewFromConfig(awsCfg),
+		RDSClient:            rds.NewFromConfig(awsCfg),
+		Route53Client:        route53.NewFromConfig(awsCfg),
+		SecretsManagerClient: secretsmanager.NewFromConfig(awsCfg),
+		STSClient:            sts.NewFromConfig(awsCfg),
+		Region:               cfg.Region,
+		Profile:              cfg.Profile,
 	}, nil
 }
 

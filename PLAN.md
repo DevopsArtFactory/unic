@@ -161,6 +161,10 @@ unic/
 - Graph rendering: Bubbletea viewport with braille/block characters
 - Multiple metrics overlay on single chart
 
+**M3.9 — Secrets Manager**
+- List secrets
+- Drill into secret detail: name, key/value pairs, encryption key (KMS key ID)
+
 ---
 
 ### M4 — Polish & Release
