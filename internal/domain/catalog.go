@@ -30,5 +30,14 @@ func Catalog() []Service {
 				},
 			},
 		},
+		{
+			Name: ServiceRoute53,
+			Features: []Feature{
+				{
+					Kind:        FeatureRoute53Browser,
+					Description: "Browse hosted zones and DNS records",
+				},
+			},
+		},
 	}
 }

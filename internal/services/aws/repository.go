@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
@@ -24,6 +25,9 @@ var _ EC2ClientAPI = (*ec2.Client)(nil)
 
 // Verify *rds.Client satisfies RDSClientAPI at compile time.
 var _ RDSClientAPI = (*rds.Client)(nil)
+
+// Verify *route53.Client satisfies Route53ClientAPI at compile time.
+var _ Route53ClientAPI = (*route53.Client)(nil)
 
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
@@ -43,6 +47,12 @@ type RDSClientAPI interface {
 	FailoverDBCluster(ctx context.Context, params *rds.FailoverDBClusterInput, optFns ...func(*rds.Options)) (*rds.FailoverDBClusterOutput, error)
 }
 
+// Route53ClientAPI is the interface for Route53 operations used by AwsRepository.
+type Route53ClientAPI interface {
+	ListHostedZones(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error)
+	ListResourceRecordSets(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
+}
+
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
 	ec2.DescribeInstancesAPIClient
@@ -60,10 +70,11 @@ type CallerIdentity struct {
 
 // AwsRepository holds AWS SDK clients for EC2, SSM, RDS, and STS.
 type AwsRepository struct {
-	EC2Client EC2ClientAPI
-	SSMClient SSMClientAPI
-	RDSClient RDSClientAPI
-	STSClient *sts.Client
+	EC2Client     EC2ClientAPI
+	SSMClient     SSMClientAPI
+	RDSClient     RDSClientAPI
+	Route53Client Route53ClientAPI
+	STSClient     *sts.Client
 	Region    string
 	Profile   string
 }
@@ -123,12 +134,13 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 	}
 
 	return &AwsRepository{
-		EC2Client: ec2.NewFromConfig(awsCfg),
-		SSMClient: ssm.NewFromConfig(awsCfg),
-		RDSClient: rds.NewFromConfig(awsCfg),
-		STSClient: sts.NewFromConfig(awsCfg),
-		Region:    cfg.Region,
-		Profile:   cfg.Profile,
+		EC2Client:     ec2.NewFromConfig(awsCfg),
+		SSMClient:     ssm.NewFromConfig(awsCfg),
+		RDSClient:     rds.NewFromConfig(awsCfg),
+		Route53Client: route53.NewFromConfig(awsCfg),
+		STSClient:     sts.NewFromConfig(awsCfg),
+		Region:        cfg.Region,
+		Profile:       cfg.Profile,
 	}, nil
 }
 

@@ -28,6 +28,9 @@ const (
 	screenRDSList
 	screenRDSDetail
 	screenRDSConfirm
+	screenRoute53ZoneList
+	screenRoute53RecordList
+	screenRoute53RecordDetail
 	screenContextPicker
 	screenContextAdd
 	screenLoading
@@ -96,6 +99,14 @@ type rdsTickMsg struct {
 	instanceID string
 }
 
+type route53ZonesLoadedMsg struct {
+	zones []awsservice.HostedZone
+}
+
+type route53RecordsLoadedMsg struct {
+	records []awsservice.DNSRecord
+}
+
 // Model is the root Bubbletea model.
 type Model struct {
 	cfg      *config.Config
@@ -145,6 +156,20 @@ type Model struct {
 	rdsAction       string // "start", "stop", "failover"
 	rdsConfirmInput string // typed input for destructive action confirmation
 	rdsPolling      bool
+
+	// Route53 browser state
+	route53Zones            []awsservice.HostedZone
+	filteredRoute53Zones    []awsservice.HostedZone
+	route53ZoneIdx          int
+	route53ZoneFilter       string
+	route53ZoneFilterActive bool
+	selectedRoute53Zone     *awsservice.HostedZone
+	route53Records          []awsservice.DNSRecord
+	filteredRoute53Records  []awsservice.DNSRecord
+	route53RecordIdx        int
+	route53RecordFilter     string
+	route53RecordFilterActive bool
+	selectedRoute53Record   *awsservice.DNSRecord
 
 	// Context picker
 	configPath         string
@@ -242,6 +267,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ipFilter = ""
 		m.ipFilterActive = false
 		m.screen = screenSubnetDetail
+		return m, nil
+
+	case route53ZonesLoadedMsg:
+		m.route53Zones = msg.zones
+		m.filteredRoute53Zones = msg.zones
+		m.route53ZoneIdx = 0
+		m.screen = screenRoute53ZoneList
+		return m, nil
+
+	case route53RecordsLoadedMsg:
+		m.route53Records = msg.records
+		m.filteredRoute53Records = msg.records
+		m.route53RecordIdx = 0
+		m.screen = screenRoute53RecordList
 		return m, nil
 
 	case rdsInstancesLoadedMsg:
@@ -366,6 +405,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateRDSDetail(msg)
 		case screenRDSConfirm:
 			return m.updateRDSConfirm(msg)
+		case screenRoute53ZoneList:
+			return m.updateRoute53ZoneList(msg)
+		case screenRoute53RecordList:
+			return m.updateRoute53RecordList(msg)
+		case screenRoute53RecordDetail:
+			return m.updateRoute53RecordDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -429,6 +474,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureRDSBrowser:
 				m.screen = screenLoading
 				return m, m.loadRDSInstances()
+			case domain.FeatureRoute53Browser:
+				m.screen = screenLoading
+				return m, m.loadRoute53Zones()
 			}
 		}
 	}
@@ -737,6 +785,145 @@ func (m *Model) applyRDSFilter() {
 	m.rdsIdx = 0
 }
 
+func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	if m.route53ZoneFilterActive {
+		switch key {
+		case "esc":
+			m.route53ZoneFilterActive = false
+		case "enter":
+			m.route53ZoneFilterActive = false
+		case "backspace":
+			if len(m.route53ZoneFilter) > 0 {
+				m.route53ZoneFilter = m.route53ZoneFilter[:len(m.route53ZoneFilter)-1]
+				m.applyRoute53ZoneFilter()
+			}
+		default:
+			if len(key) == 1 {
+				m.route53ZoneFilter += key
+				m.applyRoute53ZoneFilter()
+			}
+		}
+		return m, nil
+	}
+
+	switch key {
+	case "q", "esc":
+		m.screen = screenFeatureList
+		m.route53ZoneFilter = ""
+		m.filteredRoute53Zones = m.route53Zones
+		m.route53ZoneIdx = 0
+	case "up", "k":
+		if m.route53ZoneIdx > 0 {
+			m.route53ZoneIdx--
+		}
+	case "down", "j":
+		if m.route53ZoneIdx < len(m.filteredRoute53Zones)-1 {
+			m.route53ZoneIdx++
+		}
+	case "/":
+		m.route53ZoneFilterActive = true
+	case "enter":
+		if len(m.filteredRoute53Zones) > 0 && m.route53ZoneIdx < len(m.filteredRoute53Zones) {
+			selected := m.filteredRoute53Zones[m.route53ZoneIdx]
+			m.selectedRoute53Zone = &selected
+			m.screen = screenLoading
+			return m, m.loadRoute53Records(selected.ID)
+		}
+	}
+	return m, nil
+}
+
+func (m Model) updateRoute53RecordList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	if m.route53RecordFilterActive {
+		switch key {
+		case "esc":
+			m.route53RecordFilterActive = false
+		case "enter":
+			m.route53RecordFilterActive = false
+		case "backspace":
+			if len(m.route53RecordFilter) > 0 {
+				m.route53RecordFilter = m.route53RecordFilter[:len(m.route53RecordFilter)-1]
+				m.applyRoute53RecordFilter()
+			}
+		default:
+			if len(key) == 1 {
+				m.route53RecordFilter += key
+				m.applyRoute53RecordFilter()
+			}
+		}
+		return m, nil
+	}
+
+	switch key {
+	case "q", "esc":
+		m.screen = screenRoute53ZoneList
+		m.route53RecordFilter = ""
+		m.filteredRoute53Records = m.route53Records
+		m.route53RecordIdx = 0
+	case "up", "k":
+		if m.route53RecordIdx > 0 {
+			m.route53RecordIdx--
+		}
+	case "down", "j":
+		if m.route53RecordIdx < len(m.filteredRoute53Records)-1 {
+			m.route53RecordIdx++
+		}
+	case "/":
+		m.route53RecordFilterActive = true
+	case "enter":
+		if len(m.filteredRoute53Records) > 0 && m.route53RecordIdx < len(m.filteredRoute53Records) {
+			selected := m.filteredRoute53Records[m.route53RecordIdx]
+			m.selectedRoute53Record = &selected
+			m.screen = screenRoute53RecordDetail
+		}
+	}
+	return m, nil
+}
+
+func (m Model) updateRoute53RecordDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.screen = screenRoute53RecordList
+	}
+	return m, nil
+}
+
+func (m *Model) applyRoute53ZoneFilter() {
+	if m.route53ZoneFilter == "" {
+		m.filteredRoute53Zones = m.route53Zones
+	} else {
+		query := strings.ToLower(m.route53ZoneFilter)
+		var result []awsservice.HostedZone
+		for _, zone := range m.route53Zones {
+			if strings.Contains(zone.FilterText(), query) {
+				result = append(result, zone)
+			}
+		}
+		m.filteredRoute53Zones = result
+	}
+	m.route53ZoneIdx = 0
+}
+
+func (m *Model) applyRoute53RecordFilter() {
+	if m.route53RecordFilter == "" {
+		m.filteredRoute53Records = m.route53Records
+	} else {
+		query := strings.ToLower(m.route53RecordFilter)
+		var result []awsservice.DNSRecord
+		for _, rec := range m.route53Records {
+			if strings.Contains(rec.FilterText(), query) {
+				result = append(result, rec)
+			}
+		}
+		m.filteredRoute53Records = result
+	}
+	m.route53RecordIdx = 0
+}
+
 func (m *Model) applyFilter() {
 	if m.filterInput == "" {
 		m.filtered = m.instances
@@ -858,6 +1045,49 @@ func (m Model) loadRDSInstances() tea.Cmd {
 			return errMsg{err: fmt.Errorf("no RDS instances found")}
 		}
 		return rdsInstancesLoadedMsg{instances: instances}
+	}
+}
+
+func (m Model) loadRoute53Zones() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		m.awsRepo = repo
+
+		zones, err := repo.ListHostedZones(ctx)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		if len(zones) == 0 {
+			return errMsg{err: fmt.Errorf("no hosted zones found")}
+		}
+		return route53ZonesLoadedMsg{zones: zones}
+	}
+}
+
+func (m Model) loadRoute53Records(zoneID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo := m.awsRepo
+		if repo == nil {
+			var err error
+			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
+			if err != nil {
+				return errMsg{err: err}
+			}
+		}
+
+		records, err := repo.ListResourceRecordSets(ctx, zoneID)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		if len(records) == 0 {
+			return errMsg{err: fmt.Errorf("no records found in zone %s", zoneID)}
+		}
+		return route53RecordsLoadedMsg{records: records}
 	}
 }
 
@@ -1021,6 +1251,12 @@ func (m Model) View() string {
 		v = m.viewRDSDetail()
 	case screenRDSConfirm:
 		v = m.viewRDSConfirm()
+	case screenRoute53ZoneList:
+		v = m.viewRoute53ZoneList()
+	case screenRoute53RecordList:
+		v = m.viewRoute53RecordList()
+	case screenRoute53RecordDetail:
+		v = m.viewRoute53RecordDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:
@@ -1654,6 +1890,137 @@ func (m Model) viewRDSDetail() string {
 	}
 	b.WriteString(normalStyle.Render("  [r] Refresh"))
 	b.WriteString("\n")
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) viewRoute53ZoneList() string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render("Route53 Hosted Zones"))
+	b.WriteString("\n")
+
+	if m.route53ZoneFilterActive {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.route53ZoneFilter)))
+	} else if m.route53ZoneFilter != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.route53ZoneFilter)))
+	}
+	b.WriteString("\n\n")
+
+	if len(m.filteredRoute53Zones) == 0 {
+		b.WriteString(dimStyle.Render("  No matching hosted zones"))
+		b.WriteString("\n")
+	} else {
+		visibleLines := max(m.height-8, 5)
+		start := 0
+		if m.route53ZoneIdx >= visibleLines {
+			start = m.route53ZoneIdx - visibleLines + 1
+		}
+		end := min(start+visibleLines, len(m.filteredRoute53Zones))
+
+		for i := start; i < end; i++ {
+			zone := m.filteredRoute53Zones[i]
+			cursor := "  "
+			style := normalStyle
+			if i == m.route53ZoneIdx {
+				cursor = "> "
+				style = selectedStyle
+			}
+			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, zone.DisplayTitle())))
+			b.WriteString("\n")
+		}
+
+		b.WriteString("\n")
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d zones", len(m.filteredRoute53Zones), len(m.route53Zones))))
+	}
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: records • esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) viewRoute53RecordList() string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	zoneName := ""
+	if m.selectedRoute53Zone != nil {
+		zoneName = m.selectedRoute53Zone.Name
+	}
+	b.WriteString(titleStyle.Render(fmt.Sprintf("DNS Records — %s", zoneName)))
+	b.WriteString("\n")
+
+	if m.route53RecordFilterActive {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.route53RecordFilter)))
+	} else if m.route53RecordFilter != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.route53RecordFilter)))
+	}
+	b.WriteString("\n\n")
+
+	if len(m.filteredRoute53Records) == 0 {
+		b.WriteString(dimStyle.Render("  No matching records"))
+		b.WriteString("\n")
+	} else {
+		visibleLines := max(m.height-8, 5)
+		start := 0
+		if m.route53RecordIdx >= visibleLines {
+			start = m.route53RecordIdx - visibleLines + 1
+		}
+		end := min(start+visibleLines, len(m.filteredRoute53Records))
+
+		for i := start; i < end; i++ {
+			rec := m.filteredRoute53Records[i]
+			cursor := "  "
+			style := normalStyle
+			if i == m.route53RecordIdx {
+				cursor = "> "
+				style = selectedStyle
+			}
+			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, rec.DisplayTitle())))
+			b.WriteString("\n")
+		}
+
+		b.WriteString("\n")
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d records", len(m.filteredRoute53Records), len(m.route53Records))))
+	}
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) viewRoute53RecordDetail() string {
+	if m.selectedRoute53Record == nil {
+		return ""
+	}
+	r := m.selectedRoute53Record
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render("DNS Record Detail"))
+	b.WriteString("\n\n")
+
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Name   : %s", r.Name)))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  Type   : %s", r.Type)))
+	b.WriteString("\n")
+
+	if r.AliasTarget != "" {
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  Alias  : %s", r.AliasTarget)))
+		b.WriteString("\n")
+	} else {
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  TTL    : %d", r.TTL)))
+		b.WriteString("\n")
+	}
+
+	if len(r.Values) > 0 {
+		b.WriteString(normalStyle.Render("  Values :"))
+		b.WriteString("\n")
+		for _, v := range r.Values {
+			b.WriteString(normalStyle.Render(fmt.Sprintf("    %s", v)))
+			b.WriteString("\n")
+		}
+	}
 
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("esc: back • H: home"))
