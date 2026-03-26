@@ -141,6 +141,14 @@ unic/
 - Create / Delete records
 - Show change status (PENDING → INSYNC)
 
+**M3.6.1 — Route 53 (Phase 1)** ✅
+- List hosted zones → drill into DNS records → record detail view
+- Filter support on zone list and record list
+
+**M3.9 — IAM Users**
+- List IAM users with metadata (creation date, last activity, MFA status)
+- View user details (attached policies, groups, access keys)
+
 **M3.7 — CloudWatch Logs**
 - List log groups → log streams
 - Live tail (polling via `FilterLogEvents`)
@@ -241,7 +249,7 @@ Prerequisite: `go get github.com/sahilm/fuzzy`
 ```
 M1.1 → M1.2 → M2.1 → M2.2 → M2.3 → M2.4
                                         ↓
-                        M3.1 ~ M3.8 (independent, any order)
+                        M3.1 ~ M3.9 (independent, any order)
                                         ↓
                                   M4.1 → M4.2 → M4.3
                                         ↓
@@ -255,7 +263,7 @@ Note: M5.2 (textinput) provides the foundation for M6 (enhanced search) — they
 - M1 is complete; M2 is deferred (relying on AWS SDK default credential chain)
 - M2.1 (Context-based auth with SSO, credential, assume-role) is complete
 - M3 services are independent of each other, build in any order
-- M3.1 (VPC), M3.2 (RDS), and M3.4 (SSM Sessions) are complete
+- M3.1 (VPC), M3.2 (RDS), M3.4 (SSM Sessions), and M3.6.1 (Route53 phase 1) are complete
 - M4.3 (Distribution) is partially done (GoReleaser + GitHub Actions)
 - M5 and M6 can begin independently of remaining M3/M4 work
 
