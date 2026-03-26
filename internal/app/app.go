@@ -1913,7 +1913,25 @@ func (m Model) viewRoute53ZoneList() string {
 		b.WriteString(dimStyle.Render("  No matching hosted zones"))
 		b.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		// Measure max widths for column alignment
+		maxName, maxID := 4, 2 // "NAME", "ID"
+		for _, zone := range m.filteredRoute53Zones {
+			if len(zone.Name) > maxName {
+				maxName = len(zone.Name)
+			}
+			if len(zone.ID) > maxID {
+				maxID = len(zone.ID)
+			}
+		}
+		nameCol := lipgloss.NewStyle().Width(maxName + 2)
+		idCol := lipgloss.NewStyle().Width(maxID + 2)
+		recordsCol := lipgloss.NewStyle().Width(9) // "RECORDS" + padding
+
+		// Header
+		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + idCol.Render("ID") + recordsCol.Render("RECORDS") + "TYPE"))
+		b.WriteString("\n")
+
+		visibleLines := max(m.height-9, 5)
 		start := 0
 		if m.route53ZoneIdx >= visibleLines {
 			start = m.route53ZoneIdx - visibleLines + 1
@@ -1928,7 +1946,16 @@ func (m Model) viewRoute53ZoneList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, zone.DisplayTitle())))
+			zoneType := "Public"
+			if zone.IsPrivate {
+				zoneType = "Private"
+			}
+			row := cursor +
+				nameCol.Inherit(style).Render(zone.Name) +
+				idCol.Inherit(dimStyle).Render(zone.ID) +
+				recordsCol.Inherit(dimStyle).Render(fmt.Sprintf("%d", zone.ResourceRecordCount)) +
+				dimStyle.Render(zoneType)
+			b.WriteString(row)
 			b.WriteString("\n")
 		}
 
@@ -1962,7 +1989,24 @@ func (m Model) viewRoute53RecordList() string {
 		b.WriteString(dimStyle.Render("  No matching records"))
 		b.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		// Measure max widths for column alignment
+		maxName, maxType := 4, 4 // "NAME", "TYPE"
+		for _, rec := range m.filteredRoute53Records {
+			if len(rec.Name) > maxName {
+				maxName = len(rec.Name)
+			}
+			if len(rec.Type) > maxType {
+				maxType = len(rec.Type)
+			}
+		}
+		nameCol := lipgloss.NewStyle().Width(maxName + 2)
+		typeCol := lipgloss.NewStyle().Width(maxType + 2)
+
+		// Header
+		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + typeCol.Render("TYPE") + "VALUE"))
+		b.WriteString("\n")
+
+		visibleLines := max(m.height-9, 5)
 		start := 0
 		if m.route53RecordIdx >= visibleLines {
 			start = m.route53RecordIdx - visibleLines + 1
@@ -1977,7 +2021,21 @@ func (m Model) viewRoute53RecordList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, rec.DisplayTitle())))
+			// Build value string
+			valStr := ""
+			if rec.AliasTarget != "" {
+				valStr = "ALIAS → " + rec.AliasTarget
+			} else {
+				valStr = strings.Join(rec.Values, ", ")
+			}
+			if len(valStr) > 60 {
+				valStr = valStr[:57] + "..."
+			}
+			row := cursor +
+				nameCol.Inherit(style).Render(rec.Name) +
+				typeCol.Inherit(filterStyle).Render(rec.Type) +
+				dimStyle.Render(valStr)
+			b.WriteString(row)
 			b.WriteString("\n")
 		}
 
@@ -2000,24 +2058,26 @@ func (m Model) viewRoute53RecordDetail() string {
 	b.WriteString(titleStyle.Render("DNS Record Detail"))
 	b.WriteString("\n\n")
 
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Name   : %s", r.Name)))
+	labelStyle := dimStyle.Width(10)
+
+	b.WriteString("  " + labelStyle.Render("Name") + normalStyle.Render(r.Name))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Type   : %s", r.Type)))
+	b.WriteString("  " + labelStyle.Render("Type") + filterStyle.Render(r.Type))
 	b.WriteString("\n")
 
 	if r.AliasTarget != "" {
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  Alias  : %s", r.AliasTarget)))
+		b.WriteString("  " + labelStyle.Render("Alias") + normalStyle.Render(r.AliasTarget))
 		b.WriteString("\n")
 	} else {
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  TTL    : %d", r.TTL)))
+		b.WriteString("  " + labelStyle.Render("TTL") + normalStyle.Render(fmt.Sprintf("%d", r.TTL)))
 		b.WriteString("\n")
 	}
 
 	if len(r.Values) > 0 {
-		b.WriteString(normalStyle.Render("  Values :"))
+		b.WriteString("  " + labelStyle.Render("Values"))
 		b.WriteString("\n")
 		for _, v := range r.Values {
-			b.WriteString(normalStyle.Render(fmt.Sprintf("    %s", v)))
+			b.WriteString("  " + labelStyle.Render("") + normalStyle.Render(v))
 			b.WriteString("\n")
 		}
 	}
