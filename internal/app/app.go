@@ -31,6 +31,8 @@ const (
 	screenRoute53RecordDetail
 	screenSecretList
 	screenSecretDetail
+	screenSecurityGroupList
+	screenSecurityGroupDetail
 	screenContextPicker
 	screenContextAdd
 	screenLoading
@@ -108,6 +110,14 @@ type Model struct {
 	secretFilter        string
 	secretFilterActive  bool
 	selectedSecret      *awsservice.SecretDetail
+
+	// Security Group browser state
+	securityGroups         []awsservice.SecurityGroup
+	filteredSecurityGroups []awsservice.SecurityGroup
+	sgIdx                  int
+	sgFilter               string
+	sgFilterActive         bool
+	selectedSecurityGroup  *awsservice.SecurityGroup
 
 	// Context picker
 	configPath         string
@@ -240,6 +250,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenSecretDetail
 		return m, nil
 
+	case securityGroupsLoadedMsg:
+		m.securityGroups = msg.securityGroups
+		m.filteredSecurityGroups = msg.securityGroups
+		m.sgIdx = 0
+		m.screen = screenSecurityGroupList
+		return m, nil
+
 	case rdsActionDoneMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
@@ -365,6 +382,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecretList(msg)
 		case screenSecretDetail:
 			return m.updateSecretDetail(msg)
+		case screenSecurityGroupList:
+			return m.updateSecurityGroupList(msg)
+		case screenSecurityGroupDetail:
+			return m.updateSecurityGroupDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -434,6 +455,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureSecretsBrowser:
 				m.screen = screenLoading
 				return m, m.loadSecrets()
+			case domain.FeatureSecurityGroupBrowser:
+				m.screen = screenLoading
+				return m, m.loadSecurityGroups()
 			}
 		}
 	}
@@ -487,6 +511,10 @@ func (m Model) View() string {
 		v = m.viewSecretList()
 	case screenSecretDetail:
 		v = m.viewSecretDetail()
+	case screenSecurityGroupList:
+		v = m.viewSecurityGroupList()
+	case screenSecurityGroupDetail:
+		v = m.viewSecurityGroupDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:
