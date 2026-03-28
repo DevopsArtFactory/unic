@@ -7,10 +7,13 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
+
+	uniclog "unic/internal/log"
 )
 
 // ListHostedZones returns all Route53 hosted zones in the current account.
 func (r *AwsRepository) ListHostedZones(ctx context.Context) ([]HostedZone, error) {
+	uniclog.Debug("aws", "ListHostedZones called")
 	var zones []HostedZone
 	var marker *string
 
@@ -46,6 +49,7 @@ func (r *AwsRepository) ListHostedZones(ctx context.Context) ([]HostedZone, erro
 
 // ListResourceRecordSets returns all DNS records for a given hosted zone.
 func (r *AwsRepository) ListResourceRecordSets(ctx context.Context, zoneID string) ([]DNSRecord, error) {
+	uniclog.Debug("aws", "ListResourceRecordSets called", "zone_id", zoneID)
 	var records []DNSRecord
 	input := &route53.ListResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(zoneID),

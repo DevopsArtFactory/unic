@@ -9,12 +9,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+
+	uniclog "unic/internal/log"
 )
 
 // ListRunningInstances returns running EC2 instances that are also SSM-managed.
 // It first queries SSM for managed instance IDs, then fetches EC2 details
 // only for those instances so that every returned instance can be connected via SSM.
 func (r *AwsRepository) ListRunningInstances(ctx context.Context) ([]EC2Instance, error) {
+	uniclog.Debug("aws", "ListRunningInstances called")
 	// Step 1: Get SSM-managed online instance IDs.
 	ssmIDs, err := r.listSSMManagedInstanceIDs(ctx)
 	if err != nil {

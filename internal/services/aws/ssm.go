@@ -5,11 +5,14 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+
+	uniclog "unic/internal/log"
 )
 
 // StartSession initiates an SSM session to the given instance.
 // Returns the StartSessionOutput, the SSM endpoint URL, and any error.
 func (r *AwsRepository) StartSession(ctx context.Context, instanceID string) (*ssm.StartSessionOutput, string, error) {
+	uniclog.Info("aws", "StartSession called", "instance", instanceID)
 	input := &ssm.StartSessionInput{
 		Target: &instanceID,
 	}
@@ -26,6 +29,7 @@ func (r *AwsRepository) StartSession(ctx context.Context, instanceID string) (*s
 
 // TerminateSession terminates an active SSM session.
 func (r *AwsRepository) TerminateSession(ctx context.Context, sessionID string) error {
+	uniclog.Debug("aws", "TerminateSession called", "session", sessionID)
 	_, err := r.SSMClient.TerminateSession(ctx, &ssm.TerminateSessionInput{
 		SessionId: &sessionID,
 	})
