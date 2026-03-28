@@ -716,3 +716,193 @@ func TestSecurityGroupBrowserInCatalog(t *testing.T) {
 	}
 	t.Error("EC2 service not found")
 }
+
+// --- IAM tests ---
+
+func TestIAMFeatureListContainsSeparateActions(t *testing.T) {
+	m := New(testConfig(), "")
+
+	for _, svc := range m.services {
+		if svc.Name == domain.ServiceIAM {
+			m.features = svc.Features
+			break
+		}
+	}
+
+	if len(m.features) != 2 {
+		t.Fatalf("expected 2 IAM features, got %d", len(m.features))
+	}
+	if m.features[0].Kind != domain.FeatureListAccessKeys {
+		t.Fatalf("expected first IAM feature ListAccessKeys, got %s", m.features[0].Kind)
+	}
+	if m.features[1].Kind != domain.FeatureRotateAccessKey {
+		t.Fatalf("expected second IAM feature RotateAccessKey, got %s", m.features[1].Kind)
+	}
+}
+
+func TestIAMKeyDetailHidesRotateActionInListMode(t *testing.T) {
+	m := New(testConfig(), "")
+	m.iamRotationEnabled = false
+	m.selectedIAMKey = &awsservice.AccessKey{
+		AccessKeyID: "AKIATEST",
+		Status:      "Active",
+	}
+
+	view := m.viewIAMKeyDetail()
+	if !strings.Contains(view, "RotateAccessKey feature") {
+		t.Fatalf("expected list mode detail view to hide direct rotate action, got %q", view)
+	}
+}
+
+func TestIAMKeyDetailShowsRotateActionInRotateMode(t *testing.T) {
+	m := New(testConfig(), "")
+	m.iamRotationEnabled = true
+	m.selectedIAMKey = &awsservice.AccessKey{
+		AccessKeyID: "AKIATEST",
+		Status:      "Active",
+	}
+
+	view := m.viewIAMKeyDetail()
+	if !strings.Contains(view, "[r] Rotate key") {
+		t.Fatalf("expected rotate mode detail view to show rotate action, got %q", view)
+	}
+}
+
+func TestIAMRotationResultRequiresApplyBeforeDeactivateForCredentialCurrentIdentity(t *testing.T) {
+	m := New(testConfig(), "")
+	m.cfg.AuthType = config.AuthTypeCredential
+	m.iamNewKey = &awsservice.NewAccessKey{
+		AccessKeyID:     "AKIANEWKEY",
+		SecretAccessKey: "secret",
+	}
+	m.iamRotationOldKeyID = "AKIAOLDKEY"
+
+	if m.canDeactivateIAMOldKey() {
+		t.Fatal("expected deactivate to be blocked before apply/verify")
+	}
+
+	view := m.viewIAMKeyRotateResult()
+	if !strings.Contains(view, "Apply to ~/.aws/credentials and verify") {
+		t.Fatalf("expected apply action in result view, got %q", view)
+	}
+	if !strings.Contains(view, "available after apply + verify") {
+		t.Fatalf("expected deactivate gating message, got %q", view)
+	}
+}
+
+func TestIAMRotationResultAllowsDeactivateAfterVerify(t *testing.T) {
+	m := New(testConfig(), "")
+	m.cfg.AuthType = config.AuthTypeCredential
+	m.iamNewKey = &awsservice.NewAccessKey{
+		AccessKeyID:     "AKIANEWKEY",
+		SecretAccessKey: "secret",
+	}
+	m.iamRotationOldKeyID = "AKIAOLDKEY"
+	m.iamNewKeyVerified = true
+
+	if !m.canDeactivateIAMOldKey() {
+		t.Fatal("expected deactivate to be allowed after verification")
+	}
+}
+
+func TestIAMRotationResultRequiresNoApplyForSSOContext(t *testing.T) {
+	m := New(testConfig(), "")
+	m.cfg.AuthType = config.AuthTypeSSO
+	m.iamNewKey = &awsservice.NewAccessKey{
+		AccessKeyID:     "AKIANEWKEY",
+		SecretAccessKey: "secret",
+	}
+	m.iamRotationOldKeyID = "AKIAOLDKEY"
+
+	if !m.canDeactivateIAMOldKey() {
+		t.Fatal("expected non-credential flow to allow immediate deactivate")
+	}
+}
+
+func TestIAMRotationResultShowsApplyForLegacyCredentialContext(t *testing.T) {
+	m := New(testConfig(), "")
+	m.cfg.AuthType = config.AuthTypeDefault
+	m.cfg.Profile = "default"
+	m.cfg.RoleArn = ""
+	m.cfg.SSOStartURL = ""
+	m.cfg.SSOAccountID = ""
+	m.cfg.SSORoleName = ""
+	m.iamNewKey = &awsservice.NewAccessKey{
+		AccessKeyID:     "AKIANEWKEY",
+		SecretAccessKey: "secret",
+	}
+	m.iamRotationOldKeyID = "AKIAOLDKEY"
+
+	if !m.requiresIAMCredentialApplyBeforeDeactivate() {
+		t.Fatal("expected legacy profile-based context to require apply/verify")
+	}
+
+	view := m.viewIAMKeyRotateResult()
+	if !strings.Contains(view, "[a] Apply to ~/.aws/credentials and verify") {
+		t.Fatalf("expected apply action for legacy credential context, got %q", view)
+	}
+}
+
+func TestIAMRotationResultShowsApplyForImplicitDefaultProfile(t *testing.T) {
+	m := New(testConfig(), "")
+	m.cfg.AuthType = config.AuthTypeDefault
+	m.cfg.Profile = ""
+	m.cfg.RoleArn = ""
+	m.cfg.SSOStartURL = ""
+	m.cfg.SSOAccountID = ""
+	m.cfg.SSORoleName = ""
+	m.iamNewKey = &awsservice.NewAccessKey{
+		AccessKeyID:     "AKIANEWKEY",
+		SecretAccessKey: "secret",
+	}
+	m.iamRotationOldKeyID = "AKIAOLDKEY"
+
+	if !m.requiresIAMCredentialApplyBeforeDeactivate() {
+		t.Fatal("expected implicit default profile to require apply/verify")
+	}
+
+	view := m.viewIAMKeyRotateResult()
+	if !strings.Contains(view, "[a] Apply to ~/.aws/credentials and verify") {
+		t.Fatalf("expected apply action for implicit default profile, got %q", view)
+	}
+}
+
+func TestIAMRotationResultShowsDisabledApplyReasonForSSO(t *testing.T) {
+	m := New(testConfig(), "")
+	m.cfg.AuthType = config.AuthTypeSSO
+	m.iamNewKey = &awsservice.NewAccessKey{
+		AccessKeyID:     "AKIANEWKEY",
+		SecretAccessKey: "secret",
+	}
+	m.iamRotationOldKeyID = "AKIAOLDKEY"
+
+	view := m.viewIAMKeyRotateResult()
+	if !strings.Contains(view, "disabled for auth:sso") {
+		t.Fatalf("expected disabled reason for sso flow, got %q", view)
+	}
+}
+
+func TestRotateAccessKeyFeatureUsesCurrentIdentityFlow(t *testing.T) {
+	m := New(testConfig(), "")
+
+	for _, svc := range m.services {
+		if svc.Name == domain.ServiceIAM {
+			m.features = svc.Features
+			break
+		}
+	}
+	m.screen = screenFeatureList
+	m.featIdx = 1
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if !model.iamRotationEnabled {
+		t.Fatal("expected IAM rotation mode to be enabled")
+	}
+	if model.screen != screenLoading {
+		t.Fatalf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected load IAM keys command")
+	}
+}

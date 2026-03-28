@@ -102,3 +102,34 @@ func TestEC2HasSecurityGroupBrowserFeature(t *testing.T) {
 
 	t.Error("EC2 service not found in catalog")
 }
+
+func TestIAMHasAccessKeyFeatures(t *testing.T) {
+	services := Catalog()
+
+	for _, svc := range services {
+		if svc.Name != ServiceIAM {
+			continue
+		}
+
+		foundList := false
+		foundRotate := false
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureListAccessKeys {
+				foundList = true
+			}
+			if feat.Kind == FeatureRotateAccessKey {
+				foundRotate = true
+			}
+		}
+
+		if !foundList {
+			t.Error("IAM service should have ListAccessKeys feature")
+		}
+		if !foundRotate {
+			t.Error("IAM service should have RotateAccessKey feature")
+		}
+		return
+	}
+
+	t.Error("IAM service not found in catalog")
+}

@@ -338,6 +338,43 @@ contexts:
 	}
 }
 
+func TestContextWithCredentialsAliasAuthType(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: default-cred
+contexts:
+  - name: default-cred
+    profile: default
+    auth_type: credentials
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuthType != AuthTypeCredential {
+		t.Errorf("expected auth_type alias 'credentials' to normalize to 'credential', got '%s'", cfg.AuthType)
+	}
+}
+
+func TestContextWithAssumeRoleAliasAuthType(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: prod-admin
+contexts:
+  - name: prod-admin
+    profile: default
+    auth_type: assume-role
+    role_arn: arn:aws:iam::111111111111:role/Admin
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuthType != AuthTypeAssumeRole {
+		t.Errorf("expected auth_type alias 'assume-role' to normalize to 'assume_role', got '%s'", cfg.AuthType)
+	}
+}
+
 func TestContextWithAssumeRoleAuthType(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `

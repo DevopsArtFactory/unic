@@ -9,18 +9,21 @@ const (
 	ServiceRDS            AwsService = "RDS"
 	ServiceRoute53        AwsService = "Route53"
 	ServiceSecretsManager AwsService = "Secrets Manager"
+	ServiceIAM            AwsService = "IAM"
 )
 
 // FeatureKind represents a specific feature within a service.
 type FeatureKind string
 
 const (
-	FeatureSSMSession     FeatureKind = "SSM Sessions Manager"
-	FeatureVPCBrowser     FeatureKind = "VPC Browser"
-	FeatureRDSBrowser     FeatureKind = "RDS Browser"
-	FeatureRoute53Browser FeatureKind = "Route53 Browser"
-	FeatureSecretsBrowser          FeatureKind = "Secrets Manager Browser"
-	FeatureSecurityGroupBrowser    FeatureKind = "Security Group Browser"
+	FeatureSSMSession           FeatureKind = "SSM Sessions Manager"
+	FeatureVPCBrowser           FeatureKind = "VPC Browser"
+	FeatureRDSBrowser           FeatureKind = "RDS Browser"
+	FeatureRoute53Browser       FeatureKind = "Route53 Browser"
+	FeatureSecretsBrowser       FeatureKind = "Secrets Manager Browser"
+	FeatureSecurityGroupBrowser FeatureKind = "Security Group Browser"
+	FeatureListAccessKeys       FeatureKind = "ListAccessKeys"
+	FeatureRotateAccessKey      FeatureKind = "RotateAccessKey"
 )
 
 // Feature describes a selectable feature under an AWS service.

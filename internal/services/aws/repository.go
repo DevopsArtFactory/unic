@@ -9,6 +9,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
@@ -33,6 +34,12 @@ var _ Route53ClientAPI = (*route53.Client)(nil)
 
 // Verify *secretsmanager.Client satisfies SecretsManagerClientAPI at compile time.
 var _ SecretsManagerClientAPI = (*secretsmanager.Client)(nil)
+
+// Verify *iam.Client satisfies IAMClientAPI at compile time.
+var _ IAMClientAPI = (*iam.Client)(nil)
+
+// Verify *sts.Client satisfies STSClientAPI at compile time.
+var _ STSClientAPI = (*sts.Client)(nil)
 
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
@@ -64,6 +71,19 @@ type SecretsManagerClientAPI interface {
 	GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 }
 
+// IAMClientAPI is the interface for IAM operations used by AwsRepository.
+type IAMClientAPI interface {
+	ListAccessKeys(ctx context.Context, params *iam.ListAccessKeysInput, optFns ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error)
+	GetAccessKeyLastUsed(ctx context.Context, params *iam.GetAccessKeyLastUsedInput, optFns ...func(*iam.Options)) (*iam.GetAccessKeyLastUsedOutput, error)
+	CreateAccessKey(ctx context.Context, params *iam.CreateAccessKeyInput, optFns ...func(*iam.Options)) (*iam.CreateAccessKeyOutput, error)
+	UpdateAccessKey(ctx context.Context, params *iam.UpdateAccessKeyInput, optFns ...func(*iam.Options)) (*iam.UpdateAccessKeyOutput, error)
+	DeleteAccessKey(ctx context.Context, params *iam.DeleteAccessKeyInput, optFns ...func(*iam.Options)) (*iam.DeleteAccessKeyOutput, error)
+}
+
+type STSClientAPI interface {
+	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
 	ec2.DescribeInstancesAPIClient
@@ -80,14 +100,15 @@ type CallerIdentity struct {
 	UserID  string
 }
 
-// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, Route53, STS, and Secrets Manager.
+// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, Route53, STS, Secrets Manager, and IAM.
 type AwsRepository struct {
 	EC2Client            EC2ClientAPI
 	SSMClient            SSMClientAPI
 	RDSClient            RDSClientAPI
 	Route53Client        Route53ClientAPI
 	SecretsManagerClient SecretsManagerClientAPI
-	STSClient            *sts.Client
+	IAMClient            IAMClientAPI
+	STSClient            STSClientAPI
 	Region               string
 	Profile              string
 }
@@ -156,6 +177,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		RDSClient:            rds.NewFromConfig(awsCfg),
 		Route53Client:        route53.NewFromConfig(awsCfg),
 		SecretsManagerClient: secretsmanager.NewFromConfig(awsCfg),
+		IAMClient:            iam.NewFromConfig(awsCfg),
 		STSClient:            sts.NewFromConfig(awsCfg),
 		Region:               cfg.Region,
 		Profile:              cfg.Profile,

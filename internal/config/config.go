@@ -22,9 +22,9 @@ type fileConfig struct {
 	DefaultRegion  string `yaml:"default_region"`
 
 	// New contexts-based format
-	Current  string          `yaml:"current"`
-	Defaults fileDefaults    `yaml:"defaults"`
-	Contexts []contextEntry  `yaml:"contexts"`
+	Current  string         `yaml:"current"`
+	Defaults fileDefaults   `yaml:"defaults"`
+	Contexts []contextEntry `yaml:"contexts"`
 }
 
 type fileDefaults struct {
@@ -67,6 +67,21 @@ type Config struct {
 	SSOStartURL  string
 	SSOAccountID string
 	SSORoleName  string
+}
+
+func normalizeAuthType(value string) AuthType {
+	switch value {
+	case "":
+		return AuthTypeDefault
+	case "sso":
+		return AuthTypeSSO
+	case "credential", "credentials":
+		return AuthTypeCredential
+	case "assume_role", "assume-role":
+		return AuthTypeAssumeRole
+	default:
+		return AuthType(value)
+	}
 }
 
 // ContextInfo holds summary information about a context for listing.
@@ -122,7 +137,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		for _, ctx := range fc.Contexts {
 			if ctx.Name == fc.Current {
 				contextName = ctx.Name
-				authType = AuthType(ctx.AuthType)
+				authType = normalizeAuthType(ctx.AuthType)
 				if ctx.Profile != "" {
 					profile = ctx.Profile
 				}

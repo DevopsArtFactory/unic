@@ -98,10 +98,13 @@ contexts:
 | Service | Feature | Status |
 |---------|---------|--------|
 | EC2 | SSM Session Manager (connect to running, SSM-managed instances) | ✅ Implemented |
+| EC2 | Security Group Browser (list/filter SGs, view inbound/outbound rules) | ✅ Implemented |
 | VPC | VPC Browser (VPCs → Subnets → Available IPs with reserved-IP exclusion) | ✅ Implemented |
 | RDS | RDS Browser (list, start/stop, failover, Aurora cluster support, auto-polling) | ✅ Implemented |
 | Route53 | DNS Browser (Hosted Zones → Records → Record Detail, public/private zones) | ✅ Implemented |
 | Secrets Manager | Secrets Browser (list secrets, view key-value pairs or raw values) | ✅ Implemented |
+| IAM | Access Key Browser (list keys with status, age, last used) | ✅ Implemented |
+| IAM | Access Key Rotation (create → verify/apply → deactivate → delete) | ✅ Implemented |
 
 ## TUI Key Bindings
 
@@ -138,42 +141,16 @@ contexts:
 ### Filtering
 
 Available on: EC2 instances, VPC/Subnets, RDS instances, Route53 zones/records, Secrets Manager. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
-| EC2 | SSM Session Manager (connect to EC2 instances) | ✅ Implemented |
-| EC2 | Security Group Browser (list/filter SGs, view inbound/outbound rules) | ✅ Implemented |
-| VPC | VPC Browser (VPCs → subnets → available IPs) | ✅ Implemented |
-| RDS | RDS Browser (list, start/stop, failover, Aurora cluster support) | ✅ Implemented |
-| Route53 | ListHostedZones | 🚧 Coming Soon |
-| IAM | ListUsers | 🚧 Coming Soon |
 
-## TUI Key Bindings
+### IAM Access Key Rotation
 
-### Global
-
-| Key | Action |
-|-----|--------|
-| `j`/`k` or `↑`/`↓` | Navigate |
-| `Enter` | Select |
-| `Esc`/`q` | Go back |
-| `H` | Go to home (service list) |
-| `/` | Filter (instances, IPs, contexts) |
-| `C` | Context switcher |
-| `q` (on service list) | Quit |
-
-### EC2 (SSM Session)
-
-| Key | Action |
-|-----|--------|
-| `/` | Filter instances |
-| `r` | Refresh instance list |
-| `Enter` | Connect to instance |
-
-### RDS
-
-| Key | Action |
-|-----|--------|
-| `s` | Start instance |
-| `x` | Stop instance |
-| `f` | Failover (Aurora) |
+| Key | Action | Screen |
+|-----|--------|--------|
+| `r` | Rotate access key | Key detail |
+| `c` | Copy new key as export commands | Rotation result |
+| `a` | Apply new key to ~/.aws/credentials | Rotation result |
+| `d` | Deactivate old key | Rotation result |
+| `x` | Delete old inactive key | Rotation result |
 
 ## Documentation
 
