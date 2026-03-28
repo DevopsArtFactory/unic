@@ -74,16 +74,32 @@ contexts:
 
 ## TUI Key Bindings
 
+### Global
+
 | Key | Action |
 |-----|--------|
 | `j`/`k` or `↑`/`↓` | Navigate |
 | `Enter` | Select |
 | `Esc`/`q` | Go back |
 | `H` | Go to home (service list) |
-| `/` | Filter (instances, IPs) |
 | `C` | Context switcher |
-| `s`/`x`/`f` | Start/Stop/Failover (RDS detail) |
 | `q` (on service list) | Quit |
+
+### EC2 (SSM Session)
+
+| Key | Action |
+|-----|--------|
+| `/` | Filter instances |
+| `r` | Refresh instance list |
+| `Enter` | Connect to instance |
+
+### RDS
+
+| Key | Action |
+|-----|--------|
+| `s` | Start instance |
+| `x` | Stop instance |
+| `f` | Failover (Aurora) |
 
 ## Documentation
 
