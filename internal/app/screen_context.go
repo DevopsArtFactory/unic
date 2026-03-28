@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -23,7 +24,30 @@ func (m Model) loadContexts() tea.Cmd {
 }
 
 func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	key := msg.String()
+
+	// If filter is active, handle text input
+	if m.ctxFilterActive {
+		switch key {
+		case "esc":
+			m.ctxFilterActive = false
+		case "enter":
+			m.ctxFilterActive = false
+		case "backspace":
+			if len(m.ctxFilterInput) > 0 {
+				m.ctxFilterInput = m.ctxFilterInput[:len(m.ctxFilterInput)-1]
+				m.applyCtxFilter()
+			}
+		default:
+			if len(key) == 1 {
+				m.ctxFilterInput += key
+				m.applyCtxFilter()
+			}
+		}
+		return m, nil
+	}
+
+	switch key {
 	case "q":
 		m.quitting = true
 		return m, tea.Quit
@@ -32,6 +56,8 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If initial launch, quit.
 		if m.cfg.ContextName != "" {
 			m.screen = m.ctxPrevScreen
+			m.ctxFilterInput = ""
+			m.filteredCtxList = m.ctxList
 		} else {
 			m.quitting = true
 			return m, tea.Quit
@@ -41,12 +67,14 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ctxIdx--
 		}
 	case "down", "j":
-		if m.ctxIdx < len(m.ctxList)-1 {
+		if m.ctxIdx < len(m.filteredCtxList)-1 {
 			m.ctxIdx++
 		}
+	case "/":
+		m.ctxFilterActive = true
 	case "enter":
-		if len(m.ctxList) > 0 && m.ctxIdx < len(m.ctxList) {
-			selected := m.ctxList[m.ctxIdx]
+		if len(m.filteredCtxList) > 0 && m.ctxIdx < len(m.filteredCtxList) {
+			selected := m.filteredCtxList[m.ctxIdx]
 			m.pendingContextName = selected.Name
 			m.screen = screenLoading
 			return m, m.switchContext(selected.Name)
@@ -61,6 +89,22 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenContextAdd
 	}
 	return m, nil
+}
+
+func (m *Model) applyCtxFilter() {
+	if m.ctxFilterInput == "" {
+		m.filteredCtxList = m.ctxList
+	} else {
+		query := strings.ToLower(m.ctxFilterInput)
+		var result []config.ContextInfo
+		for _, ctx := range m.ctxList {
+			if strings.Contains(ctx.FilterText(), query) {
+				result = append(result, ctx)
+			}
+		}
+		m.filteredCtxList = result
+	}
+	m.ctxIdx = 0
 }
 
 func (m Model) switchContext(name string) tea.Cmd {
@@ -127,6 +171,14 @@ func (m Model) doFinalizeContextSwitch() tea.Cmd {
 func (m Model) viewContextPicker() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Select Context"))
+	b.WriteString("\n")
+
+	// Filter bar
+	if m.ctxFilterActive {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.ctxFilterInput)))
+	} else if m.ctxFilterInput != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.ctxFilterInput)))
+	}
 	b.WriteString("\n\n")
 
 	if len(m.ctxList) == 0 {
@@ -134,10 +186,13 @@ func (m Model) viewContextPicker() string {
 		b.WriteString("\n\n")
 		b.WriteString(dimStyle.Render("  Press 'a' to add your first context."))
 		b.WriteString("\n")
+	} else if len(m.filteredCtxList) == 0 {
+		b.WriteString(dimStyle.Render("  No matching contexts"))
+		b.WriteString("\n")
 	} else {
 		// Measure max widths for alignment
 		maxName, maxRegion := 4, 6 // "NAME", "REGION"
-		for _, ctx := range m.ctxList {
+		for _, ctx := range m.filteredCtxList {
 			if len(ctx.Name) > maxName {
 				maxName = len(ctx.Name)
 			}
@@ -153,16 +208,16 @@ func (m Model) viewContextPicker() string {
 		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + regionCol.Render("REGION") + "AUTH"))
 		b.WriteString("\n")
 
-		// overhead: title (1) + blank (1) + table header (1) + blank (1) + footer (1) = 5
-		visibleLines := max(m.height-5, 3)
+		// overhead: title (1) + filter (1) + blank (1) + table header (1) + blank (1) + footer (1) = 6
+		visibleLines := max(m.height-6, 3)
 		start := 0
 		if m.ctxIdx >= visibleLines {
 			start = m.ctxIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.ctxList))
+		end := min(start+visibleLines, len(m.filteredCtxList))
 
 		for i := start; i < end; i++ {
-			ctx := m.ctxList[i]
+			ctx := m.filteredCtxList[i]
 			cursor := "  "
 			style := normalStyle
 			if i == m.ctxIdx {
@@ -181,9 +236,9 @@ func (m Model) viewContextPicker() string {
 
 	b.WriteString("\n")
 	if m.cfg.ContextName != "" {
-		b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • a: add • esc: back • q: quit"))
+		b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: select • a: add • esc: back • q: quit"))
 	} else {
-		b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • a: add • q: quit"))
+		b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: select • a: add • q: quit"))
 	}
 	return b.String()
 }

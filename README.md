@@ -80,7 +80,7 @@ contexts:
 | `Enter` | Select |
 | `Esc`/`q` | Go back |
 | `H` | Go to home (service list) |
-| `/` | Filter (instances, IPs) |
+| `/` | Filter (instances, IPs, contexts) |
 | `C` | Context switcher |
 | `s`/`x`/`f` | Start/Stop/Failover (RDS detail) |
 | `q` (on service list) | Quit |

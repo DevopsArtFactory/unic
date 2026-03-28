@@ -112,7 +112,10 @@ type Model struct {
 	// Context picker
 	configPath         string
 	ctxList            []config.ContextInfo
+	filteredCtxList    []config.ContextInfo
 	ctxIdx             int
+	ctxFilterInput     string
+	ctxFilterActive    bool
 	ctxPrevScreen      screen
 	pendingContextName string
 
@@ -293,8 +296,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case contextsLoadedMsg:
 		m.ctxList = msg.contexts
+		m.filteredCtxList = msg.contexts
 		m.ctxIdx = 0
-		for i, ctx := range m.ctxList {
+		m.ctxFilterInput = ""
+		m.ctxFilterActive = false
+		for i, ctx := range m.filteredCtxList {
 			if ctx.Current {
 				m.ctxIdx = i
 				break
