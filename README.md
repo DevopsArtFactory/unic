@@ -121,6 +121,13 @@ contexts:
 | `/` | Toggle filter mode |
 | `Ctrl+C` | Force quit |
 
+### EC2 SSM Session
+
+| Key | Action |
+|-----|--------|
+| `r` | Refresh instance list |
+| `Enter` | Connect to instance |
+
 ### RDS Detail Actions
 
 | Key | Action | Condition |
@@ -140,7 +147,7 @@ contexts:
 
 ### Filtering
 
-Available on: EC2 instances, VPC/Subnets, RDS instances, Route53 zones/records, Secrets Manager. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
+Available on: EC2 instances, VPC/Subnets, RDS instances, Route53 zones/records, Secrets Manager, Context Switcher. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
 
 ### IAM Access Key Rotation
 
