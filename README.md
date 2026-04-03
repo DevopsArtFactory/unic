@@ -121,23 +121,14 @@ contexts:
 | `/` | Toggle filter mode |
 | `Ctrl+C` | Force quit |
 
-### EC2 (SSM Session)
+### EC2 SSM Session
 
 | Key | Action |
 |-----|--------|
-| `/` | Filter instances |
 | `r` | Refresh instance list |
-| `Enter` | Connect to instance via SSM |
+| `Enter` | Connect to instance |
 
-### Security Groups
-
-| Key | Action |
-|-----|--------|
-| `/` | Filter security groups |
-| `r` | Refresh list |
-| `Enter` | View inbound/outbound rules |
-
-### RDS Detail
+### RDS Detail Actions
 
 | Key | Action | Condition |
 |-----|--------|-----------|
@@ -167,7 +158,17 @@ contexts:
 
 ### Filtering
 
-Available on: EC2 instances, Security Groups, VPC/Subnets, RDS instances, Route53 zones/records, Secrets Manager, Contexts. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
+Available on: EC2 instances, VPC/Subnets, RDS instances, Route53 zones/records, Secrets Manager, Context Switcher. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
+
+### IAM Access Key Rotation
+
+| Key | Action | Screen |
+|-----|--------|--------|
+| `r` | Rotate access key | Key detail |
+| `c` | Copy new key as export commands | Rotation result |
+| `a` | Apply new key to ~/.aws/credentials | Rotation result |
+| `d` | Deactivate old key | Rotation result |
+| `x` | Delete old inactive key | Rotation result |
 
 ## Documentation
 

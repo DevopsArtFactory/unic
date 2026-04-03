@@ -119,9 +119,9 @@ unic/
 - Aurora cluster-level stop/start/failover
 - Type-to-confirm for destructive actions (stop, failover)
 
-**M3.3 — IAM Credentials**
-- List access keys, show key age/status
-- Rotate: create new key → display once → deactivate old (with confirmation)
+**M3.3 — IAM Credentials** ✅
+- List access keys, show key age/status ✅
+- Rotate: create new key → display once → deactivate old (with confirmation) ✅
 
 **M3.4 — Systems Manager (Sessions Manager)** ✅
 - List SSM-eligible EC2 instances (agent status check)
@@ -129,9 +129,9 @@ unic/
 - Implementation: suspend Bubbletea program → spawn `session-manager-plugin` process → resume on exit
 - Prerequisite check: verify `session-manager-plugin` is installed
 
-**M3.5 — EC2 Security Groups**
-- List/filter security groups (by VPC, name, ID)
-- View inbound + outbound rules
+**M3.5 — EC2 Security Groups** 🟡
+- List/filter security groups (by VPC, name, ID) ✅
+- View inbound + outbound rules ✅
 - Add / Delete / Modify rules (protocol, port range, source/dest CIDR or SG)
 - Confirmation before apply
 
@@ -161,9 +161,9 @@ unic/
 - Graph rendering: Bubbletea viewport with braille/block characters
 - Multiple metrics overlay on single chart
 
-**M3.9 — Secrets Manager**
-- List secrets
-- Drill into secret detail: name, key/value pairs, encryption key (KMS key ID)
+**M3.9 — Secrets Manager** ✅
+- List secrets ✅
+- Drill into secret detail: name, key/value pairs, encryption key (KMS key ID) ✅
 
 ---
 
@@ -175,10 +175,10 @@ unic/
 - ~~Fuzzy search/filter on all list views~~ → moved to M6
 - ~~Loading spinners for async operations~~ → moved to M5.3
 
-**M4.2 — Error Handling & Logging**
+**M4.2 — Error Handling & Logging** ✅
 - Structured error messages with actionable hints
-- Debug log file (`~/.config/unic/logs/`)
-- `--verbose` flag
+- Debug log file (`~/.config/unic/logs/`) ✅
+- `--verbose` flag ✅
 
 **M4.3 — Distribution** 🟡
 - GitHub Actions CI/CD ✅
@@ -192,7 +192,7 @@ unic/
 
 Prerequisite: `go get github.com/charmbracelet/bubbles`
 
-**M5.1 — File Extraction (no behavior change)**
+**M5.1 — File Extraction (no behavior change)** ✅
 - Split `internal/app/app.go` (~1700 lines) into focused files:
   - `styles.go` — all lipgloss style vars + new styles
   - `views.go` — all `view*()` methods + `renderStatusBar()`
@@ -267,8 +267,12 @@ Note: M5.2 (textinput) provides the foundation for M6 (enhanced search) — they
 - M1 is complete; M2 is deferred (relying on AWS SDK default credential chain)
 - M2.1 (Context-based auth with SSO, credential, assume-role) is complete
 - M3 services are independent of each other, build in any order
-- M3.1 (VPC), M3.2 (RDS), M3.4 (SSM Sessions), and M3.6.1 (Route53 phase 1) are complete
+- M3.1 (VPC), M3.2 (RDS), M3.3 (IAM Credentials), M3.4 (SSM Sessions), M3.6.1 (Route53 phase 1), and M3.9 (Secrets Manager) are complete
+- M3.5 (Security Groups) is partially done — read-only browsing with filter; write operations (add/delete/modify rules) remain
+- Context switcher now supports "/" filtering (from feat/context-filter)
+- M4.2 (Error Handling & Logging) is complete (verbose flag + debug log file)
 - M4.3 (Distribution) is partially done (GoReleaser + GitHub Actions)
+- M5.1 (File Extraction) is complete — app.go split into per-screen files
 - M5 and M6 can begin independently of remaining M3/M4 work
 
 ---
