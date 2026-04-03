@@ -98,7 +98,7 @@ contexts:
 | Service | Feature | Status |
 |---------|---------|--------|
 | EC2 | SSM Session Manager (connect to running, SSM-managed instances) | ✅ Implemented |
-| EC2 | Security Group Browser (list/filter SGs, view inbound/outbound rules) | ✅ Implemented |
+| EC2 | Security Group Browser (list/filter SGs, view rules, add/delete rules with confirmation) | ✅ Implemented |
 | VPC | VPC Browser (VPCs → Subnets → Available IPs with reserved-IP exclusion) | ✅ Implemented |
 | RDS | RDS Browser (list, start/stop, failover, Aurora cluster support, auto-polling) | ✅ Implemented |
 | Route53 | DNS Browser (Hosted Zones → Records → Record Detail, public/private zones) | ✅ Implemented |
@@ -128,7 +128,19 @@ contexts:
 | `r` | Refresh instance list |
 | `Enter` | Connect to instance |
 
-### RDS Detail Actions
+### Security Groups
+
+| Key | Action | Screen |
+|-----|--------|--------|
+| `/` | Filter security groups | List |
+| `r` | Refresh list | List |
+| `Enter` | View inbound/outbound rules | List |
+| `Tab` | Switch between Inbound/Outbound section | Detail |
+| `j`/`k` or `↑`/`↓` | Navigate rules | Detail |
+| `a` | Add rule (multi-step form) | Detail |
+| `d` | Delete selected rule (type-to-confirm) | Detail |
+
+### RDS Detail
 
 | Key | Action | Condition |
 |-----|--------|-----------|

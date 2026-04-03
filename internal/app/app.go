@@ -33,6 +33,8 @@ const (
 	screenSecretDetail
 	screenSecurityGroupList
 	screenSecurityGroupDetail
+	screenSecurityGroupAddRule
+	screenSecurityGroupDeleteConfirm
 	screenIAMKeyList
 	screenIAMKeyDetail
 	screenIAMKeyRotateConfirm
@@ -136,6 +138,14 @@ type Model struct {
 	sgFilter               string
 	sgFilterActive         bool
 	selectedSecurityGroup  *awsservice.SecurityGroup
+	sgRuleSection          string // "ingress" or "egress" — active section in detail view
+	sgRuleIdx              int    // selected rule index within the active section
+	sgDeleteConfirm        string // type-to-confirm input for rule deletion
+	sgDeleteRule           *awsservice.SecurityGroupRule
+	sgAddField             int               // current field in add form (0=direction, 1=protocol, 2=fromPort, 3=toPort, 4=source, 5=description)
+	sgAddValues            map[string]string  // accumulated form values
+	sgAddInput             string             // current field text input
+	sgAddSelectIdx         int                // index for select-type fields (direction, protocol)
 
 	// Context picker
 	configPath         string
@@ -278,6 +288,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenSecurityGroupList
 		return m, nil
 
+	case sgRuleAddedMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil
+		}
+		return m, m.refreshSecurityGroup()
+
+	case sgRuleDeletedMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil
+		}
+		return m, m.refreshSecurityGroup()
+
+	case sgRefreshedMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil
+		}
+		m.selectedSecurityGroup = msg.sg
+		// Update the SG in the list
+		for i, sg := range m.securityGroups {
+			if sg.GroupID == msg.sg.GroupID {
+				m.securityGroups[i] = *msg.sg
+				break
+			}
+		}
+		m.applySecurityGroupFilter()
+		m.sgRuleIdx = 0
+		m.screen = screenSecurityGroupDetail
+		return m, nil
+
 	case iamKeysLoadedMsg:
 		m.iamKeys = msg.keys
 		m.iamKeyIdx = 0
@@ -418,13 +463,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		}
-		// Global home — return to service list from any screen
-		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker {
+		// Global home — return to service list from any screen (skip text-input screens)
+		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
+			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm {
 			m.screen = screenServiceList
 			return m, nil
 		}
-		// Global context switch — C key opens context picker
-		if msg.String() == "C" && m.screen != screenContextPicker {
+		// Global context switch — C key opens context picker (skip text-input screens)
+		if msg.String() == "C" && m.screen != screenContextPicker &&
+			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm {
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
 		}
@@ -462,6 +509,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecurityGroupList(msg)
 		case screenSecurityGroupDetail:
 			return m.updateSecurityGroupDetail(msg)
+		case screenSecurityGroupAddRule:
+			return m.updateSecurityGroupAddRule(msg)
+		case screenSecurityGroupDeleteConfirm:
+			return m.updateSecurityGroupDeleteConfirm(msg)
 		case screenIAMKeyList:
 			return m.updateIAMKeyList(msg)
 		case screenIAMKeyDetail:
@@ -607,6 +658,10 @@ func (m Model) View() string {
 		v = m.viewSecurityGroupList()
 	case screenSecurityGroupDetail:
 		v = m.viewSecurityGroupDetail()
+	case screenSecurityGroupAddRule:
+		v = m.viewSecurityGroupAddRule()
+	case screenSecurityGroupDeleteConfirm:
+		v = m.viewSecurityGroupDeleteConfirm()
 	case screenIAMKeyList:
 		v = m.viewIAMKeyList()
 	case screenIAMKeyDetail:

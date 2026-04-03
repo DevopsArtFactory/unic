@@ -17,6 +17,10 @@ type mockEC2Client struct {
 	describeInstancesFunc         func(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
 	describeNetworkInterfacesFunc func(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
 	describeSecurityGroupsFunc    func(ctx context.Context, params *ec2.DescribeSecurityGroupsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error)
+	authorizeSGIngressFunc        func(ctx context.Context, params *ec2.AuthorizeSecurityGroupIngressInput, optFns ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupIngressOutput, error)
+	authorizeSGEgressFunc         func(ctx context.Context, params *ec2.AuthorizeSecurityGroupEgressInput, optFns ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupEgressOutput, error)
+	revokeSGIngressFunc           func(ctx context.Context, params *ec2.RevokeSecurityGroupIngressInput, optFns ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupIngressOutput, error)
+	revokeSGEgressFunc            func(ctx context.Context, params *ec2.RevokeSecurityGroupEgressInput, optFns ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupEgressOutput, error)
 }
 
 func (m *mockEC2Client) DescribeVpcs(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error) {
@@ -46,6 +50,34 @@ func (m *mockEC2Client) DescribeSecurityGroups(ctx context.Context, params *ec2.
 		return m.describeSecurityGroupsFunc(ctx, params, optFns...)
 	}
 	return &ec2.DescribeSecurityGroupsOutput{}, nil
+}
+
+func (m *mockEC2Client) AuthorizeSecurityGroupIngress(ctx context.Context, params *ec2.AuthorizeSecurityGroupIngressInput, optFns ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
+	if m.authorizeSGIngressFunc != nil {
+		return m.authorizeSGIngressFunc(ctx, params, optFns...)
+	}
+	return &ec2.AuthorizeSecurityGroupIngressOutput{}, nil
+}
+
+func (m *mockEC2Client) AuthorizeSecurityGroupEgress(ctx context.Context, params *ec2.AuthorizeSecurityGroupEgressInput, optFns ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupEgressOutput, error) {
+	if m.authorizeSGEgressFunc != nil {
+		return m.authorizeSGEgressFunc(ctx, params, optFns...)
+	}
+	return &ec2.AuthorizeSecurityGroupEgressOutput{}, nil
+}
+
+func (m *mockEC2Client) RevokeSecurityGroupIngress(ctx context.Context, params *ec2.RevokeSecurityGroupIngressInput, optFns ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupIngressOutput, error) {
+	if m.revokeSGIngressFunc != nil {
+		return m.revokeSGIngressFunc(ctx, params, optFns...)
+	}
+	return &ec2.RevokeSecurityGroupIngressOutput{}, nil
+}
+
+func (m *mockEC2Client) RevokeSecurityGroupEgress(ctx context.Context, params *ec2.RevokeSecurityGroupEgressInput, optFns ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupEgressOutput, error) {
+	if m.revokeSGEgressFunc != nil {
+		return m.revokeSGEgressFunc(ctx, params, optFns...)
+	}
+	return &ec2.RevokeSecurityGroupEgressOutput{}, nil
 }
 
 // --- VPC tests ---

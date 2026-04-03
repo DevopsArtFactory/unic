@@ -124,6 +124,163 @@ func TestSecurityGroupDisplayTitle(t *testing.T) {
 	}
 }
 
+func TestAddSecurityGroupRule_Ingress(t *testing.T) {
+	var captured *ec2.AuthorizeSecurityGroupIngressInput
+	mock := &mockEC2Client{
+		authorizeSGIngressFunc: func(_ context.Context, params *ec2.AuthorizeSecurityGroupIngressInput, _ ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
+			captured = params
+			return &ec2.AuthorizeSecurityGroupIngressOutput{}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	err := repo.AddSecurityGroupRule(context.Background(), "sg-aaa", "ingress", SecurityGroupRule{
+		Protocol:    "tcp",
+		FromPort:    443,
+		ToPort:      443,
+		CIDRV4:      "10.0.0.0/8",
+		Description: "HTTPS from internal",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured == nil {
+		t.Fatal("expected AuthorizeSecurityGroupIngress to be called")
+	}
+	if awssdk.ToString(captured.GroupId) != "sg-aaa" {
+		t.Errorf("expected GroupId sg-aaa, got %s", awssdk.ToString(captured.GroupId))
+	}
+	if len(captured.IpPermissions) != 1 {
+		t.Fatalf("expected 1 IpPermission, got %d", len(captured.IpPermissions))
+	}
+	perm := captured.IpPermissions[0]
+	if awssdk.ToString(perm.IpProtocol) != "tcp" {
+		t.Errorf("expected protocol tcp, got %s", awssdk.ToString(perm.IpProtocol))
+	}
+	if len(perm.IpRanges) != 1 || awssdk.ToString(perm.IpRanges[0].CidrIp) != "10.0.0.0/8" {
+		t.Errorf("expected CIDR 10.0.0.0/8")
+	}
+}
+
+func TestAddSecurityGroupRule_Egress_SGRef(t *testing.T) {
+	var captured *ec2.AuthorizeSecurityGroupEgressInput
+	mock := &mockEC2Client{
+		authorizeSGEgressFunc: func(_ context.Context, params *ec2.AuthorizeSecurityGroupEgressInput, _ ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupEgressOutput, error) {
+			captured = params
+			return &ec2.AuthorizeSecurityGroupEgressOutput{}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	err := repo.AddSecurityGroupRule(context.Background(), "sg-bbb", "egress", SecurityGroupRule{
+		Protocol:       "tcp",
+		FromPort:       5432,
+		ToPort:         5432,
+		ReferencedSGID: "sg-db",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured == nil {
+		t.Fatal("expected AuthorizeSecurityGroupEgress to be called")
+	}
+	perm := captured.IpPermissions[0]
+	if len(perm.UserIdGroupPairs) != 1 || awssdk.ToString(perm.UserIdGroupPairs[0].GroupId) != "sg-db" {
+		t.Error("expected SG reference sg-db in UserIdGroupPairs")
+	}
+}
+
+func TestDeleteSecurityGroupRule_Ingress(t *testing.T) {
+	var captured *ec2.RevokeSecurityGroupIngressInput
+	mock := &mockEC2Client{
+		revokeSGIngressFunc: func(_ context.Context, params *ec2.RevokeSecurityGroupIngressInput, _ ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupIngressOutput, error) {
+			captured = params
+			return &ec2.RevokeSecurityGroupIngressOutput{}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	err := repo.DeleteSecurityGroupRule(context.Background(), "sg-aaa", "ingress", SecurityGroupRule{
+		Protocol: "tcp",
+		FromPort: 22,
+		ToPort:   22,
+		CIDRV4:   "0.0.0.0/0",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured == nil {
+		t.Fatal("expected RevokeSecurityGroupIngress to be called")
+	}
+	if awssdk.ToString(captured.GroupId) != "sg-aaa" {
+		t.Errorf("expected GroupId sg-aaa, got %s", awssdk.ToString(captured.GroupId))
+	}
+}
+
+func TestDeleteSecurityGroupRule_Egress(t *testing.T) {
+	var captured *ec2.RevokeSecurityGroupEgressInput
+	mock := &mockEC2Client{
+		revokeSGEgressFunc: func(_ context.Context, params *ec2.RevokeSecurityGroupEgressInput, _ ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupEgressOutput, error) {
+			captured = params
+			return &ec2.RevokeSecurityGroupEgressOutput{}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	err := repo.DeleteSecurityGroupRule(context.Background(), "sg-aaa", "egress", SecurityGroupRule{
+		Protocol: "-1",
+		CIDRV4:   "0.0.0.0/0",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured == nil {
+		t.Fatal("expected RevokeSecurityGroupEgress to be called")
+	}
+}
+
+func TestRefreshSecurityGroup_Success(t *testing.T) {
+	mock := &mockEC2Client{
+		describeSecurityGroupsFunc: func(_ context.Context, params *ec2.DescribeSecurityGroupsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error) {
+			if len(params.GroupIds) != 1 || params.GroupIds[0] != "sg-aaa" {
+				t.Errorf("expected GroupIds [sg-aaa], got %v", params.GroupIds)
+			}
+			return &ec2.DescribeSecurityGroupsOutput{
+				SecurityGroups: []types.SecurityGroup{
+					{
+						GroupId:   awssdk.String("sg-aaa"),
+						GroupName: awssdk.String("web-sg"),
+						VpcId:     awssdk.String("vpc-111"),
+					},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	sg, err := repo.RefreshSecurityGroup(context.Background(), "sg-aaa")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sg.GroupID != "sg-aaa" {
+		t.Errorf("expected GroupID sg-aaa, got %s", sg.GroupID)
+	}
+}
+
+func TestRefreshSecurityGroup_NotFound(t *testing.T) {
+	mock := &mockEC2Client{
+		describeSecurityGroupsFunc: func(_ context.Context, _ *ec2.DescribeSecurityGroupsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error) {
+			return &ec2.DescribeSecurityGroupsOutput{SecurityGroups: []types.SecurityGroup{}}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	_, err := repo.RefreshSecurityGroup(context.Background(), "sg-missing")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 func TestSecurityGroupRuleDisplayTitle(t *testing.T) {
 	tests := []struct {
 		name     string
