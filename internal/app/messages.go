@@ -82,3 +82,7 @@ type secretsLoadedMsg struct {
 type secretDetailLoadedMsg struct {
 	detail *awsservice.SecretDetail
 }
+
+type securityGroupsLoadedMsg struct {
+	securityGroups []awsservice.SecurityGroup
+}

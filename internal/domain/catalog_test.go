@@ -84,3 +84,21 @@ func TestRDSHasBrowserFeature(t *testing.T) {
 
 	t.Error("RDS service not found in catalog")
 }
+
+func TestEC2HasSecurityGroupBrowserFeature(t *testing.T) {
+	services := Catalog()
+
+	for _, svc := range services {
+		if svc.Name == ServiceEC2 {
+			for _, feat := range svc.Features {
+				if feat.Kind == FeatureSecurityGroupBrowser {
+					return
+				}
+			}
+			t.Error("EC2 service should have Security Group Browser feature")
+			return
+		}
+	}
+
+	t.Error("EC2 service not found in catalog")
+}

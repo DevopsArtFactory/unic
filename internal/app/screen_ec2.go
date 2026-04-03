@@ -50,6 +50,11 @@ func (m Model) updateInstanceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "/":
 		m.filterActive = true
+	case "r":
+		m.screen = screenLoading
+		m.filterInput = ""
+		m.instIdx = 0
+		return m, m.loadInstances()
 	case "enter":
 		if len(m.filtered) > 0 && m.instIdx < len(m.filtered) {
 			return m, m.startSSMSession(m.filtered[m.instIdx])
@@ -178,6 +183,6 @@ func (m Model) viewInstanceList() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: connect • esc: back • H: home"))
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • r: refresh • enter: connect • esc: back • H: home"))
 	return b.String()
 }
