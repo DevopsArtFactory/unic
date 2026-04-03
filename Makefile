@@ -1,5 +1,5 @@
 APP_NAME := unic
-VERSION  := 0.1.0
+VERSION  := 0.0.3
 DIST_DIR := dist
 CMD_PATH := ./cmd/unic
 
@@ -13,11 +13,11 @@ all: build
 
 ## Build for current platform (debug)
 build:
-	go build -o $(APP_NAME) $(CMD_PATH)
+	go build -ldflags="-X unic/internal/cli.Version=$(VERSION)" -o $(APP_NAME) $(CMD_PATH)
 
 ## Build for current platform (release, stripped)
 release:
-	go build -ldflags="-s -w" -o $(APP_NAME) $(CMD_PATH)
+	go build -ldflags="-s -w -X unic/internal/cli.Version=$(VERSION)" -o $(APP_NAME) $(CMD_PATH)
 
 ## Run tests
 test:
@@ -32,25 +32,25 @@ test-v:
 build-darwin: build-darwin-amd64 build-darwin-arm64
 
 build-darwin-amd64:
-	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(APP_NAME)-darwin-amd64 $(CMD_PATH)
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X unic/internal/cli.Version=$(VERSION)" -o $(DIST_DIR)/$(APP_NAME)-darwin-amd64 $(CMD_PATH)
 
 build-darwin-arm64:
-	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(APP_NAME)-darwin-arm64 $(CMD_PATH)
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X unic/internal/cli.Version=$(VERSION)" -o $(DIST_DIR)/$(APP_NAME)-darwin-arm64 $(CMD_PATH)
 
 ## ── Linux ───────────────────────────────────────────────
 
 build-linux: build-linux-amd64 build-linux-arm64
 
 build-linux-amd64:
-	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(APP_NAME)-linux-amd64 $(CMD_PATH)
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X unic/internal/cli.Version=$(VERSION)" -o $(DIST_DIR)/$(APP_NAME)-linux-amd64 $(CMD_PATH)
 
 build-linux-arm64:
-	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(APP_NAME)-linux-arm64 $(CMD_PATH)
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X unic/internal/cli.Version=$(VERSION)" -o $(DIST_DIR)/$(APP_NAME)-linux-arm64 $(CMD_PATH)
 
 ## ── Windows ─────────────────────────────────────────────
 
 build-windows:
-	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(APP_NAME)-windows-amd64.exe $(CMD_PATH)
+	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X unic/internal/cli.Version=$(VERSION)" -o $(DIST_DIR)/$(APP_NAME)-windows-amd64.exe $(CMD_PATH)
 
 ## ── All platforms ───────────────────────────────────────
 

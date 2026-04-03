@@ -11,6 +11,7 @@ import (
 	"unic/internal/config"
 	"unic/internal/domain"
 	awsservice "unic/internal/services/aws"
+	"unic/internal/update"
 )
 
 // screen represents the current TUI screen.
@@ -168,6 +169,11 @@ type Model struct {
 	// Caller identity (loaded at startup)
 	callerIdentity *awsservice.CallerIdentity
 
+	// Update check
+	currentVersion  string
+	updateAvailable string             // non-empty = new version available
+	installMethod   update.InstallMethod
+
 	// Error display
 	errMsg string
 
@@ -177,19 +183,34 @@ type Model struct {
 }
 
 // New creates a new app Model.
-func New(cfg *config.Config, configPath string) Model {
+func New(cfg *config.Config, configPath string, version string) Model {
 	services := domain.Catalog()
 	return Model{
-		cfg:           cfg,
-		configPath:    configPath,
-		screen:        screenContextPicker,
-		ctxPrevScreen: screenServiceList,
-		services:      services,
+		cfg:            cfg,
+		configPath:     configPath,
+		currentVersion: version,
+		screen:         screenContextPicker,
+		ctxPrevScreen:  screenServiceList,
+		services:       services,
+	}
+}
+
+// updateAvailableMsg is sent when a background version check completes.
+type updateAvailableMsg struct {
+	version string
+	method  update.InstallMethod
+}
+
+func (m Model) checkForUpdate() tea.Cmd {
+	return func() tea.Msg {
+		method := update.DetectInstallMethod()
+		newVersion := update.CheckForUpdate(m.currentVersion)
+		return updateAvailableMsg{version: newVersion, method: method}
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return m.loadContexts()
+	return tea.Batch(m.loadContexts(), m.checkForUpdate())
 }
 
 func (m Model) loadCallerIdentity() tea.Cmd {
@@ -217,6 +238,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case callerIdentityMsg:
 		m.callerIdentity = msg.identity
+		return m, nil
+
+	case updateAvailableMsg:
+		m.installMethod = msg.method
+		if msg.version != "" {
+			m.updateAvailable = msg.version
+		}
 		return m, nil
 
 	case instancesLoadedMsg:
