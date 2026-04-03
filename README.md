@@ -155,6 +155,7 @@ Available on: EC2 instances, VPC/Subnets, RDS instances, Route53 zones/records, 
 | `Enter` | Select |
 | `Esc`/`q` | Go back |
 | `H` | Go to home (service list) |
+| `/` | Filter (instances, IPs, contexts) |
 | `C` | Context switcher |
 | `q` (on service list) | Quit |
 

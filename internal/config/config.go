@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -80,6 +81,11 @@ type ContextInfo struct {
 	SSOAccountID string
 	SSORoleName  string
 	Current      bool
+}
+
+// FilterText returns a lowercase string for keyword matching.
+func (c ContextInfo) FilterText() string {
+	return strings.ToLower(fmt.Sprintf("%s %s %s", c.Name, c.Profile, c.Region))
 }
 
 // Load resolves config with priority: CLI flags > context > config file defaults > hardcoded defaults.
