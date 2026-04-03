@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	uniclog "unic/internal/log"
 )
 
 const (
@@ -138,6 +140,14 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	if cliRegion != nil {
 		region = *cliRegion
 	}
+
+	uniclog.Debug("config", "config resolved",
+		"path", configPath,
+		"profile", profile,
+		"region", region,
+		"context", contextName,
+		"auth_type", string(authType),
+	)
 
 	return &Config{
 		Profile:      profile,

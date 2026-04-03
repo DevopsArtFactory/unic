@@ -9,10 +9,13 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	uniclog "unic/internal/log"
 )
 
 // ListVPCs returns all VPCs in the current account/region.
 func (r *AwsRepository) ListVPCs(ctx context.Context) ([]VPC, error) {
+	uniclog.Debug("aws", "ListVPCs called")
 	output, err := r.EC2Client.DescribeVpcs(ctx, &ec2.DescribeVpcsInput{})
 	if err != nil {
 		return nil, err
@@ -32,6 +35,7 @@ func (r *AwsRepository) ListVPCs(ctx context.Context) ([]VPC, error) {
 
 // ListSubnets returns all subnets belonging to the given VPC.
 func (r *AwsRepository) ListSubnets(ctx context.Context, vpcID string) ([]Subnet, error) {
+	uniclog.Debug("aws", "ListSubnets called", "vpc_id", vpcID)
 	input := &ec2.DescribeSubnetsInput{
 		Filters: []types.Filter{
 			{
@@ -64,6 +68,7 @@ func (r *AwsRepository) ListSubnets(ctx context.Context, vpcID string) ([]Subnet
 // AWS reserves 5 IPs per subnet: .0 (network), .1 (router), .2 (DNS),
 // .3 (future use), .255 (broadcast) — these are always excluded.
 func (r *AwsRepository) ListAvailableIPs(ctx context.Context, subnetID, cidr string) ([]string, error) {
+	uniclog.Debug("aws", "ListAvailableIPs called", "subnet_id", subnetID, "cidr", cidr)
 	// Parse CIDR to get all IPs in range
 	allIPs, err := cidrUsableIPs(cidr)
 	if err != nil {

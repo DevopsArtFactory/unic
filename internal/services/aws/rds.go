@@ -6,10 +6,13 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+
+	uniclog "unic/internal/log"
 )
 
 // ListDBInstances returns all RDS DB instances in the current account/region.
 func (r *AwsRepository) ListDBInstances(ctx context.Context) ([]RDSInstance, error) {
+	uniclog.Debug("aws", "ListDBInstances called")
 	output, err := r.RDSClient.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe DB instances: %w", err)
@@ -70,6 +73,7 @@ func (r *AwsRepository) DescribeDBInstance(ctx context.Context, dbInstanceID str
 
 // StopDBInstance stops a running RDS instance.
 func (r *AwsRepository) StopDBInstance(ctx context.Context, dbInstanceID string) error {
+	uniclog.Info("aws", "StopDBInstance called", "instance", dbInstanceID)
 	_, err := r.RDSClient.StopDBInstance(ctx, &rds.StopDBInstanceInput{
 		DBInstanceIdentifier: awssdk.String(dbInstanceID),
 	})
@@ -81,6 +85,7 @@ func (r *AwsRepository) StopDBInstance(ctx context.Context, dbInstanceID string)
 
 // StartDBInstance starts a stopped RDS instance.
 func (r *AwsRepository) StartDBInstance(ctx context.Context, dbInstanceID string) error {
+	uniclog.Info("aws", "StartDBInstance called", "instance", dbInstanceID)
 	_, err := r.RDSClient.StartDBInstance(ctx, &rds.StartDBInstanceInput{
 		DBInstanceIdentifier: awssdk.String(dbInstanceID),
 	})
@@ -93,6 +98,7 @@ func (r *AwsRepository) StartDBInstance(ctx context.Context, dbInstanceID string
 // RebootDBInstance reboots an RDS instance. If forceFailover is true,
 // a Multi-AZ failover is triggered.
 func (r *AwsRepository) RebootDBInstance(ctx context.Context, dbInstanceID string, forceFailover bool) error {
+	uniclog.Info("aws", "RebootDBInstance called", "instance", dbInstanceID, "force_failover", forceFailover)
 	_, err := r.RDSClient.RebootDBInstance(ctx, &rds.RebootDBInstanceInput{
 		DBInstanceIdentifier: awssdk.String(dbInstanceID),
 		ForceFailover:        awssdk.Bool(forceFailover),
@@ -105,6 +111,7 @@ func (r *AwsRepository) RebootDBInstance(ctx context.Context, dbInstanceID strin
 
 // StopDBCluster stops an Aurora DB cluster.
 func (r *AwsRepository) StopDBCluster(ctx context.Context, clusterID string) error {
+	uniclog.Info("aws", "StopDBCluster called", "cluster", clusterID)
 	_, err := r.RDSClient.StopDBCluster(ctx, &rds.StopDBClusterInput{
 		DBClusterIdentifier: awssdk.String(clusterID),
 	})
@@ -116,6 +123,7 @@ func (r *AwsRepository) StopDBCluster(ctx context.Context, clusterID string) err
 
 // StartDBCluster starts a stopped Aurora DB cluster.
 func (r *AwsRepository) StartDBCluster(ctx context.Context, clusterID string) error {
+	uniclog.Info("aws", "StartDBCluster called", "cluster", clusterID)
 	_, err := r.RDSClient.StartDBCluster(ctx, &rds.StartDBClusterInput{
 		DBClusterIdentifier: awssdk.String(clusterID),
 	})
@@ -127,6 +135,7 @@ func (r *AwsRepository) StartDBCluster(ctx context.Context, clusterID string) er
 
 // FailoverDBCluster triggers a failover for an Aurora DB cluster.
 func (r *AwsRepository) FailoverDBCluster(ctx context.Context, clusterID string) error {
+	uniclog.Info("aws", "FailoverDBCluster called", "cluster", clusterID)
 	_, err := r.RDSClient.FailoverDBCluster(ctx, &rds.FailoverDBClusterInput{
 		DBClusterIdentifier: awssdk.String(clusterID),
 	})
