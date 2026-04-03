@@ -67,6 +67,7 @@ contexts:
 | Service | Feature | Status |
 |---------|---------|--------|
 | EC2 | SSM Session Manager (connect to EC2 instances) | ✅ Implemented |
+| EC2 | Security Group Browser (list/filter SGs, view inbound/outbound rules) | ✅ Implemented |
 | VPC | VPC Browser (VPCs → subnets → available IPs) | ✅ Implemented |
 | RDS | RDS Browser (list, start/stop, failover, Aurora cluster support) | ✅ Implemented |
 | Route53 | ListHostedZones | 🚧 Coming Soon |

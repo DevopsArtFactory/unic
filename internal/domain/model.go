@@ -19,7 +19,8 @@ const (
 	FeatureVPCBrowser     FeatureKind = "VPC Browser"
 	FeatureRDSBrowser     FeatureKind = "RDS Browser"
 	FeatureRoute53Browser FeatureKind = "Route53 Browser"
-	FeatureSecretsBrowser FeatureKind = "Secrets Manager Browser"
+	FeatureSecretsBrowser          FeatureKind = "Secrets Manager Browser"
+	FeatureSecurityGroupBrowser    FeatureKind = "Security Group Browser"
 )
 
 // Feature describes a selectable feature under an AWS service.
