@@ -16,21 +16,21 @@ func testConfig() *config.Config {
 }
 
 func TestNewModelNotQuitting(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	if m.quitting {
 		t.Error("new model should not be quitting")
 	}
 }
 
 func TestNewModelStartsOnContextPicker(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	if m.screen != screenContextPicker {
 		t.Error("new model should start on context picker screen")
 	}
 }
 
 func TestQuitOnCtrlC(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	model := updated.(Model)
 	if !model.quitting {
@@ -42,7 +42,7 @@ func TestQuitOnCtrlC(t *testing.T) {
 }
 
 func TestQuitOnQ(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenServiceList
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	model := updated.(Model)
@@ -55,7 +55,7 @@ func TestQuitOnQ(t *testing.T) {
 }
 
 func TestViewNotEmpty(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	v := m.View()
 	if v == "" {
 		t.Error("view should not be empty when not quitting")
@@ -71,7 +71,7 @@ func TestViewEmptyWhenQuitting(t *testing.T) {
 }
 
 func TestServiceListNavigation(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenServiceList
 	// Press down — should move to index 1 (now 2 services: EC2, VPC)
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
@@ -82,7 +82,7 @@ func TestServiceListNavigation(t *testing.T) {
 }
 
 func TestServiceListEnterGoesToFeatures(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenServiceList
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
@@ -92,7 +92,7 @@ func TestServiceListEnterGoesToFeatures(t *testing.T) {
 }
 
 func TestFeatureListEscGoesBack(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenFeatureList
 	m.features = m.services[0].Features
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -105,7 +105,7 @@ func TestFeatureListEscGoesBack(t *testing.T) {
 // --- RDS screen tests ---
 
 func TestRDSListNavigation(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
@@ -129,7 +129,7 @@ func TestRDSListNavigation(t *testing.T) {
 }
 
 func TestRDSListEnterGoesToDetail(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
@@ -147,7 +147,7 @@ func TestRDSListEnterGoesToDetail(t *testing.T) {
 }
 
 func TestRDSListEscGoesBack(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{}
 	m.filteredRDS = m.rdsInstances
@@ -160,7 +160,7 @@ func TestRDSListEscGoesBack(t *testing.T) {
 }
 
 func TestRDSDetailEscGoesBack(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available"}
 
@@ -172,7 +172,7 @@ func TestRDSDetailEscGoesBack(t *testing.T) {
 }
 
 func TestRDSDetailStopGoesToConfirm(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: ""}
 
@@ -187,7 +187,7 @@ func TestRDSDetailStopGoesToConfirm(t *testing.T) {
 }
 
 func TestRDSDetailStartGoesToConfirm(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "stopped"}
 
@@ -202,7 +202,7 @@ func TestRDSDetailStartGoesToConfirm(t *testing.T) {
 }
 
 func TestRDSDetailFailoverGoesToConfirm(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", MultiAZ: true}
 
@@ -217,7 +217,7 @@ func TestRDSDetailFailoverGoesToConfirm(t *testing.T) {
 }
 
 func TestRDSDetailStopClusterMember(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: "my-cluster"}
 
@@ -234,7 +234,7 @@ func TestRDSDetailStopClusterMember(t *testing.T) {
 
 func TestRDSConfirmNoGoesBack(t *testing.T) {
 	// For start action, 'n' cancels back to detail
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 	m.rdsAction = "start"
@@ -247,7 +247,7 @@ func TestRDSConfirmNoGoesBack(t *testing.T) {
 }
 
 func TestRDSConfirmEscGoesBack(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 	m.rdsAction = "stop"
@@ -260,7 +260,7 @@ func TestRDSConfirmEscGoesBack(t *testing.T) {
 }
 
 func TestRDSListFilter(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{
 		{DBInstanceID: "prod-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
@@ -290,7 +290,7 @@ func TestRDSListFilter(t *testing.T) {
 }
 
 func TestRDSActionDoneMsg_Success(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 
@@ -308,7 +308,7 @@ func TestRDSActionDoneMsg_Success(t *testing.T) {
 }
 
 func TestRDSInstancesLoadedMsg(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenLoading
 
 	instances := []awsservice.RDSInstance{
@@ -325,7 +325,7 @@ func TestRDSInstancesLoadedMsg(t *testing.T) {
 }
 
 func TestFeatureListRDSBrowserGoesToLoading(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenFeatureList
 	m.features = []domain.Feature{
 		{Kind: domain.FeatureRDSBrowser, Description: "Browse RDS instances"},
@@ -343,7 +343,7 @@ func TestFeatureListRDSBrowserGoesToLoading(t *testing.T) {
 }
 
 func TestRDSViewNotEmpty(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
 	m.rdsInstances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro", EngineVersion: "8.0"},
@@ -358,7 +358,7 @@ func TestRDSViewNotEmpty(t *testing.T) {
 }
 
 func TestRDSDetailViewNotEmpty(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{
 		DBInstanceID: "db-1", Engine: "mysql", EngineVersion: "8.0",
@@ -373,7 +373,7 @@ func TestRDSDetailViewNotEmpty(t *testing.T) {
 }
 
 func TestRDSConfirmViewNotEmpty(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 	m.rdsAction = "stop"
@@ -386,7 +386,7 @@ func TestRDSConfirmViewNotEmpty(t *testing.T) {
 
 func TestRDSConfirmStopRequiresTypedInput(t *testing.T) {
 	// Test with standalone instance (confirm target = instance ID)
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", ClusterID: ""}
 	m.rdsAction = "stop"
@@ -427,7 +427,7 @@ func TestRDSConfirmStopRequiresTypedInput(t *testing.T) {
 
 func TestRDSConfirmStopClusterRequiresClusterID(t *testing.T) {
 	// Test with Aurora cluster member (confirm target = cluster ID)
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "inst-1", ClusterID: "my-cluster", Status: "available"}
 	m.rdsAction = "stop"
@@ -457,7 +457,7 @@ func TestRDSConfirmStopClusterRequiresClusterID(t *testing.T) {
 }
 
 func TestRDSConfirmFailoverRequiresTypedInput(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "prod-db", MultiAZ: true}
 	m.rdsAction = "failover"
@@ -486,7 +486,7 @@ func TestRDSConfirmFailoverRequiresTypedInput(t *testing.T) {
 }
 
 func TestRDSConfirmStartUsesSimpleYN(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "stopped"}
 	m.rdsAction = "start"
@@ -503,7 +503,7 @@ func TestRDSConfirmStartUsesSimpleYN(t *testing.T) {
 }
 
 func TestRDSConfirmInputBackspace(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 	m.rdsAction = "stop"
@@ -527,7 +527,7 @@ func TestRDSConfirmInputBackspace(t *testing.T) {
 }
 
 func TestRDSConfirmInputResetOnEntry(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: ""}
 	m.rdsConfirmInput = "leftover"
@@ -544,7 +544,7 @@ func TestRDSConfirmInputResetOnEntry(t *testing.T) {
 }
 
 func TestFitToHeight(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 
 	// height=0 → no change
 	m.height = 0
@@ -573,7 +573,7 @@ func TestFitToHeight(t *testing.T) {
 }
 
 func TestViewFitsTerminalHeight(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.height = 10
 	m.selectedRDS = &awsservice.RDSInstance{
@@ -592,7 +592,7 @@ func TestViewFitsTerminalHeight(t *testing.T) {
 // --- Security Group tests ---
 
 func TestSecurityGroupListNavigation(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupList
 	m.securityGroups = []awsservice.SecurityGroup{
 		{GroupID: "sg-1", Name: "web", VPCID: "vpc-1"},
@@ -614,7 +614,7 @@ func TestSecurityGroupListNavigation(t *testing.T) {
 }
 
 func TestSecurityGroupListEnterGoesToDetail(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupList
 	m.securityGroups = []awsservice.SecurityGroup{
 		{GroupID: "sg-1", Name: "web", VPCID: "vpc-1"},
@@ -632,7 +632,7 @@ func TestSecurityGroupListEnterGoesToDetail(t *testing.T) {
 }
 
 func TestSecurityGroupDetailEscGoesBack(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupDetail
 	m.selectedSecurityGroup = &awsservice.SecurityGroup{GroupID: "sg-1"}
 
@@ -644,7 +644,7 @@ func TestSecurityGroupDetailEscGoesBack(t *testing.T) {
 }
 
 func TestSecurityGroupFilter(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupList
 	m.securityGroups = []awsservice.SecurityGroup{
 		{GroupID: "sg-1", Name: "web-sg", VPCID: "vpc-1"},
@@ -670,7 +670,7 @@ func TestSecurityGroupFilter(t *testing.T) {
 }
 
 func TestSecurityGroupDetailView(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupDetail
 	m.height = 30
 	m.selectedSecurityGroup = &awsservice.SecurityGroup{
@@ -720,7 +720,7 @@ func TestSecurityGroupBrowserInCatalog(t *testing.T) {
 // --- IAM tests ---
 
 func TestIAMFeatureListContainsSeparateActions(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 
 	for _, svc := range m.services {
 		if svc.Name == domain.ServiceIAM {
@@ -741,7 +741,7 @@ func TestIAMFeatureListContainsSeparateActions(t *testing.T) {
 }
 
 func TestIAMKeyDetailHidesRotateActionInListMode(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.iamRotationEnabled = false
 	m.selectedIAMKey = &awsservice.AccessKey{
 		AccessKeyID: "AKIATEST",
@@ -755,7 +755,7 @@ func TestIAMKeyDetailHidesRotateActionInListMode(t *testing.T) {
 }
 
 func TestIAMKeyDetailShowsRotateActionInRotateMode(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.iamRotationEnabled = true
 	m.selectedIAMKey = &awsservice.AccessKey{
 		AccessKeyID: "AKIATEST",
@@ -769,7 +769,7 @@ func TestIAMKeyDetailShowsRotateActionInRotateMode(t *testing.T) {
 }
 
 func TestIAMRotationResultRequiresApplyBeforeDeactivateForCredentialCurrentIdentity(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeCredential
 	m.iamNewKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
@@ -791,7 +791,7 @@ func TestIAMRotationResultRequiresApplyBeforeDeactivateForCredentialCurrentIdent
 }
 
 func TestIAMRotationResultAllowsDeactivateAfterVerify(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeCredential
 	m.iamNewKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
@@ -806,7 +806,7 @@ func TestIAMRotationResultAllowsDeactivateAfterVerify(t *testing.T) {
 }
 
 func TestIAMRotationResultRequiresNoApplyForSSOContext(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeSSO
 	m.iamNewKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
@@ -820,7 +820,7 @@ func TestIAMRotationResultRequiresNoApplyForSSOContext(t *testing.T) {
 }
 
 func TestIAMRotationResultShowsApplyForLegacyCredentialContext(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeDefault
 	m.cfg.Profile = "default"
 	m.cfg.RoleArn = ""
@@ -844,7 +844,7 @@ func TestIAMRotationResultShowsApplyForLegacyCredentialContext(t *testing.T) {
 }
 
 func TestIAMRotationResultShowsApplyForImplicitDefaultProfile(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeDefault
 	m.cfg.Profile = ""
 	m.cfg.RoleArn = ""
@@ -868,7 +868,7 @@ func TestIAMRotationResultShowsApplyForImplicitDefaultProfile(t *testing.T) {
 }
 
 func TestIAMRotationResultShowsDisabledApplyReasonForSSO(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeSSO
 	m.iamNewKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
@@ -883,7 +883,7 @@ func TestIAMRotationResultShowsDisabledApplyReasonForSSO(t *testing.T) {
 }
 
 func TestRotateAccessKeyFeatureUsesCurrentIdentityFlow(t *testing.T) {
-	m := New(testConfig(), "")
+	m := New(testConfig(), "", "dev")
 
 	for _, svc := range m.services {
 		if svc.Name == domain.ServiceIAM {

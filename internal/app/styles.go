@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"unic/internal/update"
 )
 
 var (
@@ -29,6 +31,14 @@ func (m Model) renderStatusBar() string {
 	}
 	if m.callerIdentity != nil && m.callerIdentity.Account != "" {
 		parts = append(parts, fmt.Sprintf("account:%s", m.callerIdentity.Account))
+	}
+
+	if m.updateAvailable != "" {
+		hint := "unic update"
+		if m.installMethod == update.InstallBrew {
+			hint = "brew upgrade unic"
+		}
+		parts = append(parts, filterStyle.Render(fmt.Sprintf("%s available — %s", m.updateAvailable, hint)))
 	}
 
 	bar := strings.Join(parts, "  ")

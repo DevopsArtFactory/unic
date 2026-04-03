@@ -14,11 +14,29 @@ It manages authentication contexts (SSO or STS AssumeRole) via `~/.config/unic/c
 - Concurrency: goroutines + errgroup
 - Error handling: fmt.Errorf / errors
 
-## Installation & Build
+## Installation
+
+### Homebrew (macOS/Linux)
 
 ```bash
-git clone <repository-url>
-go build -o unic ./cmd/unic
+brew tap DevopsArtFactory/unic
+brew install unic
+```
+
+### Install Script (macOS/Linux)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.sh | sh
+```
+
+Set `INSTALL_DIR` to change the install location (default: `/usr/local/bin`).
+
+### Build from Source
+
+```bash
+git clone https://github.com/DevopsArtFactory/unic.git
+cd unic
+make build
 ```
 
 ## Usage
@@ -38,6 +56,9 @@ unic -v
 # Initialize config file
 unic init                      # Create default config
 unic init --force              # Overwrite existing config
+
+# Update to latest version
+unic update                    # Auto-detects install method (brew vs binary)
 ```
 
 ## Configuration
