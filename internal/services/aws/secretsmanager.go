@@ -7,10 +7,13 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+
+	uniclog "unic/internal/log"
 )
 
 // ListSecrets returns all secrets in the current account/region.
 func (r *AwsRepository) ListSecrets(ctx context.Context) ([]Secret, error) {
+	uniclog.Debug("aws", "ListSecrets called")
 	output, err := r.SecretsManagerClient.ListSecrets(ctx, &secretsmanager.ListSecretsInput{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list secrets: %w", err)
@@ -30,6 +33,7 @@ func (r *AwsRepository) ListSecrets(ctx context.Context) ([]Secret, error) {
 
 // GetSecretDetail retrieves the full detail of a secret including its value.
 func (r *AwsRepository) GetSecretDetail(ctx context.Context, secretName string) (*SecretDetail, error) {
+	uniclog.Debug("aws", "GetSecretDetail called", "secret", secretName)
 	output, err := r.SecretsManagerClient.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 		SecretId: awssdk.String(secretName),
 	})

@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"unic/internal/config"
+	uniclog "unic/internal/log"
 )
 
 // Verify *ssm.Client satisfies SSMClientAPI at compile time.
@@ -69,6 +70,7 @@ type EC2ClientAPI interface {
 	DescribeVpcs(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
 	DescribeSubnets(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
 	DescribeNetworkInterfaces(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
+	DescribeSecurityGroups(ctx context.Context, params *ec2.DescribeSecurityGroupsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error)
 }
 
 // CallerIdentity holds the result of sts:GetCallerIdentity.
@@ -92,6 +94,8 @@ type AwsRepository struct {
 
 // NewAwsRepository creates a new AwsRepository with configured EC2 and SSM clients.
 func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, error) {
+	uniclog.Debug("aws", "creating repository", "auth_type", string(cfg.AuthType), "profile", cfg.Profile, "region", cfg.Region)
+
 	var awsCfg aws.Config
 	var err error
 
@@ -144,6 +148,8 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		}
 	}
 
+	uniclog.Info("aws", "repository created", "region", cfg.Region, "profile", cfg.Profile)
+
 	return &AwsRepository{
 		EC2Client:            ec2.NewFromConfig(awsCfg),
 		SSMClient:            ssm.NewFromConfig(awsCfg),
@@ -158,10 +164,13 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 
 // GetCallerIdentity returns the AWS identity for this repository's credentials.
 func (r *AwsRepository) GetCallerIdentity(ctx context.Context) (*CallerIdentity, error) {
+	uniclog.Debug("aws", "calling GetCallerIdentity")
 	out, err := r.STSClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
+		uniclog.Error("aws", "GetCallerIdentity failed", "error", err.Error())
 		return nil, fmt.Errorf("GetCallerIdentity failed: %w", err)
 	}
+	uniclog.Debug("aws", "GetCallerIdentity success", "account", aws.ToString(out.Account), "arn", aws.ToString(out.Arn))
 	return &CallerIdentity{
 		Account: aws.ToString(out.Account),
 		Arn:     aws.ToString(out.Arn),
@@ -171,6 +180,7 @@ func (r *AwsRepository) GetCallerIdentity(ctx context.Context) (*CallerIdentity,
 
 // resolveAssumeRoleCredentials assumes a role and returns an aws.Config with temporary credentials.
 func resolveAssumeRoleCredentials(ctx context.Context, cfg *config.Config) (aws.Config, error) {
+	uniclog.Debug("aws", "resolving assume-role credentials", "role_arn", cfg.RoleArn)
 	opts := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(cfg.Region),
 	}

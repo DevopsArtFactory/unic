@@ -13,12 +13,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"unic/internal/config"
+	uniclog "unic/internal/log"
 	awsservice "unic/internal/services/aws"
 )
 
 // PostSwitch performs the auth action after switching to a context.
 // Returns a human-readable status message.
 func PostSwitch(cfg *config.Config) (string, error) {
+	uniclog.Info("auth", "post-switch started", "context", cfg.ContextName, "auth_type", string(cfg.AuthType))
+
 	var msg string
 	var err error
 
@@ -33,6 +36,7 @@ func PostSwitch(cfg *config.Config) (string, error) {
 		msg = fmt.Sprintf("Context %q activated (profile: %s, region: %s)", cfg.ContextName, cfg.Profile, cfg.Region)
 	}
 	if err != nil {
+		uniclog.Error("auth", "post-switch failed", "error", err.Error())
 		return "", err
 	}
 
@@ -46,6 +50,7 @@ func PostSwitch(cfg *config.Config) (string, error) {
 }
 
 func postSwitchSSO(cfg *config.Config) (string, error) {
+	uniclog.Debug("auth", "starting SSO login", "sso_start_url", cfg.SSOStartURL)
 	if err := awsservice.RunSSOLogin(cfg); err != nil {
 		return "", err
 	}
@@ -73,6 +78,7 @@ func postSwitchCredential(cfg *config.Config) (string, error) {
 }
 
 func postSwitchAssumeRole(cfg *config.Config) (string, error) {
+	uniclog.Debug("auth", "assuming role", "role_arn", cfg.RoleArn)
 	ctx := context.Background()
 
 	opts := []func(*awsconfig.LoadOptions) error{

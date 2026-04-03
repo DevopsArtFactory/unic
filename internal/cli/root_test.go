@@ -24,4 +24,11 @@ func TestRootCmdHasFlags(t *testing.T) {
 	if rf == nil {
 		t.Error("expected --region flag")
 	}
+	vf := cmd.PersistentFlags().Lookup("verbose")
+	if vf == nil {
+		t.Error("expected --verbose flag")
+	}
+	if vf != nil && vf.Shorthand != "v" {
+		t.Errorf("expected --verbose shorthand 'v', got '%s'", vf.Shorthand)
+	}
 }

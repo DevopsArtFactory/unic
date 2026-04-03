@@ -588,3 +588,131 @@ func TestViewFitsTerminalHeight(t *testing.T) {
 		t.Errorf("view output has %d lines, exceeds terminal height %d", len(lines), m.height)
 	}
 }
+
+// --- Security Group tests ---
+
+func TestSecurityGroupListNavigation(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenSecurityGroupList
+	m.securityGroups = []awsservice.SecurityGroup{
+		{GroupID: "sg-1", Name: "web", VPCID: "vpc-1"},
+		{GroupID: "sg-2", Name: "db", VPCID: "vpc-1"},
+	}
+	m.filteredSecurityGroups = m.securityGroups
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model := updated.(Model)
+	if model.sgIdx != 1 {
+		t.Errorf("expected sgIdx 1, got %d", model.sgIdx)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model = updated.(Model)
+	if model.sgIdx != 0 {
+		t.Errorf("expected sgIdx 0, got %d", model.sgIdx)
+	}
+}
+
+func TestSecurityGroupListEnterGoesToDetail(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenSecurityGroupList
+	m.securityGroups = []awsservice.SecurityGroup{
+		{GroupID: "sg-1", Name: "web", VPCID: "vpc-1"},
+	}
+	m.filteredSecurityGroups = m.securityGroups
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenSecurityGroupDetail {
+		t.Errorf("expected detail screen, got %d", model.screen)
+	}
+	if model.selectedSecurityGroup == nil {
+		t.Error("selectedSecurityGroup should not be nil")
+	}
+}
+
+func TestSecurityGroupDetailEscGoesBack(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenSecurityGroupDetail
+	m.selectedSecurityGroup = &awsservice.SecurityGroup{GroupID: "sg-1"}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+	if model.screen != screenSecurityGroupList {
+		t.Errorf("expected list screen, got %d", model.screen)
+	}
+}
+
+func TestSecurityGroupFilter(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenSecurityGroupList
+	m.securityGroups = []awsservice.SecurityGroup{
+		{GroupID: "sg-1", Name: "web-sg", VPCID: "vpc-1"},
+		{GroupID: "sg-2", Name: "db-sg", VPCID: "vpc-1"},
+	}
+	m.filteredSecurityGroups = m.securityGroups
+
+	// Activate filter
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model := updated.(Model)
+	if !model.sgFilterActive {
+		t.Error("filter should be active")
+	}
+
+	// Type "web"
+	for _, ch := range "web" {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+	if len(model.filteredSecurityGroups) != 1 {
+		t.Errorf("expected 1 filtered SG, got %d", len(model.filteredSecurityGroups))
+	}
+}
+
+func TestSecurityGroupDetailView(t *testing.T) {
+	m := New(testConfig(), "")
+	m.screen = screenSecurityGroupDetail
+	m.height = 30
+	m.selectedSecurityGroup = &awsservice.SecurityGroup{
+		GroupID:     "sg-aaa",
+		Name:        "web-sg",
+		Description: "Web servers",
+		VPCID:       "vpc-111",
+		IngressRules: []awsservice.SecurityGroupRule{
+			{Protocol: "tcp", FromPort: 443, ToPort: 443, CIDRV4: "0.0.0.0/0", Description: "HTTPS"},
+		},
+		EgressRules: []awsservice.SecurityGroupRule{
+			{Protocol: "-1", CIDRV4: "0.0.0.0/0"},
+		},
+	}
+
+	v := m.View()
+	if !strings.Contains(v, "sg-aaa") {
+		t.Error("detail view should contain group ID")
+	}
+	if !strings.Contains(v, "Inbound Rules") {
+		t.Error("detail view should show inbound rules section")
+	}
+	if !strings.Contains(v, "Outbound Rules") {
+		t.Error("detail view should show outbound rules section")
+	}
+	if !strings.Contains(v, "443") {
+		t.Error("detail view should show port 443")
+	}
+}
+
+func TestSecurityGroupBrowserInCatalog(t *testing.T) {
+	catalog := domain.Catalog()
+	for _, svc := range catalog {
+		if svc.Name == domain.ServiceEC2 {
+			for _, feat := range svc.Features {
+				if feat.Kind == domain.FeatureSecurityGroupBrowser {
+					return
+				}
+			}
+			t.Error("EC2 should have Security Group Browser feature")
+			return
+		}
+	}
+	t.Error("EC2 service not found")
+}

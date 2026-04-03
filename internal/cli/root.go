@@ -10,6 +10,7 @@ var (
 
 	profile string
 	region  string
+	verbose bool
 )
 
 func NewRootCmd() *cobra.Command {
@@ -22,6 +23,7 @@ func NewRootCmd() *cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "AWS profile to use")
 	cmd.PersistentFlags().StringVar(&region, "region", "", "AWS region to use")
+	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose debug logging")
 
 	cmd.AddCommand(newInitCmd())
 
@@ -42,4 +44,9 @@ func Region() *string {
 		return nil
 	}
 	return &region
+}
+
+// Verbose returns true if --verbose was passed.
+func Verbose() bool {
+	return verbose
 }
