@@ -129,11 +129,11 @@ unic/
 - Implementation: suspend Bubbletea program → spawn `session-manager-plugin` process → resume on exit
 - Prerequisite check: verify `session-manager-plugin` is installed
 
-**M3.5 — EC2 Security Groups**
-- List/filter security groups (by VPC, name, ID)
-- View inbound + outbound rules
-- Add / Delete / Modify rules (protocol, port range, source/dest CIDR or SG)
-- Confirmation before apply
+**M3.5 — EC2 Security Groups** ✅
+- List/filter security groups (by VPC, name, ID) ✅
+- View inbound + outbound rules ✅
+- Add / Delete rules (protocol, port range, source/dest CIDR or SG reference) ✅
+- Type-to-confirm for rule deletion ✅
 
 **M3.6 — Route 53**
 - List hosted zones → records
@@ -267,7 +267,7 @@ Note: M5.2 (textinput) provides the foundation for M6 (enhanced search) — they
 - M1 is complete; M2 is deferred (relying on AWS SDK default credential chain)
 - M2.1 (Context-based auth with SSO, credential, assume-role) is complete
 - M3 services are independent of each other, build in any order
-- M3.1 (VPC), M3.2 (RDS), M3.4 (SSM Sessions), and M3.6.1 (Route53 phase 1) are complete
+- M3.1 (VPC), M3.2 (RDS), M3.3 (IAM Credentials), M3.4 (SSM Sessions), M3.5 (Security Groups), M3.6.1 (Route53 phase 1), and M3.9 (Secrets Manager) are complete
 - M4.3 (Distribution) is partially done (GoReleaser + GitHub Actions)
 - M5 and M6 can begin independently of remaining M3/M4 work
 
