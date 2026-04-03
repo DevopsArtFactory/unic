@@ -108,7 +108,7 @@ contexts:
 
 ## TUI Key Bindings
 
-### Global Navigation
+### Global
 
 | Key | Action |
 |-----|--------|
@@ -137,12 +137,23 @@ contexts:
 | `f` | Failover database | Multi-AZ standalone or Aurora cluster |
 | `r` | Refresh status | Always |
 
+### IAM Access Key Rotation
+
+| Key | Action | Screen |
+|-----|--------|--------|
+| `r` | Rotate access key | Key detail (RotateAccessKey mode) |
+| `c` | Copy new key as export commands | Rotation result |
+| `a` | Apply new key to ~/.aws/credentials and verify | Rotation result |
+| `d` | Deactivate old key | Rotation result |
+| `x` | Delete old inactive key | Rotation result |
+
 ### Context Switcher
 
 | Key | Action |
 |-----|--------|
 | `Enter` | Switch to selected context |
 | `a` | Add new context (wizard) |
+| `/` | Filter contexts |
 | `Esc` | Back |
 
 ### Filtering
