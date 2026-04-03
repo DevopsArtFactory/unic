@@ -86,3 +86,27 @@ type secretDetailLoadedMsg struct {
 type securityGroupsLoadedMsg struct {
 	securityGroups []awsservice.SecurityGroup
 }
+
+type iamKeysLoadedMsg struct {
+	keys []awsservice.AccessKey
+}
+
+type iamKeyCreatedMsg struct {
+	newKey *awsservice.NewAccessKey
+	err    error
+}
+
+type iamKeyVerifiedMsg struct {
+	identity *awsservice.CallerIdentity
+	err      error
+}
+
+type iamKeyDeactivatedMsg struct {
+	keyID string
+	err   error
+}
+
+type iamKeyDeletedMsg struct {
+	keyID string
+	err   error
+}

@@ -33,6 +33,10 @@ const (
 	screenSecretDetail
 	screenSecurityGroupList
 	screenSecurityGroupDetail
+	screenIAMKeyList
+	screenIAMKeyDetail
+	screenIAMKeyRotateConfirm
+	screenIAMKeyRotateResult
 	screenContextPicker
 	screenContextAdd
 	screenLoading
@@ -103,13 +107,27 @@ type Model struct {
 	route53RecordFilterActive bool
 	selectedRoute53Record     *awsservice.DNSRecord
 
+	// IAM credentials state
+	iamKeys             []awsservice.AccessKey
+	iamKeyIdx           int
+	selectedIAMKey      *awsservice.AccessKey
+	iamRotationEnabled  bool
+	iamRotateConfirm    string // typed input for rotate confirmation
+	iamRotationOldKeyID string
+	iamNewKey           *awsservice.NewAccessKey
+	iamCopyMsg          string // feedback message for clipboard copy
+	iamRotationStatus   string
+	iamNewKeyVerified   bool
+	iamOldKeyDeleted    bool
+	iamOldKeyInactive   bool
+
 	// Secrets Manager browser state
-	secrets             []awsservice.Secret
-	filteredSecrets     []awsservice.Secret
-	secretIdx           int
-	secretFilter        string
-	secretFilterActive  bool
-	selectedSecret      *awsservice.SecretDetail
+	secrets            []awsservice.Secret
+	filteredSecrets    []awsservice.Secret
+	secretIdx          int
+	secretFilter       string
+	secretFilterActive bool
+	selectedSecret     *awsservice.SecretDetail
 
 	// Security Group browser state
 	securityGroups         []awsservice.SecurityGroup
@@ -260,6 +278,58 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenSecurityGroupList
 		return m, nil
 
+	case iamKeysLoadedMsg:
+		m.iamKeys = msg.keys
+		m.iamKeyIdx = 0
+		m.screen = screenIAMKeyList
+		return m, nil
+
+	case iamKeyCreatedMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil
+		}
+		m.iamNewKey = msg.newKey
+		m.iamCopyMsg = ""
+		m.iamRotationStatus = ""
+		m.iamNewKeyVerified = false
+		m.iamOldKeyInactive = false
+		m.iamOldKeyDeleted = false
+		m.screen = screenIAMKeyRotateResult
+		return m, nil
+
+	case iamKeyVerifiedMsg:
+		if msg.err != nil {
+			m.iamRotationStatus = fmt.Sprintf("Verification failed: %s", msg.err)
+			return m, nil
+		}
+		m.iamNewKeyVerified = true
+		if msg.identity != nil {
+			m.iamRotationStatus = fmt.Sprintf("Verified new key as %s", msg.identity.Arn)
+		} else {
+			m.iamRotationStatus = "Verified new key"
+		}
+		return m, nil
+
+	case iamKeyDeactivatedMsg:
+		if msg.err != nil {
+			m.iamRotationStatus = msg.err.Error()
+			return m, nil
+		}
+		m.iamOldKeyInactive = true
+		m.iamRotationStatus = fmt.Sprintf("Old key %s marked Inactive", msg.keyID)
+		return m, nil
+
+	case iamKeyDeletedMsg:
+		if msg.err != nil {
+			m.iamRotationStatus = msg.err.Error()
+			return m, nil
+		}
+		m.iamOldKeyDeleted = true
+		m.iamRotationStatus = fmt.Sprintf("Old key %s deleted", msg.keyID)
+		return m, nil
+
 	case rdsActionDoneMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
@@ -392,6 +462,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecurityGroupList(msg)
 		case screenSecurityGroupDetail:
 			return m.updateSecurityGroupDetail(msg)
+		case screenIAMKeyList:
+			return m.updateIAMKeyList(msg)
+		case screenIAMKeyDetail:
+			return m.updateIAMKeyDetail(msg)
+		case screenIAMKeyRotateConfirm:
+			return m.updateIAMKeyRotateConfirm(msg)
+		case screenIAMKeyRotateResult:
+			return m.updateIAMKeyRotateResult(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -464,6 +542,14 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureSecurityGroupBrowser:
 				m.screen = screenLoading
 				return m, m.loadSecurityGroups()
+			case domain.FeatureListAccessKeys:
+				m.iamRotationEnabled = false
+				m.screen = screenLoading
+				return m, m.loadIAMKeys()
+			case domain.FeatureRotateAccessKey:
+				m.iamRotationEnabled = true
+				m.screen = screenLoading
+				return m, m.loadIAMKeys()
 			}
 		}
 	}
@@ -521,6 +607,14 @@ func (m Model) View() string {
 		v = m.viewSecurityGroupList()
 	case screenSecurityGroupDetail:
 		v = m.viewSecurityGroupDetail()
+	case screenIAMKeyList:
+		v = m.viewIAMKeyList()
+	case screenIAMKeyDetail:
+		v = m.viewIAMKeyDetail()
+	case screenIAMKeyRotateConfirm:
+		v = m.viewIAMKeyRotateConfirm()
+	case screenIAMKeyRotateResult:
+		v = m.viewIAMKeyRotateResult()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:

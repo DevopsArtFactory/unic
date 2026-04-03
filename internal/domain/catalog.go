@@ -52,5 +52,18 @@ func Catalog() []Service {
 				},
 			},
 		},
+		{
+			Name: ServiceIAM,
+			Features: []Feature{
+				{
+					Kind:        FeatureListAccessKeys,
+					Description: "List IAM access keys with status, age, and last used date",
+				},
+				{
+					Kind:        FeatureRotateAccessKey,
+					Description: "Rotate the current session IAM access key with verify and cleanup steps",
+				},
+			},
+		},
 	}
 }

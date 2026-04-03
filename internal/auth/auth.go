@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
+	"unic/internal/clipboard"
 	"unic/internal/config"
 	uniclog "unic/internal/log"
 	awsservice "unic/internal/services/aws"
@@ -119,7 +118,7 @@ func postSwitchAssumeRole(cfg *config.Config) (string, error) {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Assumed role: %s\n", cfg.RoleArn))
 
-	if err := copyToClipboard(exportStr); err != nil {
+	if err := clipboard.Copy(exportStr); err != nil {
 		sb.WriteString("\nClipboard unavailable. Copy and paste the following:\n\n")
 		sb.WriteString(exportStr)
 	} else {
@@ -145,21 +144,3 @@ func verifyIdentity(cfg *config.Config) string {
 	return fmt.Sprintf("  Identity: %s (account: %s)", identity.Arn, identity.Account)
 }
 
-func copyToClipboard(text string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("pbcopy")
-	case "linux":
-		if _, err := exec.LookPath("xclip"); err == nil {
-			cmd = exec.Command("xclip", "-selection", "clipboard")
-		} else {
-			cmd = exec.Command("xsel", "--clipboard", "--input")
-		}
-	default:
-		return fmt.Errorf("clipboard not supported on %s", runtime.GOOS)
-	}
-
-	cmd.Stdin = strings.NewReader(text)
-	return cmd.Run()
-}
