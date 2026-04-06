@@ -549,7 +549,11 @@ func (m Model) loadCWLogEvents(appendMode bool) tea.Cmd {
 		}
 
 		now := time.Now()
-		duration := cwTimeRanges[m.cwLogTimeRange].duration
+		timeIdx := m.cwLogTimeRange
+		if timeIdx < 0 || timeIdx >= len(cwTimeRanges) {
+			timeIdx = 2 // default: 1h
+		}
+		duration := cwTimeRanges[timeIdx].duration
 		startTime := now.Add(-duration).UnixMilli()
 		endTime := now.UnixMilli()
 
