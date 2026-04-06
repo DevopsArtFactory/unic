@@ -56,3 +56,9 @@ func (r DNSRecord) FilterText() string {
 	return strings.ToLower(fmt.Sprintf("%s %s %s %s",
 		r.Name, r.Type, strings.Join(r.Values, " "), r.AliasTarget))
 }
+
+// ChangeInfo holds the result of a Route53 change operation.
+type ChangeInfo struct {
+	ID     string // change ID (e.g., "/change/C1234...")
+	Status string // "PENDING" or "INSYNC"
+}
