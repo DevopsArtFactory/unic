@@ -21,6 +21,7 @@ func TestIsNewer(t *testing.T) {
 		{"multi-digit minor", "0.9.0", "0.10.0", true},
 		{"multi-digit patch", "0.1.9", "0.1.10", true},
 		{"major double digit", "2.0.0", "10.0.0", true},
+		{"non-numeric segment", "0.1.0", "0.1.0-beta", false},
 		{"dev version", "dev", "", false},
 		{"empty latest", "0.1.0", "", false},
 		{"empty current", "", "0.1.0", false},

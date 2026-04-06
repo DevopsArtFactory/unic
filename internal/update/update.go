@@ -195,18 +195,26 @@ func compareVersions(a, b string) int {
 	bParts := strings.Split(b, ".")
 	maxLen := max(len(aParts), len(bParts))
 	for i := 0; i < maxLen; i++ {
-		var ai, bi int
-		if i < len(aParts) {
-			fmt.Sscanf(aParts[i], "%d", &ai)
-		}
-		if i < len(bParts) {
-			fmt.Sscanf(bParts[i], "%d", &bi)
-		}
+		ai := parseVersionSegment(aParts, i)
+		bi := parseVersionSegment(bParts, i)
 		if ai != bi {
 			return ai - bi
 		}
 	}
 	return 0
+}
+
+// parseVersionSegment extracts a numeric segment from a version parts slice.
+// Returns 0 for out-of-range indices or non-numeric segments.
+func parseVersionSegment(parts []string, i int) int {
+	if i >= len(parts) {
+		return 0
+	}
+	var n int
+	if _, err := fmt.Sscanf(parts[i], "%d", &n); err != nil {
+		return 0
+	}
+	return n
 }
 
 // normalizeVersion strips "v" prefix for comparison.
