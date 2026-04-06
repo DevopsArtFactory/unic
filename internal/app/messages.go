@@ -97,9 +97,11 @@ type cwLogStreamsLoadedMsg struct {
 }
 
 type cwLogEventsLoadedMsg struct {
-	events    []awsservice.LogEvent
-	nextToken *string
-	append    bool // true = append (tail/load-more), false = replace
+	events                []awsservice.LogEvent
+	nextToken             *string
+	append                bool // true = append (tail/load-more), false = replace
+	updatePaginationToken bool
+	updateTailToken       bool
 }
 
 type cwLogTailTickMsg struct{}

@@ -105,8 +105,12 @@ func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			visibleLines := max(m.height-8, 5)
 			m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogEvents), visibleLines)
 		}
-		m.cwLogNextToken = msg.nextToken
-		m.cwLogTailToken = msg.nextToken
+		if msg.updatePaginationToken {
+			m.cwLogNextToken = msg.nextToken
+		}
+		if msg.updateTailToken {
+			m.cwLogTailToken = msg.nextToken
+		}
 		m.screen = screenCWLogViewer
 		return m, nil, true
 
@@ -599,9 +603,11 @@ func (m Model) loadCWLogEvents(appendMode bool) tea.Cmd {
 		}
 
 		return cwLogEventsLoadedMsg{
-			events:    events,
-			nextToken: nextToken,
-			append:    appendMode,
+			events:                events,
+			nextToken:             nextToken,
+			append:                appendMode,
+			updatePaginationToken: true,
+			updateTailToken:       !appendMode,
 		}
 	}
 }
@@ -633,9 +639,10 @@ func (m Model) pollCWLogTail() tea.Cmd {
 		}
 
 		return cwLogEventsLoadedMsg{
-			events:    events,
-			nextToken: nextToken,
-			append:    true,
+			events:                events,
+			nextToken:             nextToken,
+			append:                true,
+			updateTailToken:       true,
 		}
 	}
 }

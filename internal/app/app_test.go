@@ -1010,3 +1010,62 @@ func TestCWLogTailAppendDeduplicatesExistingEventIDs(t *testing.T) {
 		t.Fatalf("expected final event to be evt-3, got %q", model.cwLogEvents[2].EventID)
 	}
 }
+
+func TestCWLogLoadMoreDoesNotOverwriteTailToken(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwLogTailToken = stringPtr("tail-token")
+	m.cwLogNextToken = stringPtr("page-token")
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append:                true,
+		nextToken:             stringPtr("older-page-token"),
+		updatePaginationToken: true,
+		events:                []awsservice.LogEvent{{EventID: "evt-1", Timestamp: time.Unix(0, 0), Message: "one"}},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if got := derefString(model.cwLogTailToken); got != "tail-token" {
+		t.Fatalf("expected tail token to remain unchanged, got %q", got)
+	}
+	if got := derefString(model.cwLogNextToken); got != "older-page-token" {
+		t.Fatalf("expected pagination token to update, got %q", got)
+	}
+}
+
+func TestCWLogTailAppendDoesNotOverwritePaginationToken(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwLogNextToken = stringPtr("page-token")
+	m.cwLogTailToken = stringPtr("tail-token")
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append:          true,
+		nextToken:       stringPtr("new-tail-token"),
+		updateTailToken: true,
+		events:          []awsservice.LogEvent{{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"}},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if got := derefString(model.cwLogNextToken); got != "page-token" {
+		t.Fatalf("expected pagination token to remain unchanged, got %q", got)
+	}
+	if got := derefString(model.cwLogTailToken); got != "new-tail-token" {
+		t.Fatalf("expected tail token to update, got %q", got)
+	}
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
