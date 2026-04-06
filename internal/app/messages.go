@@ -88,6 +88,22 @@ type route53ChangeStatusMsg struct {
 
 type route53PollTickMsg struct{}
 
+type cwLogGroupsLoadedMsg struct {
+	groups []awsservice.LogGroup
+}
+
+type cwLogStreamsLoadedMsg struct {
+	streams []awsservice.LogStream
+}
+
+type cwLogEventsLoadedMsg struct {
+	events    []awsservice.LogEvent
+	nextToken *string
+	append    bool // true = append (tail/load-more), false = replace
+}
+
+type cwLogTailTickMsg struct{}
+
 type secretsLoadedMsg struct {
 	secrets []awsservice.Secret
 }

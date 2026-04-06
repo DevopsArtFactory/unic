@@ -122,7 +122,8 @@ contexts:
 | EC2 | Security Group Browser (list/filter SGs, view rules, add/delete rules with confirmation) | ✅ Implemented |
 | VPC | VPC Browser (VPCs → Subnets → Available IPs with reserved-IP exclusion) | ✅ Implemented |
 | RDS | RDS Browser (list, start/stop, failover, Aurora cluster support, auto-polling) | ✅ Implemented |
-| Route53 | DNS Browser (Hosted Zones → Records → Record Detail, public/private zones) | ✅ Implemented |
+| Route53 | DNS Browser (Hosted Zones → Records → Record Detail, create/edit/delete A/CNAME, change status polling) | ✅ Implemented |
+| CloudWatch Logs | Log Browser (Log Groups → Streams → Events, live tail with 2s poll, time range presets, filter patterns, log level highlighting) | ✅ Implemented |
 | Secrets Manager | Secrets Browser (list secrets, view key-value pairs or raw values) | ✅ Implemented |
 | IAM | Access Key Browser (list keys with status, age, last used) | ✅ Implemented |
 | IAM | Access Key Rotation (create → verify/apply → deactivate → delete) | ✅ Implemented |
@@ -180,6 +181,18 @@ contexts:
 | `d` | Deactivate old key | Rotation result |
 | `x` | Delete old inactive key | Rotation result |
 
+### CloudWatch Logs
+
+| Key | Action | Screen |
+|-----|--------|--------|
+| `/` | Filter log groups/streams | List |
+| `Enter` | Drill into streams/view logs | List |
+| `1`-`6` | Time range preset (5m/15m/1h/6h/24h/7d) | Viewer |
+| `t` | Toggle live tail (2s poll) | Viewer |
+| `f` | Enter filter pattern | Viewer |
+| `n` | Load more (older events) | Viewer |
+| `PgUp`/`PgDn` | Page scroll | Viewer |
+
 ### Context Switcher
 
 | Key | Action |
@@ -191,7 +204,7 @@ contexts:
 
 ### Filtering
 
-Available on: EC2 instances, VPC/Subnets, RDS instances, Route53 zones/records, Secrets Manager, Context Switcher. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
+Available on: EC2 instances, VPC/Subnets, RDS instances, Route53 zones/records, CloudWatch Log Groups/Streams, Secrets Manager, Context Switcher. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
 
 ### IAM Access Key Rotation
 

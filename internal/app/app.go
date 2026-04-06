@@ -43,6 +43,9 @@ const (
 	screenIAMKeyDetail
 	screenIAMKeyRotateConfirm
 	screenIAMKeyRotateResult
+	screenCWLogGroupList
+	screenCWLogStreamList
+	screenCWLogViewer
 	screenContextPicker
 	screenContextAdd
 	screenLoading
@@ -162,6 +165,28 @@ type Model struct {
 	sgAddInput             string             // current field text input
 	sgAddSelectIdx         int                // index for select-type fields (direction, protocol)
 
+	// CloudWatch Logs browser state
+	cwLogGroups            []awsservice.LogGroup
+	filteredCWLogGroups    []awsservice.LogGroup
+	cwLogGroupIdx          int
+	cwLogGroupFilter       string
+	cwLogGroupFilterActive bool
+	selectedCWLogGroup     *awsservice.LogGroup
+	cwLogStreams            []awsservice.LogStream
+	filteredCWLogStreams    []awsservice.LogStream
+	cwLogStreamIdx          int
+	cwLogStreamFilter       string
+	cwLogStreamFilterActive bool
+	selectedCWLogStream     *awsservice.LogStream
+	cwLogEvents            []awsservice.LogEvent
+	cwLogScrollOffset      int
+	cwLogNextToken         *string
+	cwLogTimeRange         int    // index into preset time ranges
+	cwLogFilterPattern     string
+	cwLogFilterActive      bool   // filter pattern input active
+	cwLogTailing           bool   // live tail active
+	cwLogTailToken         *string
+
 	// Context picker
 	configPath         string
 	ctxList            []config.ContextInfo
@@ -273,6 +298,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleSecurityGroupMsg,
 		m.handleIAMMsg,
 		m.handleSecretMsg,
+		m.handleCloudWatchLogsMsg,
 		m.handleContextMsg,
 	} {
 		if newM, cmd, handled := h(msg); handled {
@@ -335,6 +361,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecretList(msg)
 		case screenSecretDetail:
 			return m.updateSecretDetail(msg)
+		case screenCWLogGroupList:
+			return m.updateCWLogGroupList(msg)
+		case screenCWLogStreamList:
+			return m.updateCWLogStreamList(msg)
+		case screenCWLogViewer:
+			return m.updateCWLogViewer(msg)
 		case screenSecurityGroupList:
 			return m.updateSecurityGroupList(msg)
 		case screenSecurityGroupDetail:
@@ -437,6 +469,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureSecretsBrowser:
 				m.screen = screenLoading
 				return m, m.loadSecrets()
+			case domain.FeatureCloudWatchLogsBrowser:
+				m.screen = screenLoading
+				return m, m.loadCWLogGroups()
 			case domain.FeatureSecurityGroupBrowser:
 				m.screen = screenLoading
 				return m, m.loadSecurityGroups()
@@ -507,6 +542,12 @@ func (m Model) View() string {
 		v = m.viewSecretList()
 	case screenSecretDetail:
 		v = m.viewSecretDetail()
+	case screenCWLogGroupList:
+		v = m.viewCWLogGroupList()
+	case screenCWLogStreamList:
+		v = m.viewCWLogStreamList()
+	case screenCWLogViewer:
+		v = m.viewCWLogViewer()
 	case screenSecurityGroupList:
 		v = m.viewSecurityGroupList()
 	case screenSecurityGroupDetail:
