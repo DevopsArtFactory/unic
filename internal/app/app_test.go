@@ -1011,6 +1011,35 @@ func TestCWLogTailAppendDeduplicatesExistingEventIDs(t *testing.T) {
 	}
 }
 
+func TestCWLogTailAppendDeduplicatesEventsWithoutEventIDs(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 20
+	m.screen = screenCWLogViewer
+	m.cwLogTailing = true
+	m.cwLogEvents = []awsservice.LogEvent{
+		{Timestamp: time.Unix(1, 0), Message: "duplicate"},
+	}
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append: true,
+		events: []awsservice.LogEvent{
+			{Timestamp: time.Unix(1, 0), Message: "duplicate"},
+			{Timestamp: time.Unix(2, 0), Message: "new event"},
+		},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if len(model.cwLogEvents) != 2 {
+		t.Fatalf("expected 2 deduplicated events, got %d", len(model.cwLogEvents))
+	}
+	if got := strings.TrimSpace(model.cwLogEvents[1].Message); got != "new event" {
+		t.Fatalf("expected final event to be new event, got %q", got)
+	}
+}
+
 func TestCWLogLoadMoreDoesNotOverwriteTailToken(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cwLogTailToken = stringPtr("tail-token")

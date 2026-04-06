@@ -49,6 +49,13 @@ func clampCWLogScrollOffset(offset, totalEvents, visibleLines int) int {
 	return offset
 }
 
+func cwLogEventDedupKey(evt awsservice.LogEvent) string {
+	if evt.EventID != "" {
+		return "id:" + evt.EventID
+	}
+	return fmt.Sprintf("fallback:%d:%s", evt.Timestamp.UnixMilli(), strings.TrimSpace(evt.Message))
+}
+
 func appendUniqueCWLogEvents(existing, incoming []awsservice.LogEvent) []awsservice.LogEvent {
 	if len(incoming) == 0 {
 		return existing
@@ -56,19 +63,16 @@ func appendUniqueCWLogEvents(existing, incoming []awsservice.LogEvent) []awsserv
 
 	seenEventIDs := make(map[string]struct{}, len(existing))
 	for _, evt := range existing {
-		if evt.EventID != "" {
-			seenEventIDs[evt.EventID] = struct{}{}
-		}
+		seenEventIDs[cwLogEventDedupKey(evt)] = struct{}{}
 	}
 
 	result := existing
 	for _, evt := range incoming {
-		if evt.EventID != "" {
-			if _, exists := seenEventIDs[evt.EventID]; exists {
-				continue
-			}
-			seenEventIDs[evt.EventID] = struct{}{}
+		key := cwLogEventDedupKey(evt)
+		if _, exists := seenEventIDs[key]; exists {
+			continue
 		}
+		seenEventIDs[key] = struct{}{}
 		result = append(result, evt)
 	}
 
