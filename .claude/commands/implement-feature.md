@@ -1,13 +1,31 @@
 Implement a feature for the unic TUI tool.
 
 ## Input
-$ARGUMENTS — feature description or GitHub issue number (e.g., "CloudWatch Logs browser" or "#29")
+$ARGUMENTS — feature description or GitHub issue number (e.g., "CloudWatch Logs browser" or "#29"). Can be empty.
+
+## Phase 0: Auto-Suggest (when no argument is provided)
+
+If `$ARGUMENTS` is empty or blank:
+
+1. Read `PLAN.md` and identify milestones/features that are **not** marked ✅ (complete).
+2. Run `gh issue list --state open --limit 30` to fetch open GitHub issues.
+3. Cross-reference: find open issues whose title or body matches an incomplete PLAN.md item. Also note incomplete PLAN.md items that have no issue yet.
+4. Rank candidates by priority:
+   - Items in the earliest incomplete milestone come first (M3 before M4, M4 before M5, etc.)
+   - Within a milestone, prefer items that already have an open GitHub issue
+   - Within the same milestone, prefer items with fewer dependencies or prerequisites
+5. Present the top 3–5 candidates to the user using AskUserQuestion, showing for each:
+   - The PLAN.md item name and milestone (e.g., "M3.6 — Route 53 Phase 2")
+   - The linked GitHub issue number if one exists, or "(no issue yet)" otherwise
+   - A one-line summary of what's involved
+6. After the user picks one, if no GitHub issue exists for it, remind the user that one should be created (per project workflow rules) before proceeding.
+7. Continue to Phase 1 with the selected feature.
 
 ## Phase 1: Gather Context
 
 1. If the argument is a GitHub issue number, fetch it with `gh issue view <number>`. Read the full body, checklist, and comments.
 2. If the argument is a description, search for a matching issue with `gh issue list --search "<description>"` and read it if found.
-3. Read `PLAN.md` to find the relevant milestone and any design decisions.
+3. Read `PLAN.md` (if not already read in Phase 0) to find the relevant milestone and any design decisions.
 4. Read `.kiro/docs/architecture-en.md` if it exists for architectural context.
 5. Explore the codebase to understand existing patterns:
    - `internal/domain/model.go` and `catalog.go` for service/feature registration

@@ -75,6 +75,19 @@ type route53RecordsLoadedMsg struct {
 	records []awsservice.DNSRecord
 }
 
+type route53ActionDoneMsg struct {
+	action   string
+	changeID string
+	err      error
+}
+
+type route53ChangeStatusMsg struct {
+	status string
+	err    error
+}
+
+type route53PollTickMsg struct{}
+
 type secretsLoadedMsg struct {
 	secrets []awsservice.Secret
 }

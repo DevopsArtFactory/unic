@@ -30,6 +30,9 @@ const (
 	screenRoute53ZoneList
 	screenRoute53RecordList
 	screenRoute53RecordDetail
+	screenRoute53RecordCreate
+	screenRoute53RecordEdit
+	screenRoute53RecordDeleteConfirm
 	screenSecretList
 	screenSecretDetail
 	screenSecurityGroupList
@@ -109,6 +112,17 @@ type Model struct {
 	route53RecordFilter       string
 	route53RecordFilterActive bool
 	selectedRoute53Record     *awsservice.DNSRecord
+
+	// Route53 mutation state
+	route53Action       string            // "create", "edit", "delete"
+	route53ConfirmInput string            // type-to-confirm for delete
+	route53EditField    int               // current form field index
+	route53EditValues   map[string]string // accumulated form values
+	route53EditInput    string            // current field text input
+	route53EditSelectIdx int              // index for select-type fields (record type)
+	route53ChangeID     string            // for status polling
+	route53ChangeStatus string            // "PENDING" / "INSYNC"
+	route53Polling      bool              // polling active
 
 	// IAM credentials state
 	iamKeys             []awsservice.AccessKey
@@ -288,6 +302,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filteredRoute53Records = msg.records
 		m.route53RecordIdx = 0
 		m.screen = screenRoute53RecordList
+		return m, nil
+
+	case route53ActionDoneMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil
+		}
+		m.route53ChangeID = msg.changeID
+		m.route53ChangeStatus = "PENDING"
+		m.route53Polling = true
+		// Reload records and start polling change status
+		if m.selectedRoute53Zone != nil {
+			return m, tea.Batch(
+				m.loadRoute53Records(m.selectedRoute53Zone.ID),
+				m.pollRoute53ChangeStatus(),
+			)
+		}
+		m.screen = screenRoute53RecordList
+		return m, nil
+
+	case route53ChangeStatusMsg:
+		if msg.err != nil {
+			m.route53Polling = false
+			return m, nil
+		}
+		m.route53ChangeStatus = msg.status
+		if msg.status == "INSYNC" {
+			m.route53Polling = false
+			return m, nil
+		}
+		return m, m.tickRoute53Poll()
+
+	case route53PollTickMsg:
+		if m.route53Polling {
+			return m, m.pollRoute53ChangeStatus()
+		}
 		return m, nil
 
 	case rdsInstancesLoadedMsg:
@@ -529,6 +580,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateRoute53RecordList(msg)
 		case screenRoute53RecordDetail:
 			return m.updateRoute53RecordDetail(msg)
+		case screenRoute53RecordCreate:
+			return m.updateRoute53RecordCreate(msg)
+		case screenRoute53RecordEdit:
+			return m.updateRoute53RecordEdit(msg)
+		case screenRoute53RecordDeleteConfirm:
+			return m.updateRoute53RecordDeleteConfirm(msg)
 		case screenSecretList:
 			return m.updateSecretList(msg)
 		case screenSecretDetail:
@@ -678,6 +735,12 @@ func (m Model) View() string {
 		v = m.viewRoute53RecordList()
 	case screenRoute53RecordDetail:
 		v = m.viewRoute53RecordDetail()
+	case screenRoute53RecordCreate:
+		v = m.viewRoute53RecordCreate()
+	case screenRoute53RecordEdit:
+		v = m.viewRoute53RecordEdit()
+	case screenRoute53RecordDeleteConfirm:
+		v = m.viewRoute53RecordDeleteConfirm()
 	case screenSecretList:
 		v = m.viewSecretList()
 	case screenSecretDetail:

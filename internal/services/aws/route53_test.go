@@ -15,6 +15,8 @@ import (
 type mockRoute53Client struct {
 	listHostedZonesFunc        func(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error)
 	listResourceRecordSetsFunc func(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
+	changeResourceRecordSetsFunc func(ctx context.Context, params *route53.ChangeResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error)
+	getChangeFunc              func(ctx context.Context, params *route53.GetChangeInput, optFns ...func(*route53.Options)) (*route53.GetChangeOutput, error)
 }
 
 func (m *mockRoute53Client) ListHostedZones(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error) {
@@ -23,6 +25,20 @@ func (m *mockRoute53Client) ListHostedZones(ctx context.Context, params *route53
 
 func (m *mockRoute53Client) ListResourceRecordSets(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error) {
 	return m.listResourceRecordSetsFunc(ctx, params, optFns...)
+}
+
+func (m *mockRoute53Client) ChangeResourceRecordSets(ctx context.Context, params *route53.ChangeResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+	if m.changeResourceRecordSetsFunc != nil {
+		return m.changeResourceRecordSetsFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockRoute53Client) GetChange(ctx context.Context, params *route53.GetChangeInput, optFns ...func(*route53.Options)) (*route53.GetChangeOutput, error) {
+	if m.getChangeFunc != nil {
+		return m.getChangeFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("not implemented")
 }
 
 // --- ListHostedZones tests ---
@@ -178,7 +194,8 @@ func TestListResourceRecordSets_Success(t *testing.T) {
 						Name: awssdk.String("www.example.com."),
 						Type: r53types.RRTypeA,
 						AliasTarget: &r53types.AliasTarget{
-							DNSName: awssdk.String("d111111abcdef8.cloudfront.net."),
+							DNSName:      awssdk.String("d111111abcdef8.cloudfront.net."),
+							HostedZoneId: awssdk.String("Z2FDTNDATAQYW2"),
 						},
 					},
 				},
@@ -216,6 +233,9 @@ func TestListResourceRecordSets_Success(t *testing.T) {
 	alias := records[1]
 	if alias.AliasTarget != "d111111abcdef8.cloudfront.net." {
 		t.Errorf("expected AliasTarget 'd111111abcdef8.cloudfront.net.', got %q", alias.AliasTarget)
+	}
+	if alias.AliasHostedZoneId != "Z2FDTNDATAQYW2" {
+		t.Errorf("expected AliasHostedZoneId 'Z2FDTNDATAQYW2', got %q", alias.AliasHostedZoneId)
 	}
 	if len(alias.Values) != 0 {
 		t.Errorf("expected no values for alias record, got %d", len(alias.Values))
@@ -344,5 +364,245 @@ func TestCleanZoneID(t *testing.T) {
 		if got != tt.expected {
 			t.Errorf("cleanZoneID(%q) = %q, want %q", tt.input, got, tt.expected)
 		}
+	}
+}
+
+// --- Mutation tests ---
+
+func TestCreateRecord_Success(t *testing.T) {
+	mock := &mockRoute53Client{
+		changeResourceRecordSetsFunc: func(_ context.Context, params *route53.ChangeResourceRecordSetsInput, _ ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+			if awssdk.ToString(params.HostedZoneId) != "Z123" {
+				t.Errorf("expected zone ID 'Z123', got %q", awssdk.ToString(params.HostedZoneId))
+			}
+			changes := params.ChangeBatch.Changes
+			if len(changes) != 1 {
+				t.Fatalf("expected 1 change, got %d", len(changes))
+			}
+			if changes[0].Action != r53types.ChangeActionUpsert {
+				t.Errorf("expected UPSERT action, got %v", changes[0].Action)
+			}
+			if awssdk.ToString(changes[0].ResourceRecordSet.Name) != "test.example.com." {
+				t.Errorf("expected record name 'test.example.com.', got %q", awssdk.ToString(changes[0].ResourceRecordSet.Name))
+			}
+			return &route53.ChangeResourceRecordSetsOutput{
+				ChangeInfo: &r53types.ChangeInfo{
+					Id:     awssdk.String("/change/C123"),
+					Status: r53types.ChangeStatusPending,
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{Route53Client: mock}
+	info, err := repo.CreateRecord(context.Background(), "Z123", "test.example.com.", "A", []string{"1.2.3.4"}, 300)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.ID != "/change/C123" {
+		t.Errorf("expected change ID '/change/C123', got %q", info.ID)
+	}
+	if info.Status != "PENDING" {
+		t.Errorf("expected status 'PENDING', got %q", info.Status)
+	}
+}
+
+func TestCreateRecord_Error(t *testing.T) {
+	mock := &mockRoute53Client{
+		changeResourceRecordSetsFunc: func(_ context.Context, _ *route53.ChangeResourceRecordSetsInput, _ ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+			return nil, fmt.Errorf("invalid input")
+		},
+	}
+
+	repo := &AwsRepository{Route53Client: mock}
+	_, err := repo.CreateRecord(context.Background(), "Z123", "test.example.com.", "A", []string{"1.2.3.4"}, 300)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestUpdateRecord_Success(t *testing.T) {
+	mock := &mockRoute53Client{
+		changeResourceRecordSetsFunc: func(_ context.Context, params *route53.ChangeResourceRecordSetsInput, _ ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+			changes := params.ChangeBatch.Changes
+			if changes[0].Action != r53types.ChangeActionUpsert {
+				t.Errorf("expected UPSERT action, got %v", changes[0].Action)
+			}
+			rrs := changes[0].ResourceRecordSet
+			if awssdk.ToInt64(rrs.TTL) != 600 {
+				t.Errorf("expected TTL 600, got %d", awssdk.ToInt64(rrs.TTL))
+			}
+			if len(rrs.ResourceRecords) != 1 || awssdk.ToString(rrs.ResourceRecords[0].Value) != "5.6.7.8" {
+				t.Errorf("expected value '5.6.7.8'")
+			}
+			return &route53.ChangeResourceRecordSetsOutput{
+				ChangeInfo: &r53types.ChangeInfo{
+					Id:     awssdk.String("/change/C456"),
+					Status: r53types.ChangeStatusPending,
+				},
+			}, nil
+		},
+	}
+
+	record := DNSRecord{Name: "test.example.com.", Type: "A", TTL: 300, Values: []string{"1.2.3.4"}}
+	repo := &AwsRepository{Route53Client: mock}
+	info, err := repo.UpdateRecord(context.Background(), "Z123", record, []string{"5.6.7.8"}, 600)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.ID != "/change/C456" {
+		t.Errorf("expected change ID '/change/C456', got %q", info.ID)
+	}
+}
+
+func TestUpdateRecord_Error(t *testing.T) {
+	mock := &mockRoute53Client{
+		changeResourceRecordSetsFunc: func(_ context.Context, _ *route53.ChangeResourceRecordSetsInput, _ ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+			return nil, fmt.Errorf("access denied")
+		},
+	}
+
+	record := DNSRecord{Name: "test.example.com.", Type: "A", TTL: 300, Values: []string{"1.2.3.4"}}
+	repo := &AwsRepository{Route53Client: mock}
+	_, err := repo.UpdateRecord(context.Background(), "Z123", record, []string{"5.6.7.8"}, 600)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestDeleteRecord_Success(t *testing.T) {
+	mock := &mockRoute53Client{
+		changeResourceRecordSetsFunc: func(_ context.Context, params *route53.ChangeResourceRecordSetsInput, _ ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+			changes := params.ChangeBatch.Changes
+			if changes[0].Action != r53types.ChangeActionDelete {
+				t.Errorf("expected DELETE action, got %v", changes[0].Action)
+			}
+			return &route53.ChangeResourceRecordSetsOutput{
+				ChangeInfo: &r53types.ChangeInfo{
+					Id:     awssdk.String("/change/C789"),
+					Status: r53types.ChangeStatusPending,
+				},
+			}, nil
+		},
+	}
+
+	record := DNSRecord{Name: "test.example.com.", Type: "A", TTL: 300, Values: []string{"1.2.3.4"}}
+	repo := &AwsRepository{Route53Client: mock}
+	info, err := repo.DeleteRecord(context.Background(), "Z123", record)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.ID != "/change/C789" {
+		t.Errorf("expected change ID '/change/C789', got %q", info.ID)
+	}
+}
+
+func TestDeleteRecord_Error(t *testing.T) {
+	mock := &mockRoute53Client{
+		changeResourceRecordSetsFunc: func(_ context.Context, _ *route53.ChangeResourceRecordSetsInput, _ ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+			return nil, fmt.Errorf("record not found")
+		},
+	}
+
+	record := DNSRecord{Name: "test.example.com.", Type: "A", TTL: 300, Values: []string{"1.2.3.4"}}
+	repo := &AwsRepository{Route53Client: mock}
+	_, err := repo.DeleteRecord(context.Background(), "Z123", record)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestDeleteRecord_AliasUsesCorrectHostedZoneId(t *testing.T) {
+	mock := &mockRoute53Client{
+		changeResourceRecordSetsFunc: func(_ context.Context, params *route53.ChangeResourceRecordSetsInput, _ ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+			changes := params.ChangeBatch.Changes
+			if changes[0].Action != r53types.ChangeActionDelete {
+				t.Errorf("expected DELETE action, got %v", changes[0].Action)
+			}
+			rrs := changes[0].ResourceRecordSet
+			if rrs.AliasTarget == nil {
+				t.Fatal("expected AliasTarget to be set for alias record deletion")
+			}
+			// The critical check: alias hosted zone ID must be the target's zone, not the source zone
+			if awssdk.ToString(rrs.AliasTarget.HostedZoneId) != "Z2FDTNDATAQYW2" {
+				t.Errorf("expected alias HostedZoneId 'Z2FDTNDATAQYW2' (target zone), got %q", awssdk.ToString(rrs.AliasTarget.HostedZoneId))
+			}
+			if rrs.TTL != nil {
+				t.Error("expected TTL to be nil for alias record")
+			}
+			if len(rrs.ResourceRecords) != 0 {
+				t.Error("expected no ResourceRecords for alias record")
+			}
+			return &route53.ChangeResourceRecordSetsOutput{
+				ChangeInfo: &r53types.ChangeInfo{
+					Id:     awssdk.String("/change/CALIAS"),
+					Status: r53types.ChangeStatusPending,
+				},
+			}, nil
+		},
+	}
+
+	record := DNSRecord{
+		Name:              "www.example.com.",
+		Type:              "A",
+		AliasTarget:       "d111111abcdef8.cloudfront.net.",
+		AliasHostedZoneId: "Z2FDTNDATAQYW2",
+	}
+	repo := &AwsRepository{Route53Client: mock}
+	info, err := repo.DeleteRecord(context.Background(), "ZSOURCEZONE", record)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.ID != "/change/CALIAS" {
+		t.Errorf("expected change ID '/change/CALIAS', got %q", info.ID)
+	}
+}
+
+func TestGetChangeStatus_Success(t *testing.T) {
+	mock := &mockRoute53Client{
+		getChangeFunc: func(_ context.Context, params *route53.GetChangeInput, _ ...func(*route53.Options)) (*route53.GetChangeOutput, error) {
+			if awssdk.ToString(params.Id) != "/change/C123" {
+				t.Errorf("expected change ID '/change/C123', got %q", awssdk.ToString(params.Id))
+			}
+			return &route53.GetChangeOutput{
+				ChangeInfo: &r53types.ChangeInfo{
+					Id:     awssdk.String("/change/C123"),
+					Status: r53types.ChangeStatusInsync,
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{Route53Client: mock}
+	status, err := repo.GetChangeStatus(context.Background(), "/change/C123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status != "INSYNC" {
+		t.Errorf("expected status 'INSYNC', got %q", status)
+	}
+}
+
+func TestGetChangeStatus_Error(t *testing.T) {
+	mock := &mockRoute53Client{
+		getChangeFunc: func(_ context.Context, _ *route53.GetChangeInput, _ ...func(*route53.Options)) (*route53.GetChangeOutput, error) {
+			return nil, fmt.Errorf("change not found")
+		},
+	}
+
+	repo := &AwsRepository{Route53Client: mock}
+	_, err := repo.GetChangeStatus(context.Background(), "/change/CXXX")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestChangeInfo_Model(t *testing.T) {
+	ci := ChangeInfo{ID: "/change/C123", Status: "PENDING"}
+	if ci.ID != "/change/C123" {
+		t.Errorf("expected ID '/change/C123', got %q", ci.ID)
+	}
+	if ci.Status != "PENDING" {
+		t.Errorf("expected Status 'PENDING', got %q", ci.Status)
 	}
 }

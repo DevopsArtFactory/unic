@@ -32,11 +32,12 @@ func (hz HostedZone) FilterText() string {
 
 // DNSRecord holds essential information about a Route53 resource record set.
 type DNSRecord struct {
-	Name        string
-	Type        string
-	TTL         int64
-	Values      []string
-	AliasTarget string
+	Name              string
+	Type              string
+	TTL               int64
+	Values            []string
+	AliasTarget       string
+	AliasHostedZoneId string // hosted zone ID of the alias target resource
 }
 
 // DisplayTitle returns a formatted string for list display.
@@ -55,4 +56,10 @@ func (r DNSRecord) DisplayTitle() string {
 func (r DNSRecord) FilterText() string {
 	return strings.ToLower(fmt.Sprintf("%s %s %s %s",
 		r.Name, r.Type, strings.Join(r.Values, " "), r.AliasTarget))
+}
+
+// ChangeInfo holds the result of a Route53 change operation.
+type ChangeInfo struct {
+	ID     string // change ID (e.g., "/change/C1234...")
+	Status string // "PENDING" or "INSYNC"
 }
