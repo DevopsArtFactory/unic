@@ -62,19 +62,13 @@ func (m Model) updateSubnetDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if m.ipFilterActive {
-		switch key {
-		case "esc", "enter":
+		newFilter, deactivate, changed := handleFilterKey(key, m.ipFilter)
+		m.ipFilter = newFilter
+		if deactivate {
 			m.ipFilterActive = false
-		case "backspace":
-			if len(m.ipFilter) > 0 {
-				m.ipFilter = m.ipFilter[:len(m.ipFilter)-1]
-				m.applyIPFilter()
-			}
-		default:
-			if len(key) == 1 {
-				m.ipFilter += key
-				m.applyIPFilter()
-			}
+		}
+		if changed {
+			m.applyIPFilter()
 		}
 		return m, nil
 	}

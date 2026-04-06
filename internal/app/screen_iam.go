@@ -15,6 +15,63 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
+func (m Model) handleIAMMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case iamKeysLoadedMsg:
+		m.iamKeys = msg.keys
+		m.iamKeyIdx = 0
+		m.screen = screenIAMKeyList
+		return m, nil, true
+
+	case iamKeyCreatedMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil, true
+		}
+		m.iamNewKey = msg.newKey
+		m.iamCopyMsg = ""
+		m.iamRotationStatus = ""
+		m.iamNewKeyVerified = false
+		m.iamOldKeyInactive = false
+		m.iamOldKeyDeleted = false
+		m.screen = screenIAMKeyRotateResult
+		return m, nil, true
+
+	case iamKeyVerifiedMsg:
+		if msg.err != nil {
+			m.iamRotationStatus = fmt.Sprintf("Verification failed: %s", msg.err)
+			return m, nil, true
+		}
+		m.iamNewKeyVerified = true
+		if msg.identity != nil {
+			m.iamRotationStatus = fmt.Sprintf("Verified new key as %s", msg.identity.Arn)
+		} else {
+			m.iamRotationStatus = "Verified new key"
+		}
+		return m, nil, true
+
+	case iamKeyDeactivatedMsg:
+		if msg.err != nil {
+			m.iamRotationStatus = msg.err.Error()
+			return m, nil, true
+		}
+		m.iamOldKeyInactive = true
+		m.iamRotationStatus = fmt.Sprintf("Old key %s marked Inactive", msg.keyID)
+		return m, nil, true
+
+	case iamKeyDeletedMsg:
+		if msg.err != nil {
+			m.iamRotationStatus = msg.err.Error()
+			return m, nil, true
+		}
+		m.iamOldKeyDeleted = true
+		m.iamRotationStatus = fmt.Sprintf("Old key %s deleted", msg.keyID)
+		return m, nil, true
+	}
+	return m, nil, false
+}
+
 func (m Model) loadIAMKeys() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()

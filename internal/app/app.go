@@ -244,299 +244,44 @@ func (m Model) loadCallerIdentity() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Global messages
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
-
 	case callerIdentityMsg:
 		m.callerIdentity = msg.identity
 		return m, nil
-
 	case updateAvailableMsg:
 		m.installMethod = msg.method
 		if msg.version != "" {
 			m.updateAvailable = msg.version
 		}
 		return m, nil
-
-	case instancesLoadedMsg:
-		m.instances = msg.instances
-		m.filtered = msg.instances
-		m.instIdx = 0
-		m.screen = screenInstanceList
-		return m, nil
-
-	case vpcsLoadedMsg:
-		m.vpcs = msg.vpcs
-		m.filteredVPCs = msg.vpcs
-		m.vpcIdx = 0
-		m.screen = screenVPCList
-		return m, nil
-
-	case subnetsLoadedMsg:
-		m.subnets = msg.subnets
-		m.subnetIdx = 0
-		m.screen = screenSubnetList
-		return m, nil
-
-	case availableIPsLoadedMsg:
-		m.availableIPs = msg.ips
-		m.filteredIPs = msg.ips
-		m.ipScrollOffset = 0
-		m.ipFilter = ""
-		m.ipFilterActive = false
-		m.screen = screenSubnetDetail
-		return m, nil
-
-	case route53ZonesLoadedMsg:
-		m.route53Zones = msg.zones
-		m.filteredRoute53Zones = msg.zones
-		m.route53ZoneIdx = 0
-		m.screen = screenRoute53ZoneList
-		return m, nil
-
-	case route53RecordsLoadedMsg:
-		m.route53Records = msg.records
-		m.filteredRoute53Records = msg.records
-		m.route53RecordIdx = 0
-		m.screen = screenRoute53RecordList
-		return m, nil
-
-	case route53ActionDoneMsg:
-		if msg.err != nil {
-			m.errMsg = msg.err.Error()
-			m.screen = screenError
-			return m, nil
-		}
-		m.route53ChangeID = msg.changeID
-		m.route53ChangeStatus = "PENDING"
-		m.route53Polling = true
-		// Reload records and start polling change status
-		if m.selectedRoute53Zone != nil {
-			return m, tea.Batch(
-				m.loadRoute53Records(m.selectedRoute53Zone.ID),
-				m.pollRoute53ChangeStatus(),
-			)
-		}
-		m.screen = screenRoute53RecordList
-		return m, nil
-
-	case route53ChangeStatusMsg:
-		if msg.err != nil {
-			m.route53Polling = false
-			return m, nil
-		}
-		m.route53ChangeStatus = msg.status
-		if msg.status == "INSYNC" {
-			m.route53Polling = false
-			return m, nil
-		}
-		return m, m.tickRoute53Poll()
-
-	case route53PollTickMsg:
-		if m.route53Polling {
-			return m, m.pollRoute53ChangeStatus()
-		}
-		return m, nil
-
-	case rdsInstancesLoadedMsg:
-		m.rdsInstances = msg.instances
-		m.filteredRDS = msg.instances
-		m.rdsIdx = 0
-		m.screen = screenRDSList
-		return m, nil
-
-	case secretsLoadedMsg:
-		m.secrets = msg.secrets
-		m.filteredSecrets = msg.secrets
-		m.secretIdx = 0
-		m.screen = screenSecretList
-		return m, nil
-
-	case secretDetailLoadedMsg:
-		m.selectedSecret = msg.detail
-		m.screen = screenSecretDetail
-		return m, nil
-
-	case securityGroupsLoadedMsg:
-		m.securityGroups = msg.securityGroups
-		m.filteredSecurityGroups = msg.securityGroups
-		m.sgIdx = 0
-		m.screen = screenSecurityGroupList
-		return m, nil
-
-	case sgRuleAddedMsg:
-		if msg.err != nil {
-			m.errMsg = msg.err.Error()
-			m.screen = screenError
-			return m, nil
-		}
-		return m, m.refreshSecurityGroup()
-
-	case sgRuleDeletedMsg:
-		if msg.err != nil {
-			m.errMsg = msg.err.Error()
-			m.screen = screenError
-			return m, nil
-		}
-		return m, m.refreshSecurityGroup()
-
-	case sgRefreshedMsg:
-		if msg.err != nil {
-			m.errMsg = msg.err.Error()
-			m.screen = screenError
-			return m, nil
-		}
-		m.selectedSecurityGroup = msg.sg
-		// Update the SG in the list
-		for i, sg := range m.securityGroups {
-			if sg.GroupID == msg.sg.GroupID {
-				m.securityGroups[i] = *msg.sg
-				break
-			}
-		}
-		m.applySecurityGroupFilter()
-		m.sgRuleIdx = 0
-		m.screen = screenSecurityGroupDetail
-		return m, nil
-
-	case iamKeysLoadedMsg:
-		m.iamKeys = msg.keys
-		m.iamKeyIdx = 0
-		m.screen = screenIAMKeyList
-		return m, nil
-
-	case iamKeyCreatedMsg:
-		if msg.err != nil {
-			m.errMsg = msg.err.Error()
-			m.screen = screenError
-			return m, nil
-		}
-		m.iamNewKey = msg.newKey
-		m.iamCopyMsg = ""
-		m.iamRotationStatus = ""
-		m.iamNewKeyVerified = false
-		m.iamOldKeyInactive = false
-		m.iamOldKeyDeleted = false
-		m.screen = screenIAMKeyRotateResult
-		return m, nil
-
-	case iamKeyVerifiedMsg:
-		if msg.err != nil {
-			m.iamRotationStatus = fmt.Sprintf("Verification failed: %s", msg.err)
-			return m, nil
-		}
-		m.iamNewKeyVerified = true
-		if msg.identity != nil {
-			m.iamRotationStatus = fmt.Sprintf("Verified new key as %s", msg.identity.Arn)
-		} else {
-			m.iamRotationStatus = "Verified new key"
-		}
-		return m, nil
-
-	case iamKeyDeactivatedMsg:
-		if msg.err != nil {
-			m.iamRotationStatus = msg.err.Error()
-			return m, nil
-		}
-		m.iamOldKeyInactive = true
-		m.iamRotationStatus = fmt.Sprintf("Old key %s marked Inactive", msg.keyID)
-		return m, nil
-
-	case iamKeyDeletedMsg:
-		if msg.err != nil {
-			m.iamRotationStatus = msg.err.Error()
-			return m, nil
-		}
-		m.iamOldKeyDeleted = true
-		m.iamRotationStatus = fmt.Sprintf("Old key %s deleted", msg.keyID)
-		return m, nil
-
-	case rdsActionDoneMsg:
-		if msg.err != nil {
-			m.errMsg = msg.err.Error()
-			m.screen = screenError
-			return m, nil
-		}
-		m.rdsPolling = true
-		m.screen = screenRDSDetail
-		return m, m.tickRDSPoll(msg.instanceID)
-
-	case rdsStatusRefreshedMsg:
-		if msg.err != nil {
-			m.rdsPolling = false
-			return m, nil
-		}
-		m.selectedRDS = msg.instance
-		// Update the instance in the list
-		for i, inst := range m.rdsInstances {
-			if inst.DBInstanceID == msg.instance.DBInstanceID {
-				m.rdsInstances[i] = *msg.instance
-				break
-			}
-		}
-		m.applyRDSFilter()
-		if awsservice.IsTransitionalStatus(msg.instance.Status) {
-			return m, m.tickRDSPoll(msg.instance.DBInstanceID)
-		}
-		m.rdsPolling = false
-		return m, nil
-
-	case rdsTickMsg:
-		if m.rdsPolling {
-			return m, m.pollRDSStatus(msg.instanceID)
-		}
-		return m, nil
-
 	case errMsg:
 		m.errMsg = msg.err.Error()
 		m.screen = screenError
 		return m, nil
+	}
 
-	case ssmSessionDoneMsg:
-		if msg.err != nil {
-			m.errMsg = msg.err.Error()
-			m.screen = screenError
-			return m, nil
+	// Domain message handlers
+	for _, h := range []func(tea.Msg) (tea.Model, tea.Cmd, bool){
+		m.handleEC2VPCMsg,
+		m.handleRoute53Msg,
+		m.handleRDSMsg,
+		m.handleSecurityGroupMsg,
+		m.handleIAMMsg,
+		m.handleSecretMsg,
+		m.handleContextMsg,
+	} {
+		if newM, cmd, handled := h(msg); handled {
+			return newM, cmd
 		}
-		// Return to instance list after session ends
-		m.screen = screenInstanceList
-		return m, nil
+	}
 
-	case contextsLoadedMsg:
-		m.ctxList = msg.contexts
-		m.filteredCtxList = msg.contexts
-		m.ctxIdx = 0
-		m.ctxFilterInput = ""
-		m.ctxFilterActive = false
-		for i, ctx := range m.filteredCtxList {
-			if ctx.Current {
-				m.ctxIdx = i
-				break
-			}
-		}
-		m.screen = screenContextPicker
-		return m, nil
-
-	case ssoLoginDoneMsg:
-		if msg.err != nil {
-			m.errMsg = fmt.Sprintf("SSO login failed: %s", msg.err)
-			m.screen = screenError
-			return m, tea.ClearScreen
-		}
-		// SSO login done, now finalize the context switch
-		return m, m.finalizeContextSwitch()
-
-	case contextSwitchedMsg:
-		m.cfg = msg.cfg
-		m.callerIdentity = msg.identity
-		m.awsRepo = nil // reset so next AWS call uses new credentials
-		m.screen = m.ctxPrevScreen
-		return m, tea.ClearScreen
-
-	case tea.KeyMsg:
+	// Key messages — screen dispatch
+	if msg, ok := msg.(tea.KeyMsg); ok {
 		// Global quit
 		if msg.String() == "ctrl+c" {
 			m.quitting = true
@@ -616,6 +361,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleSecretMsg handles Secrets Manager messages.
+func (m Model) handleSecretMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case secretsLoadedMsg:
+		m.secrets = msg.secrets
+		m.filteredSecrets = msg.secrets
+		m.secretIdx = 0
+		m.screen = screenSecretList
+		return m, nil, true
+	case secretDetailLoadedMsg:
+		m.selectedSecret = msg.detail
+		m.screen = screenSecretDetail
+		return m, nil, true
+	}
+	return m, nil, false
 }
 
 func (m Model) updateServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -910,21 +672,14 @@ func (m Model) updateSecretList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if m.secretFilterActive {
-		switch key {
-		case "esc":
+		newFilter, deactivate, changed := handleFilterKey(key, m.secretFilter)
+		m.secretFilter = newFilter
+		if deactivate {
 			m.secretFilterActive = false
-		case "enter":
-			m.secretFilterActive = false
-		case "backspace":
-			if len(m.secretFilter) > 0 {
-				m.secretFilter = m.secretFilter[:len(m.secretFilter)-1]
-				m.applySecretFilter()
-			}
-		default:
-			if len(key) == 1 {
-				m.secretFilter += key
-				m.applySecretFilter()
-			}
+		}
+		if changed {
+			m.filteredSecrets = applyFilter(m.secrets, m.secretFilter)
+			m.secretIdx = 0
 		}
 		return m, nil
 	}
@@ -964,21 +719,6 @@ func (m Model) updateSecretDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) applySecretFilter() {
-	if m.secretFilter == "" {
-		m.filteredSecrets = m.secrets
-	} else {
-		query := strings.ToLower(m.secretFilter)
-		var result []awsservice.Secret
-		for _, s := range m.secrets {
-			if strings.Contains(s.FilterText(), query) {
-				result = append(result, s)
-			}
-		}
-		m.filteredSecrets = result
-	}
-	m.secretIdx = 0
-}
 
 func (m Model) viewSecretList() string {
 	var b strings.Builder
