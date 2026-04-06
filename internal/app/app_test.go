@@ -952,3 +952,31 @@ func TestCWLogTailAppendClampsScrollOffsetForShortEventList(t *testing.T) {
 		t.Fatalf("expected clamped scroll offset 0, got %d", model.cwLogScrollOffset)
 	}
 }
+
+func TestCWLogTailTickSchedulesPollAndNextTick(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwLogTailing = true
+	m.selectedCWLogGroup = &awsservice.LogGroup{Name: "/aws/lambda/test"}
+
+	updated, cmd, handled := m.handleCloudWatchLogsMsg(cwLogTailTickMsg{})
+	if !handled {
+		t.Fatal("expected CloudWatch logs tail tick to be handled")
+	}
+	if cmd == nil {
+		t.Fatal("expected batched tail commands")
+	}
+
+	model := updated.(Model)
+	if !model.cwLogTailing {
+		t.Fatal("expected tailing to remain enabled")
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected tea.BatchMsg, got %T", msg)
+	}
+	if len(batch) != 2 {
+		t.Fatalf("expected 2 batched commands, got %d", len(batch))
+	}
+}

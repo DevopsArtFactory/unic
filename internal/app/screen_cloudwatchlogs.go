@@ -86,7 +86,7 @@ func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 	case cwLogTailTickMsg:
 		if m.cwLogTailing && m.selectedCWLogGroup != nil {
-			return m, m.pollCWLogTail(), true
+			return m, tea.Batch(m.pollCWLogTail(), m.tickCWLogTail()), true
 		}
 		return m, nil, true
 	}
