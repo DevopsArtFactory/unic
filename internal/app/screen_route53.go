@@ -889,9 +889,13 @@ func (m Model) tickRoute53Poll() tea.Cmd {
 }
 
 func parseTTL(s string) int64 {
-	var ttl int64 = 300
-	if s != "" {
-		fmt.Sscanf(s, "%d", &ttl)
+	const defaultTTL int64 = 300
+	if s == "" {
+		return defaultTTL
+	}
+	var ttl int64
+	if _, err := fmt.Sscanf(s, "%d", &ttl); err != nil || ttl < 0 {
+		return defaultTTL
 	}
 	return ttl
 }
