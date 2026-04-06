@@ -185,7 +185,28 @@ func IsNewer(current, latest string) bool {
 	if c == "" || l == "" {
 		return false
 	}
-	return l > c
+	return compareVersions(l, c) > 0
+}
+
+// compareVersions compares two dot-separated version strings segment by segment.
+// Returns positive if a > b, negative if a < b, zero if equal.
+func compareVersions(a, b string) int {
+	aParts := strings.Split(a, ".")
+	bParts := strings.Split(b, ".")
+	maxLen := max(len(aParts), len(bParts))
+	for i := 0; i < maxLen; i++ {
+		var ai, bi int
+		if i < len(aParts) {
+			fmt.Sscanf(aParts[i], "%d", &ai)
+		}
+		if i < len(bParts) {
+			fmt.Sscanf(bParts[i], "%d", &bi)
+		}
+		if ai != bi {
+			return ai - bi
+		}
+	}
+	return 0
 }
 
 // normalizeVersion strips "v" prefix for comparison.
