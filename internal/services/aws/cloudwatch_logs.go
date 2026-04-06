@@ -111,6 +111,7 @@ func (r *AwsRepository) FilterLogEvents(ctx context.Context, logGroupName string
 	var events []LogEvent
 	for _, e := range output.Events {
 		event := LogEvent{
+			EventID: awssdk.ToString(e.EventId),
 			Message: awssdk.ToString(e.Message),
 		}
 		if e.Timestamp != nil {

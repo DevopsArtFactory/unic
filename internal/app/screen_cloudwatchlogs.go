@@ -49,6 +49,32 @@ func clampCWLogScrollOffset(offset, totalEvents, visibleLines int) int {
 	return offset
 }
 
+func appendUniqueCWLogEvents(existing, incoming []awsservice.LogEvent) []awsservice.LogEvent {
+	if len(incoming) == 0 {
+		return existing
+	}
+
+	seenEventIDs := make(map[string]struct{}, len(existing))
+	for _, evt := range existing {
+		if evt.EventID != "" {
+			seenEventIDs[evt.EventID] = struct{}{}
+		}
+	}
+
+	result := existing
+	for _, evt := range incoming {
+		if evt.EventID != "" {
+			if _, exists := seenEventIDs[evt.EventID]; exists {
+				continue
+			}
+			seenEventIDs[evt.EventID] = struct{}{}
+		}
+		result = append(result, evt)
+	}
+
+	return result
+}
+
 func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case cwLogGroupsLoadedMsg:
@@ -67,7 +93,7 @@ func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 	case cwLogEventsLoadedMsg:
 		if msg.append {
-			m.cwLogEvents = append(m.cwLogEvents, msg.events...)
+			m.cwLogEvents = appendUniqueCWLogEvents(m.cwLogEvents, msg.events)
 			// Auto-scroll to bottom when tailing
 			if m.cwLogTailing {
 				total := len(m.cwLogEvents)

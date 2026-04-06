@@ -52,6 +52,7 @@ func (s LogStream) FilterText() string {
 
 // LogEvent holds a single log event from CloudWatch Logs.
 type LogEvent struct {
+	EventID   string
 	Timestamp time.Time
 	Message   string
 	Level     string // extracted: INFO, WARN, ERROR, DEBUG, FATAL, or empty

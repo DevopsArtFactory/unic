@@ -204,10 +204,12 @@ func TestFilterLogEvents_Success(t *testing.T) {
 			return &cloudwatchlogs.FilterLogEventsOutput{
 				Events: []cwltypes.FilteredLogEvent{
 					{
+						EventId:   awssdk.String("evt-1"),
 						Timestamp: &ts,
 						Message:   awssdk.String("2024-01-01T00:00:00Z INFO Starting handler"),
 					},
 					{
+						EventId:   awssdk.String("evt-2"),
 						Timestamp: &ts,
 						Message:   awssdk.String("2024-01-01T00:00:01Z ERROR Something failed"),
 					},
@@ -228,8 +230,14 @@ func TestFilterLogEvents_Success(t *testing.T) {
 	if events[0].Level != "INFO" {
 		t.Errorf("expected level 'INFO', got %q", events[0].Level)
 	}
+	if events[0].EventID != "evt-1" {
+		t.Errorf("expected event ID 'evt-1', got %q", events[0].EventID)
+	}
 	if events[1].Level != "ERROR" {
 		t.Errorf("expected level 'ERROR', got %q", events[1].Level)
+	}
+	if events[1].EventID != "evt-2" {
+		t.Errorf("expected event ID 'evt-2', got %q", events[1].EventID)
 	}
 	if nextToken == nil {
 		t.Error("expected non-nil next token")

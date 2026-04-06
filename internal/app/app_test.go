@@ -980,3 +980,33 @@ func TestCWLogTailTickSchedulesPollAndNextTick(t *testing.T) {
 		t.Fatalf("expected 2 batched commands, got %d", len(batch))
 	}
 }
+
+func TestCWLogTailAppendDeduplicatesExistingEventIDs(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 20
+	m.screen = screenCWLogViewer
+	m.cwLogTailing = true
+	m.cwLogEvents = []awsservice.LogEvent{
+		{EventID: "evt-1", Timestamp: time.Unix(0, 0), Message: "one"},
+		{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"},
+	}
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append: true,
+		events: []awsservice.LogEvent{
+			{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"},
+			{EventID: "evt-3", Timestamp: time.Unix(2, 0), Message: "three"},
+		},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if len(model.cwLogEvents) != 3 {
+		t.Fatalf("expected 3 deduplicated events, got %d", len(model.cwLogEvents))
+	}
+	if model.cwLogEvents[2].EventID != "evt-3" {
+		t.Fatalf("expected final event to be evt-3, got %q", model.cwLogEvents[2].EventID)
+	}
+}
