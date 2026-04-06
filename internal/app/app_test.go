@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -905,4 +906,195 @@ func TestRotateAccessKeyFeatureUsesCurrentIdentityFlow(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected load IAM keys command")
 	}
+}
+
+func TestCWLogViewerDownDoesNotOverflowShortEventList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenCWLogViewer
+	m.height = 20
+	m.cwLogEvents = []awsservice.LogEvent{
+		{Timestamp: time.Unix(0, 0), Message: "one"},
+		{Timestamp: time.Unix(1, 0), Message: "two"},
+		{Timestamp: time.Unix(2, 0), Message: "three"},
+	}
+	m.cwLogScrollOffset = 0
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model := updated.(Model)
+	if model.cwLogScrollOffset != 0 {
+		t.Fatalf("expected scroll offset to remain 0, got %d", model.cwLogScrollOffset)
+	}
+}
+
+func TestCWLogTailAppendClampsScrollOffsetForShortEventList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 20
+	m.screen = screenCWLogViewer
+	m.cwLogTailing = true
+	m.cwLogScrollOffset = 7
+	m.cwLogEvents = []awsservice.LogEvent{
+		{Timestamp: time.Unix(0, 0), Message: "one"},
+		{Timestamp: time.Unix(1, 0), Message: "two"},
+	}
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append: true,
+		events: []awsservice.LogEvent{
+			{Timestamp: time.Unix(2, 0), Message: "three"},
+		},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if model.cwLogScrollOffset != 0 {
+		t.Fatalf("expected clamped scroll offset 0, got %d", model.cwLogScrollOffset)
+	}
+}
+
+func TestCWLogTailTickSchedulesPollAndNextTick(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwLogTailing = true
+	m.selectedCWLogGroup = &awsservice.LogGroup{Name: "/aws/lambda/test"}
+
+	updated, cmd, handled := m.handleCloudWatchLogsMsg(cwLogTailTickMsg{})
+	if !handled {
+		t.Fatal("expected CloudWatch logs tail tick to be handled")
+	}
+	if cmd == nil {
+		t.Fatal("expected batched tail commands")
+	}
+
+	model := updated.(Model)
+	if !model.cwLogTailing {
+		t.Fatal("expected tailing to remain enabled")
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected tea.BatchMsg, got %T", msg)
+	}
+	if len(batch) != 2 {
+		t.Fatalf("expected 2 batched commands, got %d", len(batch))
+	}
+}
+
+func TestCWLogTailAppendDeduplicatesExistingEventIDs(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 20
+	m.screen = screenCWLogViewer
+	m.cwLogTailing = true
+	m.cwLogEvents = []awsservice.LogEvent{
+		{EventID: "evt-1", Timestamp: time.Unix(0, 0), Message: "one"},
+		{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"},
+	}
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append: true,
+		events: []awsservice.LogEvent{
+			{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"},
+			{EventID: "evt-3", Timestamp: time.Unix(2, 0), Message: "three"},
+		},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if len(model.cwLogEvents) != 3 {
+		t.Fatalf("expected 3 deduplicated events, got %d", len(model.cwLogEvents))
+	}
+	if model.cwLogEvents[2].EventID != "evt-3" {
+		t.Fatalf("expected final event to be evt-3, got %q", model.cwLogEvents[2].EventID)
+	}
+}
+
+func TestCWLogTailAppendDeduplicatesEventsWithoutEventIDs(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 20
+	m.screen = screenCWLogViewer
+	m.cwLogTailing = true
+	m.cwLogEvents = []awsservice.LogEvent{
+		{Timestamp: time.Unix(1, 0), Message: "duplicate"},
+	}
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append: true,
+		events: []awsservice.LogEvent{
+			{Timestamp: time.Unix(1, 0), Message: "duplicate"},
+			{Timestamp: time.Unix(2, 0), Message: "new event"},
+		},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if len(model.cwLogEvents) != 2 {
+		t.Fatalf("expected 2 deduplicated events, got %d", len(model.cwLogEvents))
+	}
+	if got := strings.TrimSpace(model.cwLogEvents[1].Message); got != "new event" {
+		t.Fatalf("expected final event to be new event, got %q", got)
+	}
+}
+
+func TestCWLogLoadMoreDoesNotOverwriteTailToken(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwLogTailToken = stringPtr("tail-token")
+	m.cwLogNextToken = stringPtr("page-token")
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append:                true,
+		nextToken:             stringPtr("older-page-token"),
+		updatePaginationToken: true,
+		events:                []awsservice.LogEvent{{EventID: "evt-1", Timestamp: time.Unix(0, 0), Message: "one"}},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if got := derefString(model.cwLogTailToken); got != "tail-token" {
+		t.Fatalf("expected tail token to remain unchanged, got %q", got)
+	}
+	if got := derefString(model.cwLogNextToken); got != "older-page-token" {
+		t.Fatalf("expected pagination token to update, got %q", got)
+	}
+}
+
+func TestCWLogTailAppendDoesNotOverwritePaginationToken(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwLogNextToken = stringPtr("page-token")
+	m.cwLogTailToken = stringPtr("tail-token")
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append:          true,
+		nextToken:       stringPtr("new-tail-token"),
+		updateTailToken: true,
+		events:          []awsservice.LogEvent{{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"}},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if got := derefString(model.cwLogNextToken); got != "page-token" {
+		t.Fatalf("expected pagination token to remain unchanged, got %q", got)
+	}
+	if got := derefString(model.cwLogTailToken); got != "new-tail-token" {
+		t.Fatalf("expected tail token to update, got %q", got)
+	}
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

@@ -53,6 +53,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceCloudWatchLogs,
+			Features: []Feature{
+				{
+					Kind:        FeatureCloudWatchLogsBrowser,
+					Description: "Browse log groups, streams, and events",
+				},
+			},
+		},
+		{
 			Name: ServiceIAM,
 			Features: []Feature{
 				{

@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"unic/internal/config"
@@ -40,6 +41,9 @@ var _ IAMClientAPI = (*iam.Client)(nil)
 
 // Verify *sts.Client satisfies STSClientAPI at compile time.
 var _ STSClientAPI = (*sts.Client)(nil)
+
+// Verify *cloudwatchlogs.Client satisfies CloudWatchLogsClientAPI at compile time.
+var _ CloudWatchLogsClientAPI = (*cloudwatchlogs.Client)(nil)
 
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
@@ -86,6 +90,13 @@ type STSClientAPI interface {
 	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
 }
 
+// CloudWatchLogsClientAPI is the interface for CloudWatch Logs operations used by AwsRepository.
+type CloudWatchLogsClientAPI interface {
+	DescribeLogGroups(ctx context.Context, params *cloudwatchlogs.DescribeLogGroupsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error)
+	DescribeLogStreams(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error)
+	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
+}
+
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
 	ec2.DescribeInstancesAPIClient
@@ -115,6 +126,7 @@ type AwsRepository struct {
 	SecretsManagerClient SecretsManagerClientAPI
 	IAMClient            IAMClientAPI
 	STSClient            STSClientAPI
+	CloudWatchLogsClient CloudWatchLogsClientAPI
 	Region               string
 	Profile              string
 }
@@ -185,6 +197,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		SecretsManagerClient: secretsmanager.NewFromConfig(awsCfg),
 		IAMClient:            iam.NewFromConfig(awsCfg),
 		STSClient:            sts.NewFromConfig(awsCfg),
+		CloudWatchLogsClient: cloudwatchlogs.NewFromConfig(awsCfg),
 		Region:               cfg.Region,
 		Profile:              cfg.Profile,
 	}, nil
