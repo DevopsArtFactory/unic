@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -904,5 +905,50 @@ func TestRotateAccessKeyFeatureUsesCurrentIdentityFlow(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Fatal("expected load IAM keys command")
+	}
+}
+
+func TestCWLogViewerDownDoesNotOverflowShortEventList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenCWLogViewer
+	m.height = 20
+	m.cwLogEvents = []awsservice.LogEvent{
+		{Timestamp: time.Unix(0, 0), Message: "one"},
+		{Timestamp: time.Unix(1, 0), Message: "two"},
+		{Timestamp: time.Unix(2, 0), Message: "three"},
+	}
+	m.cwLogScrollOffset = 0
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model := updated.(Model)
+	if model.cwLogScrollOffset != 0 {
+		t.Fatalf("expected scroll offset to remain 0, got %d", model.cwLogScrollOffset)
+	}
+}
+
+func TestCWLogTailAppendClampsScrollOffsetForShortEventList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 20
+	m.screen = screenCWLogViewer
+	m.cwLogTailing = true
+	m.cwLogScrollOffset = 7
+	m.cwLogEvents = []awsservice.LogEvent{
+		{Timestamp: time.Unix(0, 0), Message: "one"},
+		{Timestamp: time.Unix(1, 0), Message: "two"},
+	}
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+		append: true,
+		events: []awsservice.LogEvent{
+			{Timestamp: time.Unix(2, 0), Message: "three"},
+		},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch logs message to be handled")
+	}
+
+	model := updated.(Model)
+	if model.cwLogScrollOffset != 0 {
+		t.Fatalf("expected clamped scroll offset 0, got %d", model.cwLogScrollOffset)
 	}
 }

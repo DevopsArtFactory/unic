@@ -35,6 +35,20 @@ var (
 
 // --- Message handler ---
 
+func clampCWLogScrollOffset(offset, totalEvents, visibleLines int) int {
+	maxOffset := totalEvents - visibleLines
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset < 0 {
+		return 0
+	}
+	if offset > maxOffset {
+		return maxOffset
+	}
+	return offset
+}
+
 func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case cwLogGroupsLoadedMsg:
@@ -58,13 +72,12 @@ func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			if m.cwLogTailing {
 				total := len(m.cwLogEvents)
 				visibleLines := max(m.height-8, 5)
-				if total > visibleLines {
-					m.cwLogScrollOffset = total - visibleLines
-				}
+				m.cwLogScrollOffset = clampCWLogScrollOffset(total-visibleLines, total, visibleLines)
 			}
 		} else {
 			m.cwLogEvents = msg.events
-			m.cwLogScrollOffset = 0
+			visibleLines := max(m.height-8, 5)
+			m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogEvents), visibleLines)
 		}
 		m.cwLogNextToken = msg.nextToken
 		m.cwLogTailToken = msg.nextToken
@@ -358,7 +371,8 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cwLogScrollOffset--
 		}
 	case "down", "j":
-		if m.cwLogScrollOffset < len(m.cwLogEvents)-visibleLines {
+		maxOffset := clampCWLogScrollOffset(len(m.cwLogEvents)-visibleLines, len(m.cwLogEvents), visibleLines)
+		if m.cwLogScrollOffset < maxOffset {
 			m.cwLogScrollOffset++
 		}
 	case "pgup":
@@ -368,13 +382,7 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "pgdown":
 		m.cwLogScrollOffset += visibleLines
-		maxOffset := len(m.cwLogEvents) - visibleLines
-		if maxOffset < 0 {
-			maxOffset = 0
-		}
-		if m.cwLogScrollOffset > maxOffset {
-			m.cwLogScrollOffset = maxOffset
-		}
+		m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogEvents), visibleLines)
 	case "t": // Toggle live tail
 		m.cwLogTailing = !m.cwLogTailing
 		if m.cwLogTailing {
@@ -447,10 +455,7 @@ func (m Model) viewCWLogViewer() string {
 		b.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-8, 5)
-		start := m.cwLogScrollOffset
-		if start < 0 {
-			start = 0
-		}
+		start := clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogEvents), visibleLines)
 		end := min(start+visibleLines, len(m.cwLogEvents))
 
 		for i := start; i < end; i++ {
