@@ -194,7 +194,8 @@ func TestListResourceRecordSets_Success(t *testing.T) {
 						Name: awssdk.String("www.example.com."),
 						Type: r53types.RRTypeA,
 						AliasTarget: &r53types.AliasTarget{
-							DNSName: awssdk.String("d111111abcdef8.cloudfront.net."),
+							DNSName:      awssdk.String("d111111abcdef8.cloudfront.net."),
+							HostedZoneId: awssdk.String("Z2FDTNDATAQYW2"),
 						},
 					},
 				},
@@ -232,6 +233,9 @@ func TestListResourceRecordSets_Success(t *testing.T) {
 	alias := records[1]
 	if alias.AliasTarget != "d111111abcdef8.cloudfront.net." {
 		t.Errorf("expected AliasTarget 'd111111abcdef8.cloudfront.net.', got %q", alias.AliasTarget)
+	}
+	if alias.AliasHostedZoneId != "Z2FDTNDATAQYW2" {
+		t.Errorf("expected AliasHostedZoneId 'Z2FDTNDATAQYW2', got %q", alias.AliasHostedZoneId)
 	}
 	if len(alias.Values) != 0 {
 		t.Errorf("expected no values for alias record, got %d", len(alias.Values))
@@ -505,6 +509,52 @@ func TestDeleteRecord_Error(t *testing.T) {
 	_, err := repo.DeleteRecord(context.Background(), "Z123", record)
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestDeleteRecord_AliasUsesCorrectHostedZoneId(t *testing.T) {
+	mock := &mockRoute53Client{
+		changeResourceRecordSetsFunc: func(_ context.Context, params *route53.ChangeResourceRecordSetsInput, _ ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error) {
+			changes := params.ChangeBatch.Changes
+			if changes[0].Action != r53types.ChangeActionDelete {
+				t.Errorf("expected DELETE action, got %v", changes[0].Action)
+			}
+			rrs := changes[0].ResourceRecordSet
+			if rrs.AliasTarget == nil {
+				t.Fatal("expected AliasTarget to be set for alias record deletion")
+			}
+			// The critical check: alias hosted zone ID must be the target's zone, not the source zone
+			if awssdk.ToString(rrs.AliasTarget.HostedZoneId) != "Z2FDTNDATAQYW2" {
+				t.Errorf("expected alias HostedZoneId 'Z2FDTNDATAQYW2' (target zone), got %q", awssdk.ToString(rrs.AliasTarget.HostedZoneId))
+			}
+			if rrs.TTL != nil {
+				t.Error("expected TTL to be nil for alias record")
+			}
+			if len(rrs.ResourceRecords) != 0 {
+				t.Error("expected no ResourceRecords for alias record")
+			}
+			return &route53.ChangeResourceRecordSetsOutput{
+				ChangeInfo: &r53types.ChangeInfo{
+					Id:     awssdk.String("/change/CALIAS"),
+					Status: r53types.ChangeStatusPending,
+				},
+			}, nil
+		},
+	}
+
+	record := DNSRecord{
+		Name:              "www.example.com.",
+		Type:              "A",
+		AliasTarget:       "d111111abcdef8.cloudfront.net.",
+		AliasHostedZoneId: "Z2FDTNDATAQYW2",
+	}
+	repo := &AwsRepository{Route53Client: mock}
+	info, err := repo.DeleteRecord(context.Background(), "ZSOURCEZONE", record)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.ID != "/change/CALIAS" {
+		t.Errorf("expected change ID '/change/CALIAS', got %q", info.ID)
 	}
 }
 

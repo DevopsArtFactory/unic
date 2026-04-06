@@ -72,6 +72,7 @@ func (r *AwsRepository) ListResourceRecordSets(ctx context.Context, zoneID strin
 			}
 			if rrs.AliasTarget != nil {
 				rec.AliasTarget = awssdk.ToString(rrs.AliasTarget.DNSName)
+				rec.AliasHostedZoneId = awssdk.ToString(rrs.AliasTarget.HostedZoneId)
 			}
 			for _, v := range rrs.ResourceRecords {
 				rec.Values = append(rec.Values, awssdk.ToString(v.Value))
@@ -176,7 +177,7 @@ func (r *AwsRepository) DeleteRecord(ctx context.Context, zoneID string, record 
 		rrs.ResourceRecords = nil
 		rrs.AliasTarget = &r53types.AliasTarget{
 			DNSName:              awssdk.String(record.AliasTarget),
-			HostedZoneId:         awssdk.String(zoneID),
+			HostedZoneId:         awssdk.String(record.AliasHostedZoneId),
 			EvaluateTargetHealth: false,
 		}
 	}
