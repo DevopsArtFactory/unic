@@ -16,7 +16,7 @@ func applyFilter[T Filterable](items []T, query string) []T {
 	q := strings.ToLower(query)
 	var result []T
 	for _, item := range items {
-		if strings.Contains(item.FilterText(), q) {
+		if strings.Contains(strings.ToLower(item.FilterText()), q) {
 			result = append(result, item)
 		}
 	}
