@@ -13,6 +13,41 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
+func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case contextsLoadedMsg:
+		m.ctxList = msg.contexts
+		m.filteredCtxList = msg.contexts
+		m.ctxIdx = 0
+		m.ctxFilterInput = ""
+		m.ctxFilterActive = false
+		for i, ctx := range m.filteredCtxList {
+			if ctx.Current {
+				m.ctxIdx = i
+				break
+			}
+		}
+		m.screen = screenContextPicker
+		return m, nil, true
+
+	case ssoLoginDoneMsg:
+		if msg.err != nil {
+			m.errMsg = fmt.Sprintf("SSO login failed: %s", msg.err)
+			m.screen = screenError
+			return m, tea.ClearScreen, true
+		}
+		return m, m.finalizeContextSwitch(), true
+
+	case contextSwitchedMsg:
+		m.cfg = msg.cfg
+		m.callerIdentity = msg.identity
+		m.awsRepo = nil
+		m.screen = m.ctxPrevScreen
+		return m, tea.ClearScreen, true
+	}
+	return m, nil, false
+}
+
 func (m Model) loadContexts() tea.Cmd {
 	return func() tea.Msg {
 		contexts, err := config.Contexts(m.configPath)
@@ -26,23 +61,15 @@ func (m Model) loadContexts() tea.Cmd {
 func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	// If filter is active, handle text input
 	if m.ctxFilterActive {
-		switch key {
-		case "esc":
+		newFilter, deactivate, changed := handleFilterKey(key, m.ctxFilterInput)
+		m.ctxFilterInput = newFilter
+		if deactivate {
 			m.ctxFilterActive = false
-		case "enter":
-			m.ctxFilterActive = false
-		case "backspace":
-			if len(m.ctxFilterInput) > 0 {
-				m.ctxFilterInput = m.ctxFilterInput[:len(m.ctxFilterInput)-1]
-				m.applyCtxFilter()
-			}
-		default:
-			if len(key) == 1 {
-				m.ctxFilterInput += key
-				m.applyCtxFilter()
-			}
+		}
+		if changed {
+			m.filteredCtxList = applyFilter(m.ctxList, m.ctxFilterInput)
+			m.ctxIdx = 0
 		}
 		return m, nil
 	}
@@ -91,21 +118,6 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) applyCtxFilter() {
-	if m.ctxFilterInput == "" {
-		m.filteredCtxList = m.ctxList
-	} else {
-		query := strings.ToLower(m.ctxFilterInput)
-		var result []config.ContextInfo
-		for _, ctx := range m.ctxList {
-			if strings.Contains(ctx.FilterText(), query) {
-				result = append(result, ctx)
-			}
-		}
-		m.filteredCtxList = result
-	}
-	m.ctxIdx = 0
-}
 
 func (m Model) switchContext(name string) tea.Cmd {
 	return func() tea.Msg {

@@ -10,26 +10,61 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
+func (m Model) handleEC2VPCMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case instancesLoadedMsg:
+		m.instances = msg.instances
+		m.filtered = msg.instances
+		m.instIdx = 0
+		m.screen = screenInstanceList
+		return m, nil, true
+
+	case vpcsLoadedMsg:
+		m.vpcs = msg.vpcs
+		m.filteredVPCs = msg.vpcs
+		m.vpcIdx = 0
+		m.screen = screenVPCList
+		return m, nil, true
+
+	case subnetsLoadedMsg:
+		m.subnets = msg.subnets
+		m.subnetIdx = 0
+		m.screen = screenSubnetList
+		return m, nil, true
+
+	case availableIPsLoadedMsg:
+		m.availableIPs = msg.ips
+		m.filteredIPs = msg.ips
+		m.ipScrollOffset = 0
+		m.ipFilter = ""
+		m.ipFilterActive = false
+		m.screen = screenSubnetDetail
+		return m, nil, true
+
+	case ssmSessionDoneMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil, true
+		}
+		m.screen = screenInstanceList
+		return m, nil, true
+	}
+	return m, nil, false
+}
+
 func (m Model) updateInstanceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	// If filter is active, handle text input
 	if m.filterActive {
-		switch key {
-		case "esc":
+		newFilter, deactivate, changed := handleFilterKey(key, m.filterInput)
+		m.filterInput = newFilter
+		if deactivate {
 			m.filterActive = false
-		case "enter":
-			m.filterActive = false
-		case "backspace":
-			if len(m.filterInput) > 0 {
-				m.filterInput = m.filterInput[:len(m.filterInput)-1]
-				m.applyFilter()
-			}
-		default:
-			if len(key) == 1 {
-				m.filterInput += key
-				m.applyFilter()
-			}
+		}
+		if changed {
+			m.filtered = applyFilter(m.instances, m.filterInput)
+			m.instIdx = 0
 		}
 		return m, nil
 	}
@@ -63,21 +98,6 @@ func (m Model) updateInstanceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) applyFilter() {
-	if m.filterInput == "" {
-		m.filtered = m.instances
-	} else {
-		query := strings.ToLower(m.filterInput)
-		var result []awsservice.EC2Instance
-		for _, inst := range m.instances {
-			if strings.Contains(inst.FilterText(), query) {
-				result = append(result, inst)
-			}
-		}
-		m.filtered = result
-	}
-	m.instIdx = 0
-}
 
 func (m Model) loadInstances() tea.Cmd {
 	return func() tea.Msg {

@@ -20,6 +20,53 @@ type sgRefreshedMsg struct {
 	err error
 }
 
+func (m Model) handleSecurityGroupMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case securityGroupsLoadedMsg:
+		m.securityGroups = msg.securityGroups
+		m.filteredSecurityGroups = msg.securityGroups
+		m.sgIdx = 0
+		m.screen = screenSecurityGroupList
+		return m, nil, true
+
+	case sgRuleAddedMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil, true
+		}
+		return m, m.refreshSecurityGroup(), true
+
+	case sgRuleDeletedMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil, true
+		}
+		return m, m.refreshSecurityGroup(), true
+
+	case sgRefreshedMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil, true
+		}
+		m.selectedSecurityGroup = msg.sg
+		for i, sg := range m.securityGroups {
+			if sg.GroupID == msg.sg.GroupID {
+				m.securityGroups[i] = *msg.sg
+				break
+			}
+		}
+		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.sgFilter)
+		m.sgIdx = 0
+		m.sgRuleIdx = 0
+		m.screen = screenSecurityGroupDetail
+		return m, nil, true
+	}
+	return m, nil, false
+}
+
 // --- Commands ---
 
 func (m Model) loadSecurityGroups() tea.Cmd {
@@ -119,21 +166,14 @@ func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if m.sgFilterActive {
-		switch key {
-		case "esc":
+		newFilter, deactivate, changed := handleFilterKey(key, m.sgFilter)
+		m.sgFilter = newFilter
+		if deactivate {
 			m.sgFilterActive = false
-		case "enter":
-			m.sgFilterActive = false
-		case "backspace":
-			if len(m.sgFilter) > 0 {
-				m.sgFilter = m.sgFilter[:len(m.sgFilter)-1]
-				m.applySecurityGroupFilter()
-			}
-		default:
-			if len(key) == 1 {
-				m.sgFilter += key
-				m.applySecurityGroupFilter()
-			}
+		}
+		if changed {
+			m.filteredSecurityGroups = applyFilter(m.securityGroups, m.sgFilter)
+			m.sgIdx = 0
 		}
 		return m, nil
 	}
@@ -171,21 +211,6 @@ func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) applySecurityGroupFilter() {
-	if m.sgFilter == "" {
-		m.filteredSecurityGroups = m.securityGroups
-	} else {
-		query := strings.ToLower(m.sgFilter)
-		var result []awsservice.SecurityGroup
-		for _, sg := range m.securityGroups {
-			if strings.Contains(sg.FilterText(), query) {
-				result = append(result, sg)
-			}
-		}
-		m.filteredSecurityGroups = result
-	}
-	m.sgIdx = 0
-}
 
 func (m Model) viewSecurityGroupList() string {
 	var b strings.Builder

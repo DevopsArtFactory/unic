@@ -11,25 +11,66 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
+func (m Model) handleRDSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case rdsInstancesLoadedMsg:
+		m.rdsInstances = msg.instances
+		m.filteredRDS = msg.instances
+		m.rdsIdx = 0
+		m.screen = screenRDSList
+		return m, nil, true
+
+	case rdsActionDoneMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil, true
+		}
+		m.rdsPolling = true
+		m.screen = screenRDSDetail
+		return m, m.tickRDSPoll(msg.instanceID), true
+
+	case rdsStatusRefreshedMsg:
+		if msg.err != nil {
+			m.rdsPolling = false
+			return m, nil, true
+		}
+		m.selectedRDS = msg.instance
+		for i, inst := range m.rdsInstances {
+			if inst.DBInstanceID == msg.instance.DBInstanceID {
+				m.rdsInstances[i] = *msg.instance
+				break
+			}
+		}
+		m.filteredRDS = applyFilter(m.rdsInstances, m.rdsFilter)
+		m.rdsIdx = 0
+		if awsservice.IsTransitionalStatus(msg.instance.Status) {
+			return m, m.tickRDSPoll(msg.instance.DBInstanceID), true
+		}
+		m.rdsPolling = false
+		return m, nil, true
+
+	case rdsTickMsg:
+		if m.rdsPolling {
+			return m, m.pollRDSStatus(msg.instanceID), true
+		}
+		return m, nil, true
+	}
+	return m, nil, false
+}
+
 func (m Model) updateRDSList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if m.rdsFilterActive {
-		switch key {
-		case "esc":
+		newFilter, deactivate, changed := handleFilterKey(key, m.rdsFilter)
+		m.rdsFilter = newFilter
+		if deactivate {
 			m.rdsFilterActive = false
-		case "enter":
-			m.rdsFilterActive = false
-		case "backspace":
-			if len(m.rdsFilter) > 0 {
-				m.rdsFilter = m.rdsFilter[:len(m.rdsFilter)-1]
-				m.applyRDSFilter()
-			}
-		default:
-			if len(key) == 1 {
-				m.rdsFilter += key
-				m.applyRDSFilter()
-			}
+		}
+		if changed {
+			m.filteredRDS = applyFilter(m.rdsInstances, m.rdsFilter)
+			m.rdsIdx = 0
 		}
 		return m, nil
 	}
@@ -136,21 +177,6 @@ func (m Model) updateRDSConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) applyRDSFilter() {
-	if m.rdsFilter == "" {
-		m.filteredRDS = m.rdsInstances
-	} else {
-		query := strings.ToLower(m.rdsFilter)
-		var result []awsservice.RDSInstance
-		for _, inst := range m.rdsInstances {
-			if strings.Contains(inst.FilterText(), query) {
-				result = append(result, inst)
-			}
-		}
-		m.filteredRDS = result
-	}
-	m.rdsIdx = 0
-}
 
 func (m Model) loadRDSInstances() tea.Cmd {
 	return func() tea.Msg {

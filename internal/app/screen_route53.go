@@ -12,25 +12,73 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
+func (m Model) handleRoute53Msg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case route53ZonesLoadedMsg:
+		m.route53Zones = msg.zones
+		m.filteredRoute53Zones = msg.zones
+		m.route53ZoneIdx = 0
+		m.screen = screenRoute53ZoneList
+		return m, nil, true
+
+	case route53RecordsLoadedMsg:
+		m.route53Records = msg.records
+		m.filteredRoute53Records = msg.records
+		m.route53RecordIdx = 0
+		m.screen = screenRoute53RecordList
+		return m, nil, true
+
+	case route53ActionDoneMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			m.screen = screenError
+			return m, nil, true
+		}
+		m.route53ChangeID = msg.changeID
+		m.route53ChangeStatus = "PENDING"
+		m.route53Polling = true
+		if m.selectedRoute53Zone != nil {
+			return m, tea.Batch(
+				m.loadRoute53Records(m.selectedRoute53Zone.ID),
+				m.pollRoute53ChangeStatus(),
+			), true
+		}
+		m.screen = screenRoute53RecordList
+		return m, nil, true
+
+	case route53ChangeStatusMsg:
+		if msg.err != nil {
+			m.route53Polling = false
+			return m, nil, true
+		}
+		m.route53ChangeStatus = msg.status
+		if msg.status == "INSYNC" {
+			m.route53Polling = false
+			return m, nil, true
+		}
+		return m, m.tickRoute53Poll(), true
+
+	case route53PollTickMsg:
+		if m.route53Polling {
+			return m, m.pollRoute53ChangeStatus(), true
+		}
+		return m, nil, true
+	}
+	return m, nil, false
+}
+
 func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if m.route53ZoneFilterActive {
-		switch key {
-		case "esc":
+		newFilter, deactivate, changed := handleFilterKey(key, m.route53ZoneFilter)
+		m.route53ZoneFilter = newFilter
+		if deactivate {
 			m.route53ZoneFilterActive = false
-		case "enter":
-			m.route53ZoneFilterActive = false
-		case "backspace":
-			if len(m.route53ZoneFilter) > 0 {
-				m.route53ZoneFilter = m.route53ZoneFilter[:len(m.route53ZoneFilter)-1]
-				m.applyRoute53ZoneFilter()
-			}
-		default:
-			if len(key) == 1 {
-				m.route53ZoneFilter += key
-				m.applyRoute53ZoneFilter()
-			}
+		}
+		if changed {
+			m.filteredRoute53Zones = applyFilter(m.route53Zones, m.route53ZoneFilter)
+			m.route53ZoneIdx = 0
 		}
 		return m, nil
 	}
@@ -66,21 +114,14 @@ func (m Model) updateRoute53RecordList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if m.route53RecordFilterActive {
-		switch key {
-		case "esc":
+		newFilter, deactivate, changed := handleFilterKey(key, m.route53RecordFilter)
+		m.route53RecordFilter = newFilter
+		if deactivate {
 			m.route53RecordFilterActive = false
-		case "enter":
-			m.route53RecordFilterActive = false
-		case "backspace":
-			if len(m.route53RecordFilter) > 0 {
-				m.route53RecordFilter = m.route53RecordFilter[:len(m.route53RecordFilter)-1]
-				m.applyRoute53RecordFilter()
-			}
-		default:
-			if len(key) == 1 {
-				m.route53RecordFilter += key
-				m.applyRoute53RecordFilter()
-			}
+		}
+		if changed {
+			m.filteredRoute53Records = applyFilter(m.route53Records, m.route53RecordFilter)
+			m.route53RecordIdx = 0
 		}
 		return m, nil
 	}
@@ -154,37 +195,6 @@ func (m Model) updateRoute53RecordDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) applyRoute53ZoneFilter() {
-	if m.route53ZoneFilter == "" {
-		m.filteredRoute53Zones = m.route53Zones
-	} else {
-		query := strings.ToLower(m.route53ZoneFilter)
-		var result []awsservice.HostedZone
-		for _, zone := range m.route53Zones {
-			if strings.Contains(zone.FilterText(), query) {
-				result = append(result, zone)
-			}
-		}
-		m.filteredRoute53Zones = result
-	}
-	m.route53ZoneIdx = 0
-}
-
-func (m *Model) applyRoute53RecordFilter() {
-	if m.route53RecordFilter == "" {
-		m.filteredRoute53Records = m.route53Records
-	} else {
-		query := strings.ToLower(m.route53RecordFilter)
-		var result []awsservice.DNSRecord
-		for _, rec := range m.route53Records {
-			if strings.Contains(rec.FilterText(), query) {
-				result = append(result, rec)
-			}
-		}
-		m.filteredRoute53Records = result
-	}
-	m.route53RecordIdx = 0
-}
 
 func (m Model) loadRoute53Zones() tea.Cmd {
 	return func() tea.Msg {
