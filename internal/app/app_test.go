@@ -730,14 +730,196 @@ func TestIAMFeatureListContainsSeparateActions(t *testing.T) {
 		}
 	}
 
-	if len(m.features) != 2 {
-		t.Fatalf("expected 2 IAM features, got %d", len(m.features))
+	if len(m.features) != 3 {
+		t.Fatalf("expected 3 IAM features, got %d", len(m.features))
 	}
-	if m.features[0].Kind != domain.FeatureListAccessKeys {
-		t.Fatalf("expected first IAM feature ListAccessKeys, got %s", m.features[0].Kind)
+	if m.features[0].Kind != domain.FeatureIAMUsersBrowser {
+		t.Fatalf("expected first IAM feature IAMUsersBrowser, got %s", m.features[0].Kind)
 	}
-	if m.features[1].Kind != domain.FeatureRotateAccessKey {
-		t.Fatalf("expected second IAM feature RotateAccessKey, got %s", m.features[1].Kind)
+	if m.features[1].Kind != domain.FeatureListAccessKeys {
+		t.Fatalf("expected second IAM feature ListAccessKeys, got %s", m.features[1].Kind)
+	}
+	if m.features[2].Kind != domain.FeatureRotateAccessKey {
+		t.Fatalf("expected third IAM feature RotateAccessKey, got %s", m.features[2].Kind)
+	}
+}
+
+func TestIAMUserFeatureUsesUserBrowserFlow(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+
+	for _, svc := range m.services {
+		if svc.Name == domain.ServiceIAM {
+			m.features = svc.Features
+			break
+		}
+	}
+	m.screen = screenFeatureList
+	m.featIdx = 0
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Fatalf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected load IAM users command")
+	}
+}
+
+func TestIAMUserListEnterGoesToDetailLoad(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenIAMUserList
+	m.iamUsers = []awsservice.IAMUser{
+		{UserName: "alice"},
+	}
+	m.filteredIAMUsers = m.iamUsers
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Fatalf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected load IAM user detail command")
+	}
+}
+
+func TestIAMUserListNextPageStartsIncrementalLoad(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenIAMUserList
+	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
+	m.filteredIAMUsers = m.iamUsers
+	m.iamUserHasMore = true
+	m.iamUserNextMarker = "page-2"
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	model := updated.(Model)
+	if !model.iamUserLoadingMore {
+		t.Fatal("expected IAM user incremental loading to start")
+	}
+	if model.screen != screenIAMUserList {
+		t.Fatalf("expected IAM user list screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected load next IAM user page command")
+	}
+}
+
+func TestIAMUserListFilterStartsBackgroundSummaryLoad(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenIAMUserList
+	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
+	m.filteredIAMUsers = m.iamUsers
+	m.iamUserHasMore = true
+	m.iamUserNextMarker = "page-2"
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model := updated.(Model)
+	if !model.iamUserFilterActive {
+		t.Fatal("expected IAM user filter to activate")
+	}
+	if !model.iamUserLoadingMore {
+		t.Fatal("expected background username loading for filter")
+	}
+	if cmd == nil {
+		t.Fatal("expected background summary load command")
+	}
+}
+
+func TestHandleIAMUsersLoadedMsgAppendsPage(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenIAMUserList
+	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
+	m.filteredIAMUsers = m.iamUsers
+	m.iamUserLoadingMore = true
+
+	updated, _, handled := m.handleIAMMsg(iamUsersLoadedMsg{
+		users:      []awsservice.IAMUser{{UserName: "bob"}},
+		append:     true,
+		hasMore:    true,
+		nextMarker: "page-3",
+	})
+	if !handled {
+		t.Fatal("expected IAM users message to be handled")
+	}
+
+	model := updated.(Model)
+	if len(model.iamUsers) != 2 {
+		t.Fatalf("expected 2 IAM users after append, got %d", len(model.iamUsers))
+	}
+	if model.iamUserLoadingMore {
+		t.Fatal("expected loading-more flag to be cleared")
+	}
+	if !model.iamUserHasMore {
+		t.Fatal("expected hasMore to remain true")
+	}
+	if model.iamUserNextMarker != "page-3" {
+		t.Fatalf("expected next marker page-3, got %q", model.iamUserNextMarker)
+	}
+}
+
+func TestIAMUserDetailShowsGroupsPoliciesAndKeys(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenIAMUserDetail
+	m.selectedIAMUser = &awsservice.IAMUserDetail{
+		IAMUser: awsservice.IAMUser{
+			UserName:         "alice",
+			UserID:           "AIDA1234",
+			ARN:              "arn:aws:iam::123456789012:user/alice",
+			Path:             "/engineering/",
+			CreateDate:       time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			LastActivity:     time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+			PasswordLastUsed: time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC),
+			MFAEnabled:       true,
+		},
+		Groups:           []string{"admins"},
+		AttachedPolicies: []string{"ReadOnlyAccess"},
+		AccessKeys: []awsservice.AccessKey{
+			{
+				AccessKeyID: "AKIATEST",
+				Status:      "Active",
+				CreateDate:  time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC),
+				LastUsed:    time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	view := m.viewIAMUserDetail()
+	if !strings.Contains(view, "admins") {
+		t.Fatalf("expected groups in detail view, got %q", view)
+	}
+	if !strings.Contains(view, "ReadOnlyAccess") {
+		t.Fatalf("expected attached policies in detail view, got %q", view)
+	}
+	if !strings.Contains(view, "AKIATEST") {
+		t.Fatalf("expected access key list in detail view, got %q", view)
+	}
+}
+
+func TestIAMUserListShowsLoadMoreHint(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenIAMUserList
+	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
+	m.filteredIAMUsers = m.iamUsers
+	m.iamUserHasMore = true
+
+	view := m.viewIAMUserList()
+	if !strings.Contains(view, "Press n to load the next page") {
+		t.Fatalf("expected load-more hint in IAM user list view, got %q", view)
+	}
+}
+
+func TestIAMUserListShowsFilterBackgroundLoadHint(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenIAMUserList
+	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
+	m.filteredIAMUsers = m.iamUsers
+	m.iamUserFilterActive = true
+	m.iamUserLoadingMore = true
+
+	view := m.viewIAMUserList()
+	if !strings.Contains(view, "Loading remaining IAM usernames for filter") {
+		t.Fatalf("expected filter background load hint, got %q", view)
 	}
 }
 
@@ -893,7 +1075,7 @@ func TestRotateAccessKeyFeatureUsesCurrentIdentityFlow(t *testing.T) {
 		}
 	}
 	m.screen = screenFeatureList
-	m.featIdx = 1
+	m.featIdx = 2
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)

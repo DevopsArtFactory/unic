@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,8 +16,33 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
+const iamUserPageSize = 25
+const iamUserFilterPageSize = 100
+
 func (m Model) handleIAMMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
+	case iamUsersLoadedMsg:
+		if msg.append {
+			m.iamUsers = append(m.iamUsers, msg.users...)
+		} else {
+			m.iamUsers = msg.users
+			m.iamUserIdx = 0
+		}
+		sort.Slice(m.iamUsers, func(i, j int) bool {
+			return strings.ToLower(m.iamUsers[i].UserName) < strings.ToLower(m.iamUsers[j].UserName)
+		})
+		m.iamUserLoadingMore = false
+		m.iamUserHasMore = msg.hasMore
+		m.iamUserNextMarker = msg.nextMarker
+		m.refreshIAMUserFilter()
+		m.screen = screenIAMUserList
+		return m, nil, true
+
+	case iamUserDetailLoadedMsg:
+		m.selectedIAMUser = msg.user
+		m.screen = screenIAMUserDetail
+		return m, nil, true
+
 	case iamKeysLoadedMsg:
 		m.iamKeys = msg.keys
 		m.iamKeyIdx = 0
@@ -70,6 +96,96 @@ func (m Model) handleIAMMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 	}
 	return m, nil, false
+}
+
+func (m Model) loadIAMUsers() tea.Cmd {
+	return m.loadIAMUsersPage("", false)
+}
+
+func (m Model) loadIAMUsersPage(marker string, appendPage bool) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo := m.awsRepo
+		if repo == nil {
+			var err error
+			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
+			if err != nil {
+				return errMsg{err: err}
+			}
+			m.awsRepo = repo
+		}
+
+		page, err := repo.ListIAMUserSummariesPage(ctx, marker, iamUserPageSize)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		if len(page.Users) == 0 && !appendPage {
+			return errMsg{err: fmt.Errorf("no IAM users found")}
+		}
+		return iamUsersLoadedMsg{
+			users:      page.Users,
+			append:     appendPage,
+			hasMore:    page.HasMore,
+			nextMarker: page.NextMarker,
+		}
+	}
+}
+
+func (m Model) loadAllIAMUserSummaries(marker string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo := m.awsRepo
+		if repo == nil {
+			var err error
+			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
+			if err != nil {
+				return errMsg{err: err}
+			}
+			m.awsRepo = repo
+		}
+
+		var users []awsservice.IAMUser
+		nextMarker := marker
+		for nextMarker != "" {
+			page, err := repo.ListIAMUserSummariesPage(ctx, nextMarker, iamUserFilterPageSize)
+			if err != nil {
+				return errMsg{err: err}
+			}
+			users = append(users, page.Users...)
+			if !page.HasMore || page.NextMarker == "" {
+				nextMarker = ""
+				break
+			}
+			nextMarker = page.NextMarker
+		}
+
+		return iamUsersLoadedMsg{
+			users:      users,
+			append:     true,
+			hasMore:    false,
+			nextMarker: "",
+		}
+	}
+}
+
+func (m Model) loadIAMUserDetail(userName string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		repo := m.awsRepo
+		if repo == nil {
+			var err error
+			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
+			if err != nil {
+				return errMsg{err: err}
+			}
+		}
+
+		user, err := repo.GetIAMUserDetail(ctx, userName)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return iamUserDetailLoadedMsg{user: user}
+	}
 }
 
 func (m Model) loadIAMKeys() tea.Cmd {
@@ -210,6 +326,85 @@ func (m Model) iamApplyActionLine() string {
 	return dimStyle.Render(fmt.Sprintf("  [a] Apply to ~/.aws/credentials and verify (disabled for auth:%s)", authType))
 }
 
+func (m Model) updateIAMUserList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	if m.iamUserFilterActive {
+		newFilter, deactivate, changed := handleFilterKey(key, m.iamUserFilter)
+		m.iamUserFilter = newFilter
+		if deactivate {
+			m.iamUserFilterActive = false
+		}
+		if changed {
+			m.refreshIAMUserFilter()
+		}
+		return m, nil
+	}
+
+	switch key {
+	case "q", "esc":
+		m.screen = screenFeatureList
+		m.selectedIAMUser = nil
+		m.iamUserFilter = ""
+		m.iamUserLoadingMore = false
+		m.iamUserHasMore = false
+		m.iamUserNextMarker = ""
+		m.filteredIAMUsers = nil
+		m.iamUserIdx = 0
+	case "up", "k":
+		if m.iamUserIdx > 0 {
+			m.iamUserIdx--
+		}
+	case "down", "j":
+		if m.iamUserIdx < len(m.filteredIAMUsers)-1 {
+			m.iamUserIdx++
+		}
+	case "/":
+		m.iamUserFilterActive = true
+		if m.iamUserHasMore && !m.iamUserLoadingMore {
+			m.iamUserLoadingMore = true
+			return m, m.loadAllIAMUserSummaries(m.iamUserNextMarker)
+		}
+	case "enter":
+		if len(m.filteredIAMUsers) > 0 && m.iamUserIdx < len(m.filteredIAMUsers) {
+			selected := m.filteredIAMUsers[m.iamUserIdx]
+			m.screen = screenLoading
+			return m, m.loadIAMUserDetail(selected.UserName)
+		}
+	case "n":
+		if m.iamUserHasMore && !m.iamUserLoadingMore {
+			m.iamUserLoadingMore = true
+			return m, m.loadIAMUsersPage(m.iamUserNextMarker, true)
+		}
+	}
+	return m, nil
+}
+
+func (m *Model) refreshIAMUserFilter() {
+	if m.iamUserFilter == "" {
+		m.filteredIAMUsers = m.iamUsers
+	} else {
+		m.filteredIAMUsers = applyFilter(m.iamUsers, m.iamUserFilter)
+	}
+
+	if len(m.filteredIAMUsers) == 0 {
+		m.iamUserIdx = 0
+		return
+	}
+	if m.iamUserIdx >= len(m.filteredIAMUsers) {
+		m.iamUserIdx = len(m.filteredIAMUsers) - 1
+	}
+}
+
+func (m Model) updateIAMUserDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.selectedIAMUser = nil
+		m.screen = screenIAMUserList
+	}
+	return m, nil
+}
+
 func (m Model) updateIAMKeyList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
@@ -321,6 +516,150 @@ func (m Model) updateIAMKeyRotateResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // --- View functions ---
+
+func (m Model) viewIAMUserList() string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render("IAM Users"))
+	b.WriteString("\n")
+
+	if m.iamUserFilterActive {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.iamUserFilter)))
+	} else if m.iamUserFilter != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.iamUserFilter)))
+	}
+	b.WriteString("\n\n")
+
+	if len(m.filteredIAMUsers) == 0 {
+		b.WriteString(dimStyle.Render("  No matching IAM users"))
+		b.WriteString("\n")
+	} else {
+		maxName := len("USERNAME")
+		for _, user := range m.filteredIAMUsers {
+			if len(user.UserName) > maxName {
+				maxName = len(user.UserName)
+			}
+		}
+
+		nameCol := lipgloss.NewStyle().Width(maxName + 2)
+		createdCol := lipgloss.NewStyle().Width(12)
+		pathCol := lipgloss.NewStyle().Width(24)
+
+		b.WriteString(dimStyle.Render(
+			"  " +
+				nameCol.Render("USERNAME") +
+				createdCol.Render("CREATED") +
+				"PATH",
+		))
+		b.WriteString("\n")
+
+		visibleLines := max(m.height-9, 5)
+		start := 0
+		if m.iamUserIdx >= visibleLines {
+			start = m.iamUserIdx - visibleLines + 1
+		}
+		end := min(start+visibleLines, len(m.filteredIAMUsers))
+
+		for i := start; i < end; i++ {
+			user := m.filteredIAMUsers[i]
+			cursor := "  "
+			style := normalStyle
+			if i == m.iamUserIdx {
+				cursor = "> "
+				style = selectedStyle
+			}
+
+			row := cursor +
+				nameCol.Inherit(style).Render(user.UserName) +
+				createdCol.Inherit(dimStyle).Render(user.CreateDate.Format(time.DateOnly)) +
+				pathCol.Inherit(dimStyle).Render(truncateIAMPath(user.Path))
+			b.WriteString(row)
+			b.WriteString("\n")
+		}
+
+		b.WriteString("\n")
+		status := fmt.Sprintf("  %d/%d loaded IAM users", len(m.filteredIAMUsers), len(m.iamUsers))
+		if m.iamUserHasMore {
+			status += " • more available"
+		}
+		b.WriteString(dimStyle.Render(status))
+	}
+
+	if m.iamUserLoadingMore {
+		b.WriteString("\n")
+		if m.iamUserFilterActive || m.iamUserFilter != "" {
+			b.WriteString(filterStyle.Render("  Loading remaining IAM usernames for filter..."))
+		} else {
+			b.WriteString(filterStyle.Render("  Loading more IAM users..."))
+		}
+	} else if m.iamUserHasMore {
+		b.WriteString("\n")
+		if m.iamUserFilterActive || m.iamUserFilter != "" {
+			b.WriteString(dimStyle.Render("  Continue typing to filter loaded usernames"))
+		} else {
+			b.WriteString(dimStyle.Render("  Press n to load the next page"))
+		}
+	}
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • n: next page • enter: detail • esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) viewIAMUserDetail() string {
+	if m.selectedIAMUser == nil {
+		return ""
+	}
+
+	u := m.selectedIAMUser
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render("IAM User Detail"))
+	b.WriteString("\n\n")
+
+	labelStyle := lipgloss.NewStyle().Width(18)
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("User Name"), u.UserName)))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("User ID"), u.UserID)))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("ARN"), u.ARN)))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Path"), u.Path)))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Created"), u.CreateDate.Format(time.DateOnly))))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Console Last Used"), u.PasswordLastUsedDisplay())))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Last Activity"), u.LastActivityDisplay())))
+	b.WriteString("\n")
+
+	mfaText := dimStyle.Render("Disabled")
+	if u.MFAEnabled {
+		mfaText = selectedStyle.Render("Enabled")
+	}
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("MFA"), mfaText)))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%d", labelStyle.Render("Access Keys"), len(u.AccessKeys))))
+	b.WriteString("\n\n")
+
+	b.WriteString(titleStyle.Render("Groups"))
+	b.WriteString("\n")
+	b.WriteString(renderIAMTextList(u.Groups))
+	b.WriteString("\n\n")
+
+	b.WriteString(titleStyle.Render("Attached Policies"))
+	b.WriteString("\n")
+	b.WriteString(renderIAMTextList(u.AttachedPolicies))
+	b.WriteString("\n\n")
+
+	b.WriteString(titleStyle.Render("Access Keys"))
+	b.WriteString("\n")
+	b.WriteString(renderIAMAccessKeyList(u.AccessKeys))
+	b.WriteString("\n\n")
+
+	b.WriteString(dimStyle.Render("esc: back • H: home"))
+	return b.String()
+}
 
 func (m Model) viewIAMKeyList() string {
 	var b strings.Builder
@@ -544,4 +883,47 @@ func (m Model) viewIAMKeyRotateResult() string {
 	b.WriteString("\n\n")
 	b.WriteString(dimStyle.Render("  esc: back to key list"))
 	return b.String()
+}
+
+func renderIAMTextList(items []string) string {
+	if len(items) == 0 {
+		return dimStyle.Render("  None")
+	}
+
+	var b strings.Builder
+	for _, item := range items {
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  - %s", item)))
+		b.WriteString("\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func renderIAMAccessKeyList(keys []awsservice.AccessKey) string {
+	if len(keys) == 0 {
+		return dimStyle.Render("  None")
+	}
+
+	var b strings.Builder
+	for _, key := range keys {
+		lastUsed := "never"
+		if !key.LastUsed.IsZero() {
+			lastUsed = key.LastUsed.Format(time.DateOnly)
+		}
+		line := fmt.Sprintf("  %s [%s] created:%s last:%s",
+			key.AccessKeyID, key.Status, key.CreateDate.Format(time.DateOnly), lastUsed)
+		if key.IsAged() {
+			b.WriteString(errorStyle.Render(line))
+		} else {
+			b.WriteString(normalStyle.Render(line))
+		}
+		b.WriteString("\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func truncateIAMPath(path string) string {
+	if len(path) <= 22 {
+		return path
+	}
+	return path[:19] + "..."
 }

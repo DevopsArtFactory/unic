@@ -118,6 +118,17 @@ type securityGroupsLoadedMsg struct {
 	securityGroups []awsservice.SecurityGroup
 }
 
+type iamUsersLoadedMsg struct {
+	users      []awsservice.IAMUser
+	append     bool
+	hasMore    bool
+	nextMarker string
+}
+
+type iamUserDetailLoadedMsg struct {
+	user *awsservice.IAMUserDetail
+}
+
 type iamKeysLoadedMsg struct {
 	keys []awsservice.AccessKey
 }

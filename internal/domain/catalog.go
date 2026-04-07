@@ -65,6 +65,10 @@ func Catalog() []Service {
 			Name: ServiceIAM,
 			Features: []Feature{
 				{
+					Kind:        FeatureIAMUsersBrowser,
+					Description: "Browse IAM users, MFA status, groups, policies, and access keys",
+				},
+				{
 					Kind:        FeatureListAccessKeys,
 					Description: "List IAM access keys with status, age, and last used date",
 				},

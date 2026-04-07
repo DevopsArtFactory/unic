@@ -3,18 +3,17 @@ package aws
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"unic/internal/config"
@@ -79,6 +78,11 @@ type SecretsManagerClientAPI interface {
 
 // IAMClientAPI is the interface for IAM operations used by AwsRepository.
 type IAMClientAPI interface {
+	ListUsers(ctx context.Context, params *iam.ListUsersInput, optFns ...func(*iam.Options)) (*iam.ListUsersOutput, error)
+	GetUser(ctx context.Context, params *iam.GetUserInput, optFns ...func(*iam.Options)) (*iam.GetUserOutput, error)
+	ListGroupsForUser(ctx context.Context, params *iam.ListGroupsForUserInput, optFns ...func(*iam.Options)) (*iam.ListGroupsForUserOutput, error)
+	ListAttachedUserPolicies(ctx context.Context, params *iam.ListAttachedUserPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedUserPoliciesOutput, error)
+	ListMFADevices(ctx context.Context, params *iam.ListMFADevicesInput, optFns ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error)
 	ListAccessKeys(ctx context.Context, params *iam.ListAccessKeysInput, optFns ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error)
 	GetAccessKeyLastUsed(ctx context.Context, params *iam.GetAccessKeyLastUsedInput, optFns ...func(*iam.Options)) (*iam.GetAccessKeyLastUsedOutput, error)
 	CreateAccessKey(ctx context.Context, params *iam.CreateAccessKeyInput, optFns ...func(*iam.Options)) (*iam.CreateAccessKeyOutput, error)
@@ -146,14 +150,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		}
 
 	case config.AuthTypeCredential:
-		// Use ~/.aws/credentials via the configured profile
-		opts := []func(*awsconfig.LoadOptions) error{
-			awsconfig.WithRegion(cfg.Region),
-		}
-		if cfg.Profile != "" {
-			opts = append(opts, awsconfig.WithSharedConfigProfile(cfg.Profile))
-		}
-		awsCfg, err = awsconfig.LoadDefaultConfig(ctx, opts...)
+		awsCfg, err = LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load AWS config: %w", err)
 		}
@@ -165,16 +162,9 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		}
 
 	default:
-		// Legacy / no auth_type — auto-detect from config fields
-		opts := []func(*awsconfig.LoadOptions) error{
-			awsconfig.WithRegion(cfg.Region),
-		}
-		envHasCreds := os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
-		if cfg.Profile != "" && !envHasCreds {
-			opts = append(opts, awsconfig.WithSharedConfigProfile(cfg.Profile))
-		}
-
-		awsCfg, err = awsconfig.LoadDefaultConfig(ctx, opts...)
+		// Legacy / no auth_type — auto-detect from config fields.
+		// When a profile is configured, prefer it over ambient env credentials.
+		awsCfg, err = LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load AWS config: %w", err)
 		}
@@ -203,6 +193,18 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 	}, nil
 }
 
+// LoadBaseConfig resolves AWS config for the requested region/profile.
+// An explicit profile takes precedence over ambient env credentials.
+func LoadBaseConfig(ctx context.Context, region, profile string) (aws.Config, error) {
+	opts := []func(*awsconfig.LoadOptions) error{
+		awsconfig.WithRegion(region),
+	}
+	if profile != "" {
+		opts = append(opts, awsconfig.WithSharedConfigProfile(profile))
+	}
+	return awsconfig.LoadDefaultConfig(ctx, opts...)
+}
+
 // GetCallerIdentity returns the AWS identity for this repository's credentials.
 func (r *AwsRepository) GetCallerIdentity(ctx context.Context) (*CallerIdentity, error) {
 	uniclog.Debug("aws", "calling GetCallerIdentity")
@@ -222,15 +224,7 @@ func (r *AwsRepository) GetCallerIdentity(ctx context.Context) (*CallerIdentity,
 // resolveAssumeRoleCredentials assumes a role and returns an aws.Config with temporary credentials.
 func resolveAssumeRoleCredentials(ctx context.Context, cfg *config.Config) (aws.Config, error) {
 	uniclog.Debug("aws", "resolving assume-role credentials", "role_arn", cfg.RoleArn)
-	opts := []func(*awsconfig.LoadOptions) error{
-		awsconfig.WithRegion(cfg.Region),
-	}
-	envHasCreds := os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
-	if cfg.Profile != "" && !envHasCreds {
-		opts = append(opts, awsconfig.WithSharedConfigProfile(cfg.Profile))
-	}
-
-	baseCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	baseCfg, err := LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
 	if err != nil {
 		return aws.Config{}, fmt.Errorf("failed to load AWS config: %w", err)
 	}
