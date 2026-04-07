@@ -128,6 +128,7 @@ contexts:
 | IAM | IAM User Browser (lightweight username pages, background filter expansion, detail drill-down) | ✅ Implemented |
 | IAM | Access Key Browser (list keys with status, age, last used) | ✅ Implemented |
 | IAM | Access Key Rotation (create → verify/apply → deactivate → delete) | ✅ Implemented |
+| ECS | ECS Exec Sessions (Clusters → Services → Tasks → Containers, exec session via `aws ecs execute-command`) | ✅ Implemented |
 
 ## TUI Key Bindings
 
@@ -201,6 +202,16 @@ contexts:
 | `f` | Enter filter pattern | Viewer |
 | `n` | Load more (older events) | Viewer |
 | `PgUp`/`PgDn` | Page scroll | Viewer |
+
+### ECS Exec Sessions
+
+| Key | Action | Screen |
+|-----|--------|--------|
+| `/` | Filter clusters/services | Cluster / Service list |
+| `r` | Refresh list | Cluster / Service / Task list |
+| `Enter` | Drill down (Cluster → Service → Task → Container) | Any list |
+| `Enter` | Start exec session (`/bin/sh`) | Container list |
+| `Esc` | Go back one level | Any screen |
 
 ### Context Switcher
 

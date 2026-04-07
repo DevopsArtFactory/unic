@@ -152,3 +152,23 @@ type iamKeyDeletedMsg struct {
 	keyID string
 	err   error
 }
+
+type ecsClustersLoadedMsg struct {
+	clusters []awsservice.ECSCluster
+}
+
+type ecsServicesLoadedMsg struct {
+	services []awsservice.ECSService
+}
+
+type ecsTasksLoadedMsg struct {
+	tasks []awsservice.ECSTask
+}
+
+type ecsContainersLoadedMsg struct {
+	containers []awsservice.ECSContainer
+}
+
+type ecsExecDoneMsg struct {
+	err error
+}

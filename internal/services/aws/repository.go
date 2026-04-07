@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -43,6 +44,9 @@ var _ STSClientAPI = (*sts.Client)(nil)
 
 // Verify *cloudwatchlogs.Client satisfies CloudWatchLogsClientAPI at compile time.
 var _ CloudWatchLogsClientAPI = (*cloudwatchlogs.Client)(nil)
+
+// Verify *ecs.Client satisfies ECSClientAPI at compile time.
+var _ ECSClientAPI = (*ecs.Client)(nil)
 
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
@@ -101,6 +105,16 @@ type CloudWatchLogsClientAPI interface {
 	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
+// ECSClientAPI is the interface for ECS operations used by AwsRepository.
+type ECSClientAPI interface {
+	ListClusters(ctx context.Context, params *ecs.ListClustersInput, optFns ...func(*ecs.Options)) (*ecs.ListClustersOutput, error)
+	DescribeClusters(ctx context.Context, params *ecs.DescribeClustersInput, optFns ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error)
+	ListServices(ctx context.Context, params *ecs.ListServicesInput, optFns ...func(*ecs.Options)) (*ecs.ListServicesOutput, error)
+	DescribeServices(ctx context.Context, params *ecs.DescribeServicesInput, optFns ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error)
+	ListTasks(ctx context.Context, params *ecs.ListTasksInput, optFns ...func(*ecs.Options)) (*ecs.ListTasksOutput, error)
+	DescribeTasks(ctx context.Context, params *ecs.DescribeTasksInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error)
+}
+
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
 	ec2.DescribeInstancesAPIClient
@@ -121,7 +135,7 @@ type CallerIdentity struct {
 	UserID  string
 }
 
-// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, Route53, STS, Secrets Manager, and IAM.
+// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, Route53, STS, Secrets Manager, IAM, CloudWatch Logs, and ECS.
 type AwsRepository struct {
 	EC2Client            EC2ClientAPI
 	SSMClient            SSMClientAPI
@@ -131,6 +145,7 @@ type AwsRepository struct {
 	IAMClient            IAMClientAPI
 	STSClient            STSClientAPI
 	CloudWatchLogsClient CloudWatchLogsClientAPI
+	ECSClient            ECSClientAPI
 	Region               string
 	Profile              string
 }
@@ -188,6 +203,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		IAMClient:            iam.NewFromConfig(awsCfg),
 		STSClient:            sts.NewFromConfig(awsCfg),
 		CloudWatchLogsClient: cloudwatchlogs.NewFromConfig(awsCfg),
+		ECSClient:            ecs.NewFromConfig(awsCfg),
 		Region:               cfg.Region,
 		Profile:              cfg.Profile,
 	}, nil

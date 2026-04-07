@@ -62,6 +62,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceECS,
+			Features: []Feature{
+				{
+					Kind:        FeatureECSExec,
+					Description: "Browse ECS clusters, services, tasks, and launch exec sessions",
+				},
+			},
+		},
+		{
 			Name: ServiceIAM,
 			Features: []Feature{
 				{
