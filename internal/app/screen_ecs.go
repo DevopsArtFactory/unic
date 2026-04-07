@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	awsservice "unic/internal/services/aws"
 )
+
+const ecsAPITimeout = 30 * time.Second
 
 // handleECSMsg routes ECS messages to the correct screen.
 func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -386,7 +389,8 @@ func (m Model) loadECSClusters() tea.Cmd {
 		if err := awsservice.CheckAWSCLIInstalled(); err != nil {
 			return errMsg{err: err}
 		}
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -407,7 +411,8 @@ func (m Model) loadECSServices() tea.Cmd {
 		if m.selectedECSCluster == nil {
 			return errMsg{err: fmt.Errorf("no cluster selected")}
 		}
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -428,7 +433,8 @@ func (m Model) loadECSTasks() tea.Cmd {
 		if m.selectedECSCluster == nil || m.selectedECSService == nil {
 			return errMsg{err: fmt.Errorf("no cluster or service selected")}
 		}
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -449,7 +455,8 @@ func (m Model) loadECSContainers() tea.Cmd {
 		if m.selectedECSCluster == nil || m.selectedECSTask == nil {
 			return errMsg{err: fmt.Errorf("no cluster or task selected")}
 		}
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}

@@ -112,17 +112,26 @@ func (r *AwsRepository) ListServices(ctx context.Context, clusterARN string) ([]
 func (r *AwsRepository) ListTasks(ctx context.Context, clusterARN, serviceARN string) ([]ECSTask, error) {
 	uniclog.Debug("aws", "ListTasks called", "cluster", clusterARN, "service", serviceARN)
 
+	// Extract service name from ARN once before the pagination loop.
+	// ECS ARN format: arn:aws:ecs:<region>:<account>:service/<cluster>/<service-name>
+	// Fall back to the full string if no slash is present (bare service name passed directly).
+	var serviceNameFilter *string
+	if serviceARN != "" {
+		idx := strings.LastIndex(serviceARN, "/")
+		if idx >= 0 && idx < len(serviceARN)-1 {
+			serviceNameFilter = awssdk.String(serviceARN[idx+1:])
+		} else {
+			serviceNameFilter = awssdk.String(serviceARN)
+		}
+	}
+
 	var taskARNs []string
 	var nextToken *string
 	for {
 		input := &ecs.ListTasksInput{
-			Cluster:   awssdk.String(clusterARN),
-			NextToken: nextToken,
-		}
-		if serviceARN != "" {
-			// Extract service name from ARN for the ServiceName filter
-			parts := strings.Split(serviceARN, "/")
-			input.ServiceName = awssdk.String(parts[len(parts)-1])
+			Cluster:     awssdk.String(clusterARN),
+			NextToken:   nextToken,
+			ServiceName: serviceNameFilter,
 		}
 		out, err := r.ECSClient.ListTasks(ctx, input)
 		if err != nil {
@@ -188,7 +197,7 @@ func (r *AwsRepository) describeTasksFromARNs(ctx context.Context, clusterARN st
 		for _, t := range out.Tasks {
 			taskARN := awssdk.ToString(t.TaskArn)
 			taskID := taskARN
-			if idx := strings.LastIndex(taskARN, "/"); idx >= 0 {
+			if idx := strings.LastIndex(taskARN, "/"); idx >= 0 && idx < len(taskARN)-1 {
 				taskID = taskARN[idx+1:]
 			}
 			var startedAt time.Time
