@@ -106,6 +106,20 @@ type cwLogEventsLoadedMsg struct {
 
 type cwLogTailTickMsg struct{}
 
+type s3BucketsLoadedMsg struct {
+	buckets []awsservice.S3Bucket
+}
+
+type s3ObjectsLoadedMsg struct {
+	bucket  string
+	prefix  string
+	objects awsservice.S3ListResult
+}
+
+type s3ObjectDetailLoadedMsg struct {
+	detail *awsservice.S3ObjectDetail
+}
+
 type secretsLoadedMsg struct {
 	secrets []awsservice.Secret
 }

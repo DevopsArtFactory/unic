@@ -62,6 +62,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceS3,
+			Features: []Feature{
+				{
+					Kind:        FeatureS3Browser,
+					Description: "Browse buckets and objects with folder-like prefix navigation",
+				},
+			},
+		},
+		{
 			Name: ServiceIAM,
 			Features: []Feature{
 				{
