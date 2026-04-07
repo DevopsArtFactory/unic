@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -44,6 +45,15 @@ func (r *AwsRepository) ListHostedZones(ctx context.Context) ([]HostedZone, erro
 		}
 		marker = output.NextMarker
 	}
+
+	sort.Slice(zones, func(i, j int) bool {
+		left := normalizedSortKey(strings.TrimSuffix(zones[i].Name, "."), zones[i].ID)
+		right := normalizedSortKey(strings.TrimSuffix(zones[j].Name, "."), zones[j].ID)
+		if left == right {
+			return zones[i].ID < zones[j].ID
+		}
+		return left < right
+	})
 
 	return zones, nil
 }

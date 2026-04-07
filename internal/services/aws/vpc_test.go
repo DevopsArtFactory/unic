@@ -152,6 +152,31 @@ func TestListVPCs_Empty(t *testing.T) {
 	}
 }
 
+func TestListVPCs_SortedByName(t *testing.T) {
+	mock := &mockEC2Client{
+		describeVpcsFunc: func(_ context.Context, _ *ec2.DescribeVpcsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error) {
+			return &ec2.DescribeVpcsOutput{
+				Vpcs: []types.Vpc{
+					{VpcId: awssdk.String("vpc-2"), Tags: []types.Tag{{Key: awssdk.String("Name"), Value: awssdk.String("zeta")}}},
+					{VpcId: awssdk.String("vpc-1"), Tags: []types.Tag{{Key: awssdk.String("Name"), Value: awssdk.String("alpha")}}},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	vpcs, err := repo.ListVPCs(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(vpcs) != 2 {
+		t.Fatalf("expected 2 VPCs, got %d", len(vpcs))
+	}
+	if vpcs[0].Name != "alpha" || vpcs[1].Name != "zeta" {
+		t.Fatalf("expected alphabetical VPC order, got %+v", vpcs)
+	}
+}
+
 // --- Subnet tests ---
 
 func TestListSubnets_Success(t *testing.T) {
@@ -226,6 +251,31 @@ func TestListSubnets_Empty(t *testing.T) {
 	}
 	if len(subnets) != 0 {
 		t.Errorf("expected empty slice, got %d", len(subnets))
+	}
+}
+
+func TestListSubnets_SortedByName(t *testing.T) {
+	mock := &mockEC2Client{
+		describeSubnetsFunc: func(_ context.Context, _ *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
+			return &ec2.DescribeSubnetsOutput{
+				Subnets: []types.Subnet{
+					{SubnetId: awssdk.String("subnet-2"), Tags: []types.Tag{{Key: awssdk.String("Name"), Value: awssdk.String("z-private")}}},
+					{SubnetId: awssdk.String("subnet-1"), Tags: []types.Tag{{Key: awssdk.String("Name"), Value: awssdk.String("a-public")}}},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	subnets, err := repo.ListSubnets(context.Background(), "vpc-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(subnets) != 2 {
+		t.Fatalf("expected 2 subnets, got %d", len(subnets))
+	}
+	if subnets[0].Name != "a-public" || subnets[1].Name != "z-private" {
+		t.Fatalf("expected alphabetical subnet order, got %+v", subnets)
 	}
 }
 

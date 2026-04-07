@@ -117,37 +117,40 @@ func TestListDBInstances_Success(t *testing.T) {
 	}
 
 	inst := instances[0]
-	if inst.DBInstanceID != "my-db" {
-		t.Errorf("expected DBInstanceID 'my-db', got %q", inst.DBInstanceID)
+	if inst.DBInstanceID != "aurora-inst-1" {
+		t.Errorf("expected DBInstanceID 'aurora-inst-1', got %q", inst.DBInstanceID)
 	}
-	if inst.Engine != "mysql" {
-		t.Errorf("expected Engine 'mysql', got %q", inst.Engine)
+	if inst.Engine != "aurora-mysql" {
+		t.Errorf("expected Engine 'aurora-mysql', got %q", inst.Engine)
 	}
-	if inst.EngineVersion != "8.0.35" {
-		t.Errorf("expected EngineVersion '8.0.35', got %q", inst.EngineVersion)
+	if inst.EngineVersion != "8.0.mysql_aurora.3.04.0" {
+		t.Errorf("expected EngineVersion '8.0.mysql_aurora.3.04.0', got %q", inst.EngineVersion)
 	}
 	if inst.Status != "available" {
 		t.Errorf("expected Status 'available', got %q", inst.Status)
 	}
-	if inst.InstanceClass != "db.t3.micro" {
-		t.Errorf("expected InstanceClass 'db.t3.micro', got %q", inst.InstanceClass)
+	if inst.InstanceClass != "db.r6g.large" {
+		t.Errorf("expected InstanceClass 'db.r6g.large', got %q", inst.InstanceClass)
 	}
-	if !inst.MultiAZ {
-		t.Error("expected MultiAZ to be true")
+	if inst.MultiAZ {
+		t.Error("expected MultiAZ to be false")
 	}
-	if inst.StorageGB != 20 {
-		t.Errorf("expected StorageGB 20, got %d", inst.StorageGB)
+	if inst.StorageGB != 0 {
+		t.Errorf("expected StorageGB 0, got %d", inst.StorageGB)
 	}
-	if inst.Endpoint != "my-db.abc123.us-east-1.rds.amazonaws.com:3306" {
+	if inst.Endpoint != "aurora-inst-1.abc123.us-east-1.rds.amazonaws.com:3306" {
 		t.Errorf("unexpected Endpoint: %q", inst.Endpoint)
 	}
-	if inst.ClusterID != "" {
-		t.Errorf("expected empty ClusterID, got %q", inst.ClusterID)
+	if inst.ClusterID != "my-cluster" {
+		t.Errorf("expected ClusterID 'my-cluster', got %q", inst.ClusterID)
 	}
 
-	aurora := instances[1]
-	if aurora.ClusterID != "my-cluster" {
-		t.Errorf("expected ClusterID 'my-cluster', got %q", aurora.ClusterID)
+	mysql := instances[1]
+	if mysql.DBInstanceID != "my-db" {
+		t.Errorf("expected DBInstanceID 'my-db', got %q", mysql.DBInstanceID)
+	}
+	if mysql.ClusterID != "" {
+		t.Errorf("expected empty ClusterID, got %q", mysql.ClusterID)
 	}
 }
 
@@ -212,6 +215,31 @@ func TestListDBInstances_NilEndpoint(t *testing.T) {
 	}
 	if instances[0].Endpoint != "" {
 		t.Errorf("expected empty Endpoint for stopped instance, got %q", instances[0].Endpoint)
+	}
+}
+
+func TestListDBInstances_SortedByIdentifier(t *testing.T) {
+	mock := &mockRDSClient{
+		describeDBInstancesFunc: func(_ context.Context, _ *rds.DescribeDBInstancesInput, _ ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {
+			return &rds.DescribeDBInstancesOutput{
+				DBInstances: []rdstypes.DBInstance{
+					{DBInstanceIdentifier: awssdk.String("zeta-db")},
+					{DBInstanceIdentifier: awssdk.String("alpha-db")},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{RDSClient: mock}
+	instances, err := repo.ListDBInstances(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(instances) != 2 {
+		t.Fatalf("expected 2 instances, got %d", len(instances))
+	}
+	if instances[0].DBInstanceID != "alpha-db" || instances[1].DBInstanceID != "zeta-db" {
+		t.Fatalf("expected alphabetical DB identifier order, got %+v", instances)
 	}
 }
 

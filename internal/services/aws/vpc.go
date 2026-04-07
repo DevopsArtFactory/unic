@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"sort"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -30,6 +31,14 @@ func (r *AwsRepository) ListVPCs(ctx context.Context) ([]VPC, error) {
 			IsDefault: awssdk.ToBool(v.IsDefault),
 		})
 	}
+	sort.Slice(vpcs, func(i, j int) bool {
+		left := normalizedSortKey(vpcs[i].Name, vpcs[i].VPCID)
+		right := normalizedSortKey(vpcs[j].Name, vpcs[j].VPCID)
+		if left == right {
+			return vpcs[i].VPCID < vpcs[j].VPCID
+		}
+		return left < right
+	})
 	return vpcs, nil
 }
 
@@ -60,6 +69,14 @@ func (r *AwsRepository) ListSubnets(ctx context.Context, vpcID string) ([]Subnet
 			AvailableIPCount: awssdk.ToInt32(s.AvailableIpAddressCount),
 		})
 	}
+	sort.Slice(subnets, func(i, j int) bool {
+		left := normalizedSortKey(subnets[i].Name, subnets[i].SubnetID)
+		right := normalizedSortKey(subnets[j].Name, subnets[j].SubnetID)
+		if left == right {
+			return subnets[i].SubnetID < subnets[j].SubnetID
+		}
+		return left < right
+	})
 	return subnets, nil
 }
 

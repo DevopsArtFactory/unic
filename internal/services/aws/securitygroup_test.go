@@ -66,33 +66,40 @@ func TestListSecurityGroups_Success(t *testing.T) {
 		t.Fatalf("expected 2 security groups, got %d", len(sgs))
 	}
 
-	// First SG
+	// First SG after sorting should be "default"
 	sg := sgs[0]
-	if sg.GroupID != "sg-aaa" {
-		t.Errorf("expected GroupID sg-aaa, got %s", sg.GroupID)
+	if sg.GroupID != "sg-bbb" {
+		t.Errorf("expected GroupID sg-bbb, got %s", sg.GroupID)
 	}
-	if sg.Name != "web-sg" {
-		t.Errorf("expected Name web-sg, got %s", sg.Name)
+	if sg.Name != "default" {
+		t.Errorf("expected Name default, got %s", sg.Name)
 	}
-	if sg.IsDefault {
-		t.Error("expected IsDefault false")
-	}
-	if len(sg.IngressRules) != 2 {
-		t.Fatalf("expected 2 ingress rules, got %d", len(sg.IngressRules))
-	}
-	if sg.IngressRules[0].CIDRV4 != "0.0.0.0/0" {
-		t.Errorf("expected first ingress CIDR 0.0.0.0/0, got %s", sg.IngressRules[0].CIDRV4)
-	}
-	if sg.IngressRules[1].ReferencedSGID != "sg-bastion" {
-		t.Errorf("expected second ingress ref SG sg-bastion, got %s", sg.IngressRules[1].ReferencedSGID)
-	}
-	if len(sg.EgressRules) != 1 {
-		t.Fatalf("expected 1 egress rule, got %d", len(sg.EgressRules))
+	if !sg.IsDefault {
+		t.Error("expected IsDefault true")
 	}
 
-	// Second SG (default)
-	if !sgs[1].IsDefault {
-		t.Error("expected default SG to have IsDefault true")
+	// Second SG should be web-sg
+	web := sgs[1]
+	if web.GroupID != "sg-aaa" {
+		t.Errorf("expected GroupID sg-aaa, got %s", web.GroupID)
+	}
+	if web.Name != "web-sg" {
+		t.Errorf("expected Name web-sg, got %s", web.Name)
+	}
+	if web.IsDefault {
+		t.Error("expected IsDefault false")
+	}
+	if len(web.IngressRules) != 2 {
+		t.Fatalf("expected 2 ingress rules, got %d", len(web.IngressRules))
+	}
+	if web.IngressRules[0].CIDRV4 != "0.0.0.0/0" {
+		t.Errorf("expected first ingress CIDR 0.0.0.0/0, got %s", web.IngressRules[0].CIDRV4)
+	}
+	if web.IngressRules[1].ReferencedSGID != "sg-bastion" {
+		t.Errorf("expected second ingress ref SG sg-bastion, got %s", web.IngressRules[1].ReferencedSGID)
+	}
+	if len(web.EgressRules) != 1 {
+		t.Fatalf("expected 1 egress rule, got %d", len(web.EgressRules))
 	}
 }
 
@@ -107,6 +114,31 @@ func TestListSecurityGroups_Error(t *testing.T) {
 	_, err := repo.ListSecurityGroups(context.Background())
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestListSecurityGroups_SortedByName(t *testing.T) {
+	mock := &mockEC2Client{
+		describeSecurityGroupsFunc: func(_ context.Context, _ *ec2.DescribeSecurityGroupsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error) {
+			return &ec2.DescribeSecurityGroupsOutput{
+				SecurityGroups: []types.SecurityGroup{
+					{GroupId: awssdk.String("sg-2"), GroupName: awssdk.String("zeta")},
+					{GroupId: awssdk.String("sg-1"), GroupName: awssdk.String("alpha")},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	sgs, err := repo.ListSecurityGroups(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sgs) != 2 {
+		t.Fatalf("expected 2 security groups, got %d", len(sgs))
+	}
+	if sgs[0].Name != "alpha" || sgs[1].Name != "zeta" {
+		t.Fatalf("expected alphabetical security group order, got %+v", sgs)
 	}
 }
 

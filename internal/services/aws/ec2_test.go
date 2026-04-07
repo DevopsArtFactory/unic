@@ -1,10 +1,14 @@
 package aws
 
 import (
+	"context"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
 func TestFilterText(t *testing.T) {
@@ -100,6 +104,55 @@ func TestDerefString(t *testing.T) {
 	}
 	if derefString(nil) != "" {
 		t.Error("should return empty string for nil")
+	}
+}
+
+func TestListRunningInstances_SortedByName(t *testing.T) {
+	ec2Mock := &mockEC2Client{
+		describeInstancesFunc: func(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
+			return &ec2.DescribeInstancesOutput{
+				Reservations: []types.Reservation{
+					{
+						Instances: []types.Instance{
+							{
+								InstanceId:       aws.String("i-2"),
+								PrivateIpAddress: aws.String("10.0.0.2"),
+								State:            &types.InstanceState{Name: types.InstanceStateNameRunning},
+								Tags:             []types.Tag{{Key: aws.String("Name"), Value: aws.String("zeta-web")}},
+							},
+							{
+								InstanceId:       aws.String("i-1"),
+								PrivateIpAddress: aws.String("10.0.0.1"),
+								State:            &types.InstanceState{Name: types.InstanceStateNameRunning},
+								Tags:             []types.Tag{{Key: aws.String("Name"), Value: aws.String("alpha-web")}},
+							},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+	ssmMock := &mockSSMClient{
+		describeInstanceInfoFunc: func(_ context.Context, _ *ssm.DescribeInstanceInformationInput, _ ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error) {
+			return &ssm.DescribeInstanceInformationOutput{
+				InstanceInformationList: []ssmtypes.InstanceInformation{
+					{InstanceId: aws.String("i-2")},
+					{InstanceId: aws.String("i-1")},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: ec2Mock, SSMClient: ssmMock}
+	instances, err := repo.ListRunningInstances(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(instances) != 2 {
+		t.Fatalf("expected 2 instances, got %d", len(instances))
+	}
+	if instances[0].Name != "alpha-web" || instances[1].Name != "zeta-web" {
+		t.Fatalf("expected alphabetical EC2 order, got %+v", instances)
 	}
 }
 
