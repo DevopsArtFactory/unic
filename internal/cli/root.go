@@ -26,6 +26,8 @@ func NewRootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose debug logging")
 
 	cmd.AddCommand(newInitCmd())
+	cmd.AddCommand(newContextCmd())
+	cmd.AddCommand(newEnvCmd())
 	cmd.AddCommand(newUpdateCmd())
 
 	return cmd

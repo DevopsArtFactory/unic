@@ -59,6 +59,18 @@ unic init --force              # Overwrite existing config
 
 # Update to latest version
 unic update                    # Auto-detects install method (brew vs binary)
+
+# Print shell exports for the current context
+eval "$(unic env)"
+
+# Print shell exports for a named context
+eval "$(unic env staging-creds)"
+
+# Interactively select/setup a context, set it current, and copy exports to clipboard
+unic context setup
+
+# Clear the current context and copy cleanup commands to clipboard
+unic context unset
 ```
 
 ## Configuration
@@ -81,9 +93,19 @@ defaults:
   region: us-east-1
 
 contexts:
-  # SSO authentication
+  # SSO base context for one-step setup.
+  # `unic context setup` will log in, let you pick an account/role,
+  # then create or reuse a concrete context automatically.
   - name: dev-sso
     region: ap-northeast-2
+    profile: my-sso-profile
+    auth_type: sso
+    sso_start_url: https://my-sso-portal.awsapps.com/start
+
+  # SSO authentication
+  - name: dev-sso-123456789012-developerrole
+    region: ap-northeast-2
+    profile: my-sso-profile
     auth_type: sso
     sso_start_url: https://my-sso-portal.awsapps.com/start
     sso_account_id: "123456789012"
@@ -113,6 +135,25 @@ contexts:
 | `assume_role` | `profile`, `role_arn` | Assumes a cross-account role from a base profile |
 
 **Priority**: CLI flags (`--profile`, `--region`) > context settings > config defaults > hardcoded defaults (`us-east-1`)
+
+### One-Step Context Setup
+
+`unic context setup` is designed for interactive setup:
+
+```bash
+unic context setup
+```
+
+Behavior:
+
+- Prompts and progress messages go to `stderr`
+- Shell `export` / `unset` commands are copied to the clipboard
+- Credential contexts export `AWS_PROFILE` and region vars
+- Assume-role contexts export temporary STS credentials
+- SSO base contexts can log in, list accessible accounts and roles, and save a concrete context automatically
+- `~/.aws/credentials` is not modified by this flow
+
+`unic context unset` clears the `current` context from `~/.config/unic/config.yaml` and copies AWS cleanup commands to the clipboard so you can quickly reset your shell environment.
 
 ## Currently Implemented Features
 

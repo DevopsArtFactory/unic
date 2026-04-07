@@ -420,3 +420,132 @@ func TestMalformedConfigReturnsError(t *testing.T) {
 		t.Error("expected error for malformed config, got nil")
 	}
 }
+
+func TestUnsetCurrent(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev
+defaults:
+  region: ap-northeast-2
+contexts:
+  - name: dev
+    profile: dev-profile
+`)
+
+	if err := UnsetCurrent(path); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ContextName != "" {
+		t.Fatalf("expected empty current context, got %q", cfg.ContextName)
+	}
+	if cfg.Profile != "" {
+		t.Fatalf("expected empty profile after unset, got %q", cfg.Profile)
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected defaults region to remain, got %q", cfg.Region)
+	}
+}
+
+func TestLoadNamedContext(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev
+    profile: dev-profile
+  - name: prod
+    auth_type: assume_role
+    profile: base
+    region: ap-northeast-2
+    role_arn: arn:aws:iam::111111111111:role/Admin
+`)
+
+	cfg, err := LoadNamedContext(path, "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ContextName != "prod" {
+		t.Fatalf("expected context name prod, got %q", cfg.ContextName)
+	}
+	if cfg.Profile != "base" {
+		t.Fatalf("expected profile base, got %q", cfg.Profile)
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected region ap-northeast-2, got %q", cfg.Region)
+	}
+	if cfg.AuthType != AuthTypeAssumeRole {
+		t.Fatalf("expected assume_role auth type, got %q", cfg.AuthType)
+	}
+}
+
+func TestUpsertContextAddsEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev
+    profile: dev-profile
+`)
+
+	err := UpsertContext(path, ContextEntry{
+		Name:     "prod",
+		Profile:  "prod-profile",
+		Region:   "ap-northeast-2",
+		AuthType: "credential",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	infos, err := Contexts(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 2 {
+		t.Fatalf("expected 2 contexts, got %d", len(infos))
+	}
+	if infos[1].Name != "prod" {
+		t.Fatalf("expected appended context prod, got %q", infos[1].Name)
+	}
+}
+
+func TestUpsertContextReplacesEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev
+    profile: old-profile
+    region: us-west-2
+`)
+
+	err := UpsertContext(path, ContextEntry{
+		Name:     "dev",
+		Profile:  "new-profile",
+		Region:   "ap-northeast-2",
+		AuthType: "credential",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadNamedContext(path, "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Profile != "new-profile" {
+		t.Fatalf("expected updated profile new-profile, got %q", cfg.Profile)
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected updated region ap-northeast-2, got %q", cfg.Region)
+	}
+}
