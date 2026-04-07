@@ -17,14 +17,15 @@ const (
 type FeatureKind string
 
 const (
-	FeatureSSMSession           FeatureKind = "SSM Sessions Manager"
-	FeatureVPCBrowser           FeatureKind = "VPC Browser"
-	FeatureRDSBrowser           FeatureKind = "RDS Browser"
-	FeatureRoute53Browser       FeatureKind = "Route53 Browser"
-	FeatureSecretsBrowser       FeatureKind = "Secrets Manager Browser"
-	FeatureSecurityGroupBrowser FeatureKind = "Security Group Browser"
-	FeatureListAccessKeys       FeatureKind = "ListAccessKeys"
-	FeatureRotateAccessKey      FeatureKind = "RotateAccessKey"
+	FeatureSSMSession            FeatureKind = "SSM Sessions Manager"
+	FeatureVPCBrowser            FeatureKind = "VPC Browser"
+	FeatureRDSBrowser            FeatureKind = "RDS Browser"
+	FeatureRoute53Browser        FeatureKind = "Route53 Browser"
+	FeatureSecretsBrowser        FeatureKind = "Secrets Manager Browser"
+	FeatureSecurityGroupBrowser  FeatureKind = "Security Group Browser"
+	FeatureIAMUsersBrowser       FeatureKind = "IAM User Browser"
+	FeatureListAccessKeys        FeatureKind = "ListAccessKeys"
+	FeatureRotateAccessKey       FeatureKind = "RotateAccessKey"
 	FeatureCloudWatchLogsBrowser FeatureKind = "CloudWatch Logs Browser"
 )
 

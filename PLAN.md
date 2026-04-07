@@ -145,9 +145,9 @@ unic/
 - List hosted zones → drill into DNS records → record detail view
 - Filter support on zone list and record list
 
-**M3.9 — IAM Users**
-- List IAM users with metadata (creation date, last activity, MFA status)
-- View user details (attached policies, groups, access keys)
+**M3.9 — IAM Users** ✅
+- List IAM users with metadata (creation date, last activity, MFA status) ✅
+- View user details (attached policies, groups, access keys) ✅
 
 **M3.7 — CloudWatch Logs**
 - List log groups → log streams
@@ -267,7 +267,7 @@ Note: M5.2 (textinput) provides the foundation for M6 (enhanced search) — they
 - M1 is complete; M2 is deferred (relying on AWS SDK default credential chain)
 - M2.1 (Context-based auth with SSO, credential, assume-role) is complete
 - M3 services are independent of each other, build in any order
-- M3.1 (VPC), M3.2 (RDS), M3.3 (IAM Credentials), M3.4 (SSM Sessions), M3.5 (Security Groups), M3.6.1 (Route53 phase 1), and M3.9 (Secrets Manager) are complete
+- M3.1 (VPC), M3.2 (RDS), M3.3 (IAM Credentials), M3.4 (SSM Sessions), M3.5 (Security Groups), M3.6.1 (Route53 phase 1), IAM Users, and Secrets Manager are complete
 - M4.3 (Distribution) is partially done (GoReleaser + GitHub Actions)
 - M5.1 (File Extraction) is complete — app.go split into per-screen files
 - M5 and M6 can begin independently of remaining M3/M4 work

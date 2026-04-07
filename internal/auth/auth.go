@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"unic/internal/clipboard"
@@ -80,15 +79,7 @@ func postSwitchAssumeRole(cfg *config.Config) (string, error) {
 	uniclog.Debug("auth", "assuming role", "role_arn", cfg.RoleArn)
 	ctx := context.Background()
 
-	opts := []func(*awsconfig.LoadOptions) error{
-		awsconfig.WithRegion(cfg.Region),
-	}
-	envHasCreds := os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
-	if cfg.Profile != "" && !envHasCreds {
-		opts = append(opts, awsconfig.WithSharedConfigProfile(cfg.Profile))
-	}
-
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	awsCfg, err := awsservice.LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
 	if err != nil {
 		return "", fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -143,4 +134,3 @@ func verifyIdentity(cfg *config.Config) string {
 	}
 	return fmt.Sprintf("  Identity: %s (account: %s)", identity.Arn, identity.Account)
 }
-

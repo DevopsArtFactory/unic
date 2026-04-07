@@ -39,6 +39,8 @@ const (
 	screenSecurityGroupDetail
 	screenSecurityGroupAddRule
 	screenSecurityGroupDeleteConfirm
+	screenIAMUserList
+	screenIAMUserDetail
 	screenIAMKeyList
 	screenIAMKeyDetail
 	screenIAMKeyRotateConfirm
@@ -117,17 +119,26 @@ type Model struct {
 	selectedRoute53Record     *awsservice.DNSRecord
 
 	// Route53 mutation state
-	route53Action       string            // "create", "edit", "delete"
-	route53ConfirmInput string            // type-to-confirm for delete
-	route53EditField    int               // current form field index
-	route53EditValues   map[string]string // accumulated form values
-	route53EditInput    string            // current field text input
-	route53EditSelectIdx int              // index for select-type fields (record type)
-	route53ChangeID     string            // for status polling
-	route53ChangeStatus string            // "PENDING" / "INSYNC"
-	route53Polling      bool              // polling active
+	route53Action        string            // "create", "edit", "delete"
+	route53ConfirmInput  string            // type-to-confirm for delete
+	route53EditField     int               // current form field index
+	route53EditValues    map[string]string // accumulated form values
+	route53EditInput     string            // current field text input
+	route53EditSelectIdx int               // index for select-type fields (record type)
+	route53ChangeID      string            // for status polling
+	route53ChangeStatus  string            // "PENDING" / "INSYNC"
+	route53Polling       bool              // polling active
 
 	// IAM credentials state
+	iamUsers            []awsservice.IAMUser
+	filteredIAMUsers    []awsservice.IAMUser
+	iamUserIdx          int
+	iamUserFilter       string
+	iamUserFilterActive bool
+	iamUserLoadingMore  bool
+	iamUserHasMore      bool
+	iamUserNextMarker   string
+	selectedIAMUser     *awsservice.IAMUserDetail
 	iamKeys             []awsservice.AccessKey
 	iamKeyIdx           int
 	selectedIAMKey      *awsservice.AccessKey
@@ -161,31 +172,31 @@ type Model struct {
 	sgDeleteConfirm        string // type-to-confirm input for rule deletion
 	sgDeleteRule           *awsservice.SecurityGroupRule
 	sgAddField             int               // current field in add form (0=direction, 1=protocol, 2=fromPort, 3=toPort, 4=source, 5=description)
-	sgAddValues            map[string]string  // accumulated form values
-	sgAddInput             string             // current field text input
-	sgAddSelectIdx         int                // index for select-type fields (direction, protocol)
+	sgAddValues            map[string]string // accumulated form values
+	sgAddInput             string            // current field text input
+	sgAddSelectIdx         int               // index for select-type fields (direction, protocol)
 
 	// CloudWatch Logs browser state
-	cwLogGroups            []awsservice.LogGroup
-	filteredCWLogGroups    []awsservice.LogGroup
-	cwLogGroupIdx          int
-	cwLogGroupFilter       string
-	cwLogGroupFilterActive bool
-	selectedCWLogGroup     *awsservice.LogGroup
+	cwLogGroups             []awsservice.LogGroup
+	filteredCWLogGroups     []awsservice.LogGroup
+	cwLogGroupIdx           int
+	cwLogGroupFilter        string
+	cwLogGroupFilterActive  bool
+	selectedCWLogGroup      *awsservice.LogGroup
 	cwLogStreams            []awsservice.LogStream
 	filteredCWLogStreams    []awsservice.LogStream
 	cwLogStreamIdx          int
 	cwLogStreamFilter       string
 	cwLogStreamFilterActive bool
 	selectedCWLogStream     *awsservice.LogStream
-	cwLogEvents            []awsservice.LogEvent
-	cwLogScrollOffset      int
-	cwLogNextToken         *string
-	cwLogTimeRange         int    // index into preset time ranges
-	cwLogFilterPattern     string
-	cwLogFilterActive      bool   // filter pattern input active
-	cwLogTailing           bool   // live tail active
-	cwLogTailToken         *string
+	cwLogEvents             []awsservice.LogEvent
+	cwLogScrollOffset       int
+	cwLogNextToken          *string
+	cwLogTimeRange          int // index into preset time ranges
+	cwLogFilterPattern      string
+	cwLogFilterActive       bool // filter pattern input active
+	cwLogTailing            bool // live tail active
+	cwLogTailToken          *string
 
 	// Context picker
 	configPath         string
@@ -210,7 +221,7 @@ type Model struct {
 
 	// Update check
 	currentVersion  string
-	updateAvailable string             // non-empty = new version available
+	updateAvailable string // non-empty = new version available
 	installMethod   update.InstallMethod
 
 	// Error display
@@ -375,6 +386,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecurityGroupAddRule(msg)
 		case screenSecurityGroupDeleteConfirm:
 			return m.updateSecurityGroupDeleteConfirm(msg)
+		case screenIAMUserList:
+			return m.updateIAMUserList(msg)
+		case screenIAMUserDetail:
+			return m.updateIAMUserDetail(msg)
 		case screenIAMKeyList:
 			return m.updateIAMKeyList(msg)
 		case screenIAMKeyDetail:
@@ -475,6 +490,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureSecurityGroupBrowser:
 				m.screen = screenLoading
 				return m, m.loadSecurityGroups()
+			case domain.FeatureIAMUsersBrowser:
+				m.screen = screenLoading
+				return m, m.loadIAMUsers()
 			case domain.FeatureListAccessKeys:
 				m.iamRotationEnabled = false
 				m.screen = screenLoading
@@ -556,6 +574,10 @@ func (m Model) View() string {
 		v = m.viewSecurityGroupAddRule()
 	case screenSecurityGroupDeleteConfirm:
 		v = m.viewSecurityGroupDeleteConfirm()
+	case screenIAMUserList:
+		v = m.viewIAMUserList()
+	case screenIAMUserDetail:
+		v = m.viewIAMUserDetail()
 	case screenIAMKeyList:
 		v = m.viewIAMKeyList()
 	case screenIAMKeyDetail:
@@ -759,7 +781,6 @@ func (m Model) updateSecretDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-
 
 func (m Model) viewSecretList() string {
 	var b strings.Builder

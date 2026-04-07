@@ -125,6 +125,7 @@ contexts:
 | Route53 | DNS Browser (Hosted Zones → Records → Record Detail, create/edit/delete A/CNAME, change status polling) | ✅ Implemented |
 | CloudWatch Logs | Log Browser (Log Groups → Streams → Events, live tail with 2s poll, time range presets, filter patterns, log level highlighting) | ✅ Implemented |
 | Secrets Manager | Secrets Browser (list secrets, view key-value pairs or raw values) | ✅ Implemented |
+| IAM | IAM User Browser (lightweight username pages, background filter expansion, detail drill-down) | ✅ Implemented |
 | IAM | Access Key Browser (list keys with status, age, last used) | ✅ Implemented |
 | IAM | Access Key Rotation (create → verify/apply → deactivate → delete) | ✅ Implemented |
 
@@ -171,6 +172,14 @@ contexts:
 | `f` | Failover database | Multi-AZ standalone or Aurora cluster |
 | `r` | Refresh status | Always |
 
+### IAM Users
+
+| Key | Action | Screen |
+|-----|--------|--------|
+| `/` | Filter IAM users and continue loading remaining usernames in background | List |
+| `n` | Load next page of IAM users | List |
+| `Enter` | View groups, policies, and access keys | List |
+
 ### IAM Access Key Rotation
 
 | Key | Action | Screen |
@@ -204,17 +213,7 @@ contexts:
 
 ### Filtering
 
-Available on: EC2 instances, VPC/Subnets, RDS instances, Route53 zones/records, CloudWatch Log Groups/Streams, Secrets Manager, Context Switcher. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
-
-### IAM Access Key Rotation
-
-| Key | Action | Screen |
-|-----|--------|--------|
-| `r` | Rotate access key | Key detail |
-| `c` | Copy new key as export commands | Rotation result |
-| `a` | Apply new key to ~/.aws/credentials | Rotation result |
-| `d` | Deactivate old key | Rotation result |
-| `x` | Delete old inactive key | Rotation result |
+Available on: EC2 instances, IAM users, VPC/Subnets, RDS instances, Route53 zones/records, CloudWatch Log Groups/Streams, Secrets Manager, Context Switcher. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
 
 ## Documentation
 
