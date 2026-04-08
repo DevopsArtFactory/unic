@@ -52,6 +52,9 @@ const (
 	screenECSServiceList
 	screenECSTaskList
 	screenECSContainerList
+	screenS3BucketList
+	screenS3ObjectList
+	screenS3ObjectDetail
 	screenContextPicker
 	screenContextAdd
 	screenLoading
@@ -224,6 +227,22 @@ type Model struct {
 	cwLogTailing            bool // live tail active
 	cwLogTailToken          *string
 
+	// S3 browser state
+	s3Buckets            []awsservice.S3Bucket
+	filteredS3Buckets    []awsservice.S3Bucket
+	s3BucketIdx          int
+	s3BucketFilter       string
+	s3BucketFilterActive bool
+	selectedS3Bucket     *awsservice.S3Bucket
+	s3Objects            []awsservice.S3Object
+	filteredS3Objects    []awsservice.S3Object
+	s3ObjectIdx          int
+	s3ObjectFilter       string
+	s3ObjectFilterActive bool
+	s3CurrentPrefix      string
+	s3PrefixStack        []string
+	selectedS3Object     *awsservice.S3ObjectDetail
+
 	// Context picker
 	configPath         string
 	ctxList            []config.ContextInfo
@@ -337,6 +356,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleSecretMsg,
 		m.handleCloudWatchLogsMsg,
 		m.handleECSMsg,
+		m.handleS3Msg,
 		m.handleContextMsg,
 	} {
 		if newM, cmd, handled := h(msg); handled {
@@ -405,6 +425,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateCWLogStreamList(msg)
 		case screenCWLogViewer:
 			return m.updateCWLogViewer(msg)
+		case screenS3BucketList:
+			return m.updateS3BucketList(msg)
+		case screenS3ObjectList:
+			return m.updateS3ObjectList(msg)
+		case screenS3ObjectDetail:
+			return m.updateS3ObjectDetail(msg)
 		case screenSecurityGroupList:
 			return m.updateSecurityGroupList(msg)
 		case screenSecurityGroupDetail:
@@ -522,6 +548,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureCloudWatchLogsBrowser:
 				m.screen = screenLoading
 				return m, m.loadCWLogGroups()
+			case domain.FeatureS3Browser:
+				m.screen = screenLoading
+				return m, m.loadS3Buckets()
 			case domain.FeatureSecurityGroupBrowser:
 				m.screen = screenLoading
 				return m, m.loadSecurityGroups()
@@ -604,6 +633,12 @@ func (m Model) View() string {
 		v = m.viewCWLogStreamList()
 	case screenCWLogViewer:
 		v = m.viewCWLogViewer()
+	case screenS3BucketList:
+		v = m.viewS3BucketList()
+	case screenS3ObjectList:
+		v = m.viewS3ObjectList()
+	case screenS3ObjectDetail:
+		v = m.viewS3ObjectDetail()
 	case screenSecurityGroupList:
 		v = m.viewSecurityGroupList()
 	case screenSecurityGroupDetail:

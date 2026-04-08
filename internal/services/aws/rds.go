@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -38,6 +39,14 @@ func (r *AwsRepository) ListDBInstances(ctx context.Context) ([]RDSInstance, err
 
 		instances = append(instances, inst)
 	}
+	sort.Slice(instances, func(i, j int) bool {
+		left := normalizedSortKey(instances[i].DBInstanceID)
+		right := normalizedSortKey(instances[j].DBInstanceID)
+		if left == right {
+			return instances[i].Endpoint < instances[j].Endpoint
+		}
+		return left < right
+	})
 	return instances, nil
 }
 

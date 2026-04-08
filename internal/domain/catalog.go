@@ -67,6 +67,15 @@ func Catalog() []Service {
 				{
 					Kind:        FeatureECSExec,
 					Description: "Browse ECS clusters, services, tasks, and launch exec sessions",
+        },
+      },
+    },
+    {
+      Name: ServiceS3,
+			Features: []Feature{
+				{
+					Kind:        FeatureS3Browser,
+					Description: "Browse buckets and objects with folder-like prefix navigation",
 				},
 			},
 		},

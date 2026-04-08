@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -47,6 +48,9 @@ var _ CloudWatchLogsClientAPI = (*cloudwatchlogs.Client)(nil)
 
 // Verify *ecs.Client satisfies ECSClientAPI at compile time.
 var _ ECSClientAPI = (*ecs.Client)(nil)
+
+// Verify *s3.Client satisfies S3ClientAPI at compile time.
+var _ S3ClientAPI = (*s3.Client)(nil)
 
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
@@ -114,6 +118,13 @@ type ECSClientAPI interface {
 	ListTasks(ctx context.Context, params *ecs.ListTasksInput, optFns ...func(*ecs.Options)) (*ecs.ListTasksOutput, error)
 	DescribeTasks(ctx context.Context, params *ecs.DescribeTasksInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error)
 }
+// S3ClientAPI is the interface for S3 operations used by AwsRepository.
+type S3ClientAPI interface {
+	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+	GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+}
 
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
@@ -146,6 +157,7 @@ type AwsRepository struct {
 	STSClient            STSClientAPI
 	CloudWatchLogsClient CloudWatchLogsClientAPI
 	ECSClient            ECSClientAPI
+	S3Client             S3ClientAPI
 	Region               string
 	Profile              string
 	awsCfg               aws.Config
@@ -205,6 +217,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		STSClient:            sts.NewFromConfig(awsCfg),
 		CloudWatchLogsClient: cloudwatchlogs.NewFromConfig(awsCfg),
 		ECSClient:            ecs.NewFromConfig(awsCfg),
+		S3Client:             s3.NewFromConfig(awsCfg),
 		Region:               cfg.Region,
 		Profile:              cfg.Profile,
 		awsCfg:               awsCfg,
