@@ -9,6 +9,7 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 type mockS3Client struct {
@@ -70,6 +71,56 @@ func TestListBuckets_Success(t *testing.T) {
 	}
 	if buckets[1].Region != "us-east-1" {
 		t.Fatalf("expected us-east-1 fallback, got %s", buckets[1].Region)
+	}
+}
+
+func TestListBuckets_UsesUnknownForNonFatalRegionErrors(t *testing.T) {
+	created := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	mock := &mockS3Client{
+		listBucketsFunc: func(_ context.Context, _ *s3.ListBucketsInput, _ ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
+			return &s3.ListBucketsOutput{
+				Buckets: []s3types.Bucket{
+					{Name: awssdk.String("bucket-a"), CreationDate: &created},
+				},
+			}, nil
+		},
+		getBucketLocationFunc: func(_ context.Context, _ *s3.GetBucketLocationInput, _ ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
+			return nil, &smithy.GenericAPIError{Code: "AccessDenied", Message: "access denied"}
+		},
+	}
+
+	repo := &AwsRepository{S3Client: mock}
+	buckets, err := repo.ListBuckets(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(buckets) != 1 {
+		t.Fatalf("expected 1 bucket, got %d", len(buckets))
+	}
+	if buckets[0].Region != "unknown" {
+		t.Fatalf("expected unknown region for non-fatal error, got %q", buckets[0].Region)
+	}
+}
+
+func TestListBuckets_FailsOnFatalRegionErrors(t *testing.T) {
+	created := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	mock := &mockS3Client{
+		listBucketsFunc: func(_ context.Context, _ *s3.ListBucketsInput, _ ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
+			return &s3.ListBucketsOutput{
+				Buckets: []s3types.Bucket{
+					{Name: awssdk.String("bucket-a"), CreationDate: &created},
+				},
+			}, nil
+		},
+		getBucketLocationFunc: func(_ context.Context, _ *s3.GetBucketLocationInput, _ ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
+			return nil, &smithy.GenericAPIError{Code: "InternalError", Message: "boom"}
+		},
+	}
+
+	repo := &AwsRepository{S3Client: mock}
+	_, err := repo.ListBuckets(context.Background())
+	if err == nil {
+		t.Fatal("expected fatal region error, got nil")
 	}
 }
 

@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 
 	uniclog "unic/internal/log"
 )
@@ -22,11 +24,15 @@ func (r *AwsRepository) ListBuckets(ctx context.Context) ([]S3Bucket, error) {
 	}
 
 	buckets := make([]S3Bucket, 0, len(out.Buckets))
+	var regionWarnings []string
 	for _, bucket := range out.Buckets {
 		name := awssdk.ToString(bucket.Name)
 		region, err := r.bucketRegion(ctx, name)
 		if err != nil {
-			uniclog.Debug("aws", "failed to get bucket region, using unknown", "bucket", name, "error", err.Error())
+			if !isNonFatalBucketRegionError(err) {
+				return nil, err
+			}
+			regionWarnings = append(regionWarnings, fmt.Sprintf("%s: %v", name, err))
 			region = "unknown"
 		}
 		item := S3Bucket{
@@ -42,6 +48,12 @@ func (r *AwsRepository) ListBuckets(ctx context.Context) ([]S3Bucket, error) {
 	sort.Slice(buckets, func(i, j int) bool {
 		return buckets[i].Name < buckets[j].Name
 	})
+	if len(regionWarnings) > 0 {
+		uniclog.Info("aws", "bucket regions unavailable for some buckets",
+			"count", len(regionWarnings),
+			"details", strings.Join(regionWarnings, "; "),
+		)
+	}
 	return buckets, nil
 }
 
@@ -151,4 +163,21 @@ func (r *AwsRepository) bucketRegion(ctx context.Context, bucketName string) (st
 	default:
 		return string(out.LocationConstraint), nil
 	}
+}
+
+func isNonFatalBucketRegionError(err error) bool {
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		switch apiErr.ErrorCode() {
+		case "AccessDenied", "AllAccessDisabled", "Forbidden", "NoSuchBucket", "NotFound":
+			return true
+		}
+	}
+
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "access denied") ||
+		strings.Contains(text, "forbidden") ||
+		strings.Contains(text, "all access disabled") ||
+		strings.Contains(text, "no such bucket") ||
+		strings.Contains(text, "not found")
 }
