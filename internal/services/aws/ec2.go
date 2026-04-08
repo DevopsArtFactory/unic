@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -58,6 +59,15 @@ func (r *AwsRepository) ListRunningInstances(ctx context.Context) ([]EC2Instance
 			}
 		}
 	}
+
+	sort.Slice(instances, func(i, j int) bool {
+		left := normalizedSortKey(instances[i].Name, instances[i].InstanceID)
+		right := normalizedSortKey(instances[j].Name, instances[j].InstanceID)
+		if left == right {
+			return instances[i].InstanceID < instances[j].InstanceID
+		}
+		return left < right
+	})
 
 	return instances, nil
 }

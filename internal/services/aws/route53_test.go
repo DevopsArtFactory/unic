@@ -13,10 +13,10 @@ import (
 
 // mockRoute53Client implements Route53ClientAPI for testing.
 type mockRoute53Client struct {
-	listHostedZonesFunc        func(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error)
-	listResourceRecordSetsFunc func(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
+	listHostedZonesFunc          func(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error)
+	listResourceRecordSetsFunc   func(ctx context.Context, params *route53.ListResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error)
 	changeResourceRecordSetsFunc func(ctx context.Context, params *route53.ChangeResourceRecordSetsInput, optFns ...func(*route53.Options)) (*route53.ChangeResourceRecordSetsOutput, error)
-	getChangeFunc              func(ctx context.Context, params *route53.GetChangeInput, optFns ...func(*route53.Options)) (*route53.GetChangeOutput, error)
+	getChangeFunc                func(ctx context.Context, params *route53.GetChangeInput, optFns ...func(*route53.Options)) (*route53.GetChangeOutput, error)
 }
 
 func (m *mockRoute53Client) ListHostedZones(ctx context.Context, params *route53.ListHostedZonesInput, optFns ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error) {
@@ -49,8 +49,8 @@ func TestListHostedZones_Success(t *testing.T) {
 			return &route53.ListHostedZonesOutput{
 				HostedZones: []r53types.HostedZone{
 					{
-						Id:                    awssdk.String("/hostedzone/Z1234567890"),
-						Name:                  awssdk.String("example.com."),
+						Id:                     awssdk.String("/hostedzone/Z1234567890"),
+						Name:                   awssdk.String("example.com."),
 						ResourceRecordSetCount: awssdk.Int64(10),
 						Config: &r53types.HostedZoneConfig{
 							PrivateZone: false,
@@ -58,8 +58,8 @@ func TestListHostedZones_Success(t *testing.T) {
 						},
 					},
 					{
-						Id:                    awssdk.String("/hostedzone/Z0987654321"),
-						Name:                  awssdk.String("internal.example.com."),
+						Id:                     awssdk.String("/hostedzone/Z0987654321"),
+						Name:                   awssdk.String("internal.example.com."),
 						ResourceRecordSetCount: awssdk.Int64(5),
 						Config: &r53types.HostedZoneConfig{
 							PrivateZone: true,
@@ -144,10 +144,10 @@ func TestListHostedZones_NilConfig(t *testing.T) {
 			return &route53.ListHostedZonesOutput{
 				HostedZones: []r53types.HostedZone{
 					{
-						Id:                    awssdk.String("/hostedzone/Z111"),
-						Name:                  awssdk.String("noconfig.com."),
+						Id:                     awssdk.String("/hostedzone/Z111"),
+						Name:                   awssdk.String("noconfig.com."),
 						ResourceRecordSetCount: awssdk.Int64(1),
-						Config:                nil,
+						Config:                 nil,
 					},
 				},
 				IsTruncated: false,
@@ -168,6 +168,32 @@ func TestListHostedZones_NilConfig(t *testing.T) {
 	}
 	if zones[0].Comment != "" {
 		t.Errorf("expected empty Comment when Config is nil, got %q", zones[0].Comment)
+	}
+}
+
+func TestListHostedZones_SortedByName(t *testing.T) {
+	mock := &mockRoute53Client{
+		listHostedZonesFunc: func(_ context.Context, _ *route53.ListHostedZonesInput, _ ...func(*route53.Options)) (*route53.ListHostedZonesOutput, error) {
+			return &route53.ListHostedZonesOutput{
+				HostedZones: []r53types.HostedZone{
+					{Id: awssdk.String("/hostedzone/Z2"), Name: awssdk.String("zeta.example.com.")},
+					{Id: awssdk.String("/hostedzone/Z1"), Name: awssdk.String("alpha.example.com.")},
+				},
+				IsTruncated: false,
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{Route53Client: mock}
+	zones, err := repo.ListHostedZones(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(zones) != 2 {
+		t.Fatalf("expected 2 zones, got %d", len(zones))
+	}
+	if zones[0].Name != "alpha.example.com." || zones[1].Name != "zeta.example.com." {
+		t.Fatalf("expected alphabetical hosted zone order, got %+v", zones)
 	}
 }
 

@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -65,6 +66,14 @@ func (r *AwsRepository) ListSecurityGroups(ctx context.Context) ([]SecurityGroup
 		group.EgressRules = parseRules(sg.IpPermissionsEgress)
 		sgs = append(sgs, group)
 	}
+	sort.Slice(sgs, func(i, j int) bool {
+		left := normalizedSortKey(sgs[i].Name, sgs[i].GroupID)
+		right := normalizedSortKey(sgs[j].Name, sgs[j].GroupID)
+		if left == right {
+			return sgs[i].GroupID < sgs[j].GroupID
+		}
+		return left < right
+	})
 	return sgs, nil
 }
 
