@@ -140,3 +140,22 @@ func TestIAMHasUserAndAccessKeyFeatures(t *testing.T) {
 
 	t.Error("IAM service not found in catalog")
 }
+
+func TestCatalogContainsS3BrowserFeature(t *testing.T) {
+	services := Catalog()
+
+	for _, svc := range services {
+		if svc.Name != ServiceS3 {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureS3Browser {
+				return
+			}
+		}
+		t.Error("S3 service should have S3 Browser feature")
+		return
+	}
+
+	t.Error("S3 service not found in catalog")
+}

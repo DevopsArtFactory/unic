@@ -1090,6 +1090,70 @@ func TestRotateAccessKeyFeatureUsesCurrentIdentityFlow(t *testing.T) {
 	}
 }
 
+func TestS3BrowserFeatureExistsInCatalog(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+
+	for _, svc := range m.services {
+		if svc.Name != domain.ServiceS3 {
+			continue
+		}
+		if len(svc.Features) != 1 {
+			t.Fatalf("expected 1 S3 feature, got %d", len(svc.Features))
+		}
+		if svc.Features[0].Kind != domain.FeatureS3Browser {
+			t.Fatalf("expected S3 browser feature, got %s", svc.Features[0].Kind)
+		}
+		return
+	}
+
+	t.Fatal("expected S3 service in catalog")
+}
+
+func TestS3FeatureStartsBucketLoading(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	for _, svc := range m.services {
+		if svc.Name == domain.ServiceS3 {
+			m.features = svc.Features
+			break
+		}
+	}
+	m.screen = screenFeatureList
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Fatalf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected load S3 buckets command")
+	}
+}
+
+func TestS3ObjectListEscAtRootReturnsToBucketList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenS3ObjectList
+	m.selectedS3Bucket = &awsservice.S3Bucket{Name: "my-bucket"}
+	m.s3CurrentPrefix = ""
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+	if model.screen != screenS3BucketList {
+		t.Fatalf("expected bucket list screen, got %d", model.screen)
+	}
+}
+
+func TestS3ObjectListShowsBreadcrumb(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenS3ObjectList
+	m.selectedS3Bucket = &awsservice.S3Bucket{Name: "my-bucket"}
+	m.s3CurrentPrefix = "logs/app/"
+
+	view := m.viewS3ObjectList()
+	if !strings.Contains(view, "Path: /logs/app") {
+		t.Fatalf("expected breadcrumb in S3 object list, got %q", view)
+	}
+}
+
 func TestCWLogViewerDownDoesNotOverflowShortEventList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenCWLogViewer
