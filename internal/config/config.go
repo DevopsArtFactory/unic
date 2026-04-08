@@ -183,6 +183,52 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	}, nil
 }
 
+// LoadNamedContext resolves a specific named context from the config file.
+func LoadNamedContext(configPath, name string) (*Config, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config: %w", err)
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+
+	region := DefaultRegion
+	if fc.DefaultRegion != "" {
+		region = fc.DefaultRegion
+	}
+	if fc.Defaults.Region != "" {
+		region = fc.Defaults.Region
+	}
+
+	for _, ctx := range fc.Contexts {
+		if ctx.Name != name {
+			continue
+		}
+
+		profile := ctx.Profile
+		if ctx.Region != "" {
+			region = ctx.Region
+		}
+
+		return &Config{
+			Profile:      profile,
+			Region:       region,
+			ContextName:  ctx.Name,
+			AuthType:     normalizeAuthType(ctx.AuthType),
+			RoleArn:      ctx.RoleArn,
+			ExternalID:   ctx.ExternalID,
+			SSOStartURL:  ctx.SSOStartURL,
+			SSOAccountID: ctx.SSOAccountID,
+			SSORoleName:  ctx.SSORoleName,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("context %q not found in config", name)
+}
+
 // Contexts reads the config file and returns all defined contexts.
 func Contexts(configPath string) ([]ContextInfo, error) {
 	data, err := os.ReadFile(configPath)
@@ -277,6 +323,39 @@ func SetCurrent(configPath, name string) error {
 	return nil
 }
 
+// UnsetCurrent clears the "current" field in the config file.
+func UnsetCurrent(configPath string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config: %w", err)
+	}
+
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("failed to parse config as node: %w", err)
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
+		return fmt.Errorf("unexpected config structure")
+	}
+	mapping := doc.Content[0]
+
+	for i := 0; i < len(mapping.Content)-1; i += 2 {
+		if mapping.Content[i].Value == "current" {
+			mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
+			break
+		}
+	}
+
+	out, err := yaml.Marshal(&doc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	return nil
+}
+
 // AddContext appends a new context entry to the config file.
 func AddContext(configPath string, entry ContextEntry) error {
 	data, err := os.ReadFile(configPath)
@@ -345,6 +424,43 @@ func AddContext(configPath string, entry ContextEntry) error {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
+	return nil
+}
+
+// UpsertContext adds a new context or replaces an existing one with the same name.
+func UpsertContext(configPath string, entry ContextEntry) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		data = []byte("contexts: []\n")
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+
+	replaced := false
+	for i := range fc.Contexts {
+		if fc.Contexts[i].Name == entry.Name {
+			fc.Contexts[i] = entry
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		fc.Contexts = append(fc.Contexts, entry)
+	}
+
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
 	return nil
 }
 
