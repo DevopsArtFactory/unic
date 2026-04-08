@@ -56,7 +56,8 @@ func (m Model) loadS3Buckets() tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		m.awsRepo = repo
+		// Note: Cannot assign to m.awsRepo here as m is a value receiver copy
+		// The repository will be created fresh on each call which is acceptable
 
 		buckets, err := repo.ListBuckets(ctx)
 		if err != nil {
