@@ -36,7 +36,6 @@ func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 	case ecsTasksLoadedMsg:
 		m.ecsTasks = msg.tasks
-		m.filteredECSTasks = msg.tasks
 		m.ecsTaskIdx = 0
 		m.screen = screenECSTaskList
 		return m, nil, true
@@ -48,11 +47,6 @@ func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 
 	case ecsExecDoneMsg:
-		if msg.err != nil {
-			m.errMsg = msg.err.Error()
-			m.screen = screenError
-			return m, nil, true
-		}
 		m.screen = screenECSContainerList
 		return m, nil, true
 	}
@@ -121,6 +115,7 @@ func (m Model) viewECSClusterList() string {
 		b.WriteString(dimStyle.Render("  No clusters found"))
 		b.WriteString("\n")
 	} else {
+		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + count (1) + blank (1) + footer (1) = 8
 		visibleLines := max(m.height-8, 5)
 		start := 0
 		if m.ecsClusterIdx >= visibleLines {
@@ -214,6 +209,7 @@ func (m Model) viewECSServiceList() string {
 		b.WriteString(dimStyle.Render("  No services found"))
 		b.WriteString("\n")
 	} else {
+		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + count (1) + blank (1) + footer (1) = 8
 		visibleLines := max(m.height-8, 5)
 		start := 0
 		if m.ecsServiceIdx >= visibleLines {
@@ -252,15 +248,15 @@ func (m Model) updateECSTaskList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ecsTaskIdx--
 		}
 	case "down", "j":
-		if m.ecsTaskIdx < len(m.filteredECSTasks)-1 {
+		if m.ecsTaskIdx < len(m.ecsTasks)-1 {
 			m.ecsTaskIdx++
 		}
 	case "r":
 		m.screen = screenLoading
 		return m, m.loadECSTasks()
 	case "enter":
-		if len(m.filteredECSTasks) > 0 && m.ecsTaskIdx < len(m.filteredECSTasks) {
-			task := m.filteredECSTasks[m.ecsTaskIdx]
+		if len(m.ecsTasks) > 0 && m.ecsTaskIdx < len(m.ecsTasks) {
+			task := m.ecsTasks[m.ecsTaskIdx]
 			m.selectedECSTask = &task
 			m.screen = screenLoading
 			return m, m.loadECSContainers()
@@ -279,19 +275,20 @@ func (m Model) viewECSTaskList() string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Tasks — %s", svcName)))
 	b.WriteString("\n\n")
 
-	if len(m.filteredECSTasks) == 0 {
+	if len(m.ecsTasks) == 0 {
 		b.WriteString(dimStyle.Render("  No running tasks found"))
 		b.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		// overhead: status bar (2) + title (1) + blank (1) + count (1) + blank (1) + footer (1) = 7
+		visibleLines := max(m.height-7, 5)
 		start := 0
 		if m.ecsTaskIdx >= visibleLines {
 			start = m.ecsTaskIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredECSTasks))
+		end := min(start+visibleLines, len(m.ecsTasks))
 
 		for i := start; i < end; i++ {
-			t := m.filteredECSTasks[i]
+			t := m.ecsTasks[i]
 			cursor := "  "
 			style := normalStyle
 			if i == m.ecsTaskIdx {
@@ -302,7 +299,7 @@ func (m Model) viewECSTaskList() string {
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d tasks", len(m.filteredECSTasks))))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d tasks", len(m.ecsTasks))))
 	}
 
 	b.WriteString("\n")
@@ -355,7 +352,8 @@ func (m Model) viewECSContainerList() string {
 		b.WriteString(dimStyle.Render("  No containers found"))
 		b.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		// overhead: status bar (2) + title (1) + blank (1) + count (1) + blank (1) + footer (1) = 7
+		visibleLines := max(m.height-7, 5)
 		start := 0
 		if m.ecsContainerIdx >= visibleLines {
 			start = m.ecsContainerIdx - visibleLines + 1
@@ -479,15 +477,32 @@ func (m Model) startECSExec(container awsservice.ECSContainer) tea.Cmd {
 			return errMsg{err: fmt.Errorf("no cluster or task selected")}
 		}
 
+		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		defer cancel()
+
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
+			return errMsg{err: err}
+		}
+
+		credEnv, err := repo.ResolveCredentialEnv(ctx)
+		if err != nil {
+			return errMsg{err: fmt.Errorf("failed to resolve credentials for ECS exec: %w", err)}
+		}
+
 		cmd := awsservice.BuildECSExecCommand(
 			m.selectedECSCluster.ARN,
 			m.selectedECSTask.TaskARN,
 			container.Name,
 			m.cfg.Region,
+			credEnv,
 		)
 
 		execCmd := tea.ExecProcess(cmd, func(err error) tea.Msg {
-			return ecsExecDoneMsg{err: err}
+			if err != nil {
+				return errMsg{err: err}
+			}
+			return ecsExecDoneMsg{}
 		})
 		return execCmd()
 	}

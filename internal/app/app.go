@@ -195,10 +195,9 @@ type Model struct {
 	ecsServiceFilterActive bool
 	selectedECSService     *awsservice.ECSService
 
-	ecsTasks            []awsservice.ECSTask
-	filteredECSTasks    []awsservice.ECSTask
-	ecsTaskIdx          int
-	selectedECSTask     *awsservice.ECSTask
+	ecsTasks    []awsservice.ECSTask
+	ecsTaskIdx  int
+	selectedECSTask *awsservice.ECSTask
 
 	ecsContainers    []awsservice.ECSContainer
 	ecsContainerIdx  int

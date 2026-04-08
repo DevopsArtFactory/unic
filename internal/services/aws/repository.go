@@ -148,6 +148,7 @@ type AwsRepository struct {
 	ECSClient            ECSClientAPI
 	Region               string
 	Profile              string
+	awsCfg               aws.Config
 }
 
 // NewAwsRepository creates a new AwsRepository with configured EC2 and SSM clients.
@@ -206,7 +207,20 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		ECSClient:            ecs.NewFromConfig(awsCfg),
 		Region:               cfg.Region,
 		Profile:              cfg.Profile,
+		awsCfg:               awsCfg,
 	}, nil
+}
+
+// ResolveCredentialEnv retrieves the current AWS credentials and returns them
+// as environment variable pairs suitable for subprocess injection. This ensures
+// that CLI subprocesses (e.g. aws ecs execute-command) use the same credentials
+// as the SDK, preventing AccountIDs mismatch when using assume_role contexts.
+func (r *AwsRepository) ResolveCredentialEnv(ctx context.Context) ([]string, error) {
+	creds, err := r.awsCfg.Credentials.Retrieve(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve AWS credentials: %w", err)
+	}
+	return CredentialEnv(creds), nil
 }
 
 // LoadBaseConfig resolves AWS config for the requested region/profile.
