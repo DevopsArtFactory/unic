@@ -24,7 +24,6 @@ func (r *AwsRepository) ListBuckets(ctx context.Context) ([]S3Bucket, error) {
 	buckets := make([]S3Bucket, 0, len(out.Buckets))
 	for _, bucket := range out.Buckets {
 		name := awssdk.ToString(bucket.Name)
-		name := awssdk.ToString(bucket.Name)
 		region, err := r.bucketRegion(ctx, name)
 		if err != nil {
 			uniclog.Debug("aws", "failed to get bucket region, using unknown", "bucket", name, "error", err.Error())
