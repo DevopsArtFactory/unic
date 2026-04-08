@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -44,6 +45,9 @@ var _ STSClientAPI = (*sts.Client)(nil)
 
 // Verify *cloudwatchlogs.Client satisfies CloudWatchLogsClientAPI at compile time.
 var _ CloudWatchLogsClientAPI = (*cloudwatchlogs.Client)(nil)
+
+// Verify *ecs.Client satisfies ECSClientAPI at compile time.
+var _ ECSClientAPI = (*ecs.Client)(nil)
 
 // Verify *s3.Client satisfies S3ClientAPI at compile time.
 var _ S3ClientAPI = (*s3.Client)(nil)
@@ -105,6 +109,15 @@ type CloudWatchLogsClientAPI interface {
 	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
+// ECSClientAPI is the interface for ECS operations used by AwsRepository.
+type ECSClientAPI interface {
+	ListClusters(ctx context.Context, params *ecs.ListClustersInput, optFns ...func(*ecs.Options)) (*ecs.ListClustersOutput, error)
+	DescribeClusters(ctx context.Context, params *ecs.DescribeClustersInput, optFns ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error)
+	ListServices(ctx context.Context, params *ecs.ListServicesInput, optFns ...func(*ecs.Options)) (*ecs.ListServicesOutput, error)
+	DescribeServices(ctx context.Context, params *ecs.DescribeServicesInput, optFns ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error)
+	ListTasks(ctx context.Context, params *ecs.ListTasksInput, optFns ...func(*ecs.Options)) (*ecs.ListTasksOutput, error)
+	DescribeTasks(ctx context.Context, params *ecs.DescribeTasksInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error)
+}
 // S3ClientAPI is the interface for S3 operations used by AwsRepository.
 type S3ClientAPI interface {
 	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
@@ -133,7 +146,7 @@ type CallerIdentity struct {
 	UserID  string
 }
 
-// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, Route53, STS, Secrets Manager, and IAM.
+// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, Route53, STS, Secrets Manager, IAM, CloudWatch Logs, and ECS.
 type AwsRepository struct {
 	EC2Client            EC2ClientAPI
 	SSMClient            SSMClientAPI
@@ -143,9 +156,11 @@ type AwsRepository struct {
 	IAMClient            IAMClientAPI
 	STSClient            STSClientAPI
 	CloudWatchLogsClient CloudWatchLogsClientAPI
+	ECSClient            ECSClientAPI
 	S3Client             S3ClientAPI
 	Region               string
 	Profile              string
+	awsCfg               aws.Config
 }
 
 // NewAwsRepository creates a new AwsRepository with configured EC2 and SSM clients.
@@ -201,10 +216,24 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		IAMClient:            iam.NewFromConfig(awsCfg),
 		STSClient:            sts.NewFromConfig(awsCfg),
 		CloudWatchLogsClient: cloudwatchlogs.NewFromConfig(awsCfg),
+		ECSClient:            ecs.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),
 		Region:               cfg.Region,
 		Profile:              cfg.Profile,
+		awsCfg:               awsCfg,
 	}, nil
+}
+
+// ResolveCredentialEnv retrieves the current AWS credentials and returns them
+// as environment variable pairs suitable for subprocess injection. This ensures
+// that CLI subprocesses (e.g. aws ecs execute-command) use the same credentials
+// as the SDK, preventing AccountIDs mismatch when using assume_role contexts.
+func (r *AwsRepository) ResolveCredentialEnv(ctx context.Context) ([]string, error) {
+	creds, err := r.awsCfg.Credentials.Retrieve(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve AWS credentials: %w", err)
+	}
+	return CredentialEnv(creds), nil
 }
 
 // LoadBaseConfig resolves AWS config for the requested region/profile.

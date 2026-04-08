@@ -11,6 +11,7 @@ const (
 	ServiceSecretsManager AwsService = "Secrets Manager"
 	ServiceIAM            AwsService = "IAM"
 	ServiceCloudWatchLogs AwsService = "CloudWatch Logs"
+	ServiceECS            AwsService = "ECS"
 	ServiceS3             AwsService = "S3"
 )
 
@@ -28,6 +29,7 @@ const (
 	FeatureListAccessKeys        FeatureKind = "ListAccessKeys"
 	FeatureRotateAccessKey       FeatureKind = "RotateAccessKey"
 	FeatureCloudWatchLogsBrowser FeatureKind = "CloudWatch Logs Browser"
+	FeatureECSExec               FeatureKind = "ECS Exec Sessions"
 	FeatureS3Browser             FeatureKind = "S3 Browser"
 )
 

@@ -48,6 +48,10 @@ const (
 	screenCWLogGroupList
 	screenCWLogStreamList
 	screenCWLogViewer
+	screenECSClusterList
+	screenECSServiceList
+	screenECSTaskList
+	screenECSContainerList
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -178,6 +182,28 @@ type Model struct {
 	sgAddValues            map[string]string // accumulated form values
 	sgAddInput             string            // current field text input
 	sgAddSelectIdx         int               // index for select-type fields (direction, protocol)
+
+	// ECS browser state
+	ecsClusters            []awsservice.ECSCluster
+	filteredECSClusters    []awsservice.ECSCluster
+	ecsClusterIdx          int
+	ecsClusterFilter       string
+	ecsClusterFilterActive bool
+	selectedECSCluster     *awsservice.ECSCluster
+
+	ecsServices            []awsservice.ECSService
+	filteredECSServices    []awsservice.ECSService
+	ecsServiceIdx          int
+	ecsServiceFilter       string
+	ecsServiceFilterActive bool
+	selectedECSService     *awsservice.ECSService
+
+	ecsTasks    []awsservice.ECSTask
+	ecsTaskIdx  int
+	selectedECSTask *awsservice.ECSTask
+
+	ecsContainers    []awsservice.ECSContainer
+	ecsContainerIdx  int
 
 	// CloudWatch Logs browser state
 	cwLogGroups             []awsservice.LogGroup
@@ -329,6 +355,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleIAMMsg,
 		m.handleSecretMsg,
 		m.handleCloudWatchLogsMsg,
+		m.handleECSMsg,
 		m.handleS3Msg,
 		m.handleContextMsg,
 	} {
@@ -424,6 +451,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateIAMKeyRotateConfirm(msg)
 		case screenIAMKeyRotateResult:
 			return m.updateIAMKeyRotateResult(msg)
+		case screenECSClusterList:
+			return m.updateECSClusterList(msg)
+		case screenECSServiceList:
+			return m.updateECSServiceList(msg)
+		case screenECSTaskList:
+			return m.updateECSTaskList(msg)
+		case screenECSContainerList:
+			return m.updateECSContainerList(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -530,6 +565,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.iamRotationEnabled = true
 				m.screen = screenLoading
 				return m, m.loadIAMKeys()
+			case domain.FeatureECSExec:
+				m.screen = screenLoading
+				return m, m.loadECSClusters()
 			}
 		}
 	}
@@ -621,6 +659,14 @@ func (m Model) View() string {
 		v = m.viewIAMKeyRotateConfirm()
 	case screenIAMKeyRotateResult:
 		v = m.viewIAMKeyRotateResult()
+	case screenECSClusterList:
+		v = m.viewECSClusterList()
+	case screenECSServiceList:
+		v = m.viewECSServiceList()
+	case screenECSTaskList:
+		v = m.viewECSTaskList()
+	case screenECSContainerList:
+		v = m.viewECSContainerList()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:
