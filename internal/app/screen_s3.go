@@ -152,8 +152,7 @@ func (m Model) updateS3BucketList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.selectedS3Bucket = &selected
 			m.s3CurrentPrefix = ""
 			m.s3PrefixStack = nil
-			m.screen = screenLoading
-			return m, m.loadS3Objects(selected.Name, "")
+			return m.startLoading(m.loadS3Objects(selected.Name, ""))
 		}
 	}
 	return m, nil
@@ -189,8 +188,7 @@ func (m Model) updateS3ObjectList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		nextPrefix := awsservice.ParentS3Prefix(m.s3CurrentPrefix)
-		m.screen = screenLoading
-		return m, m.loadS3Objects(m.selectedS3Bucket.Name, nextPrefix)
+		return m.startLoading(m.loadS3Objects(m.selectedS3Bucket.Name, nextPrefix))
 	case "up", "k":
 		if m.s3ObjectIdx > 0 {
 			m.s3ObjectIdx--
@@ -207,11 +205,9 @@ func (m Model) updateS3ObjectList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		selected := m.filteredS3Objects[m.s3ObjectIdx]
 		if selected.IsPrefix {
-			m.screen = screenLoading
-			return m, m.loadS3Objects(m.selectedS3Bucket.Name, selected.Prefix)
+			return m.startLoading(m.loadS3Objects(m.selectedS3Bucket.Name, selected.Prefix))
 		}
-		m.screen = screenLoading
-		return m, m.loadS3ObjectDetail(m.selectedS3Bucket.Name, selected.Key)
+		return m.startLoading(m.loadS3ObjectDetail(m.selectedS3Bucket.Name, selected.Key))
 	}
 	return m, nil
 }

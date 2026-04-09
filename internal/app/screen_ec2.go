@@ -86,10 +86,9 @@ func (m Model) updateInstanceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.filterActive = true
 	case "r":
-		m.screen = screenLoading
 		m.filterInput = ""
 		m.instIdx = 0
-		return m, m.loadInstances()
+		return m.startLoading(m.loadInstances())
 	case "enter":
 		if len(m.filtered) > 0 && m.instIdx < len(m.filtered) {
 			return m, m.startSSMSession(m.filtered[m.instIdx])
@@ -97,7 +96,6 @@ func (m Model) updateInstanceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-
 
 func (m Model) loadInstances() tea.Cmd {
 	return func() tea.Msg {

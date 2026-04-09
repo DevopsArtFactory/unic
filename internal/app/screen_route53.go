@@ -103,8 +103,7 @@ func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filteredRoute53Zones) > 0 && m.route53ZoneIdx < len(m.filteredRoute53Zones) {
 			selected := m.filteredRoute53Zones[m.route53ZoneIdx]
 			m.selectedRoute53Zone = &selected
-			m.screen = screenLoading
-			return m, m.loadRoute53Records(selected.ID)
+			return m.startLoading(m.loadRoute53Records(selected.ID))
 		}
 	}
 	return m, nil
@@ -194,7 +193,6 @@ func (m Model) updateRoute53RecordDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-
 
 func (m Model) loadRoute53Zones() tea.Cmd {
 	return func() tea.Msg {
@@ -535,8 +533,7 @@ func (m Model) updateRoute53CreateTTL(key string) (tea.Model, tea.Cmd) {
 		}
 		m.route53EditValues["ttl"] = m.route53EditInput
 		// Execute create
-		m.screen = screenLoading
-		return m, m.executeRoute53Create()
+		return m.startLoading(m.executeRoute53Create())
 	case "backspace":
 		if len(m.route53EditInput) > 0 {
 			m.route53EditInput = m.route53EditInput[:len(m.route53EditInput)-1]
@@ -642,8 +639,7 @@ func (m Model) updateRoute53RecordEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.route53EditValues["ttl"] = m.route53EditInput
-			m.screen = screenLoading
-			return m, m.executeRoute53Update()
+			return m.startLoading(m.executeRoute53Update())
 		case "backspace":
 			if len(m.route53EditInput) > 0 {
 				m.route53EditInput = m.route53EditInput[:len(m.route53EditInput)-1]
@@ -718,8 +714,7 @@ func (m Model) updateRoute53RecordDeleteConfirm(msg tea.KeyMsg) (tea.Model, tea.
 		m.screen = screenRoute53RecordDetail
 	case "enter":
 		if m.route53ConfirmInput == confirmTarget {
-			m.screen = screenLoading
-			return m, m.executeRoute53Delete()
+			return m.startLoading(m.executeRoute53Delete())
 		}
 	case "backspace":
 		if len(m.route53ConfirmInput) > 0 {

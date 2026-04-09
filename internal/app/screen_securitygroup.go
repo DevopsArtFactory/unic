@@ -195,10 +195,9 @@ func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.sgFilterActive = true
 	case "r":
-		m.screen = screenLoading
 		m.sgFilter = ""
 		m.sgIdx = 0
-		return m, m.loadSecurityGroups()
+		return m.startLoading(m.loadSecurityGroups())
 	case "enter":
 		if len(m.filteredSecurityGroups) > 0 && m.sgIdx < len(m.filteredSecurityGroups) {
 			selected := m.filteredSecurityGroups[m.sgIdx]
@@ -210,7 +209,6 @@ func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-
 
 func (m Model) viewSecurityGroupList() string {
 	var b strings.Builder
@@ -475,9 +473,8 @@ func (m Model) updateSGAddTextInput(key string) (tea.Model, tea.Cmd) {
 		case 5:
 			m.sgAddValues["description"] = m.sgAddInput
 			// Last field — execute the add
-			m.screen = screenLoading
 			m.sgAddInput = ""
-			return m, m.executeSGAddRule()
+			return m.startLoading(m.executeSGAddRule())
 		}
 		m.sgAddField++
 		m.sgAddInput = ""
@@ -610,8 +607,7 @@ func (m Model) updateSecurityGroupDeleteConfirm(msg tea.KeyMsg) (tea.Model, tea.
 		m.screen = screenSecurityGroupDetail
 	case "enter":
 		if m.sgDeleteConfirm == confirmTarget {
-			m.screen = screenLoading
-			return m, m.executeSGDeleteRule()
+			return m.startLoading(m.executeSGDeleteRule())
 		}
 	case "backspace":
 		if len(m.sgDeleteConfirm) > 0 {

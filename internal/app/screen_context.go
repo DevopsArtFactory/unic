@@ -103,8 +103,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filteredCtxList) > 0 && m.ctxIdx < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[m.ctxIdx]
 			m.pendingContextName = selected.Name
-			m.screen = screenLoading
-			return m, m.switchContext(selected.Name)
+			return m.startLoading(m.switchContext(selected.Name))
 		}
 	case "a":
 		m.addStep = 0
@@ -117,7 +116,6 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-
 
 func (m Model) switchContext(name string) tea.Cmd {
 	return func() tea.Msg {
