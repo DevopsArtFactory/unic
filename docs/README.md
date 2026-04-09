@@ -10,6 +10,7 @@ If a user-facing behavior, architecture boundary, or development workflow change
 - [Architecture (EN)](architecture.en.md)
 - [Architecture (KO)](architecture.ko.md)
 - [Development Guide](development.md)
+- [Branch Naming Harness](branch-naming-harness.md)
 - [Documentation Harness](documentation-harness.md)
 - [Roadmap Notes](roadmap.md)
 

@@ -8,6 +8,16 @@ go test ./...
 make build
 ```
 
+## Branch Naming
+
+Use [`branch-naming-harness.md`](branch-naming-harness.md) for branch names.
+
+Preferred format:
+
+```text
+<work-type>/<issue-number>-<short-description>
+```
+
 ## Adding a New AWS Feature
 
 1. Add service or feature constants in `internal/domain/model.go`

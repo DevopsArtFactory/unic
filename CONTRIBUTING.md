@@ -10,7 +10,7 @@ Thanks for your interest in contributing.
 ## Development Workflow
 
 1. Fork or branch from `main`.
-2. Create a focused branch: `feat/...`, `fix/...`, `docs/...`.
+2. Create a focused branch following [`docs/branch-naming-harness.md`](docs/branch-naming-harness.md).
 3. Keep commits small and descriptive.
 4. Run `go test ./...` before pushing.
 5. Run the documentation harness in [`docs/documentation-harness.md`](docs/documentation-harness.md) for user-visible or architecture-relevant changes.
@@ -19,6 +19,7 @@ Thanks for your interest in contributing.
 ## Pull Request Checklist
 
 - [ ] The change is scoped and documented.
+- [ ] Branch name follows `docs/branch-naming-harness.md`.
 - [ ] `README.md` and relevant `docs/` pages were reviewed and updated if needed.
 - [ ] Existing behavior is not broken.
 - [ ] Tests or validation steps are included.

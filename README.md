@@ -22,6 +22,7 @@ This is the closest structure to a "harness-like" doc hub in this repository: on
 - [Project Overview (EN)](docs/project-overview.en.md)
 - [Project Overview (KO)](docs/project-overview.ko.md)
 - [Development Guide](docs/development.md)
+- [Branch Naming Harness](docs/branch-naming-harness.md)
 - [Roadmap / Planning Notes](docs/roadmap.md)
 - [Ticket Tracking Note](TICKET.md)
 
