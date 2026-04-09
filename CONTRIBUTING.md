@@ -13,11 +13,13 @@ Thanks for your interest in contributing.
 2. Create a focused branch: `feat/...`, `fix/...`, `docs/...`.
 3. Keep commits small and descriptive.
 4. Run `go test ./...` before pushing.
-5. Open a Pull Request with context and testing notes.
+5. Run the documentation harness in [`docs/documentation-harness.md`](docs/documentation-harness.md) for user-visible or architecture-relevant changes.
+6. Open a Pull Request with context and testing notes.
 
 ## Pull Request Checklist
 
 - [ ] The change is scoped and documented.
+- [ ] `README.md` and relevant `docs/` pages were reviewed and updated if needed.
 - [ ] Existing behavior is not broken.
 - [ ] Tests or validation steps are included.
 - [ ] Related issue is linked (if any).

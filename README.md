@@ -1,37 +1,58 @@
 # unic
 
-`unic` is a Go-based TUI (Terminal User Interface) tool for browsing and managing AWS resources in the terminal.
+`unic` is a Go-based TUI for browsing and operating AWS resources from the terminal.
+It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 clients behind a context-aware authentication layer.
 
-It manages authentication contexts (SSO or STS AssumeRole) via `~/.config/unic/config.yaml` and provides drill-down exploration of AWS services registered in the catalog.
+## What It Does
+
+- Browse AWS services from a single terminal UI
+- Switch between credential, assume-role, and SSO contexts
+- Export shell environment variables for the active context
+- Drill down into resources with filters, detail views, and action screens
+- Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
+
+## Documentation Map
+
+This is the closest structure to a "harness-like" doc hub in this repository: one entry document with focused reference docs behind it.
+
+- [Docs Hub](docs/README.md)
+- [Documentation Harness](docs/documentation-harness.md)
+- [Architecture (EN)](docs/architecture.en.md)
+- [Architecture (KO)](docs/architecture.ko.md)
+- [Project Overview (EN)](docs/project-overview.en.md)
+- [Project Overview (KO)](docs/project-overview.ko.md)
+- [Development Guide](docs/development.md)
+- [Roadmap / Planning Notes](docs/roadmap.md)
+- [Ticket Tracking Note](TICKET.md)
 
 ## Tech Stack
 
-- Go (1.22+)
-- TUI: Bubbletea + Lipgloss + Bubbles
+- Go 1.22+
+- TUI: Bubble Tea, Bubbles, Lip Gloss
 - CLI: Cobra
-- AWS SDK: aws-sdk-go-v2
+- AWS: aws-sdk-go-v2
 - Config: gopkg.in/yaml.v3
-- Concurrency: goroutines + errgroup
-- Error handling: fmt.Errorf / errors
+- Logging: structured file logging under `~/.config/unic/logs/`
+- Testing: Go `testing`, table-driven tests, mocked AWS clients
 
 ## Installation
 
-### Homebrew (macOS/Linux)
+### Homebrew
 
 ```bash
 brew tap DevopsArtFactory/unic
 brew install unic
 ```
 
-### Install Script (macOS/Linux)
+### Install Script
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.sh | sh
 ```
 
-Set `INSTALL_DIR` to change the install location (default: `/usr/local/bin`).
+Set `INSTALL_DIR` to override the default install path.
 
-### Build from Source
+### Build From Source
 
 ```bash
 git clone https://github.com/DevopsArtFactory/unic.git
@@ -39,45 +60,53 @@ cd unic
 make build
 ```
 
-## Usage
+## CLI Usage
+
+### Run the TUI
 
 ```bash
-# Enter TUI mode
 unic
-
-# Specify profile/region
 unic --profile my-profile
 unic --region ap-northeast-2
-
-# Enable verbose debug logging (writes to ~/.config/unic/logs/unic.log)
 unic --verbose
-unic -v
+```
 
-# Initialize config file
-unic init                      # Create default config
-unic init --force              # Overwrite existing config
+### Config/bootstrap
 
-# Update to latest version
-unic update                    # Auto-detects install method (brew vs binary)
+```bash
+unic init
+unic init --force
+unic update
+```
 
-# Print shell exports for the current context
-eval "$(unic env)"
+### Shell environment helpers
 
-# Print shell exports for a named context
-eval "$(unic env staging-creds)"
+```bash
+# Print exports for current context
+unic env
 
-# Interactively select/setup a context, set it current, and copy exports to clipboard
+# Print exports for a named context
+eval "$(unic env prod-admin)"
+
+# Interactively choose/setup a context and copy exports to clipboard
 unic context setup
 
-# Clear the current context and copy cleanup commands to clipboard
+# Clear current context and copy cleanup commands to clipboard
 unic context unset
 ```
 
+`unic context setup` writes its prompts to `stderr` and copies the generated shell commands to the clipboard.
+`unic env` prints shell commands to `stdout` so it can be used with `eval`.
+
 ## Configuration
 
-`~/.config/unic/config.yaml` (created via `unic init` or auto-generated on first run)
+Primary config path:
 
-### Legacy Format (Flat)
+```text
+~/.config/unic/config.yaml
+```
+
+### Legacy Flat Format
 
 ```yaml
 default_profile: my-profile
@@ -90,205 +119,136 @@ default_region: ap-northeast-2
 current: dev-sso
 
 defaults:
-  region: us-east-1
+  region: ap-northeast-2
 
 contexts:
-  # SSO base context for one-step setup.
-  # `unic context setup` will log in, let you pick an account/role,
-  # then create or reuse a concrete context automatically.
   - name: dev-sso
-    region: ap-northeast-2
     profile: my-sso-profile
+    region: ap-northeast-2
     auth_type: sso
-    sso_start_url: https://my-sso-portal.awsapps.com/start
+    sso_start_url: https://example.awsapps.com/start
 
-  # SSO authentication
   - name: dev-sso-123456789012-developerrole
-    region: ap-northeast-2
     profile: my-sso-profile
+    region: ap-northeast-2
     auth_type: sso
-    sso_start_url: https://my-sso-portal.awsapps.com/start
+    sso_start_url: https://example.awsapps.com/start
     sso_account_id: "123456789012"
     sso_role_name: DeveloperRole
 
-  # Assume Role (cross-account)
-  - name: prod-assume
+  - name: prod-admin
+    profile: base-profile
     region: us-east-1
     auth_type: assume_role
-    profile: base-profile
-    role_arn: arn:aws:iam::987654321098:role/CrossAccountRole
+    role_arn: arn:aws:iam::123456789012:role/Admin
     external_id: optional-external-id
 
-  # Credential profile
-  - name: staging-creds
+  - name: staging
+    profile: staging
     region: eu-west-1
     auth_type: credential
-    profile: staging
 ```
 
 ### Auth Types
 
-| Auth Type | Required Fields | Description |
-|-----------|----------------|-------------|
-| `sso` | `sso_start_url`, `sso_account_id`, `sso_role_name` | AWS SSO portal login with token caching |
-| `credential` | `profile` | Uses `~/.aws/credentials` profile directly |
-| `assume_role` | `profile`, `role_arn` | Assumes a cross-account role from a base profile |
+| Auth Type | Meaning | Required Fields |
+|---|---|---|
+| `credential` | Use shared AWS profile credentials | `profile` |
+| `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
+| `sso` | Use AWS IAM Identity Center / SSO | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
 
-**Priority**: CLI flags (`--profile`, `--region`) > context settings > config defaults > hardcoded defaults (`us-east-1`)
+Resolution priority:
 
-### One-Step Context Setup
-
-`unic context setup` is designed for interactive setup:
-
-```bash
-unic context setup
+```text
+CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 ```
 
-Behavior:
+## Current Features
 
-- Prompts and progress messages go to `stderr`
-- Shell `export` / `unset` commands are copied to the clipboard
-- Credential contexts export `AWS_PROFILE` and region vars
-- Assume-role contexts export temporary STS credentials
-- SSO base contexts can log in, list accessible accounts and roles, and save a concrete context automatically
-- `~/.aws/credentials` is not modified by this flow
+| Service | Feature |
+|---|---|
+| EC2 | SSM Session Manager |
+| EC2 | Security Group Browser |
+| VPC | VPC Browser |
+| RDS | RDS Browser |
+| Route53 | Route53 Browser |
+| Secrets Manager | Secrets Browser |
+| CloudWatch Logs | Logs Browser |
+| ECS | ECS Exec Sessions |
+| S3 | S3 Browser |
+| IAM | IAM User Browser |
+| IAM | ListAccessKeys |
+| IAM | RotateAccessKey |
 
-`unic context unset` clears the `current` context from `~/.config/unic/config.yaml` and copies AWS cleanup commands to the clipboard so you can quickly reset your shell environment.
-
-## Currently Implemented Features
-
-| Service | Feature | Status |
-|---------|---------|--------|
-| EC2 | SSM Session Manager (connect to running, SSM-managed instances) | ✅ Implemented |
-| EC2 | Security Group Browser (list/filter SGs, view rules, add/delete rules with confirmation) | ✅ Implemented |
-| VPC | VPC Browser (VPCs → Subnets → Available IPs with reserved-IP exclusion) | ✅ Implemented |
-| RDS | RDS Browser (list, start/stop, failover, Aurora cluster support, auto-polling) | ✅ Implemented |
-| Route53 | DNS Browser (Hosted Zones → Records → Record Detail, create/edit/delete A/CNAME, change status polling) | ✅ Implemented |
-| CloudWatch Logs | Log Browser (Log Groups → Streams → Events, live tail with 2s poll, time range presets, filter patterns, log level highlighting) | ✅ Implemented |
-| Secrets Manager | Secrets Browser (list secrets, view key-value pairs or raw values) | ✅ Implemented |
-| IAM | IAM User Browser (lightweight username pages, background filter expansion, detail drill-down) | ✅ Implemented |
-| IAM | Access Key Browser (list keys with status, age, last used) | ✅ Implemented |
-| IAM | Access Key Rotation (create → verify/apply → deactivate → delete) | ✅ Implemented |
-| ECS | ECS Exec Sessions (Clusters → Services → Tasks → Containers, exec session via `aws ecs execute-command`) | ✅ Implemented |
-
-## TUI Key Bindings
+## TUI Navigation
 
 ### Global
 
 | Key | Action |
-|-----|--------|
-| `j`/`k` or `↑`/`↓` | Navigate list |
-| `Enter` | Select item |
-| `Esc` | Go back one screen |
-| `q` | Quit (on service list) |
-| `H` | Jump to home (service list) |
-| `C` | Open context switcher |
-| `/` | Toggle filter mode |
+|---|---|
+| `j` / `k`, `↑` / `↓` | Move selection |
+| `Enter` | Select / drill down |
+| `Esc` | Go back |
+| `q` | Quit from top-level screens |
+| `H` | Jump to service list |
+| `C` | Open context picker |
+| `/` | Toggle filter mode on supported screens |
 | `Ctrl+C` | Force quit |
 
-### EC2 SSM Session
+### Service-specific highlights
 
-| Key | Action |
-|-----|--------|
-| `r` | Refresh instance list |
-| `Enter` | Connect to instance |
+| Area | Keys |
+|---|---|
+| EC2 SSM | `r` refresh, `Enter` connect |
+| Security Groups | `a` add rule, `d` delete rule, `Tab` switch ingress/egress |
+| RDS | `s` start, `x` stop, `f` failover, `r` refresh |
+| Route53 | `c` create, `e` edit, `d` delete |
+| IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
+| CloudWatch Logs | `1`-`6` time presets, `t` live tail, `f` filter pattern, `n` load more |
+| ECS Exec | `r` refresh, `Enter` drill down / exec |
+| Context Picker | `a` add context, `/` filter |
 
-### Security Groups
+Filtering is currently available on EC2 instances, IAM users, VPCs/subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.
 
-| Key | Action | Screen |
-|-----|--------|--------|
-| `/` | Filter security groups | List |
-| `r` | Refresh list | List |
-| `Enter` | View inbound/outbound rules | List |
-| `Tab` | Switch between Inbound/Outbound section | Detail |
-| `j`/`k` or `↑`/`↓` | Navigate rules | Detail |
-| `a` | Add rule (multi-step form) | Detail |
-| `d` | Delete selected rule (type-to-confirm) | Detail |
+## Development
 
-### RDS Detail
+```bash
+go run ./cmd/unic
+go test ./...
+make build
+```
 
-| Key | Action | Condition |
-|-----|--------|-----------|
-| `s` | Start database | Instance/cluster is stopped |
-| `x` | Stop database | Instance/cluster is available |
-| `f` | Failover database | Multi-AZ standalone or Aurora cluster |
-| `r` | Refresh status | Always |
-
-### IAM Users
-
-| Key | Action | Screen |
-|-----|--------|--------|
-| `/` | Filter IAM users and continue loading remaining usernames in background | List |
-| `n` | Load next page of IAM users | List |
-| `Enter` | View groups, policies, and access keys | List |
-
-### IAM Access Key Rotation
-
-| Key | Action | Screen |
-|-----|--------|--------|
-| `r` | Rotate access key | Key detail (RotateAccessKey mode) |
-| `c` | Copy new key as export commands | Rotation result |
-| `a` | Apply new key to ~/.aws/credentials and verify | Rotation result |
-| `d` | Deactivate old key | Rotation result |
-| `x` | Delete old inactive key | Rotation result |
-
-### CloudWatch Logs
-
-| Key | Action | Screen |
-|-----|--------|--------|
-| `/` | Filter log groups/streams | List |
-| `Enter` | Drill into streams/view logs | List |
-| `1`-`6` | Time range preset (5m/15m/1h/6h/24h/7d) | Viewer |
-| `t` | Toggle live tail (2s poll) | Viewer |
-| `f` | Enter filter pattern | Viewer |
-| `n` | Load more (older events) | Viewer |
-| `PgUp`/`PgDn` | Page scroll | Viewer |
-
-### ECS Exec Sessions
-
-| Key | Action | Screen |
-|-----|--------|--------|
-| `/` | Filter clusters/services | Cluster / Service list |
-| `r` | Refresh list | Cluster / Service / Task list |
-| `Enter` | Drill down (Cluster → Service → Task → Container) | Any list |
-| `Enter` | Start exec session (`/bin/sh`) | Container list |
-| `Esc` | Go back one level | Any screen |
-
-### Context Switcher
-
-| Key | Action |
-|-----|--------|
-| `Enter` | Switch to selected context |
-| `a` | Add new context (wizard) |
-| `/` | Filter contexts |
-| `Esc` | Back |
-
-### Filtering
-
-Available on: EC2 instances, IAM users, VPC/Subnets, RDS instances, Route53 zones/records, CloudWatch Log Groups/Streams, Secrets Manager, Context Switcher. Press `/` to enter filter mode, type to search, `Esc` or `Enter` to exit filter mode.
-
-## Documentation
-
-- [Architecture](.kiro/docs/architecture-en.md)
-
-## License
-
-This project is licensed under the terms in [LICENSE](LICENSE).
-
-## Issue Bot
-
-Comment on any issue to interact with `@unic-bot`:
-
-| Command | Action |
-|---------|--------|
-| `@unic-bot: assign me` | Assign the issue to yourself |
+Release artifacts are produced through GoReleaser and the `dist/` outputs.
 
 ## Community Standards
 
-- Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- Contributing Guide: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Security Policy: [SECURITY.md](SECURITY.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [License](LICENSE)
 
-## Maintainers
+## Issue Bot
 
-- Add maintainers here.
+Comment on an issue with:
+
+| Command | Action |
+|---|---|
+| `@unic-bot: assign me` | Assign the issue to yourself |
+
+## Contributors
+
+<p align="left">
+  <a href="https://github.com/nathanhuh">
+    <img src="https://avatars.githubusercontent.com/u/23186038?v=4" width="72" alt="nathanhuh" />
+  </a>
+  <a href="https://github.com/YoungJinJung">
+    <img src="https://avatars.githubusercontent.com/u/18644538?v=4" width="72" alt="YoungJinJung" />
+  </a>
+  <a href="https://github.com/jjjjjjeonda86">
+    <img src="https://avatars.githubusercontent.com/u/37580012?v=4" width="72" alt="jjjjjjeonda86" />
+  </a>
+</p>
+
+- [nathanhuh](https://github.com/nathanhuh)
+- [YoungJinJung](https://github.com/YoungJinJung)
+- [jjjjjjeonda86](https://github.com/jjjjjjeonda86)

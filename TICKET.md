@@ -1,45 +1,25 @@
-# Current Ticket: UNIC-3
+# Ticket Tracking Note
 
-## Add RDS ListDBInstances Support
+This repository no longer uses `TICKET.md` as the active work tracker.
 
-**Status**: Not Started
-**Milestone**: M3.2
-**Priority**: High
+## Source of Truth
 
----
+Current work is tracked in:
 
-### Summary
+- GitHub Issues
+- GitHub Pull Requests
+- branch-specific implementation changes
 
-Add support for listing RDS DB instances in the TUI.
+## Why This File Exists
 
-### Tasks
+Older iterations of the project kept a single in-repo "current ticket" note here.
+That model became stale as work moved to GitHub-native issue and PR tracking.
 
-- [ ] Add `ServiceRDS` constant to `AwsService` in `internal/domain/model.go`
-- [ ] Add `FeatureListDBInstances` constant to `FeatureKind` in `internal/domain/model.go`
-- [ ] Register RDS service and feature in `internal/domain/catalog.go`
-- [ ] Implement `AwsRepository.ListDBInstances()` in `internal/services/aws/rds.go`
-- [ ] Add RDS model types in `internal/services/aws/rds_model.go`
-- [ ] Add RDS client interface and initialization in `internal/services/aws/repository.go`
-- [ ] Add screen transition for RDS feature in `internal/app/app.go`
-- [ ] Add `rds` SDK dependency in `go.mod`
-- [ ] Write tests
+## Recommended Practice
 
-### Acceptance Criteria
+If a change lands that affects user-facing behavior or architecture:
 
-- RDS appears as a selectable service in the TUI service list
-- Selecting "ListDBInstances" shows a list of RDS instances with identifier, engine, status, endpoint, and instance class
-- Loading and error states work correctly
-- Tests cover the RDS listing logic with mock clients
-
-### Related Issue
-
-Closes #12
-
----
-
-## Previous Tickets
-
-| Ticket | Title | Status |
-|--------|-------|--------|
-| UNIC-1 | Config & Profile Management (M1.1) | ✅ Done |
-| UNIC-2 | TUI Shell (M1.2) | ✅ Done |
+1. update the implementation
+2. add or update tests
+3. update `README.md` if the behavior is user-visible
+4. update `.kiro/docs` and `.kiro/steering` docs if the architecture or project shape changed

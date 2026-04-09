@@ -1,0 +1,61 @@
+# UNIC Project Overview
+
+UNIC is a Go-based AWS terminal console that combines:
+
+- a Bubble Tea TUI for browsing and operating AWS resources
+- Cobra CLI helpers for context setup and environment export
+- context-aware authentication across credential, assume-role, and SSO workflows
+
+## Current Scope
+
+Implemented service areas currently include:
+
+- EC2 / SSM
+- VPC
+- RDS
+- Route53
+- Secrets Manager
+- IAM
+- CloudWatch Logs
+- ECS
+- S3
+
+The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens.
+
+## Primary User Flows
+
+1. Run `unic` to enter the TUI
+2. Select a service and feature from the catalog
+3. Drill into resource lists and detail views
+4. Execute supported actions when available
+5. Use `unic env` or `unic context setup` when shell exports are needed
+
+## Configuration and Auth
+
+Configuration lives in `~/.config/unic/config.yaml`.
+The app supports:
+
+- legacy flat config
+- context-based config with `current`
+- `credential` auth
+- `assume_role` auth
+- `sso` auth, including base contexts resolved by `unic context setup`
+
+## Repository Layout
+
+```text
+cmd/unic/                 entrypoint
+internal/cli/             Cobra commands
+internal/config/          config load/save and context helpers
+internal/auth/            env export and interactive setup logic
+internal/domain/          service catalog and feature enums
+internal/services/aws/    AWS repository, models, and service operations
+internal/app/             Bubble Tea model, screens, styles, messages
+```
+
+## Maintenance Principles
+
+- keep README aligned with real behavior
+- treat `docs/` as the canonical documentation location
+- update architecture docs when screen or module boundaries change materially
+- prefer tests for repository logic and TUI transitions

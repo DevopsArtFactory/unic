@@ -1,0 +1,61 @@
+# UNIC 프로젝트 개요
+
+UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
+
+- AWS 리소스를 탐색하고 조작하는 Bubble Tea TUI
+- context setup / env export를 위한 Cobra CLI helper
+- credential, assume-role, SSO를 아우르는 context-aware 인증 흐름
+
+## 현재 범위
+
+현재 구현된 서비스 영역은 다음과 같다.
+
+- EC2 / SSM
+- VPC
+- RDS
+- Route53
+- Secrets Manager
+- IAM
+- CloudWatch Logs
+- ECS
+- S3
+
+애플리케이션은 이미 상호작용형 변경 작업 플로우, polling 기반 상태 확인, context helper, 서비스별 drill-down 화면을 포함한다.
+
+## 주요 사용자 흐름
+
+1. `unic`으로 TUI에 진입한다
+2. 카탈로그에서 서비스와 기능을 선택한다
+3. 리소스 목록과 상세 화면으로 drill-down 한다
+4. 가능한 액션을 수행한다
+5. 쉘 export가 필요하면 `unic env` 또는 `unic context setup`을 사용한다
+
+## 설정과 인증
+
+설정 파일은 `~/.config/unic/config.yaml`에 있다.
+현재 지원 범위는 다음과 같다.
+
+- legacy flat config
+- `current`를 포함한 context 기반 config
+- `credential` 인증
+- `assume_role` 인증
+- `unic context setup`으로 concrete context를 만드는 `sso` 인증
+
+## 저장소 구조
+
+```text
+cmd/unic/                 진입점
+internal/cli/             Cobra 명령
+internal/config/          config 로드/저장, context helper
+internal/auth/            env export, interactive setup
+internal/domain/          서비스 카탈로그와 feature enum
+internal/services/aws/    AWS repository, 모델, 서비스 로직
+internal/app/             Bubble Tea 모델, 화면, 스타일, 메시지
+```
+
+## 유지보수 원칙
+
+- README는 실제 동작과 맞아야 한다
+- `docs/`를 문서의 canonical 위치로 본다
+- 화면/모듈 경계가 크게 바뀌면 아키텍처 문서도 갱신한다
+- repository 로직과 TUI 전환에는 테스트를 우선한다
