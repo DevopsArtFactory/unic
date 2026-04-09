@@ -132,25 +132,14 @@ func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 func (m Model) updateCWLogGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.cwLogGroupFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.cwLogGroupFilter)
-		m.cwLogGroupFilter = newFilter
-		if deactivate {
-			m.cwLogGroupFilterActive = false
-		}
-		if changed {
-			m.filteredCWLogGroups = applyFilter(m.cwLogGroups, m.cwLogGroupFilter)
-			m.cwLogGroupIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterCWLogGroups); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.cwLogGroupFilter = ""
-		m.filteredCWLogGroups = m.cwLogGroups
-		m.cwLogGroupIdx = 0
+		m.resetFilter(filterCWLogGroups)
 	case "up", "k":
 		if m.cwLogGroupIdx > 0 {
 			m.cwLogGroupIdx--
@@ -160,7 +149,7 @@ func (m Model) updateCWLogGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cwLogGroupIdx++
 		}
 	case "/":
-		m.cwLogGroupFilterActive = true
+		return m, m.activateFilter(filterCWLogGroups)
 	case "enter":
 		if len(m.filteredCWLogGroups) > 0 && m.cwLogGroupIdx < len(m.filteredCWLogGroups) {
 			selected := m.filteredCWLogGroups[m.cwLogGroupIdx]
@@ -177,11 +166,7 @@ func (m Model) viewCWLogGroupList() string {
 	b.WriteString(titleStyle.Render("CloudWatch Log Groups"))
 	b.WriteString("\n")
 
-	if m.cwLogGroupFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.cwLogGroupFilter)))
-	} else if m.cwLogGroupFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.cwLogGroupFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterCWLogGroups))
 	b.WriteString("\n\n")
 
 	if len(m.filteredCWLogGroups) == 0 {
@@ -248,25 +233,14 @@ func (m Model) viewCWLogGroupList() string {
 func (m Model) updateCWLogStreamList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.cwLogStreamFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.cwLogStreamFilter)
-		m.cwLogStreamFilter = newFilter
-		if deactivate {
-			m.cwLogStreamFilterActive = false
-		}
-		if changed {
-			m.filteredCWLogStreams = applyFilter(m.cwLogStreams, m.cwLogStreamFilter)
-			m.cwLogStreamIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterCWLogStreams); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenCWLogGroupList
-		m.cwLogStreamFilter = ""
-		m.filteredCWLogStreams = m.cwLogStreams
-		m.cwLogStreamIdx = 0
+		m.resetFilter(filterCWLogStreams)
 	case "up", "k":
 		if m.cwLogStreamIdx > 0 {
 			m.cwLogStreamIdx--
@@ -276,13 +250,13 @@ func (m Model) updateCWLogStreamList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cwLogStreamIdx++
 		}
 	case "/":
-		m.cwLogStreamFilterActive = true
+		return m, m.activateFilter(filterCWLogStreams)
 	case "enter":
 		if len(m.filteredCWLogStreams) > 0 && m.cwLogStreamIdx < len(m.filteredCWLogStreams) {
 			selected := m.filteredCWLogStreams[m.cwLogStreamIdx]
 			m.selectedCWLogStream = &selected
 			m.cwLogTimeRange = 2 // default: 1h
-			m.cwLogFilterPattern = ""
+			m.resetFilter(filterCWLogViewer)
 			m.cwLogTailing = false
 			m.cwLogTailToken = nil
 			return m.startLoading(m.loadCWLogEvents(false))
@@ -301,11 +275,7 @@ func (m Model) viewCWLogStreamList() string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Log Streams — %s", groupName)))
 	b.WriteString("\n")
 
-	if m.cwLogStreamFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.cwLogStreamFilter)))
-	} else if m.cwLogStreamFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.cwLogStreamFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterCWLogStreams))
 	b.WriteString("\n\n")
 
 	if len(m.filteredCWLogStreams) == 0 {
@@ -370,25 +340,14 @@ func (m Model) viewCWLogStreamList() string {
 func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	// Filter pattern input mode
-	if m.cwLogFilterActive {
-		switch key {
-		case "esc":
-			m.cwLogFilterActive = false
-		case "enter":
-			m.cwLogFilterActive = false
-			// Reload with new filter
+	if m.isFiltering(filterCWLogViewer) {
+		if key == "enter" {
+			m.deactivateFilter()
 			return m.startLoading(m.loadCWLogEvents(false))
-		case "backspace":
-			if len(m.cwLogFilterPattern) > 0 {
-				m.cwLogFilterPattern = m.cwLogFilterPattern[:len(m.cwLogFilterPattern)-1]
-			}
-		default:
-			if len(key) == 1 {
-				m.cwLogFilterPattern += key
-			}
 		}
-		return m, nil
+		if cmd, handled := m.updateSharedFilter(msg, filterCWLogViewer); handled {
+			return m, cmd
+		}
 	}
 
 	visibleLines := max(m.height-8, 5)
@@ -420,7 +379,7 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.tickCWLogTail()
 		}
 	case "f": // Filter pattern input
-		m.cwLogFilterActive = true
+		return m, m.activateFilter(filterCWLogViewer)
 	case "n": // Load more (older events)
 		if m.cwLogNextToken != nil {
 			return m, m.loadCWLogEvents(true)
@@ -466,10 +425,8 @@ func (m Model) viewCWLogViewer() string {
 		}
 		status = append(status, strings.Join(ranges, ""))
 	}
-	if m.cwLogFilterActive {
-		status = append(status, filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.cwLogFilterPattern)))
-	} else if m.cwLogFilterPattern != "" {
-		status = append(status, dimStyle.Render(fmt.Sprintf("Filter: %s", m.cwLogFilterPattern)))
+	if filter := m.renderFilterValue(filterCWLogViewer); filter != "" {
+		status = append(status, filter)
 	}
 	if m.cwLogTailing {
 		status = append(status, filterStyle.Render("TAILING"))
@@ -597,7 +554,7 @@ func (m Model) loadCWLogEvents(appendMode bool) tea.Cmd {
 			token = m.cwLogNextToken
 		}
 
-		events, nextToken, err := repo.FilterLogEvents(ctx, m.selectedCWLogGroup.Name, startTime, endTime, m.cwLogFilterPattern, token)
+		events, nextToken, err := repo.FilterLogEvents(ctx, m.selectedCWLogGroup.Name, startTime, endTime, m.filterValue(filterCWLogViewer), token)
 		if err != nil {
 			return errMsg{err: err}
 		}
@@ -633,7 +590,7 @@ func (m Model) pollCWLogTail() tea.Cmd {
 		startTime := now.Add(-30 * time.Second).UnixMilli()
 		endTime := now.UnixMilli()
 
-		events, nextToken, err := repo.FilterLogEvents(ctx, m.selectedCWLogGroup.Name, startTime, endTime, m.cwLogFilterPattern, m.cwLogTailToken)
+		events, nextToken, err := repo.FilterLogEvents(ctx, m.selectedCWLogGroup.Name, startTime, endTime, m.filterValue(filterCWLogViewer), m.cwLogTailToken)
 		if err != nil {
 			return cwLogEventsLoadedMsg{append: true}
 		}

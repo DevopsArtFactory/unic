@@ -42,7 +42,7 @@ func (m Model) handleRDSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 				break
 			}
 		}
-		m.filteredRDS = applyFilter(m.rdsInstances, m.rdsFilter)
+		m.filteredRDS = applyFilter(m.rdsInstances, m.filterValue(filterRDS))
 		m.rdsIdx = 0
 		if awsservice.IsTransitionalStatus(msg.instance.Status) {
 			return m, m.tickRDSPoll(msg.instance.DBInstanceID), true
@@ -62,25 +62,14 @@ func (m Model) handleRDSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 func (m Model) updateRDSList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.rdsFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.rdsFilter)
-		m.rdsFilter = newFilter
-		if deactivate {
-			m.rdsFilterActive = false
-		}
-		if changed {
-			m.filteredRDS = applyFilter(m.rdsInstances, m.rdsFilter)
-			m.rdsIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterRDS); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.rdsFilter = ""
-		m.filteredRDS = m.rdsInstances
-		m.rdsIdx = 0
+		m.resetFilter(filterRDS)
 	case "up", "k":
 		if m.rdsIdx > 0 {
 			m.rdsIdx--
@@ -90,7 +79,7 @@ func (m Model) updateRDSList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.rdsIdx++
 		}
 	case "/":
-		m.rdsFilterActive = true
+		return m, m.activateFilter(filterRDS)
 	case "enter":
 		if len(m.filteredRDS) > 0 && m.rdsIdx < len(m.filteredRDS) {
 			selected := m.filteredRDS[m.rdsIdx]
@@ -176,7 +165,6 @@ func (m Model) updateRDSConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-
 
 func (m Model) loadRDSInstances() tea.Cmd {
 	return func() tea.Msg {
@@ -268,12 +256,7 @@ func (m Model) viewRDSList() string {
 	b.WriteString(titleStyle.Render("RDS Instances"))
 	b.WriteString("\n")
 
-	// Filter bar
-	if m.rdsFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.rdsFilter)))
-	} else if m.rdsFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.rdsFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterRDS))
 	b.WriteString("\n\n")
 
 	if len(m.filteredRDS) == 0 {

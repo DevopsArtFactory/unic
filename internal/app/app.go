@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -78,11 +79,9 @@ type Model struct {
 	featIdx  int
 
 	// Instance list with filtering
-	instances    []awsservice.EC2Instance
-	filtered     []awsservice.EC2Instance
-	instIdx      int
-	filterInput  string
-	filterActive bool
+	instances []awsservice.EC2Instance
+	filtered  []awsservice.EC2Instance
+	instIdx   int
 
 	// SSM session state
 	selectedInstance *awsservice.EC2Instance
@@ -98,33 +97,25 @@ type Model struct {
 	availableIPs   []string
 	filteredIPs    []string
 	ipScrollOffset int
-	ipFilter       string
-	ipFilterActive bool
 
 	// RDS browser state
 	rdsInstances    []awsservice.RDSInstance
 	filteredRDS     []awsservice.RDSInstance
 	rdsIdx          int
-	rdsFilter       string
-	rdsFilterActive bool
 	selectedRDS     *awsservice.RDSInstance
 	rdsAction       string // "start", "stop", "failover"
 	rdsConfirmInput string // typed input for destructive action confirmation
 	rdsPolling      bool
 
 	// Route53 browser state
-	route53Zones              []awsservice.HostedZone
-	filteredRoute53Zones      []awsservice.HostedZone
-	route53ZoneIdx            int
-	route53ZoneFilter         string
-	route53ZoneFilterActive   bool
-	selectedRoute53Zone       *awsservice.HostedZone
-	route53Records            []awsservice.DNSRecord
-	filteredRoute53Records    []awsservice.DNSRecord
-	route53RecordIdx          int
-	route53RecordFilter       string
-	route53RecordFilterActive bool
-	selectedRoute53Record     *awsservice.DNSRecord
+	route53Zones           []awsservice.HostedZone
+	filteredRoute53Zones   []awsservice.HostedZone
+	route53ZoneIdx         int
+	selectedRoute53Zone    *awsservice.HostedZone
+	route53Records         []awsservice.DNSRecord
+	filteredRoute53Records []awsservice.DNSRecord
+	route53RecordIdx       int
+	selectedRoute53Record  *awsservice.DNSRecord
 
 	// Route53 mutation state
 	route53Action        string            // "create", "edit", "delete"
@@ -141,8 +132,6 @@ type Model struct {
 	iamUsers            []awsservice.IAMUser
 	filteredIAMUsers    []awsservice.IAMUser
 	iamUserIdx          int
-	iamUserFilter       string
-	iamUserFilterActive bool
 	iamUserLoadingMore  bool
 	iamUserHasMore      bool
 	iamUserNextMarker   string
@@ -161,19 +150,15 @@ type Model struct {
 	iamOldKeyInactive   bool
 
 	// Secrets Manager browser state
-	secrets            []awsservice.Secret
-	filteredSecrets    []awsservice.Secret
-	secretIdx          int
-	secretFilter       string
-	secretFilterActive bool
-	selectedSecret     *awsservice.SecretDetail
+	secrets         []awsservice.Secret
+	filteredSecrets []awsservice.Secret
+	secretIdx       int
+	selectedSecret  *awsservice.SecretDetail
 
 	// Security Group browser state
 	securityGroups         []awsservice.SecurityGroup
 	filteredSecurityGroups []awsservice.SecurityGroup
 	sgIdx                  int
-	sgFilter               string
-	sgFilterActive         bool
 	selectedSecurityGroup  *awsservice.SecurityGroup
 	sgRuleSection          string // "ingress" or "egress" — active section in detail view
 	sgRuleIdx              int    // selected rule index within the active section
@@ -185,19 +170,15 @@ type Model struct {
 	sgAddSelectIdx         int               // index for select-type fields (direction, protocol)
 
 	// ECS browser state
-	ecsClusters            []awsservice.ECSCluster
-	filteredECSClusters    []awsservice.ECSCluster
-	ecsClusterIdx          int
-	ecsClusterFilter       string
-	ecsClusterFilterActive bool
-	selectedECSCluster     *awsservice.ECSCluster
+	ecsClusters         []awsservice.ECSCluster
+	filteredECSClusters []awsservice.ECSCluster
+	ecsClusterIdx       int
+	selectedECSCluster  *awsservice.ECSCluster
 
-	ecsServices            []awsservice.ECSService
-	filteredECSServices    []awsservice.ECSService
-	ecsServiceIdx          int
-	ecsServiceFilter       string
-	ecsServiceFilterActive bool
-	selectedECSService     *awsservice.ECSService
+	ecsServices         []awsservice.ECSService
+	filteredECSServices []awsservice.ECSService
+	ecsServiceIdx       int
+	selectedECSService  *awsservice.ECSService
 
 	ecsTasks        []awsservice.ECSTask
 	ecsTaskIdx      int
@@ -207,50 +188,38 @@ type Model struct {
 	ecsContainerIdx int
 
 	// CloudWatch Logs browser state
-	cwLogGroups             []awsservice.LogGroup
-	filteredCWLogGroups     []awsservice.LogGroup
-	cwLogGroupIdx           int
-	cwLogGroupFilter        string
-	cwLogGroupFilterActive  bool
-	selectedCWLogGroup      *awsservice.LogGroup
-	cwLogStreams            []awsservice.LogStream
-	filteredCWLogStreams    []awsservice.LogStream
-	cwLogStreamIdx          int
-	cwLogStreamFilter       string
-	cwLogStreamFilterActive bool
-	selectedCWLogStream     *awsservice.LogStream
-	cwLogEvents             []awsservice.LogEvent
-	cwLogScrollOffset       int
-	cwLogNextToken          *string
-	cwLogTimeRange          int // index into preset time ranges
-	cwLogFilterPattern      string
-	cwLogFilterActive       bool // filter pattern input active
-	cwLogTailing            bool // live tail active
-	cwLogTailToken          *string
+	cwLogGroups          []awsservice.LogGroup
+	filteredCWLogGroups  []awsservice.LogGroup
+	cwLogGroupIdx        int
+	selectedCWLogGroup   *awsservice.LogGroup
+	cwLogStreams         []awsservice.LogStream
+	filteredCWLogStreams []awsservice.LogStream
+	cwLogStreamIdx       int
+	selectedCWLogStream  *awsservice.LogStream
+	cwLogEvents          []awsservice.LogEvent
+	cwLogScrollOffset    int
+	cwLogNextToken       *string
+	cwLogTimeRange       int  // index into preset time ranges
+	cwLogTailing         bool // live tail active
+	cwLogTailToken       *string
 
 	// S3 browser state
-	s3Buckets            []awsservice.S3Bucket
-	filteredS3Buckets    []awsservice.S3Bucket
-	s3BucketIdx          int
-	s3BucketFilter       string
-	s3BucketFilterActive bool
-	selectedS3Bucket     *awsservice.S3Bucket
-	s3Objects            []awsservice.S3Object
-	filteredS3Objects    []awsservice.S3Object
-	s3ObjectIdx          int
-	s3ObjectFilter       string
-	s3ObjectFilterActive bool
-	s3CurrentPrefix      string
-	s3PrefixStack        []string
-	selectedS3Object     *awsservice.S3ObjectDetail
+	s3Buckets         []awsservice.S3Bucket
+	filteredS3Buckets []awsservice.S3Bucket
+	s3BucketIdx       int
+	selectedS3Bucket  *awsservice.S3Bucket
+	s3Objects         []awsservice.S3Object
+	filteredS3Objects []awsservice.S3Object
+	s3ObjectIdx       int
+	s3CurrentPrefix   string
+	s3PrefixStack     []string
+	selectedS3Object  *awsservice.S3ObjectDetail
 
 	// Context picker
 	configPath         string
 	ctxList            []config.ContextInfo
 	filteredCtxList    []config.ContextInfo
 	ctxIdx             int
-	ctxFilterInput     string
-	ctxFilterActive    bool
 	ctxPrevScreen      screen
 	pendingContextName string
 
@@ -275,6 +244,9 @@ type Model struct {
 
 	// Loading state
 	loadingSpinner spinner.Model
+	filterTI       textinput.Model
+	activeFilter   filterTarget
+	filters        map[filterTarget]string
 
 	// Terminal size
 	width  int
@@ -284,6 +256,7 @@ type Model struct {
 // New creates a new app Model.
 func New(cfg *config.Config, configPath string, version string) Model {
 	services := domain.Catalog()
+	filterTI := newFilterInput()
 	return Model{
 		cfg:            cfg,
 		configPath:     configPath,
@@ -292,6 +265,8 @@ func New(cfg *config.Config, configPath string, version string) Model {
 		ctxPrevScreen:  screenServiceList,
 		services:       services,
 		loadingSpinner: newLoadingSpinner(),
+		filterTI:       filterTI,
+		filters:        make(map[filterTarget]string),
 	}
 }
 
@@ -351,6 +326,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.syncFilterInputWidth()
 		return m, nil
 	case callerIdentityMsg:
 		m.callerIdentity = msg.identity
@@ -402,12 +378,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Global home — return to service list from any screen (skip text-input screens)
 		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
 			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm {
+			m.deactivateFilter()
 			m.screen = screenServiceList
 			return m, nil
 		}
 		// Global context switch — C key opens context picker (skip text-input screens)
 		if msg.String() == "C" && m.screen != screenContextPicker &&
 			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm {
+			m.deactivateFilter()
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
 		}
@@ -494,6 +472,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case screenError:
 			return m.updateError(msg)
 		}
+	}
+
+	if m.filterTI.Focused() {
+		var cmd tea.Cmd
+		m.filterTI, cmd = m.filterTI.Update(msg)
+		return m, cmd
 	}
 
 	return m, nil
@@ -831,25 +815,14 @@ func (m Model) loadSecretDetail(name string) tea.Cmd {
 func (m Model) updateSecretList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.secretFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.secretFilter)
-		m.secretFilter = newFilter
-		if deactivate {
-			m.secretFilterActive = false
-		}
-		if changed {
-			m.filteredSecrets = applyFilter(m.secrets, m.secretFilter)
-			m.secretIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterSecrets); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.secretFilter = ""
-		m.filteredSecrets = m.secrets
-		m.secretIdx = 0
+		m.resetFilter(filterSecrets)
 	case "up", "k":
 		if m.secretIdx > 0 {
 			m.secretIdx--
@@ -859,7 +832,7 @@ func (m Model) updateSecretList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.secretIdx++
 		}
 	case "/":
-		m.secretFilterActive = true
+		return m, m.activateFilter(filterSecrets)
 	case "enter":
 		if len(m.filteredSecrets) > 0 && m.secretIdx < len(m.filteredSecrets) {
 			selected := m.filteredSecrets[m.secretIdx]
@@ -884,11 +857,7 @@ func (m Model) viewSecretList() string {
 	b.WriteString(titleStyle.Render("Secrets Manager"))
 	b.WriteString("\n")
 
-	if m.secretFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.secretFilter)))
-	} else if m.secretFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.secretFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterSecrets))
 	b.WriteString("\n\n")
 
 	if len(m.filteredSecrets) == 0 {

@@ -18,8 +18,7 @@ func (m Model) handleS3Msg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.s3Buckets = msg.buckets
 		m.filteredS3Buckets = msg.buckets
 		m.s3BucketIdx = 0
-		m.s3BucketFilter = ""
-		m.s3BucketFilterActive = false
+		m.resetFilter(filterS3Buckets)
 		m.screen = screenS3BucketList
 		return m, nil, true
 	case s3ObjectsLoadedMsg:
@@ -30,8 +29,7 @@ func (m Model) handleS3Msg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.s3Objects = flattenS3Objects(msg.objects)
 		m.filteredS3Objects = m.s3Objects
 		m.s3ObjectIdx = 0
-		m.s3ObjectFilter = ""
-		m.s3ObjectFilterActive = false
+		m.resetFilter(filterS3Objects)
 		m.screen = screenS3ObjectList
 		return m, nil, true
 	case s3ObjectDetailLoadedMsg:
@@ -117,25 +115,14 @@ func (m Model) loadS3ObjectDetail(bucketName, key string) tea.Cmd {
 func (m Model) updateS3BucketList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.s3BucketFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.s3BucketFilter)
-		m.s3BucketFilter = newFilter
-		if deactivate {
-			m.s3BucketFilterActive = false
-		}
-		if changed {
-			m.filteredS3Buckets = applyFilter(m.s3Buckets, m.s3BucketFilter)
-			m.s3BucketIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterS3Buckets); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.s3BucketFilter = ""
-		m.filteredS3Buckets = m.s3Buckets
-		m.s3BucketIdx = 0
+		m.resetFilter(filterS3Buckets)
 	case "up", "k":
 		if m.s3BucketIdx > 0 {
 			m.s3BucketIdx--
@@ -145,7 +132,7 @@ func (m Model) updateS3BucketList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.s3BucketIdx++
 		}
 	case "/":
-		m.s3BucketFilterActive = true
+		return m, m.activateFilter(filterS3Buckets)
 	case "enter":
 		if len(m.filteredS3Buckets) > 0 && m.s3BucketIdx < len(m.filteredS3Buckets) {
 			selected := m.filteredS3Buckets[m.s3BucketIdx]
@@ -161,17 +148,8 @@ func (m Model) updateS3BucketList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateS3ObjectList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.s3ObjectFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.s3ObjectFilter)
-		m.s3ObjectFilter = newFilter
-		if deactivate {
-			m.s3ObjectFilterActive = false
-		}
-		if changed {
-			m.filteredS3Objects = applyFilter(m.s3Objects, m.s3ObjectFilter)
-			m.s3ObjectIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterS3Objects); handled {
+		return m, cmd
 	}
 
 	switch key {
@@ -198,7 +176,7 @@ func (m Model) updateS3ObjectList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.s3ObjectIdx++
 		}
 	case "/":
-		m.s3ObjectFilterActive = true
+		return m, m.activateFilter(filterS3Objects)
 	case "enter":
 		if len(m.filteredS3Objects) == 0 || m.s3ObjectIdx >= len(m.filteredS3Objects) || m.selectedS3Bucket == nil {
 			return m, nil
@@ -228,11 +206,7 @@ func (m Model) viewS3BucketList() string {
 	b.WriteString(titleStyle.Render("S3 Buckets"))
 	b.WriteString("\n")
 
-	if m.s3BucketFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.s3BucketFilter)))
-	} else if m.s3BucketFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.s3BucketFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterS3Buckets))
 	b.WriteString("\n\n")
 
 	if len(m.filteredS3Buckets) == 0 {
@@ -304,11 +278,7 @@ func (m Model) viewS3ObjectList() string {
 	b.WriteString(dimStyle.Render(fmt.Sprintf("Path: %s", awsservice.S3Breadcrumb(m.s3CurrentPrefix))))
 	b.WriteString("\n")
 
-	if m.s3ObjectFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.s3ObjectFilter)))
-	} else if m.s3ObjectFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.s3ObjectFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterS3Objects))
 	b.WriteString("\n\n")
 
 	if len(m.filteredS3Objects) == 0 {

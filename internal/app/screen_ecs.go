@@ -20,8 +20,7 @@ func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.ecsClusters = msg.clusters
 		m.filteredECSClusters = msg.clusters
 		m.ecsClusterIdx = 0
-		m.ecsClusterFilter = ""
-		m.ecsClusterFilterActive = false
+		m.resetFilter(filterECSClusters)
 		m.screen = screenECSClusterList
 		return m, nil, true
 
@@ -29,8 +28,7 @@ func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.ecsServices = msg.services
 		m.filteredECSServices = msg.services
 		m.ecsServiceIdx = 0
-		m.ecsServiceFilter = ""
-		m.ecsServiceFilterActive = false
+		m.resetFilter(filterECSServices)
 		m.screen = screenECSServiceList
 		return m, nil, true
 
@@ -58,17 +56,8 @@ func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 func (m Model) updateECSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.ecsClusterFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.ecsClusterFilter)
-		m.ecsClusterFilter = newFilter
-		if deactivate {
-			m.ecsClusterFilterActive = false
-		}
-		if changed {
-			m.filteredECSClusters = applyFilter(m.ecsClusters, m.ecsClusterFilter)
-			m.ecsClusterIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterECSClusters); handled {
+		return m, cmd
 	}
 
 	switch key {
@@ -83,7 +72,7 @@ func (m Model) updateECSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ecsClusterIdx++
 		}
 	case "/":
-		m.ecsClusterFilterActive = true
+		return m, m.activateFilter(filterECSClusters)
 	case "r":
 		return m.startLoading(m.loadECSClusters())
 	case "enter":
@@ -102,11 +91,7 @@ func (m Model) viewECSClusterList() string {
 	b.WriteString(titleStyle.Render("ECS Clusters"))
 	b.WriteString("\n")
 
-	if m.ecsClusterFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.ecsClusterFilter)))
-	} else if m.ecsClusterFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.ecsClusterFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterECSClusters))
 	b.WriteString("\n\n")
 
 	if len(m.filteredECSClusters) == 0 {
@@ -146,17 +131,8 @@ func (m Model) viewECSClusterList() string {
 func (m Model) updateECSServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.ecsServiceFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.ecsServiceFilter)
-		m.ecsServiceFilter = newFilter
-		if deactivate {
-			m.ecsServiceFilterActive = false
-		}
-		if changed {
-			m.filteredECSServices = applyFilter(m.ecsServices, m.ecsServiceFilter)
-			m.ecsServiceIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterECSServices); handled {
+		return m, cmd
 	}
 
 	switch key {
@@ -171,7 +147,7 @@ func (m Model) updateECSServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ecsServiceIdx++
 		}
 	case "/":
-		m.ecsServiceFilterActive = true
+		return m, m.activateFilter(filterECSServices)
 	case "r":
 		return m.startLoading(m.loadECSServices())
 	case "enter":
@@ -194,11 +170,7 @@ func (m Model) viewECSServiceList() string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Services — %s", clusterName)))
 	b.WriteString("\n")
 
-	if m.ecsServiceFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.ecsServiceFilter)))
-	} else if m.ecsServiceFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.ecsServiceFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterECSServices))
 	b.WriteString("\n\n")
 
 	if len(m.filteredECSServices) == 0 {

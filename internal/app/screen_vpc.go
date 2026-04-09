@@ -59,16 +59,8 @@ func (m Model) updateSubnetList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateSubnetDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.ipFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.ipFilter)
-		m.ipFilter = newFilter
-		if deactivate {
-			m.ipFilterActive = false
-		}
-		if changed {
-			m.applyIPFilter()
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterSubnetIPs); handled {
+		return m, cmd
 	}
 
 	switch key {
@@ -84,18 +76,19 @@ func (m Model) updateSubnetDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ipScrollOffset++
 		}
 	case "/":
-		m.ipFilterActive = true
+		return m, m.activateFilter(filterSubnetIPs)
 	}
 	return m, nil
 }
 
 func (m *Model) applyIPFilter() {
-	if m.ipFilter == "" {
+	query := m.filterValue(filterSubnetIPs)
+	if query == "" {
 		m.filteredIPs = m.availableIPs
 	} else {
 		var result []string
 		for _, ip := range m.availableIPs {
-			if strings.Contains(ip, m.ipFilter) {
+			if strings.Contains(ip, query) {
 				result = append(result, ip)
 			}
 		}
@@ -264,12 +257,7 @@ func (m Model) viewSubnetDetail() string {
 	b.WriteString(normalStyle.Render(fmt.Sprintf("  Available IPs : %d", len(m.availableIPs))))
 	b.WriteString("\n\n")
 
-	// Filter bar
-	if m.ipFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.ipFilter)))
-	} else if m.ipFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.ipFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterSubnetIPs))
 	b.WriteString("\n")
 
 	if len(m.filteredIPs) == 0 {
