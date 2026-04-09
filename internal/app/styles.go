@@ -85,7 +85,7 @@ func (m Model) fitToHeight(s string) string {
 }
 
 func (m Model) viewLoading() string {
-	return titleStyle.Render("Loading...")
+	return titleStyle.Render(fmt.Sprintf("%s Loading...", m.loadingSpinner.View()))
 }
 
 func (m Model) viewError() string {

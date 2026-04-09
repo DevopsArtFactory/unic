@@ -27,8 +27,7 @@ func (m Model) updateVPCList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filteredVPCs) > 0 && m.vpcIdx < len(m.filteredVPCs) {
 			selected := m.filteredVPCs[m.vpcIdx]
 			m.selectedVPC = &selected
-			m.screen = screenLoading
-			return m, m.loadSubnets(selected.VPCID)
+			return m.startLoading(m.loadSubnets(selected.VPCID))
 		}
 	}
 	return m, nil
@@ -51,8 +50,7 @@ func (m Model) updateSubnetList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.subnets) > 0 && m.subnetIdx < len(m.subnets) {
 			selected := m.subnets[m.subnetIdx]
 			m.selectedSubnet = &selected
-			m.screen = screenLoading
-			return m, m.loadAvailableIPs(selected)
+			return m.startLoading(m.loadAvailableIPs(selected))
 		}
 	}
 	return m, nil

@@ -165,8 +165,7 @@ func (m Model) updateCWLogGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filteredCWLogGroups) > 0 && m.cwLogGroupIdx < len(m.filteredCWLogGroups) {
 			selected := m.filteredCWLogGroups[m.cwLogGroupIdx]
 			m.selectedCWLogGroup = &selected
-			m.screen = screenLoading
-			return m, m.loadCWLogStreams(selected.Name)
+			return m.startLoading(m.loadCWLogStreams(selected.Name))
 		}
 	}
 	return m, nil
@@ -286,8 +285,7 @@ func (m Model) updateCWLogStreamList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cwLogFilterPattern = ""
 			m.cwLogTailing = false
 			m.cwLogTailToken = nil
-			m.screen = screenLoading
-			return m, m.loadCWLogEvents(false)
+			return m.startLoading(m.loadCWLogEvents(false))
 		}
 	}
 	return m, nil
@@ -380,8 +378,7 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "enter":
 			m.cwLogFilterActive = false
 			// Reload with new filter
-			m.screen = screenLoading
-			return m, m.loadCWLogEvents(false)
+			return m.startLoading(m.loadCWLogEvents(false))
 		case "backspace":
 			if len(m.cwLogFilterPattern) > 0 {
 				m.cwLogFilterPattern = m.cwLogFilterPattern[:len(m.cwLogFilterPattern)-1]
@@ -433,8 +430,7 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if idx >= 0 && idx < len(cwTimeRanges) {
 			m.cwLogTimeRange = idx
 			m.cwLogTailing = false
-			m.screen = screenLoading
-			return m, m.loadCWLogEvents(false)
+			return m.startLoading(m.loadCWLogEvents(false))
 		}
 	}
 	return m, nil
@@ -643,10 +639,10 @@ func (m Model) pollCWLogTail() tea.Cmd {
 		}
 
 		return cwLogEventsLoadedMsg{
-			events:                events,
-			nextToken:             nextToken,
-			append:                true,
-			updateTailToken:       true,
+			events:          events,
+			nextToken:       nextToken,
+			append:          true,
+			updateTailToken: true,
 		}
 	}
 }

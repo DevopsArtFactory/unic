@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"unic/internal/config"
@@ -27,6 +28,20 @@ func TestNewModelStartsOnContextPicker(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	if m.screen != screenContextPicker {
 		t.Error("new model should start on context picker screen")
+	}
+}
+
+func TestNewModelInitializesLoadingSpinner(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+
+	if got, want := m.loadingSpinner.Spinner.FPS, spinner.MiniDot.FPS; got != want {
+		t.Fatalf("expected spinner FPS %v, got %v", want, got)
+	}
+	if got, want := len(m.loadingSpinner.Spinner.Frames), len(spinner.MiniDot.Frames); got != want {
+		t.Fatalf("expected %d spinner frames, got %d", want, got)
+	}
+	if got, want := m.loadingSpinner.Spinner.Frames[0], spinner.MiniDot.Frames[0]; got != want {
+		t.Fatalf("expected first spinner frame %q, got %q", want, got)
 	}
 }
 
@@ -63,11 +78,48 @@ func TestViewNotEmpty(t *testing.T) {
 	}
 }
 
+func TestLoadingViewShowsSpinner(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+
+	v := m.View()
+	if !strings.Contains(v, "Loading...") {
+		t.Fatalf("expected loading text, got %q", v)
+	}
+	if !strings.Contains(v, m.loadingSpinner.View()) {
+		t.Fatalf("expected spinner frame in loading view, got %q", v)
+	}
+}
+
 func TestViewEmptyWhenQuitting(t *testing.T) {
 	m := Model{quitting: true}
 	v := m.View()
 	if v != "" {
 		t.Error("view should be empty when quitting")
+	}
+}
+
+func TestLoadingSpinnerTickUpdatesOnlyOnLoadingScreen(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	initialFrame := m.loadingSpinner.View()
+
+	updated, cmd := m.Update(m.loadingSpinner.Tick())
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected no follow-up spinner tick off loading screen")
+	}
+	if model.loadingSpinner.View() != initialFrame {
+		t.Fatalf("expected spinner frame to stay %q off loading screen, got %q", initialFrame, model.loadingSpinner.View())
+	}
+
+	m.screen = screenLoading
+	updated, cmd = m.Update(m.loadingSpinner.Tick())
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected follow-up spinner tick on loading screen")
+	}
+	if model.loadingSpinner.View() == initialFrame {
+		t.Fatalf("expected spinner frame to advance from %q", initialFrame)
 	}
 }
 

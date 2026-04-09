@@ -85,14 +85,12 @@ func (m Model) updateECSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.ecsClusterFilterActive = true
 	case "r":
-		m.screen = screenLoading
-		return m, m.loadECSClusters()
+		return m.startLoading(m.loadECSClusters())
 	case "enter":
 		if len(m.filteredECSClusters) > 0 && m.ecsClusterIdx < len(m.filteredECSClusters) {
 			cluster := m.filteredECSClusters[m.ecsClusterIdx]
 			m.selectedECSCluster = &cluster
-			m.screen = screenLoading
-			return m, m.loadECSServices()
+			return m.startLoading(m.loadECSServices())
 		}
 	}
 	return m, nil
@@ -175,14 +173,12 @@ func (m Model) updateECSServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.ecsServiceFilterActive = true
 	case "r":
-		m.screen = screenLoading
-		return m, m.loadECSServices()
+		return m.startLoading(m.loadECSServices())
 	case "enter":
 		if len(m.filteredECSServices) > 0 && m.ecsServiceIdx < len(m.filteredECSServices) {
 			svc := m.filteredECSServices[m.ecsServiceIdx]
 			m.selectedECSService = &svc
-			m.screen = screenLoading
-			return m, m.loadECSTasks()
+			return m.startLoading(m.loadECSTasks())
 		}
 	}
 	return m, nil
@@ -252,14 +248,12 @@ func (m Model) updateECSTaskList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ecsTaskIdx++
 		}
 	case "r":
-		m.screen = screenLoading
-		return m, m.loadECSTasks()
+		return m.startLoading(m.loadECSTasks())
 	case "enter":
 		if len(m.ecsTasks) > 0 && m.ecsTaskIdx < len(m.ecsTasks) {
 			task := m.ecsTasks[m.ecsTaskIdx]
 			m.selectedECSTask = &task
-			m.screen = screenLoading
-			return m, m.loadECSContainers()
+			return m.startLoading(m.loadECSContainers())
 		}
 	}
 	return m, nil

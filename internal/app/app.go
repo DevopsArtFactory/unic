@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -198,12 +199,12 @@ type Model struct {
 	ecsServiceFilterActive bool
 	selectedECSService     *awsservice.ECSService
 
-	ecsTasks    []awsservice.ECSTask
-	ecsTaskIdx  int
+	ecsTasks        []awsservice.ECSTask
+	ecsTaskIdx      int
 	selectedECSTask *awsservice.ECSTask
 
-	ecsContainers    []awsservice.ECSContainer
-	ecsContainerIdx  int
+	ecsContainers   []awsservice.ECSContainer
+	ecsContainerIdx int
 
 	// CloudWatch Logs browser state
 	cwLogGroups             []awsservice.LogGroup
@@ -272,6 +273,9 @@ type Model struct {
 	// Error display
 	errMsg string
 
+	// Loading state
+	loadingSpinner spinner.Model
+
 	// Terminal size
 	width  int
 	height int
@@ -287,7 +291,15 @@ func New(cfg *config.Config, configPath string, version string) Model {
 		screen:         screenContextPicker,
 		ctxPrevScreen:  screenServiceList,
 		services:       services,
+		loadingSpinner: newLoadingSpinner(),
 	}
+}
+
+func newLoadingSpinner() spinner.Model {
+	return spinner.New(
+		spinner.WithSpinner(spinner.MiniDot),
+		spinner.WithStyle(titleStyle),
+	)
 }
 
 // updateAvailableMsg is sent when a background version check completes.
@@ -324,6 +336,15 @@ func (m Model) loadCallerIdentity() tea.Cmd {
 	}
 }
 
+func (m Model) startLoading(cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	m.screen = screenLoading
+	m.loadingSpinner = newLoadingSpinner()
+	if cmd == nil {
+		return m, m.loadingSpinner.Tick
+	}
+	return m, tea.Batch(m.loadingSpinner.Tick, cmd)
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Global messages
 	switch msg := msg.(type) {
@@ -340,6 +361,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateAvailable = msg.version
 		}
 		return m, nil
+	case spinner.TickMsg:
+		if m.screen != screenLoading {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
+		return m, cmd
 	case errMsg:
 		m.errMsg = msg.err.Error()
 		m.screen = screenError
@@ -531,43 +559,31 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			feat := m.features[m.featIdx]
 			switch feat.Kind {
 			case domain.FeatureSSMSession:
-				m.screen = screenLoading
-				return m, m.loadInstances()
+				return m.startLoading(m.loadInstances())
 			case domain.FeatureVPCBrowser:
-				m.screen = screenLoading
-				return m, m.loadVPCs()
+				return m.startLoading(m.loadVPCs())
 			case domain.FeatureRDSBrowser:
-				m.screen = screenLoading
-				return m, m.loadRDSInstances()
+				return m.startLoading(m.loadRDSInstances())
 			case domain.FeatureRoute53Browser:
-				m.screen = screenLoading
-				return m, m.loadRoute53Zones()
+				return m.startLoading(m.loadRoute53Zones())
 			case domain.FeatureSecretsBrowser:
-				m.screen = screenLoading
-				return m, m.loadSecrets()
+				return m.startLoading(m.loadSecrets())
 			case domain.FeatureCloudWatchLogsBrowser:
-				m.screen = screenLoading
-				return m, m.loadCWLogGroups()
+				return m.startLoading(m.loadCWLogGroups())
 			case domain.FeatureS3Browser:
-				m.screen = screenLoading
-				return m, m.loadS3Buckets()
+				return m.startLoading(m.loadS3Buckets())
 			case domain.FeatureSecurityGroupBrowser:
-				m.screen = screenLoading
-				return m, m.loadSecurityGroups()
+				return m.startLoading(m.loadSecurityGroups())
 			case domain.FeatureIAMUsersBrowser:
-				m.screen = screenLoading
-				return m, m.loadIAMUsers()
+				return m.startLoading(m.loadIAMUsers())
 			case domain.FeatureListAccessKeys:
 				m.iamRotationEnabled = false
-				m.screen = screenLoading
-				return m, m.loadIAMKeys()
+				return m.startLoading(m.loadIAMKeys())
 			case domain.FeatureRotateAccessKey:
 				m.iamRotationEnabled = true
-				m.screen = screenLoading
-				return m, m.loadIAMKeys()
+				return m.startLoading(m.loadIAMKeys())
 			case domain.FeatureECSExec:
-				m.screen = screenLoading
-				return m, m.loadECSClusters()
+				return m.startLoading(m.loadECSClusters())
 			}
 		}
 	}
@@ -847,8 +863,7 @@ func (m Model) updateSecretList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if len(m.filteredSecrets) > 0 && m.secretIdx < len(m.filteredSecrets) {
 			selected := m.filteredSecrets[m.secretIdx]
-			m.screen = screenLoading
-			return m, m.loadSecretDetail(selected.Name)
+			return m.startLoading(m.loadSecretDetail(selected.Name))
 		}
 	}
 	return m, nil

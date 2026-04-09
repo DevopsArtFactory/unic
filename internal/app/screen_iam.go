@@ -368,8 +368,7 @@ func (m Model) updateIAMUserList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if len(m.filteredIAMUsers) > 0 && m.iamUserIdx < len(m.filteredIAMUsers) {
 			selected := m.filteredIAMUsers[m.iamUserIdx]
-			m.screen = screenLoading
-			return m, m.loadIAMUserDetail(selected.UserName)
+			return m.startLoading(m.loadIAMUserDetail(selected.UserName))
 		}
 	case "n":
 		if m.iamUserHasMore && !m.iamUserLoadingMore {
@@ -459,8 +458,7 @@ func (m Model) updateIAMKeyRotateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenIAMKeyDetail
 	case "enter":
 		if m.selectedIAMKey != nil && m.iamRotateConfirm == confirmTarget {
-			m.screen = screenLoading
-			return m, m.createIAMKey()
+			return m.startLoading(m.createIAMKey())
 		}
 	case "backspace":
 		if len(m.iamRotateConfirm) > 0 {
@@ -509,8 +507,7 @@ func (m Model) updateIAMKeyRotateResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.iamNewKeyVerified = false
 		m.iamOldKeyInactive = false
 		m.iamOldKeyDeleted = false
-		m.screen = screenLoading
-		return m, m.loadIAMKeys()
+		return m.startLoading(m.loadIAMKeys())
 	}
 	return m, nil
 }

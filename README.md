@@ -9,6 +9,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Switch between credential, assume-role, and SSO contexts
 - Export shell environment variables for the active context
 - Drill down into resources with filters, detail views, and action screens
+- Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
 
 ## Documentation Map
