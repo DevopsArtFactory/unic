@@ -26,6 +26,11 @@ const (
 	screenVPCList
 	screenSubnetList
 	screenSubnetDetail
+	screenReachabilityRegionList
+	screenReachabilitySourceList
+	screenReachabilityDestinationList
+	screenReachabilityConfig
+	screenReachabilityResult
 	screenRDSList
 	screenRDSDetail
 	screenRDSConfirm
@@ -87,17 +92,37 @@ type Model struct {
 	selectedInstance *awsservice.EC2Instance
 
 	// VPC browser state
-	vpcs           []awsservice.VPC
-	filteredVPCs   []awsservice.VPC
-	vpcIdx         int
-	subnets        []awsservice.Subnet
-	subnetIdx      int
-	selectedVPC    *awsservice.VPC
-	selectedSubnet *awsservice.Subnet
-	availableIPs   []string
-	filteredIPs    []string
-	ipScrollOffset int
-
+	vpcs                        []awsservice.VPC
+	filteredVPCs                []awsservice.VPC
+	vpcIdx                      int
+	subnets                     []awsservice.Subnet
+	subnetIdx                   int
+	selectedVPC                 *awsservice.VPC
+	selectedSubnet              *awsservice.Subnet
+	availableIPs                []string
+	filteredIPs                 []string
+	ipScrollOffset              int
+	ipFilter                    string
+	ipFilterActive              bool
+	reachabilityRegions         []string
+	filteredReachabilityRegions []string
+	reachabilityRegion          string
+	reachabilityRegionIdx       int
+	reachabilityRegionFilter    string
+	reachabilityRegionFiltering bool
+	reachabilityTargets         []awsservice.ReachabilityTarget
+	filteredReachabilityTargets []awsservice.ReachabilityTarget
+	reachabilityIdx             int
+	reachabilityFilter          string
+	reachabilityFilterActive    bool
+	reachabilitySource          *awsservice.ReachabilityTarget
+	reachabilityDestination     *awsservice.ReachabilityTarget
+	reachabilityDestinationIP   string
+	reachabilityProtocolIdx     int
+	reachabilityPortInput       string
+	reachabilityConfigField     int
+	reachabilityResult          *awsservice.ReachabilityAnalysisResult
+	reachabilityScrollOffset    int
 	// RDS browser state
 	rdsInstances    []awsservice.RDSInstance
 	filteredRDS     []awsservice.RDSInstance
@@ -403,6 +428,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSubnetList(msg)
 		case screenSubnetDetail:
 			return m.updateSubnetDetail(msg)
+		case screenReachabilityRegionList:
+			return m.updateReachabilityRegionList(msg)
+		case screenReachabilitySourceList:
+			return m.updateReachabilitySourceList(msg)
+		case screenReachabilityDestinationList:
+			return m.updateReachabilityDestinationList(msg)
+		case screenReachabilityConfig:
+			return m.updateReachabilityConfig(msg)
+		case screenReachabilityResult:
+			return m.updateReachabilityResult(msg)
 		case screenRDSList:
 			return m.updateRDSList(msg)
 		case screenRDSDetail:
@@ -546,6 +581,26 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.startLoading(m.loadInstances())
 			case domain.FeatureVPCBrowser:
 				return m.startLoading(m.loadVPCs())
+			case domain.FeatureReachabilityAnalyzer:
+				m.reachabilityRegions = availableReachabilityRegions(m.cfg.Region)
+				m.filteredReachabilityRegions = m.reachabilityRegions
+				m.reachabilityRegion = m.cfg.Region
+				m.reachabilityRegionIdx = indexOfString(m.reachabilityRegions, m.reachabilityRegion)
+				if m.reachabilityRegionIdx < 0 {
+					m.reachabilityRegionIdx = 0
+				}
+				m.reachabilityRegionFilter = ""
+				m.reachabilityRegionFiltering = false
+				m.reachabilityTargets = nil
+				m.filteredReachabilityTargets = nil
+				m.reachabilitySource = nil
+				m.reachabilityDestination = nil
+				m.reachabilityDestinationIP = ""
+				m.reachabilityResult = nil
+				m.reachabilityScrollOffset = 0
+				m.awsRepo = nil
+				m.screen = screenReachabilityRegionList
+				return m, nil
 			case domain.FeatureRDSBrowser:
 				return m.startLoading(m.loadRDSInstances())
 			case domain.FeatureRoute53Browser:
@@ -605,6 +660,16 @@ func (m Model) View() string {
 		v = m.viewSubnetList()
 	case screenSubnetDetail:
 		v = m.viewSubnetDetail()
+	case screenReachabilityRegionList:
+		v = m.viewReachabilityRegionList()
+	case screenReachabilitySourceList:
+		v = m.viewReachabilitySourceList()
+	case screenReachabilityDestinationList:
+		v = m.viewReachabilityDestinationList()
+	case screenReachabilityConfig:
+		v = m.viewReachabilityConfig()
+	case screenReachabilityResult:
+		v = m.viewReachabilityResult()
 	case screenRDSList:
 		v = m.viewRDSList()
 	case screenRDSDetail:

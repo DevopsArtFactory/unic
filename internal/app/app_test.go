@@ -144,6 +144,36 @@ func TestServiceListEnterGoesToFeatures(t *testing.T) {
 	}
 }
 
+func TestReachabilityFeatureOpensRegionSelection(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFeatureList
+	m.features = []domain.Feature{
+		{Kind: domain.FeatureVPCBrowser},
+		{Kind: domain.FeatureReachabilityAnalyzer},
+	}
+	m.featIdx = 1
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenReachabilityRegionList {
+		t.Fatalf("expected region selection screen, got %v", model.screen)
+	}
+	if model.reachabilityRegion != "us-east-1" {
+		t.Fatalf("expected default reachability region us-east-1, got %q", model.reachabilityRegion)
+	}
+}
+
+func TestReachabilityStatusBarUsesOverrideRegion(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenReachabilitySourceList
+	m.reachabilityRegion = "ap-northeast-2"
+
+	bar := m.renderStatusBar()
+	if !strings.Contains(bar, "region:ap-northeast-2") {
+		t.Fatalf("expected reachability override region in status bar, got %q", bar)
+	}
+}
+
 func TestFeatureListEscGoesBack(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenFeatureList

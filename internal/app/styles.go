@@ -25,7 +25,15 @@ func (m Model) renderStatusBar() string {
 	if m.cfg.ContextName != "" {
 		parts = append(parts, fmt.Sprintf("[%s]", m.cfg.ContextName))
 	}
-	parts = append(parts, fmt.Sprintf("region:%s", m.cfg.Region))
+	activeRegion := m.cfg.Region
+	if m.screen == screenReachabilityRegionList ||
+		m.screen == screenReachabilitySourceList ||
+		m.screen == screenReachabilityDestinationList ||
+		m.screen == screenReachabilityConfig ||
+		m.screen == screenReachabilityResult {
+		activeRegion = m.activeReachabilityRegion()
+	}
+	parts = append(parts, fmt.Sprintf("region:%s", activeRegion))
 	if m.cfg.AuthType != "" {
 		parts = append(parts, fmt.Sprintf("auth:%s", m.cfg.AuthType))
 	}

@@ -3,7 +3,9 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -12,15 +14,20 @@ import (
 
 // mockEC2Client implements EC2ClientAPI for testing.
 type mockEC2Client struct {
-	describeVpcsFunc              func(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
-	describeSubnetsFunc           func(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
-	describeInstancesFunc         func(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
-	describeNetworkInterfacesFunc func(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
-	describeSecurityGroupsFunc    func(ctx context.Context, params *ec2.DescribeSecurityGroupsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error)
-	authorizeSGIngressFunc        func(ctx context.Context, params *ec2.AuthorizeSecurityGroupIngressInput, optFns ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupIngressOutput, error)
-	authorizeSGEgressFunc         func(ctx context.Context, params *ec2.AuthorizeSecurityGroupEgressInput, optFns ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupEgressOutput, error)
-	revokeSGIngressFunc           func(ctx context.Context, params *ec2.RevokeSecurityGroupIngressInput, optFns ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupIngressOutput, error)
-	revokeSGEgressFunc            func(ctx context.Context, params *ec2.RevokeSecurityGroupEgressInput, optFns ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupEgressOutput, error)
+	describeVpcsFunc                    func(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
+	describeSubnetsFunc                 func(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
+	describeInstancesFunc               func(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
+	describeNetworkInterfacesFunc       func(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
+	createNetworkInsightsPathFunc       func(ctx context.Context, params *ec2.CreateNetworkInsightsPathInput, optFns ...func(*ec2.Options)) (*ec2.CreateNetworkInsightsPathOutput, error)
+	startNetworkInsightsAnalysisFunc    func(ctx context.Context, params *ec2.StartNetworkInsightsAnalysisInput, optFns ...func(*ec2.Options)) (*ec2.StartNetworkInsightsAnalysisOutput, error)
+	describeNetworkInsightsAnalysesFunc func(ctx context.Context, params *ec2.DescribeNetworkInsightsAnalysesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInsightsAnalysesOutput, error)
+	deleteNetworkInsightsAnalysisFunc   func(ctx context.Context, params *ec2.DeleteNetworkInsightsAnalysisInput, optFns ...func(*ec2.Options)) (*ec2.DeleteNetworkInsightsAnalysisOutput, error)
+	deleteNetworkInsightsPathFunc       func(ctx context.Context, params *ec2.DeleteNetworkInsightsPathInput, optFns ...func(*ec2.Options)) (*ec2.DeleteNetworkInsightsPathOutput, error)
+	describeSecurityGroupsFunc          func(ctx context.Context, params *ec2.DescribeSecurityGroupsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error)
+	authorizeSGIngressFunc              func(ctx context.Context, params *ec2.AuthorizeSecurityGroupIngressInput, optFns ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupIngressOutput, error)
+	authorizeSGEgressFunc               func(ctx context.Context, params *ec2.AuthorizeSecurityGroupEgressInput, optFns ...func(*ec2.Options)) (*ec2.AuthorizeSecurityGroupEgressOutput, error)
+	revokeSGIngressFunc                 func(ctx context.Context, params *ec2.RevokeSecurityGroupIngressInput, optFns ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupIngressOutput, error)
+	revokeSGEgressFunc                  func(ctx context.Context, params *ec2.RevokeSecurityGroupEgressInput, optFns ...func(*ec2.Options)) (*ec2.RevokeSecurityGroupEgressOutput, error)
 }
 
 func (m *mockEC2Client) DescribeVpcs(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error) {
@@ -43,6 +50,41 @@ func (m *mockEC2Client) DescribeNetworkInterfaces(ctx context.Context, params *e
 		return m.describeNetworkInterfacesFunc(ctx, params, optFns...)
 	}
 	return &ec2.DescribeNetworkInterfacesOutput{}, nil
+}
+
+func (m *mockEC2Client) CreateNetworkInsightsPath(ctx context.Context, params *ec2.CreateNetworkInsightsPathInput, optFns ...func(*ec2.Options)) (*ec2.CreateNetworkInsightsPathOutput, error) {
+	if m.createNetworkInsightsPathFunc != nil {
+		return m.createNetworkInsightsPathFunc(ctx, params, optFns...)
+	}
+	return &ec2.CreateNetworkInsightsPathOutput{}, nil
+}
+
+func (m *mockEC2Client) StartNetworkInsightsAnalysis(ctx context.Context, params *ec2.StartNetworkInsightsAnalysisInput, optFns ...func(*ec2.Options)) (*ec2.StartNetworkInsightsAnalysisOutput, error) {
+	if m.startNetworkInsightsAnalysisFunc != nil {
+		return m.startNetworkInsightsAnalysisFunc(ctx, params, optFns...)
+	}
+	return &ec2.StartNetworkInsightsAnalysisOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeNetworkInsightsAnalyses(ctx context.Context, params *ec2.DescribeNetworkInsightsAnalysesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInsightsAnalysesOutput, error) {
+	if m.describeNetworkInsightsAnalysesFunc != nil {
+		return m.describeNetworkInsightsAnalysesFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeNetworkInsightsAnalysesOutput{}, nil
+}
+
+func (m *mockEC2Client) DeleteNetworkInsightsAnalysis(ctx context.Context, params *ec2.DeleteNetworkInsightsAnalysisInput, optFns ...func(*ec2.Options)) (*ec2.DeleteNetworkInsightsAnalysisOutput, error) {
+	if m.deleteNetworkInsightsAnalysisFunc != nil {
+		return m.deleteNetworkInsightsAnalysisFunc(ctx, params, optFns...)
+	}
+	return &ec2.DeleteNetworkInsightsAnalysisOutput{}, nil
+}
+
+func (m *mockEC2Client) DeleteNetworkInsightsPath(ctx context.Context, params *ec2.DeleteNetworkInsightsPathInput, optFns ...func(*ec2.Options)) (*ec2.DeleteNetworkInsightsPathOutput, error) {
+	if m.deleteNetworkInsightsPathFunc != nil {
+		return m.deleteNetworkInsightsPathFunc(ctx, params, optFns...)
+	}
+	return &ec2.DeleteNetworkInsightsPathOutput{}, nil
 }
 
 func (m *mockEC2Client) DescribeSecurityGroups(ctx context.Context, params *ec2.DescribeSecurityGroupsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error) {
@@ -276,6 +318,232 @@ func TestListSubnets_SortedByName(t *testing.T) {
 	}
 	if subnets[0].Name != "a-public" || subnets[1].Name != "z-private" {
 		t.Fatalf("expected alphabetical subnet order, got %+v", subnets)
+	}
+}
+
+func TestListReachabilityTargets_Success(t *testing.T) {
+	mock := &mockEC2Client{
+		describeInstancesFunc: func(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
+			return &ec2.DescribeInstancesOutput{
+				Reservations: []types.Reservation{
+					{
+						Instances: []types.Instance{
+							{
+								InstanceId:       awssdk.String("i-123"),
+								PrivateIpAddress: awssdk.String("10.0.1.10"),
+								VpcId:            awssdk.String("vpc-1"),
+								SubnetId:         awssdk.String("subnet-1"),
+								State:            &types.InstanceState{Name: types.InstanceStateNameRunning},
+								Tags:             []types.Tag{{Key: awssdk.String("Name"), Value: awssdk.String("app-a")}},
+							},
+						},
+					},
+				},
+			}, nil
+		},
+		describeNetworkInterfacesFunc: func(_ context.Context, _ *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {
+			return &ec2.DescribeNetworkInterfacesOutput{
+				NetworkInterfaces: []types.NetworkInterface{
+					{
+						NetworkInterfaceId: awssdk.String("eni-123"),
+						PrivateIpAddress:   awssdk.String("10.0.1.20"),
+						VpcId:              awssdk.String("vpc-1"),
+						SubnetId:           awssdk.String("subnet-1"),
+						Status:             types.NetworkInterfaceStatusInUse,
+						Description:        awssdk.String("db-eni"),
+					},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	targets, err := repo.ListReachabilityTargets(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(targets) != 2 {
+		t.Fatalf("expected 2 targets, got %d", len(targets))
+	}
+	if targets[0].Type != "EC2 Instance" || targets[1].Type != "ENI" {
+		t.Fatalf("unexpected targets: %+v", targets)
+	}
+}
+
+func TestRunReachabilityAnalysis_Success(t *testing.T) {
+	var deletedAnalysis string
+	var deletedPath string
+	mock := &mockEC2Client{
+		createNetworkInsightsPathFunc: func(_ context.Context, params *ec2.CreateNetworkInsightsPathInput, _ ...func(*ec2.Options)) (*ec2.CreateNetworkInsightsPathOutput, error) {
+			if awssdk.ToString(params.Source) != "i-src" {
+				t.Fatalf("expected source i-src, got %s", awssdk.ToString(params.Source))
+			}
+			if awssdk.ToInt32(params.DestinationPort) != 443 {
+				t.Fatalf("expected port 443, got %d", awssdk.ToInt32(params.DestinationPort))
+			}
+			return &ec2.CreateNetworkInsightsPathOutput{
+				NetworkInsightsPath: &types.NetworkInsightsPath{
+					NetworkInsightsPathId: awssdk.String("nip-123"),
+				},
+			}, nil
+		},
+		startNetworkInsightsAnalysisFunc: func(_ context.Context, params *ec2.StartNetworkInsightsAnalysisInput, _ ...func(*ec2.Options)) (*ec2.StartNetworkInsightsAnalysisOutput, error) {
+			if awssdk.ToString(params.NetworkInsightsPathId) != "nip-123" {
+				t.Fatalf("expected path ID nip-123, got %s", awssdk.ToString(params.NetworkInsightsPathId))
+			}
+			return &ec2.StartNetworkInsightsAnalysisOutput{
+				NetworkInsightsAnalysis: &types.NetworkInsightsAnalysis{
+					NetworkInsightsAnalysisId: awssdk.String("nia-123"),
+				},
+			}, nil
+		},
+		describeNetworkInsightsAnalysesFunc: func(_ context.Context, _ *ec2.DescribeNetworkInsightsAnalysesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInsightsAnalysesOutput, error) {
+			return &ec2.DescribeNetworkInsightsAnalysesOutput{
+				NetworkInsightsAnalyses: []types.NetworkInsightsAnalysis{
+					{
+						NetworkInsightsAnalysisId: awssdk.String("nia-123"),
+						Status:                    types.AnalysisStatusSucceeded,
+						StatusMessage:             awssdk.String("Analysis completed successfully"),
+						NetworkPathFound:          awssdk.Bool(false),
+						ForwardPathComponents: []types.PathComponent{
+							{
+								SequenceNumber: awssdk.Int32(1),
+								Component:      &types.AnalysisComponent{Id: awssdk.String("eni-src"), Name: awssdk.String("source-eni")},
+								Explanations: []types.Explanation{
+									{
+										ExplanationCode: awssdk.String("ENI_SG_RULES_MISMATCH"),
+										SecurityGroup:   &types.AnalysisComponent{Id: awssdk.String("sg-123"), Name: awssdk.String("web-sg")},
+									},
+								},
+							},
+						},
+						Explanations: []types.Explanation{
+							{
+								ExplanationCode: awssdk.String("ENI_SG_RULES_MISMATCH"),
+								Component:       &types.AnalysisComponent{Id: awssdk.String("eni-dst"), Name: awssdk.String("dst-eni")},
+								SecurityGroup:   &types.AnalysisComponent{Id: awssdk.String("sg-123"), Name: awssdk.String("web-sg")},
+								Port:            awssdk.Int32(443),
+							},
+						},
+						StartDate: awssdk.Time(time.Now()),
+					},
+				},
+			}, nil
+		},
+		deleteNetworkInsightsAnalysisFunc: func(_ context.Context, params *ec2.DeleteNetworkInsightsAnalysisInput, _ ...func(*ec2.Options)) (*ec2.DeleteNetworkInsightsAnalysisOutput, error) {
+			deletedAnalysis = awssdk.ToString(params.NetworkInsightsAnalysisId)
+			return &ec2.DeleteNetworkInsightsAnalysisOutput{}, nil
+		},
+		deleteNetworkInsightsPathFunc: func(_ context.Context, params *ec2.DeleteNetworkInsightsPathInput, _ ...func(*ec2.Options)) (*ec2.DeleteNetworkInsightsPathOutput, error) {
+			deletedPath = awssdk.ToString(params.NetworkInsightsPathId)
+			return &ec2.DeleteNetworkInsightsPathOutput{}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	result, err := repo.RunReachabilityAnalysis(context.Background(),
+		ReachabilityTarget{ID: "i-src", Name: "source", Type: "EC2 Instance"},
+		ReachabilityTarget{ID: "i-dst", Name: "dest", Type: "EC2 Instance"},
+		"",
+		"TCP",
+		443,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.PathID != "nip-123" || result.AnalysisID != "nia-123" {
+		t.Fatalf("unexpected IDs: %+v", result)
+	}
+	if result.NetworkPathFound {
+		t.Fatalf("expected unreachable result")
+	}
+	if len(result.ForwardPath) != 1 || len(result.Explanations) != 1 {
+		t.Fatalf("expected mapped path and explanations, got %+v", result)
+	}
+	if result.Explanations[0].Code != "ENI_SG_RULES_MISMATCH" {
+		t.Fatalf("unexpected explanation: %+v", result.Explanations[0])
+	}
+	if deletedAnalysis != "nia-123" {
+		t.Fatalf("expected analysis cleanup, got %q", deletedAnalysis)
+	}
+	if deletedPath != "nip-123" {
+		t.Fatalf("expected path cleanup, got %q", deletedPath)
+	}
+}
+
+func TestRunReachabilityAnalysis_ManualIPv4UsesDestinationIP(t *testing.T) {
+	mock := &mockEC2Client{
+		createNetworkInsightsPathFunc: func(_ context.Context, params *ec2.CreateNetworkInsightsPathInput, _ ...func(*ec2.Options)) (*ec2.CreateNetworkInsightsPathOutput, error) {
+			if awssdk.ToString(params.DestinationIp) != "10.0.2.15" {
+				t.Fatalf("expected destination IP, got %q", awssdk.ToString(params.DestinationIp))
+			}
+			if params.FilterAtSource != nil {
+				t.Fatalf("expected no source filter for manual IPv4 destination")
+			}
+			return &ec2.CreateNetworkInsightsPathOutput{
+				NetworkInsightsPath: &types.NetworkInsightsPath{NetworkInsightsPathId: awssdk.String("nip-123")},
+			}, nil
+		},
+		startNetworkInsightsAnalysisFunc: func(_ context.Context, _ *ec2.StartNetworkInsightsAnalysisInput, _ ...func(*ec2.Options)) (*ec2.StartNetworkInsightsAnalysisOutput, error) {
+			return &ec2.StartNetworkInsightsAnalysisOutput{
+				NetworkInsightsAnalysis: &types.NetworkInsightsAnalysis{NetworkInsightsAnalysisId: awssdk.String("nia-123")},
+			}, nil
+		},
+		describeNetworkInsightsAnalysesFunc: func(_ context.Context, _ *ec2.DescribeNetworkInsightsAnalysesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInsightsAnalysesOutput, error) {
+			return &ec2.DescribeNetworkInsightsAnalysesOutput{
+				NetworkInsightsAnalyses: []types.NetworkInsightsAnalysis{{
+					Status:           types.AnalysisStatusSucceeded,
+					NetworkPathFound: awssdk.Bool(true),
+				}},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	_, err := repo.RunReachabilityAnalysis(context.Background(),
+		ReachabilityTarget{ID: "i-src", Name: "source", Type: "EC2 Instance"},
+		ReachabilityTarget{},
+		"10.0.2.15",
+		"TCP",
+		443,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunReachabilityAnalysis_FailedStatusReturnsError(t *testing.T) {
+	mock := &mockEC2Client{
+		createNetworkInsightsPathFunc: func(_ context.Context, _ *ec2.CreateNetworkInsightsPathInput, _ ...func(*ec2.Options)) (*ec2.CreateNetworkInsightsPathOutput, error) {
+			return &ec2.CreateNetworkInsightsPathOutput{
+				NetworkInsightsPath: &types.NetworkInsightsPath{NetworkInsightsPathId: awssdk.String("nip-123")},
+			}, nil
+		},
+		startNetworkInsightsAnalysisFunc: func(_ context.Context, _ *ec2.StartNetworkInsightsAnalysisInput, _ ...func(*ec2.Options)) (*ec2.StartNetworkInsightsAnalysisOutput, error) {
+			return &ec2.StartNetworkInsightsAnalysisOutput{
+				NetworkInsightsAnalysis: &types.NetworkInsightsAnalysis{NetworkInsightsAnalysisId: awssdk.String("nia-123")},
+			}, nil
+		},
+		describeNetworkInsightsAnalysesFunc: func(_ context.Context, _ *ec2.DescribeNetworkInsightsAnalysesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInsightsAnalysesOutput, error) {
+			return &ec2.DescribeNetworkInsightsAnalysesOutput{
+				NetworkInsightsAnalyses: []types.NetworkInsightsAnalysis{{
+					Status:        types.AnalysisStatusFailed,
+					StatusMessage: awssdk.String("unsupported destination"),
+				}},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: mock}
+	_, err := repo.RunReachabilityAnalysis(context.Background(),
+		ReachabilityTarget{ID: "i-src"},
+		ReachabilityTarget{ID: "i-dst"},
+		"",
+		"TCP",
+		443,
+	)
+	if err == nil || !strings.Contains(err.Error(), "unsupported destination") {
+		t.Fatalf("expected failed analysis error, got %v", err)
 	}
 }
 

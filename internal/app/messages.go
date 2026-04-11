@@ -23,6 +23,14 @@ type availableIPsLoadedMsg struct {
 	ips    []string
 }
 
+type reachabilityTargetsLoadedMsg struct {
+	targets []awsservice.ReachabilityTarget
+}
+
+type reachabilityAnalysisLoadedMsg struct {
+	result *awsservice.ReachabilityAnalysisResult
+}
+
 type callerIdentityMsg struct {
 	identity *awsservice.CallerIdentity
 }
