@@ -208,7 +208,7 @@ CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 | RDS | `s` start, `x` stop, `f` failover, `r` refresh |
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
-| CloudWatch Logs | `1`-`6` time presets, `t` live tail, `f` filter pattern, `n` load more |
+| CloudWatch Logs | `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll, `n` load more |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | Context Picker | `a` add context, `/` filter |
 
