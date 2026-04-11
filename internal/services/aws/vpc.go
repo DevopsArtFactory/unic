@@ -146,7 +146,7 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 				targets = append(targets, ReachabilityTarget{
 					ID:          derefString(inst.InstanceId),
 					Name:        extractNameTag(inst.Tags),
-					Type:        "EC2 Instance",
+					Type:        "EC2 instances",
 					VPCID:       derefString(inst.VpcId),
 					SubnetID:    derefString(inst.SubnetId),
 					PrivateIP:   derefString(inst.PrivateIpAddress),
