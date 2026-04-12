@@ -58,7 +58,7 @@ func (m Model) handleSecurityGroupMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 				break
 			}
 		}
-		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.sgFilter)
+		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.filterValue(filterSecurityGroups))
 		m.sgIdx = 0
 		m.sgRuleIdx = 0
 		m.screen = screenSecurityGroupDetail
@@ -165,25 +165,14 @@ func (m Model) refreshSecurityGroup() tea.Cmd {
 func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.sgFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.sgFilter)
-		m.sgFilter = newFilter
-		if deactivate {
-			m.sgFilterActive = false
-		}
-		if changed {
-			m.filteredSecurityGroups = applyFilter(m.securityGroups, m.sgFilter)
-			m.sgIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterSecurityGroups); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.sgFilter = ""
-		m.filteredSecurityGroups = m.securityGroups
-		m.sgIdx = 0
+		m.resetFilter(filterSecurityGroups)
 	case "up", "k":
 		if m.sgIdx > 0 {
 			m.sgIdx--
@@ -193,10 +182,9 @@ func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.sgIdx++
 		}
 	case "/":
-		m.sgFilterActive = true
+		return m, m.activateFilter(filterSecurityGroups)
 	case "r":
-		m.sgFilter = ""
-		m.sgIdx = 0
+		m.resetFilter(filterSecurityGroups)
 		return m.startLoading(m.loadSecurityGroups())
 	case "enter":
 		if len(m.filteredSecurityGroups) > 0 && m.sgIdx < len(m.filteredSecurityGroups) {
@@ -216,11 +204,7 @@ func (m Model) viewSecurityGroupList() string {
 	b.WriteString(titleStyle.Render("Security Groups"))
 	b.WriteString("\n")
 
-	if m.sgFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.sgFilter)))
-	} else if m.sgFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.sgFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterSecurityGroups))
 	b.WriteString("\n\n")
 
 	if len(m.filteredSecurityGroups) == 0 {

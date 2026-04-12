@@ -19,8 +19,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.ctxList = msg.contexts
 		m.filteredCtxList = msg.contexts
 		m.ctxIdx = 0
-		m.ctxFilterInput = ""
-		m.ctxFilterActive = false
+		m.resetFilter(filterContexts)
 		for i, ctx := range m.filteredCtxList {
 			if ctx.Current {
 				m.ctxIdx = i
@@ -61,17 +60,8 @@ func (m Model) loadContexts() tea.Cmd {
 func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.ctxFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.ctxFilterInput)
-		m.ctxFilterInput = newFilter
-		if deactivate {
-			m.ctxFilterActive = false
-		}
-		if changed {
-			m.filteredCtxList = applyFilter(m.ctxList, m.ctxFilterInput)
-			m.ctxIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterContexts); handled {
+		return m, cmd
 	}
 
 	switch key {
@@ -83,8 +73,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If initial launch, quit.
 		if m.cfg.ContextName != "" {
 			m.screen = m.ctxPrevScreen
-			m.ctxFilterInput = ""
-			m.filteredCtxList = m.ctxList
+			m.resetFilter(filterContexts)
 		} else {
 			m.quitting = true
 			return m, tea.Quit
@@ -98,7 +87,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ctxIdx++
 		}
 	case "/":
-		m.ctxFilterActive = true
+		return m, m.activateFilter(filterContexts)
 	case "enter":
 		if len(m.filteredCtxList) > 0 && m.ctxIdx < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[m.ctxIdx]
@@ -183,12 +172,7 @@ func (m Model) viewContextPicker() string {
 	b.WriteString(titleStyle.Render("Select Context"))
 	b.WriteString("\n")
 
-	// Filter bar
-	if m.ctxFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.ctxFilterInput)))
-	} else if m.ctxFilterInput != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.ctxFilterInput)))
-	}
+	b.WriteString(m.renderFilterValue(filterContexts))
 	b.WriteString("\n\n")
 
 	if len(m.ctxList) == 0 {

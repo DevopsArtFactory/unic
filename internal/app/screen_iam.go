@@ -329,23 +329,15 @@ func (m Model) iamApplyActionLine() string {
 func (m Model) updateIAMUserList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.iamUserFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.iamUserFilter)
-		m.iamUserFilter = newFilter
-		if deactivate {
-			m.iamUserFilterActive = false
-		}
-		if changed {
-			m.refreshIAMUserFilter()
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterIAMUsers); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
 		m.selectedIAMUser = nil
-		m.iamUserFilter = ""
+		m.resetFilter(filterIAMUsers)
 		m.iamUserLoadingMore = false
 		m.iamUserHasMore = false
 		m.iamUserNextMarker = ""
@@ -360,11 +352,12 @@ func (m Model) updateIAMUserList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.iamUserIdx++
 		}
 	case "/":
-		m.iamUserFilterActive = true
+		filterCmd := m.activateFilter(filterIAMUsers)
 		if m.iamUserHasMore && !m.iamUserLoadingMore {
 			m.iamUserLoadingMore = true
-			return m, m.loadAllIAMUserSummaries(m.iamUserNextMarker)
+			return m, tea.Batch(filterCmd, m.loadAllIAMUserSummaries(m.iamUserNextMarker))
 		}
+		return m, filterCmd
 	case "enter":
 		if len(m.filteredIAMUsers) > 0 && m.iamUserIdx < len(m.filteredIAMUsers) {
 			selected := m.filteredIAMUsers[m.iamUserIdx]
@@ -380,10 +373,11 @@ func (m Model) updateIAMUserList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) refreshIAMUserFilter() {
-	if m.iamUserFilter == "" {
+	query := m.filterValue(filterIAMUsers)
+	if query == "" {
 		m.filteredIAMUsers = m.iamUsers
 	} else {
-		m.filteredIAMUsers = applyFilter(m.iamUsers, m.iamUserFilter)
+		m.filteredIAMUsers = applyFilter(m.iamUsers, query)
 	}
 
 	if len(m.filteredIAMUsers) == 0 {
@@ -520,11 +514,7 @@ func (m Model) viewIAMUserList() string {
 	b.WriteString(titleStyle.Render("IAM Users"))
 	b.WriteString("\n")
 
-	if m.iamUserFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.iamUserFilter)))
-	} else if m.iamUserFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.iamUserFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterIAMUsers))
 	b.WriteString("\n\n")
 
 	if len(m.filteredIAMUsers) == 0 {
@@ -584,14 +574,14 @@ func (m Model) viewIAMUserList() string {
 
 	if m.iamUserLoadingMore {
 		b.WriteString("\n")
-		if m.iamUserFilterActive || m.iamUserFilter != "" {
+		if m.isFiltering(filterIAMUsers) || m.filterValue(filterIAMUsers) != "" {
 			b.WriteString(filterStyle.Render("  Loading remaining IAM usernames for filter..."))
 		} else {
 			b.WriteString(filterStyle.Render("  Loading more IAM users..."))
 		}
 	} else if m.iamUserHasMore {
 		b.WriteString("\n")
-		if m.iamUserFilterActive || m.iamUserFilter != "" {
+		if m.isFiltering(filterIAMUsers) || m.filterValue(filterIAMUsers) != "" {
 			b.WriteString(dimStyle.Render("  Continue typing to filter loaded usernames"))
 		} else {
 			b.WriteString(dimStyle.Render("  Press n to load the next page"))

@@ -34,10 +34,7 @@ func (m Model) handleEC2VPCMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 	case availableIPsLoadedMsg:
 		m.availableIPs = msg.ips
-		m.filteredIPs = msg.ips
-		m.ipScrollOffset = 0
-		m.ipFilter = ""
-		m.ipFilterActive = false
+		m.resetFilter(filterSubnetIPs)
 		m.screen = screenSubnetDetail
 		return m, nil, true
 
@@ -56,25 +53,14 @@ func (m Model) handleEC2VPCMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 func (m Model) updateInstanceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.filterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.filterInput)
-		m.filterInput = newFilter
-		if deactivate {
-			m.filterActive = false
-		}
-		if changed {
-			m.filtered = applyFilter(m.instances, m.filterInput)
-			m.instIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterInstances); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.filterInput = ""
-		m.filtered = m.instances
-		m.instIdx = 0
+		m.resetFilter(filterInstances)
 	case "up", "k":
 		if m.instIdx > 0 {
 			m.instIdx--
@@ -84,10 +70,9 @@ func (m Model) updateInstanceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.instIdx++
 		}
 	case "/":
-		m.filterActive = true
+		return m, m.activateFilter(filterInstances)
 	case "r":
-		m.filterInput = ""
-		m.instIdx = 0
+		m.resetFilter(filterInstances)
 		return m.startLoading(m.loadInstances())
 	case "enter":
 		if len(m.filtered) > 0 && m.instIdx < len(m.filtered) {
@@ -164,12 +149,7 @@ func (m Model) viewInstanceList() string {
 	b.WriteString(titleStyle.Render("EC2 Instances (Running)"))
 	b.WriteString("\n")
 
-	// Filter bar
-	if m.filterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.filterInput)))
-	} else if m.filterInput != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.filterInput)))
-	}
+	b.WriteString(m.renderFilterValue(filterInstances))
 	b.WriteString("\n\n")
 
 	if len(m.filtered) == 0 {

@@ -70,25 +70,14 @@ func (m Model) handleRoute53Msg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.route53ZoneFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.route53ZoneFilter)
-		m.route53ZoneFilter = newFilter
-		if deactivate {
-			m.route53ZoneFilterActive = false
-		}
-		if changed {
-			m.filteredRoute53Zones = applyFilter(m.route53Zones, m.route53ZoneFilter)
-			m.route53ZoneIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterRoute53Zones); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.route53ZoneFilter = ""
-		m.filteredRoute53Zones = m.route53Zones
-		m.route53ZoneIdx = 0
+		m.resetFilter(filterRoute53Zones)
 	case "up", "k":
 		if m.route53ZoneIdx > 0 {
 			m.route53ZoneIdx--
@@ -98,7 +87,7 @@ func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.route53ZoneIdx++
 		}
 	case "/":
-		m.route53ZoneFilterActive = true
+		return m, m.activateFilter(filterRoute53Zones)
 	case "enter":
 		if len(m.filteredRoute53Zones) > 0 && m.route53ZoneIdx < len(m.filteredRoute53Zones) {
 			selected := m.filteredRoute53Zones[m.route53ZoneIdx]
@@ -112,25 +101,14 @@ func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateRoute53RecordList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	if m.route53RecordFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.route53RecordFilter)
-		m.route53RecordFilter = newFilter
-		if deactivate {
-			m.route53RecordFilterActive = false
-		}
-		if changed {
-			m.filteredRoute53Records = applyFilter(m.route53Records, m.route53RecordFilter)
-			m.route53RecordIdx = 0
-		}
-		return m, nil
+	if cmd, handled := m.updateSharedFilter(msg, filterRoute53Records); handled {
+		return m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenRoute53ZoneList
-		m.route53RecordFilter = ""
-		m.filteredRoute53Records = m.route53Records
-		m.route53RecordIdx = 0
+		m.resetFilter(filterRoute53Records)
 	case "up", "k":
 		if m.route53RecordIdx > 0 {
 			m.route53RecordIdx--
@@ -140,7 +118,7 @@ func (m Model) updateRoute53RecordList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.route53RecordIdx++
 		}
 	case "/":
-		m.route53RecordFilterActive = true
+		return m, m.activateFilter(filterRoute53Records)
 	case "c":
 		m.route53Action = "create"
 		m.route53EditField = 0
@@ -243,11 +221,7 @@ func (m Model) viewRoute53ZoneList() string {
 	b.WriteString(titleStyle.Render("Route53 Hosted Zones"))
 	b.WriteString("\n")
 
-	if m.route53ZoneFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.route53ZoneFilter)))
-	} else if m.route53ZoneFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.route53ZoneFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterRoute53Zones))
 	b.WriteString("\n\n")
 
 	if len(m.filteredRoute53Zones) == 0 {
@@ -319,11 +293,7 @@ func (m Model) viewRoute53RecordList() string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf("DNS Records — %s", zoneName)))
 	b.WriteString("\n")
 
-	if m.route53RecordFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.route53RecordFilter)))
-	} else if m.route53RecordFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.route53RecordFilter)))
-	}
+	b.WriteString(m.renderFilterValue(filterRoute53Records))
 	b.WriteString("\n\n")
 
 	if len(m.filteredRoute53Records) == 0 {

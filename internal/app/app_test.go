@@ -324,7 +324,7 @@ func TestRDSListFilter(t *testing.T) {
 	// Activate filter
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	model := updated.(Model)
-	if !model.rdsFilterActive {
+	if !model.isFiltering(filterRDS) {
 		t.Error("filter should be active")
 	}
 
@@ -708,7 +708,7 @@ func TestSecurityGroupFilter(t *testing.T) {
 	// Activate filter
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	model := updated.(Model)
-	if !model.sgFilterActive {
+	if !model.isFiltering(filterSecurityGroups) {
 		t.Error("filter should be active")
 	}
 
@@ -867,7 +867,7 @@ func TestIAMUserListFilterStartsBackgroundSummaryLoad(t *testing.T) {
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	model := updated.(Model)
-	if !model.iamUserFilterActive {
+	if !model.isFiltering(filterIAMUsers) {
 		t.Fatal("expected IAM user filter to activate")
 	}
 	if !model.iamUserLoadingMore {
@@ -966,7 +966,7 @@ func TestIAMUserListShowsFilterBackgroundLoadHint(t *testing.T) {
 	m.screen = screenIAMUserList
 	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
 	m.filteredIAMUsers = m.iamUsers
-	m.iamUserFilterActive = true
+	m.storeFilterValue(filterIAMUsers, "ali")
 	m.iamUserLoadingMore = true
 
 	view := m.viewIAMUserList()
