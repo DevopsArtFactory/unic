@@ -148,6 +148,12 @@ func (m *Model) updateSharedFilter(msg tea.KeyMsg, target filterTarget) (tea.Cmd
 }
 
 func (m *Model) applyFilterTarget(target filterTarget) {
+	for _, submodel := range m.featureSubmodels() {
+		if submodel.ApplyFilter(m, target) {
+			return
+		}
+	}
+
 	switch target {
 	case filterInstances:
 		m.filtered = applyFilter(m.instances, m.filterValue(target))
@@ -177,12 +183,6 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterECSServices:
 		m.filteredECSServices = applyFilter(m.ecsServices, m.filterValue(target))
 		m.ecsServiceIdx = 0
-	case filterCWLogGroups:
-		m.filteredCWLogGroups = applyFilter(m.cwLogGroups, m.filterValue(target))
-		m.cwLogGroupIdx = 0
-	case filterCWLogStreams:
-		m.filteredCWLogStreams = applyFilter(m.cwLogStreams, m.filterValue(target))
-		m.cwLogStreamIdx = 0
 	case filterS3Buckets:
 		m.filteredS3Buckets = applyFilter(m.s3Buckets, m.filterValue(target))
 		m.s3BucketIdx = 0

@@ -33,7 +33,156 @@ var (
 	logDebugStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))  // dim gray
 )
 
-// --- Message handler ---
+type cloudWatchLogsModel struct {
+	groups           []awsservice.LogGroup
+	filteredGroups   []awsservice.LogGroup
+	groupIdx         int
+	groupNextToken   *string
+	selectedGroup    *awsservice.LogGroup
+	streams          []awsservice.LogStream
+	filteredStreams  []awsservice.LogStream
+	streamIdx        int
+	streamNextToken  *string
+	selectedStream   *awsservice.LogStream
+	events           []awsservice.LogEvent
+	scrollOffset     int
+	nextToken        *string
+	timeRange        int
+	tailing          bool
+	tailToken        *string
+	wrap             bool
+	horizontalOffset int
+}
+
+func newCloudWatchLogsModel() cloudWatchLogsModel {
+	return cloudWatchLogsModel{
+		timeRange: 2,
+		wrap:      true,
+	}
+}
+
+func (cw *cloudWatchLogsModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	cw.selectedGroup = nil
+	cw.selectedStream = nil
+	cw.events = nil
+	cw.scrollOffset = 0
+	cw.nextToken = nil
+	cw.tailToken = nil
+	cw.tailing = false
+	cw.streamNextToken = nil
+	return m.startLoading(cw.loadGroups(*m, false))
+}
+
+func (cw *cloudWatchLogsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case cwLogGroupsLoadedMsg:
+		if msg.append {
+			cw.groups = append(cw.groups, msg.groups...)
+		} else {
+			cw.groups = msg.groups
+			cw.groupIdx = 0
+		}
+		cw.groupNextToken = msg.nextToken
+		cw.filteredGroups = applyFilter(cw.groups, m.filterValue(filterCWLogGroups))
+		if len(cw.filteredGroups) == 0 {
+			cw.groupIdx = 0
+		} else if cw.groupIdx >= len(cw.filteredGroups) {
+			cw.groupIdx = len(cw.filteredGroups) - 1
+		}
+		m.screen = screenCWLogGroupList
+		return *m, nil, true
+
+	case cwLogStreamsLoadedMsg:
+		if msg.append {
+			cw.streams = append(cw.streams, msg.streams...)
+		} else {
+			cw.streams = msg.streams
+			cw.streamIdx = 0
+		}
+		cw.streamNextToken = msg.nextToken
+		cw.filteredStreams = applyFilter(cw.streams, m.filterValue(filterCWLogStreams))
+		if len(cw.filteredStreams) == 0 {
+			cw.streamIdx = 0
+		} else if cw.streamIdx >= len(cw.filteredStreams) {
+			cw.streamIdx = len(cw.filteredStreams) - 1
+		}
+		m.screen = screenCWLogStreamList
+		return *m, nil, true
+
+	case cwLogEventsLoadedMsg:
+		if msg.append {
+			cw.events = appendUniqueCWLogEvents(cw.events, msg.events)
+			if cw.tailing {
+				total := len(cw.viewerLines(*m))
+				visibleLines := max(m.height-8, 5)
+				cw.scrollOffset = clampCWLogScrollOffset(total-visibleLines, total, visibleLines)
+			}
+		} else {
+			cw.events = msg.events
+			visibleLines := max(m.height-8, 5)
+			cw.scrollOffset = clampCWLogScrollOffset(cw.scrollOffset, len(cw.viewerLines(*m)), visibleLines)
+		}
+		if msg.updatePaginationToken {
+			cw.nextToken = msg.nextToken
+		}
+		if msg.updateTailToken {
+			cw.tailToken = msg.nextToken
+		}
+		m.screen = screenCWLogViewer
+		return *m, nil, true
+
+	case cwLogTailTickMsg:
+		if cw.tailing && cw.selectedGroup != nil {
+			return *m, tea.Batch(cw.pollTail(*m), cw.tickTail()), true
+		}
+		return *m, nil, true
+	}
+	return *m, nil, false
+}
+
+func (cw *cloudWatchLogsModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenCWLogGroupList:
+		newM, cmd := cw.updateGroupList(m, msg)
+		return newM, cmd, true
+	case screenCWLogStreamList:
+		newM, cmd := cw.updateStreamList(m, msg)
+		return newM, cmd, true
+	case screenCWLogViewer:
+		newM, cmd := cw.updateViewer(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (cw cloudWatchLogsModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenCWLogGroupList:
+		return cw.viewGroupList(m), true
+	case screenCWLogStreamList:
+		return cw.viewStreamList(m), true
+	case screenCWLogViewer:
+		return cw.viewViewer(m), true
+	default:
+		return "", false
+	}
+}
+
+func (cw *cloudWatchLogsModel) ApplyFilter(m *Model, target filterTarget) bool {
+	switch target {
+	case filterCWLogGroups:
+		cw.filteredGroups = applyFilter(cw.groups, m.filterValue(target))
+		cw.groupIdx = 0
+		return true
+	case filterCWLogStreams:
+		cw.filteredStreams = applyFilter(cw.streams, m.filterValue(target))
+		cw.streamIdx = 0
+		return true
+	default:
+		return false
+	}
+}
 
 func clampCWLogScrollOffset(offset, totalEvents, visibleLines int) int {
 	maxOffset := totalEvents - visibleLines
@@ -79,81 +228,11 @@ func appendUniqueCWLogEvents(existing, incoming []awsservice.LogEvent) []awsserv
 	return result
 }
 
-func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
-	switch msg := msg.(type) {
-	case cwLogGroupsLoadedMsg:
-		if msg.append {
-			m.cwLogGroups = append(m.cwLogGroups, msg.groups...)
-		} else {
-			m.cwLogGroups = msg.groups
-			m.cwLogGroupIdx = 0
-		}
-		m.cwLogGroupNextToken = msg.nextToken
-		m.filteredCWLogGroups = applyFilter(m.cwLogGroups, m.filterValue(filterCWLogGroups))
-		if len(m.filteredCWLogGroups) == 0 {
-			m.cwLogGroupIdx = 0
-		} else if m.cwLogGroupIdx >= len(m.filteredCWLogGroups) {
-			m.cwLogGroupIdx = len(m.filteredCWLogGroups) - 1
-		}
-		m.screen = screenCWLogGroupList
-		return m, nil, true
-
-	case cwLogStreamsLoadedMsg:
-		if msg.append {
-			m.cwLogStreams = append(m.cwLogStreams, msg.streams...)
-		} else {
-			m.cwLogStreams = msg.streams
-			m.cwLogStreamIdx = 0
-		}
-		m.cwLogStreamNextToken = msg.nextToken
-		m.filteredCWLogStreams = applyFilter(m.cwLogStreams, m.filterValue(filterCWLogStreams))
-		if len(m.filteredCWLogStreams) == 0 {
-			m.cwLogStreamIdx = 0
-		} else if m.cwLogStreamIdx >= len(m.filteredCWLogStreams) {
-			m.cwLogStreamIdx = len(m.filteredCWLogStreams) - 1
-		}
-		m.screen = screenCWLogStreamList
-		return m, nil, true
-
-	case cwLogEventsLoadedMsg:
-		if msg.append {
-			m.cwLogEvents = appendUniqueCWLogEvents(m.cwLogEvents, msg.events)
-			// Auto-scroll to bottom when tailing
-			if m.cwLogTailing {
-				total := len(m.cwLogViewerLines())
-				visibleLines := max(m.height-8, 5)
-				m.cwLogScrollOffset = clampCWLogScrollOffset(total-visibleLines, total, visibleLines)
-			}
-		} else {
-			m.cwLogEvents = msg.events
-			visibleLines := max(m.height-8, 5)
-			m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogViewerLines()), visibleLines)
-		}
-		if msg.updatePaginationToken {
-			m.cwLogNextToken = msg.nextToken
-		}
-		if msg.updateTailToken {
-			m.cwLogTailToken = msg.nextToken
-		}
-		m.screen = screenCWLogViewer
-		return m, nil, true
-
-	case cwLogTailTickMsg:
-		if m.cwLogTailing && m.selectedCWLogGroup != nil {
-			return m, tea.Batch(m.pollCWLogTail(), m.tickCWLogTail()), true
-		}
-		return m, nil, true
-	}
-	return m, nil, false
-}
-
-// --- Log Group List ---
-
-func (m Model) updateCWLogGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (cw *cloudWatchLogsModel) updateGroupList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterCWLogGroups); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -161,30 +240,30 @@ func (m Model) updateCWLogGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterCWLogGroups)
 	case "up", "k":
-		if m.cwLogGroupIdx > 0 {
-			m.cwLogGroupIdx--
+		if cw.groupIdx > 0 {
+			cw.groupIdx--
 		}
 	case "down", "j":
-		if m.cwLogGroupIdx < len(m.filteredCWLogGroups)-1 {
-			m.cwLogGroupIdx++
+		if cw.groupIdx < len(cw.filteredGroups)-1 {
+			cw.groupIdx++
 		}
 	case "/":
-		return m, m.activateFilter(filterCWLogGroups)
+		return *m, m.activateFilter(filterCWLogGroups)
 	case "n":
-		if m.cwLogGroupNextToken != nil {
-			return m.startLoading(m.loadCWLogGroups(true))
+		if cw.groupNextToken != nil {
+			return m.startLoading(cw.loadGroups(*m, true))
 		}
 	case "enter":
-		if len(m.filteredCWLogGroups) > 0 && m.cwLogGroupIdx < len(m.filteredCWLogGroups) {
-			selected := m.filteredCWLogGroups[m.cwLogGroupIdx]
-			m.selectedCWLogGroup = &selected
-			return m.startLoading(m.loadCWLogStreams(selected.Name, false))
+		if len(cw.filteredGroups) > 0 && cw.groupIdx < len(cw.filteredGroups) {
+			selected := cw.filteredGroups[cw.groupIdx]
+			cw.selectedGroup = &selected
+			return m.startLoading(cw.loadStreams(*m, selected.Name, false))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewCWLogGroupList() string {
+func (cw cloudWatchLogsModel) viewGroupList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -194,12 +273,12 @@ func (m Model) viewCWLogGroupList() string {
 	b.WriteString(m.renderFilterValue(filterCWLogGroups))
 	b.WriteString("\n\n")
 
-	if len(m.filteredCWLogGroups) == 0 {
+	if len(cw.filteredGroups) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching log groups"))
 		panel.WriteString("\n")
 	} else {
-		maxName := 4 // "NAME"
-		for _, g := range m.filteredCWLogGroups {
+		maxName := 4
+		for _, g := range cw.filteredGroups {
 			if len(g.Name) > maxName {
 				maxName = len(g.Name)
 			}
@@ -215,16 +294,16 @@ func (m Model) viewCWLogGroupList() string {
 
 		visibleLines := max(m.height-11, 5)
 		start := 0
-		if m.cwLogGroupIdx >= visibleLines {
-			start = m.cwLogGroupIdx - visibleLines + 1
+		if cw.groupIdx >= visibleLines {
+			start = cw.groupIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredCWLogGroups))
+		end := min(start+visibleLines, len(cw.filteredGroups))
 
 		for i := start; i < end; i++ {
-			g := m.filteredCWLogGroups[i]
+			g := cw.filteredGroups[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.cwLogGroupIdx {
+			if i == cw.groupIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -245,8 +324,8 @@ func (m Model) viewCWLogGroupList() string {
 		}
 
 		panel.WriteString("\n")
-		countLine := fmt.Sprintf("  %d/%d log groups", len(m.filteredCWLogGroups), len(m.cwLogGroups))
-		if m.cwLogGroupNextToken != nil {
+		countLine := fmt.Sprintf("  %d/%d log groups", len(cw.filteredGroups), len(cw.groups))
+		if cw.groupNextToken != nil {
 			countLine += " • more available"
 		}
 		panel.WriteString(dimStyle.Render(countLine))
@@ -258,13 +337,11 @@ func (m Model) viewCWLogGroupList() string {
 	return b.String()
 }
 
-// --- Log Stream List ---
-
-func (m Model) updateCWLogStreamList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (cw *cloudWatchLogsModel) updateStreamList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterCWLogStreams); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -272,43 +349,43 @@ func (m Model) updateCWLogStreamList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenCWLogGroupList
 		m.resetFilter(filterCWLogStreams)
 	case "up", "k":
-		if m.cwLogStreamIdx > 0 {
-			m.cwLogStreamIdx--
+		if cw.streamIdx > 0 {
+			cw.streamIdx--
 		}
 	case "down", "j":
-		if m.cwLogStreamIdx < len(m.filteredCWLogStreams)-1 {
-			m.cwLogStreamIdx++
+		if cw.streamIdx < len(cw.filteredStreams)-1 {
+			cw.streamIdx++
 		}
 	case "/":
-		return m, m.activateFilter(filterCWLogStreams)
+		return *m, m.activateFilter(filterCWLogStreams)
 	case "n":
-		if m.selectedCWLogGroup != nil && m.cwLogStreamNextToken != nil {
-			return m.startLoading(m.loadCWLogStreams(m.selectedCWLogGroup.Name, true))
+		if cw.selectedGroup != nil && cw.streamNextToken != nil {
+			return m.startLoading(cw.loadStreams(*m, cw.selectedGroup.Name, true))
 		}
 	case "enter":
-		if len(m.filteredCWLogStreams) > 0 && m.cwLogStreamIdx < len(m.filteredCWLogStreams) {
-			selected := m.filteredCWLogStreams[m.cwLogStreamIdx]
-			m.selectedCWLogStream = &selected
-			m.cwLogTimeRange = 2 // default: 1h
+		if len(cw.filteredStreams) > 0 && cw.streamIdx < len(cw.filteredStreams) {
+			selected := cw.filteredStreams[cw.streamIdx]
+			cw.selectedStream = &selected
+			cw.timeRange = 2
 			m.resetFilter(filterCWLogViewer)
-			m.cwLogTailing = false
-			m.cwLogTailToken = nil
-			m.cwLogWrap = true
-			m.cwLogHorizontalOffset = 0
-			m.cwLogScrollOffset = 0
-			return m.startLoading(m.loadCWLogEvents(false))
+			cw.tailing = false
+			cw.tailToken = nil
+			cw.wrap = true
+			cw.horizontalOffset = 0
+			cw.scrollOffset = 0
+			return m.startLoading(cw.loadEvents(*m, false))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewCWLogStreamList() string {
+func (cw cloudWatchLogsModel) viewStreamList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	groupName := ""
-	if m.selectedCWLogGroup != nil {
-		groupName = m.selectedCWLogGroup.Name
+	if cw.selectedGroup != nil {
+		groupName = cw.selectedGroup.Name
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Log Streams — %s", groupName)))
 	b.WriteString("\n")
@@ -316,12 +393,12 @@ func (m Model) viewCWLogStreamList() string {
 	b.WriteString(m.renderFilterValue(filterCWLogStreams))
 	b.WriteString("\n\n")
 
-	if len(m.filteredCWLogStreams) == 0 {
+	if len(cw.filteredStreams) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching log streams"))
 		panel.WriteString("\n")
 	} else {
 		maxName := 4
-		for _, s := range m.filteredCWLogStreams {
+		for _, s := range cw.filteredStreams {
 			if len(s.Name) > maxName {
 				maxName = len(s.Name)
 			}
@@ -336,16 +413,16 @@ func (m Model) viewCWLogStreamList() string {
 
 		visibleLines := max(m.height-11, 5)
 		start := 0
-		if m.cwLogStreamIdx >= visibleLines {
-			start = m.cwLogStreamIdx - visibleLines + 1
+		if cw.streamIdx >= visibleLines {
+			start = cw.streamIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredCWLogStreams))
+		end := min(start+visibleLines, len(cw.filteredStreams))
 
 		for i := start; i < end; i++ {
-			s := m.filteredCWLogStreams[i]
+			s := cw.filteredStreams[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.cwLogStreamIdx {
+			if i == cw.streamIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -357,16 +434,14 @@ func (m Model) viewCWLogStreamList() string {
 			if !s.LastEventTime.IsZero() {
 				lastEvent = s.LastEventTime.Local().Format("2006-01-02 15:04:05")
 			}
-			row := cursor +
-				nameCol.Inherit(style).Render(name) +
-				dimStyle.Render(lastEvent)
+			row := cursor + nameCol.Inherit(style).Render(name) + dimStyle.Render(lastEvent)
 			panel.WriteString(row)
 			panel.WriteString("\n")
 		}
 
 		panel.WriteString("\n")
-		countLine := fmt.Sprintf("  %d/%d streams", len(m.filteredCWLogStreams), len(m.cwLogStreams))
-		if m.cwLogStreamNextToken != nil {
+		countLine := fmt.Sprintf("  %d/%d streams", len(cw.filteredStreams), len(cw.streams))
+		if cw.streamNextToken != nil {
 			countLine += " • more available"
 		}
 		panel.WriteString(dimStyle.Render(countLine))
@@ -378,18 +453,16 @@ func (m Model) viewCWLogStreamList() string {
 	return b.String()
 }
 
-// --- Log Viewer ---
-
-func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (cw *cloudWatchLogsModel) updateViewer(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if m.isFiltering(filterCWLogViewer) {
 		if key == "enter" {
 			m.deactivateFilter()
-			return m.startLoading(m.loadCWLogEvents(false))
+			return m.startLoading(cw.loadEvents(*m, false))
 		}
 		if cmd, handled := m.updateSharedFilter(msg, filterCWLogViewer); handled {
-			return m, cmd
+			return *m, cmd
 		}
 	}
 
@@ -397,85 +470,82 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "q", "esc":
-		m.cwLogTailing = false
+		cw.tailing = false
 		m.screen = screenCWLogStreamList
 	case "up", "k":
-		if m.cwLogScrollOffset > 0 {
-			m.cwLogScrollOffset--
+		if cw.scrollOffset > 0 {
+			cw.scrollOffset--
 		}
 	case "down", "j":
-		totalLines := len(m.cwLogViewerLines())
+		totalLines := len(cw.viewerLines(*m))
 		maxOffset := clampCWLogScrollOffset(totalLines-visibleLines, totalLines, visibleLines)
-		if m.cwLogScrollOffset < maxOffset {
-			m.cwLogScrollOffset++
+		if cw.scrollOffset < maxOffset {
+			cw.scrollOffset++
 		}
 	case "pgup":
-		m.cwLogScrollOffset -= visibleLines
-		if m.cwLogScrollOffset < 0 {
-			m.cwLogScrollOffset = 0
+		cw.scrollOffset -= visibleLines
+		if cw.scrollOffset < 0 {
+			cw.scrollOffset = 0
 		}
 	case "pgdown":
-		m.cwLogScrollOffset += visibleLines
-		m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogViewerLines()), visibleLines)
-	case "t": // Toggle live tail
-		m.cwLogTailing = !m.cwLogTailing
-		if m.cwLogTailing {
-			return m, m.tickCWLogTail()
+		cw.scrollOffset += visibleLines
+		cw.scrollOffset = clampCWLogScrollOffset(cw.scrollOffset, len(cw.viewerLines(*m)), visibleLines)
+	case "t":
+		cw.tailing = !cw.tailing
+		if cw.tailing {
+			return *m, cw.tickTail()
 		}
-	case "f": // Filter pattern input
-		return m, m.activateFilter(filterCWLogViewer)
+	case "f":
+		return *m, m.activateFilter(filterCWLogViewer)
 	case "w":
-		m.cwLogWrap = !m.cwLogWrap
-		if m.cwLogWrap {
-			m.cwLogHorizontalOffset = 0
+		cw.wrap = !cw.wrap
+		if cw.wrap {
+			cw.horizontalOffset = 0
 		}
-		m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogViewerLines()), visibleLines)
+		cw.scrollOffset = clampCWLogScrollOffset(cw.scrollOffset, len(cw.viewerLines(*m)), visibleLines)
 	case "h":
-		if !m.cwLogWrap && m.cwLogHorizontalOffset > 0 {
-			m.cwLogHorizontalOffset = max(m.cwLogHorizontalOffset-8, 0)
+		if !cw.wrap && cw.horizontalOffset > 0 {
+			cw.horizontalOffset = max(cw.horizontalOffset-8, 0)
 		}
 	case "l":
-		if !m.cwLogWrap {
-			m.cwLogHorizontalOffset = min(m.cwLogHorizontalOffset+8, m.maxCWLogHorizontalOffset())
+		if !cw.wrap {
+			cw.horizontalOffset = min(cw.horizontalOffset+8, cw.maxHorizontalOffset(*m))
 		}
-	case "n": // Load more (older events)
-		if m.cwLogNextToken != nil {
-			return m, m.loadCWLogEvents(true)
+	case "n":
+		if cw.nextToken != nil {
+			return *m, cw.loadEvents(*m, true)
 		}
-	case "1", "2", "3", "4", "5", "6": // Time range presets
+	case "1", "2", "3", "4", "5", "6":
 		idx := int(key[0] - '1')
 		if idx >= 0 && idx < len(cwTimeRanges) {
-			m.cwLogTimeRange = idx
-			m.cwLogTailing = false
-			return m.startLoading(m.loadCWLogEvents(false))
+			cw.timeRange = idx
+			cw.tailing = false
+			return m.startLoading(cw.loadEvents(*m, false))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewCWLogViewer() string {
+func (cw cloudWatchLogsModel) viewViewer(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 
-	// Header
 	groupName := ""
-	if m.selectedCWLogGroup != nil {
-		groupName = m.selectedCWLogGroup.Name
+	if cw.selectedGroup != nil {
+		groupName = cw.selectedGroup.Name
 	}
 	streamName := "All streams"
-	if m.selectedCWLogStream != nil {
-		streamName = m.selectedCWLogStream.Name
+	if cw.selectedStream != nil {
+		streamName = cw.selectedStream.Name
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Logs — %s / %s", groupName, streamName)))
 	b.WriteString("\n")
 
-	// Status line: time range + filter + tail indicator
 	var status []string
-	if m.cwLogTimeRange >= 0 && m.cwLogTimeRange < len(cwTimeRanges) {
-		// Build time range selector
+	if cw.timeRange >= 0 && cw.timeRange < len(cwTimeRanges) {
 		var ranges []string
 		for i, tr := range cwTimeRanges {
-			if i == m.cwLogTimeRange {
+			if i == cw.timeRange {
 				ranges = append(ranges, selectedStyle.Render(fmt.Sprintf("[%s]", tr.label)))
 			} else {
 				ranges = append(ranges, dimStyle.Render(fmt.Sprintf(" %s ", tr.label)))
@@ -486,7 +556,7 @@ func (m Model) viewCWLogViewer() string {
 	if filter := m.renderFilterValue(filterCWLogViewer); filter != "" {
 		status = append(status, filter)
 	}
-	if m.cwLogTailing {
+	if cw.tailing {
 		status = append(status, filterStyle.Render("TAILING"))
 	}
 	if len(status) > 0 {
@@ -494,14 +564,13 @@ func (m Model) viewCWLogViewer() string {
 	}
 	b.WriteString("\n\n")
 
-	// Log events
-	if len(m.cwLogEvents) == 0 {
+	if len(cw.events) == 0 {
 		b.WriteString(dimStyle.Render("  No log events found"))
 		b.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-8, 5)
-		lines := m.cwLogViewerLines()
-		start := clampCWLogScrollOffset(m.cwLogScrollOffset, len(lines), visibleLines)
+		lines := cw.viewerLines(m)
+		start := clampCWLogScrollOffset(cw.scrollOffset, len(lines), visibleLines)
 		end := min(start+visibleLines, len(lines))
 
 		for _, line := range lines[start:end] {
@@ -510,32 +579,32 @@ func (m Model) viewCWLogViewer() string {
 		}
 
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d events (showing lines %d-%d)", len(m.cwLogEvents), start+1, end)))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d events (showing lines %d-%d)", len(cw.events), start+1, end)))
 	}
 
 	b.WriteString("\n")
 	wrapStatus := "off"
-	if m.cwLogWrap {
+	if cw.wrap {
 		wrapStatus = "on"
 	}
 	hint := fmt.Sprintf("↑/↓: scroll • pgup/pgdn: page • 1-6: time range • f: filter • t: tail • w: wrap (%s)", wrapStatus)
-	if !m.cwLogWrap {
-		hint += fmt.Sprintf(" • h/l: horizontal (%d)", m.cwLogHorizontalOffset)
+	if !cw.wrap {
+		hint += fmt.Sprintf(" • h/l: horizontal (%d)", cw.horizontalOffset)
 	}
 	hint += " • n: load more • esc: back"
 	b.WriteString(m.renderHelpBar(hint))
 	return b.String()
 }
 
-func (m Model) cwLogViewerLines() []string {
-	lines := make([]string, 0, len(m.cwLogEvents))
-	for _, evt := range m.cwLogEvents {
-		lines = append(lines, m.renderCWLogEventLines(evt)...)
+func (cw cloudWatchLogsModel) viewerLines(m Model) []string {
+	lines := make([]string, 0, len(cw.events))
+	for _, evt := range cw.events {
+		lines = append(lines, cw.renderEventLines(m, evt)...)
 	}
 	return lines
 }
 
-func (m Model) renderCWLogEventLines(evt awsservice.LogEvent) []string {
+func (cw cloudWatchLogsModel) renderEventLines(m Model, evt awsservice.LogEvent) []string {
 	tsText := evt.Timestamp.Local().Format("15:04:05.000")
 	tsStyled := dimStyle.Render(tsText)
 
@@ -575,14 +644,14 @@ func (m Model) renderCWLogEventLines(evt awsservice.LogEvent) []string {
 	firstLine := true
 	for _, line := range messageLines {
 		line = strings.TrimRight(line, "\r")
-		if m.cwLogWrap {
+		if cw.wrap {
 			prefixPlain := continuationPrefix
 			prefixStyled := continuationPrefix
 			if firstLine {
 				prefixPlain = firstPrefixPlain
 				prefixStyled = firstPrefixStyled
 			}
-			wrapped := wrapCWLogMessage(line, max(m.cwLogContentWidth()-lipgloss.Width(prefixPlain), 8))
+			wrapped := wrapCWLogMessage(line, max(cw.contentWidth(m)-lipgloss.Width(prefixPlain), 8))
 			for idx, segment := range wrapped {
 				if firstLine && idx == 0 {
 					rendered = append(rendered, prefixStyled+segment)
@@ -591,7 +660,7 @@ func (m Model) renderCWLogEventLines(evt awsservice.LogEvent) []string {
 				rendered = append(rendered, continuationPrefix+segment)
 			}
 		} else {
-			segment := sliceCWLogMessage(line, m.cwLogHorizontalOffset)
+			segment := sliceCWLogMessage(line, cw.horizontalOffset)
 			if firstLine {
 				rendered = append(rendered, firstPrefixStyled+segment)
 			} else {
@@ -607,21 +676,21 @@ func (m Model) renderCWLogEventLines(evt awsservice.LogEvent) []string {
 	return rendered
 }
 
-func (m Model) cwLogContentWidth() int {
+func (cw cloudWatchLogsModel) contentWidth(m Model) int {
 	if m.width <= 0 {
 		return 120
 	}
 	return max(m.width-2, 20)
 }
 
-func (m Model) maxCWLogHorizontalOffset() int {
+func (cw cloudWatchLogsModel) maxHorizontalOffset(m Model) int {
 	maxWidth := 0
-	for _, evt := range m.cwLogEvents {
+	for _, evt := range cw.events {
 		for _, line := range strings.Split(strings.TrimRight(evt.Message, "\n"), "\n") {
 			maxWidth = max(maxWidth, lipgloss.Width(strings.TrimRight(line, "\r")))
 		}
 	}
-	return max(maxWidth-m.cwLogContentWidth()/2, 0)
+	return max(maxWidth-cw.contentWidth(m), 0)
 }
 
 func wrapCWLogMessage(message string, width int) []string {
@@ -653,20 +722,17 @@ func sliceCWLogMessage(message string, offset int) string {
 	return string(runes[offset:])
 }
 
-// --- Commands ---
-
-func (m Model) loadCWLogGroups(appendMode bool) tea.Cmd {
+func (cw cloudWatchLogsModel) loadGroups(m Model, appendMode bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
 		}
-		m.awsRepo = repo
 
 		var nextToken *string
 		if appendMode {
-			nextToken = m.cwLogGroupNextToken
+			nextToken = cw.groupNextToken
 		}
 
 		groups, token, err := repo.ListLogGroupsPage(ctx, nextToken, 10)
@@ -680,21 +746,17 @@ func (m Model) loadCWLogGroups(appendMode bool) tea.Cmd {
 	}
 }
 
-func (m Model) loadCWLogStreams(logGroupName string, appendMode bool) tea.Cmd {
+func (cw cloudWatchLogsModel) loadStreams(m Model, logGroupName string, appendMode bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		repo := m.awsRepo
-		if repo == nil {
-			var err error
-			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
-			if err != nil {
-				return errMsg{err: err}
-			}
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
+			return errMsg{err: err}
 		}
 
 		var nextToken *string
 		if appendMode {
-			nextToken = m.cwLogStreamNextToken
+			nextToken = cw.streamNextToken
 		}
 
 		streams, token, err := repo.ListLogStreamsPage(ctx, logGroupName, nextToken, 10)
@@ -708,26 +770,22 @@ func (m Model) loadCWLogStreams(logGroupName string, appendMode bool) tea.Cmd {
 	}
 }
 
-func (m Model) loadCWLogEvents(appendMode bool) tea.Cmd {
+func (cw cloudWatchLogsModel) loadEvents(m Model, appendMode bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		repo := m.awsRepo
-		if repo == nil {
-			var err error
-			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
-			if err != nil {
-				return cwLogEventsLoadedMsg{append: appendMode}
-			}
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
+			return cwLogEventsLoadedMsg{append: appendMode}
 		}
 
-		if m.selectedCWLogGroup == nil {
+		if cw.selectedGroup == nil {
 			return cwLogEventsLoadedMsg{append: appendMode}
 		}
 
 		now := time.Now()
-		timeIdx := m.cwLogTimeRange
+		timeIdx := cw.timeRange
 		if timeIdx < 0 || timeIdx >= len(cwTimeRanges) {
-			timeIdx = 2 // default: 1h
+			timeIdx = 2
 		}
 		duration := cwTimeRanges[timeIdx].duration
 		startTime := now.Add(-duration).UnixMilli()
@@ -735,10 +793,10 @@ func (m Model) loadCWLogEvents(appendMode bool) tea.Cmd {
 
 		var token *string
 		if appendMode {
-			token = m.cwLogNextToken
+			token = cw.nextToken
 		}
 
-		events, nextToken, err := repo.FilterLogEvents(ctx, m.selectedCWLogGroup.Name, startTime, endTime, m.filterValue(filterCWLogViewer), token)
+		events, nextToken, err := repo.FilterLogEvents(ctx, cw.selectedGroup.Name, startTime, endTime, m.filterValue(filterCWLogViewer), token)
 		if err != nil {
 			return errMsg{err: err}
 		}
@@ -753,28 +811,23 @@ func (m Model) loadCWLogEvents(appendMode bool) tea.Cmd {
 	}
 }
 
-func (m Model) pollCWLogTail() tea.Cmd {
+func (cw cloudWatchLogsModel) pollTail(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		repo := m.awsRepo
-		if repo == nil {
-			var err error
-			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
-			if err != nil {
-				return cwLogEventsLoadedMsg{append: true}
-			}
-		}
-
-		if m.selectedCWLogGroup == nil {
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
 			return cwLogEventsLoadedMsg{append: true}
 		}
 
-		// Poll from last token or last 30 seconds
+		if cw.selectedGroup == nil {
+			return cwLogEventsLoadedMsg{append: true}
+		}
+
 		now := time.Now()
 		startTime := now.Add(-30 * time.Second).UnixMilli()
 		endTime := now.UnixMilli()
 
-		events, nextToken, err := repo.FilterLogEvents(ctx, m.selectedCWLogGroup.Name, startTime, endTime, m.filterValue(filterCWLogViewer), m.cwLogTailToken)
+		events, nextToken, err := repo.FilterLogEvents(ctx, cw.selectedGroup.Name, startTime, endTime, m.filterValue(filterCWLogViewer), cw.tailToken)
 		if err != nil {
 			return cwLogEventsLoadedMsg{append: true}
 		}
@@ -788,8 +841,16 @@ func (m Model) pollCWLogTail() tea.Cmd {
 	}
 }
 
-func (m Model) tickCWLogTail() tea.Cmd {
+func (cw cloudWatchLogsModel) tickTail() tea.Cmd {
 	return tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
 		return cwLogTailTickMsg{}
 	})
+}
+
+func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	return m.cwLogs.HandleMessage(&m, msg)
+}
+
+func (m Model) cwLogViewerLines() []string {
+	return m.cwLogs.viewerLines(m)
 }
