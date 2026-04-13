@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -12,7 +13,10 @@ type InspectorScanner struct {
 	Run  func(context.Context, *AwsRepository) ([]SecurityFinding, error)
 }
 
-var securityInspectorScanners []InspectorScanner
+var (
+	securityInspectorScanners   []InspectorScanner
+	securityInspectorScannersMu sync.RWMutex
+)
 
 func registerSecurityInspectorScanner(scanner InspectorScanner) {
 	if scanner.Name == "" {
@@ -21,11 +25,15 @@ func registerSecurityInspectorScanner(scanner InspectorScanner) {
 	if scanner.Run == nil {
 		panic(fmt.Sprintf("security inspector scanner %q cannot have a nil runner", scanner.Name))
 	}
+	securityInspectorScannersMu.Lock()
+	defer securityInspectorScannersMu.Unlock()
 	securityInspectorScanners = append(securityInspectorScanners, scanner)
 }
 
 func listSecurityInspectorScanners() []InspectorScanner {
+	securityInspectorScannersMu.RLock()
 	scanners := append([]InspectorScanner(nil), securityInspectorScanners...)
+	securityInspectorScannersMu.RUnlock()
 	sort.Slice(scanners, func(i, j int) bool {
 		return scanners[i].Name < scanners[j].Name
 	})

@@ -336,11 +336,38 @@ func padInspectorSeverity(value string, width int) string {
 }
 
 func inspectorShorten(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
 	if lipgloss.Width(value) <= width {
 		return value
 	}
+
+	suffix := ""
+	targetWidth := width
 	if width <= 3 {
-		return value[:width]
+		targetWidth = width
+	} else {
+		suffix = "..."
+		targetWidth = width - lipgloss.Width(suffix)
 	}
-	return value[:width-3] + "..."
+	if targetWidth <= 0 {
+		return suffix
+	}
+
+	var b strings.Builder
+	currentWidth := 0
+	for _, r := range value {
+		runeWidth := lipgloss.Width(string(r))
+		if currentWidth+runeWidth > targetWidth {
+			break
+		}
+		b.WriteRune(r)
+		currentWidth += runeWidth
+	}
+
+	if b.Len() == 0 {
+		return suffix
+	}
+	return b.String() + suffix
 }

@@ -3,15 +3,24 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 )
 
+var inspectorScannerTestMu sync.Mutex
+
 func withInspectorScanners(t *testing.T, scanners []InspectorScanner) {
 	t.Helper()
-	original := securityInspectorScanners
-	securityInspectorScanners = scanners
+	inspectorScannerTestMu.Lock()
+	securityInspectorScannersMu.Lock()
+	original := append([]InspectorScanner(nil), securityInspectorScanners...)
+	securityInspectorScanners = append([]InspectorScanner(nil), scanners...)
+	securityInspectorScannersMu.Unlock()
 	t.Cleanup(func() {
+		securityInspectorScannersMu.Lock()
 		securityInspectorScanners = original
+		securityInspectorScannersMu.Unlock()
+		inspectorScannerTestMu.Unlock()
 	})
 }
 
