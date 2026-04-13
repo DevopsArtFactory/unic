@@ -192,6 +192,7 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterContexts:
 		m.filteredCtxList = applyFilter(m.ctxList, m.filterValue(target))
 		m.ctxIdx = 0
+		m.syncContextTable()
 	}
 }
 
