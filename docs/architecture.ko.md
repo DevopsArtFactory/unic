@@ -89,6 +89,7 @@ repository와 서비스별 AWS 연동 계층이다.
 패턴:
 
 - `repository.go`에서 SDK client 초기화
+- `inspector*.go`에서 Security Inspector 스캔 orchestration과 finding 모델 관리
 - `*_model.go`에서 UI 친화적 모델 정의
 - `*.go`에서 실제 서비스 로직 구현
 - 테스트에서는 AWS 서비스별 mock interface 사용
@@ -107,6 +108,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_cloudwatchlogs.go`
 - `screen_ecs.go`
 - `screen_s3.go`
+- `screen_inspector.go`
 - `screen_context.go`
 
 보조 파일로 `styles.go`, `filter.go`, `messages.go` 등이 있다.
@@ -155,6 +157,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - CloudWatch Logs group/stream/viewer
 - ECS cluster/service/task/container
 - S3 bucket/object/detail
+- Inspector home/scanning/results/detail
 - context picker, context add
 - loading, error
 
