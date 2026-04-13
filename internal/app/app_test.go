@@ -91,6 +91,20 @@ func TestLoadingViewShowsSpinner(t *testing.T) {
 	}
 }
 
+func TestLoadingViewShowsCustomLoadingDetails(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+	m.loadingTitle = "Finding Network Path"
+	m.loadingDetails = []string{"src-eni", "->", "dst-eni", "Intent: TCP/443"}
+
+	v := m.View()
+	for _, want := range []string{"Finding Network Path", "src-eni", "dst-eni", "Intent: TCP/443"} {
+		if !strings.Contains(v, want) {
+			t.Fatalf("expected loading view to contain %q, got %q", want, v)
+		}
+	}
+}
+
 func TestViewEmptyWhenQuitting(t *testing.T) {
 	m := Model{quitting: true}
 	v := m.View()
@@ -1438,6 +1452,155 @@ func TestCWLogTailAppendDoesNotOverwritePaginationToken(t *testing.T) {
 	}
 	if got := derefString(model.cwLogTailToken); got != "new-tail-token" {
 		t.Fatalf("expected tail token to update, got %q", got)
+	}
+}
+
+func TestCWLogGroupsLoadedReplacesInitialPageAndStoresNextToken(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogGroupsLoadedMsg{
+		groups: []awsservice.LogGroup{
+			{Name: "/aws/lambda/a"},
+			{Name: "/aws/lambda/b"},
+		},
+		nextToken: stringPtr("page-2"),
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch log groups message to be handled")
+	}
+
+	model := updated.(Model)
+	if len(model.cwLogGroups) != 2 {
+		t.Fatalf("expected 2 groups, got %d", len(model.cwLogGroups))
+	}
+	if got := derefString(model.cwLogGroupNextToken); got != "page-2" {
+		t.Fatalf("expected next token page-2, got %q", got)
+	}
+}
+
+func TestCWLogGroupsLoadedAppendExtendsExistingList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwLogGroups = []awsservice.LogGroup{{Name: "/aws/lambda/a"}}
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogGroupsLoadedMsg{
+		append: true,
+		groups: []awsservice.LogGroup{
+			{Name: "/aws/lambda/b"},
+			{Name: "/aws/lambda/c"},
+		},
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch log groups message to be handled")
+	}
+
+	model := updated.(Model)
+	if len(model.cwLogGroups) != 3 {
+		t.Fatalf("expected 3 groups, got %d", len(model.cwLogGroups))
+	}
+	if model.cwLogGroups[2].Name != "/aws/lambda/c" {
+		t.Fatalf("expected appended group /aws/lambda/c, got %q", model.cwLogGroups[2].Name)
+	}
+}
+
+func TestCWLogStreamsLoadedAppendExtendsExistingList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwLogStreams = []awsservice.LogStream{{Name: "stream-a"}}
+
+	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogStreamsLoadedMsg{
+		append: true,
+		streams: []awsservice.LogStream{
+			{Name: "stream-b"},
+			{Name: "stream-c"},
+		},
+		nextToken: stringPtr("stream-page-3"),
+	})
+	if !handled {
+		t.Fatal("expected CloudWatch log streams message to be handled")
+	}
+
+	model := updated.(Model)
+	if len(model.cwLogStreams) != 3 {
+		t.Fatalf("expected 3 streams, got %d", len(model.cwLogStreams))
+	}
+	if got := derefString(model.cwLogStreamNextToken); got != "stream-page-3" {
+		t.Fatalf("expected next token stream-page-3, got %q", got)
+	}
+}
+
+func TestReachabilityResultLinesUseReadableSections(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.reachabilityResult = &awsservice.ReachabilityAnalysisResult{
+		Status:           "failed",
+		NetworkPathFound: false,
+		Source:           awsservice.ReachabilityTarget{Name: "src", ID: "eni-1"},
+		Destination:      awsservice.ReachabilityTarget{Name: "dst", ID: "eni-2"},
+		Protocol:         "TCP",
+		DestinationPort:  443,
+		ForwardPath: []awsservice.ReachabilityPathComponent{
+			{Sequence: 1, Title: "eni-1", Details: []string{"subnet subnet-1"}, Explanations: []string{"security group blocked"}},
+		},
+		Explanations: []awsservice.ReachabilityExplanation{
+			{Summary: "ENI_SG_RULES_MISMATCH at eni-1", Details: []string{"security group: sg-1"}},
+		},
+	}
+
+	lines := m.reachabilityResultLines()
+	rendered := strings.Join(lines, "\n")
+	if !strings.Contains(rendered, "Summary") {
+		t.Fatalf("expected Summary section, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "● eni-1") {
+		t.Fatalf("expected visual path node, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "Findings") {
+		t.Fatalf("expected Findings section, got %q", rendered)
+	}
+}
+
+func TestReachabilityLoadingDetailsShowSourceAndDestination(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.reachabilityRegion = "ap-northeast-2"
+	m.reachabilitySource = &awsservice.ReachabilityTarget{Name: "source-eni", ID: "eni-1"}
+	m.reachabilityDestination = &awsservice.ReachabilityTarget{Name: "dest-eni", ID: "eni-2"}
+	m.reachabilityProtocolIdx = 0
+	m.reachabilityPortInput = "443"
+
+	details := m.reachabilityLoadingDetails()
+	if len(details) < 4 {
+		t.Fatalf("expected vertical loading details, got %#v", details)
+	}
+	if !strings.Contains(details[1], "source-eni") {
+		t.Fatalf("expected source line, got %#v", details)
+	}
+	if !strings.Contains(details[2], "│") {
+		t.Fatalf("expected connector line, got %#v", details)
+	}
+	if !strings.Contains(details[3], "↓") {
+		t.Fatalf("expected arrow line, got %#v", details)
+	}
+	if !strings.Contains(details[4], "dest-eni") {
+		t.Fatalf("expected destination line, got %#v", details)
+	}
+	rendered := strings.Join(details, "\n")
+	for _, want := range []string{"Region: ap-northeast-2", "source-eni", "dest-eni", "Intent: TCP/443"} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("expected loading details to contain %q, got %q", want, rendered)
+		}
+	}
+}
+
+func TestReachabilityLoadingDetailsTruncateLongLabelsForNarrowWidth(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 30
+	m.reachabilitySource = &awsservice.ReachabilityTarget{Name: strings.Repeat("source-", 8), ID: "eni-1"}
+	m.reachabilityDestination = &awsservice.ReachabilityTarget{Name: strings.Repeat("dest-", 8), ID: "eni-2"}
+
+	details := m.reachabilityLoadingDetails()
+	if !strings.Contains(details[1], "…") {
+		t.Fatalf("expected truncated source label, got %#v", details)
+	}
+	if !strings.Contains(details[4], "…") {
+		t.Fatalf("expected truncated destination label, got %#v", details)
 	}
 }
 

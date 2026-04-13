@@ -97,11 +97,15 @@ type route53ChangeStatusMsg struct {
 type route53PollTickMsg struct{}
 
 type cwLogGroupsLoadedMsg struct {
-	groups []awsservice.LogGroup
+	groups    []awsservice.LogGroup
+	nextToken *string
+	append    bool
 }
 
 type cwLogStreamsLoadedMsg struct {
-	streams []awsservice.LogStream
+	streams   []awsservice.LogStream
+	nextToken *string
+	append    bool
 }
 
 type cwLogEventsLoadedMsg struct {
