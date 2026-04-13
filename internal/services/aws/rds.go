@@ -22,14 +22,17 @@ func (r *AwsRepository) ListDBInstances(ctx context.Context) ([]RDSInstance, err
 	instances := make([]RDSInstance, 0, len(output.DBInstances))
 	for _, db := range output.DBInstances {
 		inst := RDSInstance{
-			DBInstanceID:  awssdk.ToString(db.DBInstanceIdentifier),
-			Engine:        awssdk.ToString(db.Engine),
-			EngineVersion: awssdk.ToString(db.EngineVersion),
-			Status:        awssdk.ToString(db.DBInstanceStatus),
-			InstanceClass: awssdk.ToString(db.DBInstanceClass),
-			MultiAZ:       awssdk.ToBool(db.MultiAZ),
-			StorageGB:     awssdk.ToInt32(db.AllocatedStorage),
-			ClusterID:     awssdk.ToString(db.DBClusterIdentifier),
+			DBInstanceID:          awssdk.ToString(db.DBInstanceIdentifier),
+			Engine:                awssdk.ToString(db.Engine),
+			EngineVersion:         awssdk.ToString(db.EngineVersion),
+			Status:                awssdk.ToString(db.DBInstanceStatus),
+			InstanceClass:         awssdk.ToString(db.DBInstanceClass),
+			MultiAZ:               awssdk.ToBool(db.MultiAZ),
+			StorageGB:             awssdk.ToInt32(db.AllocatedStorage),
+			StorageEncrypted:      awssdk.ToBool(db.StorageEncrypted),
+			PubliclyAccessible:    awssdk.ToBool(db.PubliclyAccessible),
+			BackupRetentionPeriod: awssdk.ToInt32(db.BackupRetentionPeriod),
+			ClusterID:             awssdk.ToString(db.DBClusterIdentifier),
 		}
 
 		// Endpoint may be nil for stopped instances
@@ -65,14 +68,17 @@ func (r *AwsRepository) DescribeDBInstance(ctx context.Context, dbInstanceID str
 
 	db := output.DBInstances[0]
 	inst := &RDSInstance{
-		DBInstanceID:  awssdk.ToString(db.DBInstanceIdentifier),
-		Engine:        awssdk.ToString(db.Engine),
-		EngineVersion: awssdk.ToString(db.EngineVersion),
-		Status:        awssdk.ToString(db.DBInstanceStatus),
-		InstanceClass: awssdk.ToString(db.DBInstanceClass),
-		MultiAZ:       awssdk.ToBool(db.MultiAZ),
-		StorageGB:     awssdk.ToInt32(db.AllocatedStorage),
-		ClusterID:     awssdk.ToString(db.DBClusterIdentifier),
+		DBInstanceID:          awssdk.ToString(db.DBInstanceIdentifier),
+		Engine:                awssdk.ToString(db.Engine),
+		EngineVersion:         awssdk.ToString(db.EngineVersion),
+		Status:                awssdk.ToString(db.DBInstanceStatus),
+		InstanceClass:         awssdk.ToString(db.DBInstanceClass),
+		MultiAZ:               awssdk.ToBool(db.MultiAZ),
+		StorageGB:             awssdk.ToInt32(db.AllocatedStorage),
+		StorageEncrypted:      awssdk.ToBool(db.StorageEncrypted),
+		PubliclyAccessible:    awssdk.ToBool(db.PubliclyAccessible),
+		BackupRetentionPeriod: awssdk.ToInt32(db.BackupRetentionPeriod),
+		ClusterID:             awssdk.ToString(db.DBClusterIdentifier),
 	}
 	if db.Endpoint != nil {
 		inst.Endpoint = fmt.Sprintf("%s:%d", awssdk.ToString(db.Endpoint.Address), awssdk.ToInt32(db.Endpoint.Port))
