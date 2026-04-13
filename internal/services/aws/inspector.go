@@ -52,6 +52,12 @@ func (r *AwsRepository) RunSecurityScan(ctx context.Context) (*SecurityScanRepor
 	}
 
 	for _, scanner := range scanners {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		findings, err := scanner.Run(ctx, r)
 		if err != nil {
 			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %v", scanner.Name, err))

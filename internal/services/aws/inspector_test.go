@@ -122,3 +122,41 @@ func TestRunSecurityScanCollectsWarningsAndContinues(t *testing.T) {
 		t.Fatalf("unexpected warning text: %q", report.Warnings[0])
 	}
 }
+
+func TestRunSecurityScanStopsWhenContextCanceledBetweenScanners(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	runCount := 0
+	withInspectorScanners(t, []InspectorScanner{
+		{
+			Name: "first",
+			Run: func(context.Context, *AwsRepository) ([]SecurityFinding, error) {
+				runCount++
+				cancel()
+				return nil, nil
+			},
+		},
+		{
+			Name: "second",
+			Run: func(context.Context, *AwsRepository) ([]SecurityFinding, error) {
+				runCount++
+				return nil, nil
+			},
+		},
+	})
+
+	report, err := (&AwsRepository{}).RunSecurityScan(ctx)
+	if err == nil {
+		t.Fatal("expected context cancellation error")
+	}
+	if err != context.Canceled {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	if report != nil {
+		t.Fatalf("expected nil report on cancellation, got %+v", report)
+	}
+	if runCount != 1 {
+		t.Fatalf("expected only the first scanner to run, got %d runs", runCount)
+	}
+}
