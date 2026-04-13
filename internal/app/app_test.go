@@ -210,6 +210,89 @@ func TestFeatureListEscGoesBack(t *testing.T) {
 	}
 }
 
+func TestHelpToggleAndClose(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenServiceList
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	model := updated.(Model)
+	if !model.helpVisible {
+		t.Fatal("expected help overlay to open")
+	}
+	if model.screen != screenServiceList {
+		t.Fatalf("expected screen to stay on service list, got %v", model.screen)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	if model.helpVisible {
+		t.Fatal("expected help overlay to close on esc")
+	}
+}
+
+func TestHelpBlocksNavigationWhileOpen(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenServiceList
+	m.svcIdx = 0
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	model := updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model = updated.(Model)
+
+	if model.svcIdx != 0 {
+		t.Fatalf("expected selection to stay unchanged while help is open, got %d", model.svcIdx)
+	}
+	if !model.helpVisible {
+		t.Fatal("expected help overlay to remain open on non-close keys")
+	}
+}
+
+func TestHelpViewShowsContextAwareRDSActions(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenRDSDetail
+	m.selectedRDS = &awsservice.RDSInstance{
+		DBInstanceID:  "db-1",
+		Status:        "available",
+		MultiAZ:       true,
+		ClusterID:     "",
+		InstanceClass: "db.t3.micro",
+	}
+	m.helpVisible = true
+
+	view := m.View()
+	for _, want := range []string{
+		"Keyboard Shortcuts",
+		"Screen: RDS Detail",
+		"Stop the selected instance or cluster",
+		"Trigger failover for the selected instance or cluster",
+		"Refresh the selected instance status",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected help view to contain %q, got %q", want, view)
+		}
+	}
+}
+
+func TestHelpViewShowsFilterModeShortcuts(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenSecretList
+	_ = m.activateFilter(filterSecrets)
+	m.helpVisible = true
+
+	view := m.View()
+	for _, want := range []string{
+		"Current Mode",
+		"Update the filter query",
+		"Delete the previous character",
+		"Close filter mode",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected filter help to contain %q, got %q", want, view)
+		}
+	}
+}
+
 // --- RDS screen tests ---
 
 func TestRDSListNavigation(t *testing.T) {

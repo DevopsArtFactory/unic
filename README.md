@@ -9,6 +9,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Switch between credential, assume-role, and SSO contexts
 - Export shell environment variables for the active context
 - Drill down into resources with filters, detail views, and action screens
+- Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
 - Open the Security Inspector workflow and review built-in findings for Security Groups, RDS, IAM keys, Secrets Manager, and S3 buckets
@@ -200,6 +201,7 @@ The Inspector feature ships built-in rule packs for Security Group exposure, RDS
 | `H` | Jump to service list |
 | `C` | Open context picker |
 | `/` | Toggle filter mode on supported screens |
+| `?` | Toggle context-aware shortcut help |
 | `Ctrl+C` | Force quit |
 
 ### Service-specific highlights
