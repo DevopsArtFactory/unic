@@ -23,6 +23,10 @@ func Catalog() []Service {
 					Kind:        FeatureVPCBrowser,
 					Description: "Browse VPCs, subnets, and available IP counts",
 				},
+				{
+					Kind:        FeatureReachabilityAnalyzer,
+					Description: "Analyze network reachability and visualize blockers hop by hop",
+				},
 			},
 		},
 		{
@@ -67,11 +71,11 @@ func Catalog() []Service {
 				{
 					Kind:        FeatureECSExec,
 					Description: "Browse ECS clusters, services, tasks, and launch exec sessions",
-        },
-      },
-    },
-    {
-      Name: ServiceS3,
+				},
+			},
+		},
+		{
+			Name: ServiceS3,
 			Features: []Feature{
 				{
 					Kind:        FeatureS3Browser,

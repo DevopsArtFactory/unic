@@ -172,6 +172,7 @@ CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 | EC2 | SSM Session Manager |
 | EC2 | Security Group Browser |
 | VPC | VPC Browser |
+| VPC | Reachability Analyzer |
 | RDS | RDS Browser |
 | Route53 | Route53 Browser |
 | Secrets Manager | Secrets Browser |
@@ -203,6 +204,7 @@ CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 |---|---|
 | EC2 SSM | `r` refresh, `Enter` connect |
 | Security Groups | `a` add rule, `d` delete rule, `Tab` switch ingress/egress |
+| Reachability Analyzer | Region select first, `←`/`→` or `Tab` change type, `/` filter, `Enter` advance, `Tab`/`↑`/`↓` move config fields, `←`/`→` protocol, `r` rerun |
 | RDS | `s` start, `x` stop, `f` failover, `r` refresh |
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
@@ -211,6 +213,8 @@ CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 | Context Picker | `a` add context, `/` filter |
 
 Filtering is currently available on EC2 instances, IAM users, VPCs/subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.
+
+Reachability Analyzer starts with a region selection step, defaults to the current context region, and now surfaces the AWS-documented source and destination resource types that unic supports: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, plus IP addresses as destinations. The source and destination pickers support type tabs, keyword filtering, IPv4 destination validation, and automatic cleanup of temporary Network Insights resources after each analysis.
 
 ## Development
 

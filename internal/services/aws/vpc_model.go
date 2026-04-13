@@ -48,3 +48,63 @@ func (s Subnet) DisplayTitle() string {
 func (s Subnet) FilterText() string {
 	return strings.ToLower(fmt.Sprintf("%s %s %s %s", s.Name, s.SubnetID, s.CIDR, s.AvailabilityZone))
 }
+
+// ReachabilityTarget represents a source or destination candidate for network analysis.
+type ReachabilityTarget struct {
+	ID          string
+	Name        string
+	Type        string
+	VPCID       string
+	SubnetID    string
+	PrivateIP   string
+	Description string
+	ManualIP    bool
+}
+
+func (t ReachabilityTarget) DisplayTitle() string {
+	if t.ManualIP {
+		return t.Name
+	}
+
+	parts := []string{fmt.Sprintf("%s (%s)", t.Name, t.ID)}
+	if t.PrivateIP != "" {
+		parts = append(parts, t.PrivateIP)
+	}
+	if t.Description != "" {
+		parts = append(parts, t.Description)
+	}
+	return strings.Join(parts, " | ")
+}
+
+func (t ReachabilityTarget) FilterText() string {
+	return strings.ToLower(fmt.Sprintf("%s %s %s %s %s %s", t.Name, t.ID, t.Type, t.VPCID, t.SubnetID, t.PrivateIP))
+}
+
+type ReachabilityPathComponent struct {
+	Sequence     int32
+	Title        string
+	Details      []string
+	Explanations []string
+}
+
+type ReachabilityExplanation struct {
+	Code    string
+	Summary string
+	Details []string
+}
+
+type ReachabilityAnalysisResult struct {
+	PathID           string
+	AnalysisID       string
+	Status           string
+	StatusMessage    string
+	NetworkPathFound bool
+	WarningMessage   string
+	Source           ReachabilityTarget
+	Destination      ReachabilityTarget
+	DestinationIP    string
+	Protocol         string
+	DestinationPort  int32
+	ForwardPath      []ReachabilityPathComponent
+	Explanations     []ReachabilityExplanation
+}

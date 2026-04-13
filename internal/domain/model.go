@@ -21,6 +21,7 @@ type FeatureKind string
 const (
 	FeatureSSMSession            FeatureKind = "SSM Sessions Manager"
 	FeatureVPCBrowser            FeatureKind = "VPC Browser"
+	FeatureReachabilityAnalyzer  FeatureKind = "Reachability Analyzer"
 	FeatureRDSBrowser            FeatureKind = "RDS Browser"
 	FeatureRoute53Browser        FeatureKind = "Route53 Browser"
 	FeatureSecretsBrowser        FeatureKind = "Secrets Manager Browser"

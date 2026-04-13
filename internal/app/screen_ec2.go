@@ -38,6 +38,33 @@ func (m Model) handleEC2VPCMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.screen = screenSubnetDetail
 		return m, nil, true
 
+	case reachabilityTargetsLoadedMsg:
+		m.reachabilityTargets = msg.targets
+		m.reachabilitySourceTypes = buildReachabilityTargetTypes(msg.targets, false)
+		m.reachabilitySourceTypeIdx = 0
+		m.reachabilityDestTypes = nil
+		m.reachabilityDestTypeIdx = 0
+		m.filteredReachabilityTargets = applyReachabilityTargetFilter(msg.targets, m.selectedReachabilitySourceType(), "")
+		m.reachabilityIdx = 0
+		m.reachabilityFilter = ""
+		m.reachabilityFilterActive = false
+		m.reachabilitySource = nil
+		m.reachabilityDestination = nil
+		m.reachabilityDestinationIP = ""
+		m.reachabilityProtocolIdx = 0
+		m.reachabilityPortInput = "443"
+		m.reachabilityConfigField = 0
+		m.reachabilityResult = nil
+		m.reachabilityScrollOffset = 0
+		m.screen = screenReachabilitySourceList
+		return m, nil, true
+
+	case reachabilityAnalysisLoadedMsg:
+		m.reachabilityResult = msg.result
+		m.reachabilityScrollOffset = 0
+		m.screen = screenReachabilityResult
+		return m, nil, true
+
 	case ssmSessionDoneMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
