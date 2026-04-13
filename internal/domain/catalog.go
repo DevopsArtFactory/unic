@@ -67,11 +67,11 @@ func Catalog() []Service {
 				{
 					Kind:        FeatureECSExec,
 					Description: "Browse ECS clusters, services, tasks, and launch exec sessions",
-        },
-      },
-    },
-    {
-      Name: ServiceS3,
+				},
+			},
+		},
+		{
+			Name: ServiceS3,
 			Features: []Feature{
 				{
 					Kind:        FeatureS3Browser,
@@ -93,6 +93,15 @@ func Catalog() []Service {
 				{
 					Kind:        FeatureRotateAccessKey,
 					Description: "Rotate the current session IAM access key with verify and cleanup steps",
+				},
+			},
+		},
+		{
+			Name: ServiceInspector,
+			Features: []Feature{
+				{
+					Kind:        FeatureSecurityScan,
+					Description: "Run built-in security scans and review findings by severity",
 				},
 			},
 		},

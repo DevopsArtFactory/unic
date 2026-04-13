@@ -11,6 +11,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Drill down into resources with filters, detail views, and action screens
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
+- Open the Security Inspector workflow and review scan results by severity as rule packs are added
 
 ## Documentation Map
 
@@ -181,6 +182,9 @@ CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 | IAM | IAM User Browser |
 | IAM | ListAccessKeys |
 | IAM | RotateAccessKey |
+| Inspector | Security Scan |
+
+The Inspector feature currently ships the service shell, scan orchestration, and results browser. The first built-in rule packs land in follow-up issues.
 
 ## TUI Navigation
 
@@ -208,6 +212,7 @@ CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | CloudWatch Logs | `1`-`6` time presets, `t` live tail, `f` filter pattern, `n` load more |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
+| Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Context Picker | `a` add context, `/` filter |
 
 Filtering is currently available on EC2 instances, IAM users, VPCs/subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.

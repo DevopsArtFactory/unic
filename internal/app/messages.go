@@ -186,3 +186,7 @@ type ecsContainersLoadedMsg struct {
 type ecsExecDoneMsg struct {
 	err error
 }
+
+type inspectorScanLoadedMsg struct {
+	report *awsservice.SecurityScanReport
+}
