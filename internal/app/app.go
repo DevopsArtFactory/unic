@@ -295,6 +295,7 @@ type Model struct {
 	filterTI       textinput.Model
 	activeFilter   filterTarget
 	filters        map[filterTarget]string
+	helpVisible    bool
 
 	// Terminal size
 	width  int
@@ -423,6 +424,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			m.quitting = true
 			return m, tea.Quit
+		}
+		if msg.String() == "?" {
+			m.helpVisible = !m.helpVisible
+			return m, nil
+		}
+		if m.helpVisible {
+			switch msg.String() {
+			case "esc", "enter":
+				m.helpVisible = false
+			}
+			return m, nil
 		}
 		// Global home — return to service list from any screen (skip text-input screens)
 		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
@@ -682,6 +694,10 @@ func (m Model) updateError(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	if m.quitting {
 		return ""
+	}
+
+	if m.helpVisible {
+		return m.fitToHeight(m.viewHelp())
 	}
 
 	var v string
