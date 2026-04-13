@@ -232,9 +232,11 @@ type Model struct {
 	cwLogStreamIdx          int
 	cwLogStreamFilter       string
 	cwLogStreamFilterActive bool
+	cwLogStreamNextToken    *string
 	selectedCWLogStream     *awsservice.LogStream
 	cwLogEvents             []awsservice.LogEvent
 	cwLogScrollOffset       int
+	cwLogGroupNextToken     *string
 	cwLogNextToken          *string
 	cwLogTimeRange          int // index into preset time ranges
 	cwLogFilterPattern      string
@@ -292,6 +294,8 @@ type Model struct {
 
 	// Loading state
 	loadingSpinner spinner.Model
+	loadingTitle   string
+	loadingDetails []string
 	filterTI       textinput.Model
 	activeFilter   filterTarget
 	filters        map[filterTarget]string
@@ -361,8 +365,14 @@ func (m Model) loadCallerIdentity() tea.Cmd {
 }
 
 func (m Model) startLoading(cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	return m.startLoadingWithMessage("Loading...", nil, cmd)
+}
+
+func (m Model) startLoadingWithMessage(title string, details []string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	m.screen = screenLoading
 	m.loadingSpinner = newLoadingSpinner()
+	m.loadingTitle = title
+	m.loadingDetails = append([]string(nil), details...)
 	if cmd == nil {
 		return m, m.loadingSpinner.Tick
 	}
@@ -395,6 +405,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case errMsg:
 		m.errMsg = msg.err.Error()
+		m.loadingTitle = ""
+		m.loadingDetails = nil
 		m.screen = screenError
 		return m, nil
 	}
@@ -650,7 +662,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureSecretsBrowser:
 				return m.startLoading(m.loadSecrets())
 			case domain.FeatureCloudWatchLogsBrowser:
-				return m.startLoading(m.loadCWLogGroups())
+				return m.startLoading(m.loadCWLogGroups(false))
 			case domain.FeatureS3Browser:
 				return m.startLoading(m.loadS3Buckets())
 			case domain.FeatureSecurityGroupBrowser:

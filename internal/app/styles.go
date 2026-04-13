@@ -15,6 +15,11 @@ var (
 	normalStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	dimStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	successStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+	warningStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+	infoStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("117"))
+	pathNodeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true)
+	pathLineStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("67"))
 	filterStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 	statusBarStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("236"))
 )
@@ -93,7 +98,24 @@ func (m Model) fitToHeight(s string) string {
 }
 
 func (m Model) viewLoading() string {
-	return titleStyle.Render(fmt.Sprintf("%s Loading...", m.loadingSpinner.View()))
+	title := m.loadingTitle
+	if strings.TrimSpace(title) == "" {
+		title = "Loading..."
+	}
+
+	var b strings.Builder
+	b.WriteString(titleStyle.Render(fmt.Sprintf("%s %s", m.loadingSpinner.View(), title)))
+	if len(m.loadingDetails) > 0 {
+		b.WriteString("\n\n")
+		for _, detail := range m.loadingDetails {
+			if strings.TrimSpace(detail) == "" {
+				continue
+			}
+			b.WriteString(detail)
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
 }
 
 func (m Model) viewError() string {

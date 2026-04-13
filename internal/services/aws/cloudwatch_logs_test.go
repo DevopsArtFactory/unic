@@ -14,7 +14,7 @@ import (
 // mockCloudWatchLogsClient implements CloudWatchLogsClientAPI for testing.
 type mockCloudWatchLogsClient struct {
 	describeLogGroupsFunc  func(ctx context.Context, params *cloudwatchlogs.DescribeLogGroupsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error)
-	describeLogStreamsFunc  func(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error)
+	describeLogStreamsFunc func(ctx context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error)
 	filterLogEventsFunc    func(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
@@ -37,7 +37,10 @@ func (m *mockCloudWatchLogsClient) FilterLogEvents(ctx context.Context, params *
 
 func TestListLogGroups_Success(t *testing.T) {
 	mock := &mockCloudWatchLogsClient{
-		describeLogGroupsFunc: func(_ context.Context, _ *cloudwatchlogs.DescribeLogGroupsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
+		describeLogGroupsFunc: func(_ context.Context, params *cloudwatchlogs.DescribeLogGroupsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
+			if awssdk.ToInt32(params.Limit) != cwLogGroupPageSize {
+				t.Fatalf("expected limit %d, got %d", cwLogGroupPageSize, awssdk.ToInt32(params.Limit))
+			}
 			var retention int32 = 30
 			var creationTime int64 = 1700000000000
 			return &cloudwatchlogs.DescribeLogGroupsOutput{
@@ -118,6 +121,41 @@ func TestListLogGroups_Error(t *testing.T) {
 	}
 }
 
+func TestListLogGroupsPage_WithToken(t *testing.T) {
+	token := "next-page"
+	mock := &mockCloudWatchLogsClient{
+		describeLogGroupsFunc: func(_ context.Context, params *cloudwatchlogs.DescribeLogGroupsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogGroupsOutput, error) {
+			if got := awssdk.ToString(params.NextToken); got != token {
+				t.Fatalf("expected token %q, got %q", token, got)
+			}
+			if awssdk.ToInt32(params.Limit) != 10 {
+				t.Fatalf("expected limit 10, got %d", awssdk.ToInt32(params.Limit))
+			}
+			return &cloudwatchlogs.DescribeLogGroupsOutput{
+				LogGroups: []cwltypes.LogGroup{
+					{LogGroupName: awssdk.String("/aws/lambda/page-2")},
+				},
+				NextToken: awssdk.String("page-3"),
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{CloudWatchLogsClient: mock}
+	groups, next, err := repo.ListLogGroupsPage(context.Background(), &token, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
+	}
+	if groups[0].Name != "/aws/lambda/page-2" {
+		t.Fatalf("expected page-2 group, got %q", groups[0].Name)
+	}
+	if next == nil || *next != "page-3" {
+		t.Fatalf("expected next token page-3, got %v", next)
+	}
+}
+
 // --- ListLogStreams tests ---
 
 func TestListLogStreams_Success(t *testing.T) {
@@ -125,6 +163,9 @@ func TestListLogStreams_Success(t *testing.T) {
 		describeLogStreamsFunc: func(_ context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
 			if awssdk.ToString(params.LogGroupName) != "/aws/lambda/my-function" {
 				t.Errorf("expected log group '/aws/lambda/my-function', got %q", awssdk.ToString(params.LogGroupName))
+			}
+			if awssdk.ToInt32(params.Limit) != cwLogStreamPageSize {
+				t.Fatalf("expected limit %d, got %d", cwLogStreamPageSize, awssdk.ToInt32(params.Limit))
 			}
 			var lastEvent int64 = 1700000000000
 			return &cloudwatchlogs.DescribeLogStreamsOutput{
@@ -189,6 +230,41 @@ func TestListLogStreams_Error(t *testing.T) {
 	_, err := repo.ListLogStreams(context.Background(), "/nonexistent")
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestListLogStreamsPage_WithToken(t *testing.T) {
+	token := "stream-page-2"
+	mock := &mockCloudWatchLogsClient{
+		describeLogStreamsFunc: func(_ context.Context, params *cloudwatchlogs.DescribeLogStreamsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
+			if got := awssdk.ToString(params.NextToken); got != token {
+				t.Fatalf("expected token %q, got %q", token, got)
+			}
+			if awssdk.ToInt32(params.Limit) != 10 {
+				t.Fatalf("expected limit 10, got %d", awssdk.ToInt32(params.Limit))
+			}
+			return &cloudwatchlogs.DescribeLogStreamsOutput{
+				LogStreams: []cwltypes.LogStream{
+					{LogStreamName: awssdk.String("page-2-stream")},
+				},
+				NextToken: awssdk.String("stream-page-3"),
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{CloudWatchLogsClient: mock}
+	streams, next, err := repo.ListLogStreamsPage(context.Background(), "/aws/lambda/my-function", &token, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(streams) != 1 {
+		t.Fatalf("expected 1 stream, got %d", len(streams))
+	}
+	if streams[0].Name != "page-2-stream" {
+		t.Fatalf("expected page-2-stream, got %q", streams[0].Name)
+	}
+	if next == nil || *next != "stream-page-3" {
+		t.Fatalf("expected next token stream-page-3, got %v", next)
 	}
 }
 

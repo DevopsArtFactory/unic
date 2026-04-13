@@ -84,7 +84,14 @@ func (m Model) updateReachabilityRegionList(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		m.reachabilityFilter = ""
 		m.reachabilityFilterActive = false
 		m.awsRepo = nil
-		return m.startLoading(m.loadReachabilityTargets())
+		return m.startLoadingWithMessage(
+			"Loading reachability targets...",
+			[]string{
+				fmt.Sprintf("Region: %s", m.activeReachabilityRegion()),
+				"Collecting source and destination candidates for Reachability Analyzer.",
+			},
+			m.loadReachabilityTargets(),
+		)
 	}
 	return m, nil
 }
@@ -187,7 +194,13 @@ func (m Model) updateReachabilitySourceList(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case "/":
 		m.reachabilityFilterActive = true
 	case "r":
-		return m.startLoading(m.loadReachabilityTargets())
+		return m.startLoadingWithMessage(
+			"Refreshing reachability targets...",
+			[]string{
+				fmt.Sprintf("Region: %s", m.activeReachabilityRegion()),
+			},
+			m.loadReachabilityTargets(),
+		)
 	case "enter":
 		if len(m.filteredReachabilityTargets) == 0 {
 			return m, nil
@@ -254,7 +267,13 @@ func (m Model) updateReachabilityDestinationList(msg tea.KeyMsg) (tea.Model, tea
 	case "/":
 		m.reachabilityFilterActive = true
 	case "r":
-		return m.startLoading(m.loadReachabilityTargets())
+		return m.startLoadingWithMessage(
+			"Refreshing reachability targets...",
+			[]string{
+				fmt.Sprintf("Region: %s", m.activeReachabilityRegion()),
+			},
+			m.loadReachabilityTargets(),
+		)
 	case "enter":
 		if len(m.filteredReachabilityTargets) == 0 {
 			return m, nil
@@ -320,7 +339,11 @@ func (m Model) updateReachabilityConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		return m.startLoading(m.runReachabilityAnalysis())
+		return m.startLoadingWithMessage(
+			"Finding Network Path",
+			m.reachabilityLoadingDetails(),
+			m.runReachabilityAnalysis(),
+		)
 	default:
 		if len(msg.String()) == 1 {
 			switch m.reachabilityConfigField {
@@ -345,7 +368,11 @@ func (m Model) updateReachabilityResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.screen = screenReachabilityConfig
 	case "r":
-		return m.startLoading(m.runReachabilityAnalysis())
+		return m.startLoadingWithMessage(
+			"Finding Network Path",
+			m.reachabilityLoadingDetails(),
+			m.runReachabilityAnalysis(),
+		)
 	case "up", "k":
 		if m.reachabilityScrollOffset > 0 {
 			m.reachabilityScrollOffset--
@@ -549,55 +576,63 @@ func (m Model) reachabilityResultLines() []string {
 
 	r := m.reachabilityResult
 	lines := make([]string, 0, 64)
-	status := "NOT REACHABLE"
+	status := "Not reachable"
 	statusStyle := errorStyle
 	if r.NetworkPathFound {
-		status = "REACHABLE"
-		statusStyle = titleStyle
+		status = "Reachable"
+		statusStyle = successStyle
 	}
-	lines = append(lines, statusStyle.Render(status))
-	lines = append(lines, normalStyle.Render(fmt.Sprintf("Status       : %s", r.Status)))
-	lines = append(lines, normalStyle.Render(fmt.Sprintf("Region       : %s", m.activeReachabilityRegion())))
+	lines = append(lines, titleStyle.Render("Summary"))
+	lines = append(lines, statusStyle.Render("  "+status))
+	lines = append(lines, dimStyle.Render("  Analysis status : "+r.Status))
+	lines = append(lines, dimStyle.Render("  Region          : "+m.activeReachabilityRegion()))
 	if r.StatusMessage != "" {
-		lines = append(lines, normalStyle.Render(fmt.Sprintf("Message      : %s", r.StatusMessage)))
+		lines = append(lines, normalStyle.Render("  Message         : "+r.StatusMessage))
 	}
-	lines = append(lines, normalStyle.Render(fmt.Sprintf("Source       : %s", r.Source.DisplayTitle())))
+	lines = append(lines, normalStyle.Render("  Source          : "+r.Source.DisplayTitle()))
 	if r.DestinationIP != "" {
-		lines = append(lines, normalStyle.Render(fmt.Sprintf("Destination  : %s", r.DestinationIP)))
+		lines = append(lines, normalStyle.Render("  Destination     : "+r.DestinationIP))
 	} else {
-		lines = append(lines, normalStyle.Render(fmt.Sprintf("Destination  : %s", r.Destination.DisplayTitle())))
+		lines = append(lines, normalStyle.Render("  Destination     : "+r.Destination.DisplayTitle()))
 	}
-	lines = append(lines, normalStyle.Render(fmt.Sprintf("Intent       : %s/%d", strings.ToUpper(r.Protocol), r.DestinationPort)))
+	lines = append(lines, normalStyle.Render(fmt.Sprintf("  Intent          : %s/%d", strings.ToUpper(r.Protocol), r.DestinationPort)))
 	if r.WarningMessage != "" {
-		lines = append(lines, errorStyle.Render("Warning      : "+r.WarningMessage))
+		lines = append(lines, errorStyle.Render("  Warning         : "+r.WarningMessage))
 	}
 
 	lines = append(lines, "")
-	lines = append(lines, titleStyle.Render("Forward Path"))
+	lines = append(lines, titleStyle.Render("Path"))
 	if len(r.ForwardPath) == 0 {
-		lines = append(lines, dimStyle.Render("  No forward path components returned"))
+		lines = append(lines, dimStyle.Render("  No path components returned"))
 	} else {
-		for _, component := range r.ForwardPath {
-			lines = append(lines, normalStyle.Render(fmt.Sprintf("  %02d. %s", component.Sequence, component.Title)))
+		for i, component := range r.ForwardPath {
+			lines = append(lines, pathNodeStyle.Render(fmt.Sprintf("  ● %s", component.Title)))
 			for _, detail := range component.Details {
-				lines = append(lines, dimStyle.Render("      "+detail))
+				lines = append(lines, infoStyle.Render("  │   "+detail))
 			}
 			for _, explanation := range component.Explanations {
-				lines = append(lines, errorStyle.Render("      blocker: "+explanation))
+				lines = append(lines, warningStyle.Render("  │   blocker: "+explanation))
+			}
+			if i < len(r.ForwardPath)-1 {
+				lines = append(lines, pathLineStyle.Render("  │"))
 			}
 		}
 	}
 
 	lines = append(lines, "")
-	lines = append(lines, titleStyle.Render("Explanations"))
+	lines = append(lines, titleStyle.Render("Findings"))
 	if len(r.Explanations) == 0 {
-		lines = append(lines, dimStyle.Render("  No explanation codes returned"))
+		lines = append(lines, dimStyle.Render("  No blocker explanations returned"))
 	} else {
-		for _, explanation := range r.Explanations {
-			lines = append(lines, errorStyle.Render("  "+explanation.Summary))
+		for idx, explanation := range r.Explanations {
+			lines = append(lines, warningStyle.Render(fmt.Sprintf("  %d) %s", idx+1, explanation.Summary)))
 			for _, detail := range explanation.Details {
-				lines = append(lines, dimStyle.Render("      "+detail))
+				lines = append(lines, dimStyle.Render("     - "+detail))
 			}
+			lines = append(lines, "")
+		}
+		if lines[len(lines)-1] == "" {
+			lines = lines[:len(lines)-1]
 		}
 	}
 
@@ -738,4 +773,60 @@ func indexOfString(items []string, target string) int {
 		}
 	}
 	return -1
+}
+
+func (m Model) reachabilityLoadingDetails() []string {
+	source := "source pending"
+	if m.reachabilitySource != nil {
+		source = m.reachabilitySource.DisplayTitle()
+	}
+
+	destination := "destination pending"
+	if strings.TrimSpace(m.reachabilityDestinationIP) != "" {
+		destination = strings.TrimSpace(m.reachabilityDestinationIP)
+	} else if m.reachabilityDestination != nil {
+		destination = m.reachabilityDestination.DisplayTitle()
+	}
+
+	protocol := ""
+	if m.reachabilityProtocolIdx >= 0 && m.reachabilityProtocolIdx < len(reachabilityProtocols) {
+		protocol = reachabilityProtocols[m.reachabilityProtocolIdx]
+	}
+
+	intent := protocol
+	if strings.TrimSpace(m.reachabilityPortInput) != "" {
+		intent = fmt.Sprintf("%s/%s", protocol, strings.TrimSpace(m.reachabilityPortInput))
+	}
+
+	source = truncateReachabilityLoadingLabel(source, m.width)
+	destination = truncateReachabilityLoadingLabel(destination, m.width)
+
+	return []string{
+		dimStyle.Render(fmt.Sprintf("Region: %s", m.activeReachabilityRegion())),
+		pathNodeStyle.Render(source),
+		pathLineStyle.Render("  │"),
+		pathLineStyle.Render("  ↓"),
+		pathNodeStyle.Render(destination),
+		infoStyle.Render(fmt.Sprintf("Intent: %s", intent)),
+	}
+}
+
+func truncateReachabilityLoadingLabel(label string, width int) string {
+	if width <= 0 {
+		return label
+	}
+
+	maxWidth := width - 6
+	if maxWidth < 24 {
+		maxWidth = 24
+	}
+
+	runes := []rune(label)
+	if len(runes) <= maxWidth {
+		return label
+	}
+	if maxWidth <= 1 {
+		return string(runes[:maxWidth])
+	}
+	return string(runes[:maxWidth-1]) + "…"
 }

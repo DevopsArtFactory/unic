@@ -82,16 +82,36 @@ func appendUniqueCWLogEvents(existing, incoming []awsservice.LogEvent) []awsserv
 func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case cwLogGroupsLoadedMsg:
-		m.cwLogGroups = msg.groups
-		m.filteredCWLogGroups = msg.groups
-		m.cwLogGroupIdx = 0
+		if msg.append {
+			m.cwLogGroups = append(m.cwLogGroups, msg.groups...)
+		} else {
+			m.cwLogGroups = msg.groups
+			m.cwLogGroupIdx = 0
+		}
+		m.cwLogGroupNextToken = msg.nextToken
+		m.filteredCWLogGroups = applyFilter(m.cwLogGroups, m.filterValue(filterCWLogGroups))
+		if len(m.filteredCWLogGroups) == 0 {
+			m.cwLogGroupIdx = 0
+		} else if m.cwLogGroupIdx >= len(m.filteredCWLogGroups) {
+			m.cwLogGroupIdx = len(m.filteredCWLogGroups) - 1
+		}
 		m.screen = screenCWLogGroupList
 		return m, nil, true
 
 	case cwLogStreamsLoadedMsg:
-		m.cwLogStreams = msg.streams
-		m.filteredCWLogStreams = msg.streams
-		m.cwLogStreamIdx = 0
+		if msg.append {
+			m.cwLogStreams = append(m.cwLogStreams, msg.streams...)
+		} else {
+			m.cwLogStreams = msg.streams
+			m.cwLogStreamIdx = 0
+		}
+		m.cwLogStreamNextToken = msg.nextToken
+		m.filteredCWLogStreams = applyFilter(m.cwLogStreams, m.filterValue(filterCWLogStreams))
+		if len(m.filteredCWLogStreams) == 0 {
+			m.cwLogStreamIdx = 0
+		} else if m.cwLogStreamIdx >= len(m.filteredCWLogStreams) {
+			m.cwLogStreamIdx = len(m.filteredCWLogStreams) - 1
+		}
 		m.screen = screenCWLogStreamList
 		return m, nil, true
 
@@ -150,11 +170,15 @@ func (m Model) updateCWLogGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "/":
 		return m, m.activateFilter(filterCWLogGroups)
+	case "n":
+		if m.cwLogGroupNextToken != nil {
+			return m.startLoading(m.loadCWLogGroups(true))
+		}
 	case "enter":
 		if len(m.filteredCWLogGroups) > 0 && m.cwLogGroupIdx < len(m.filteredCWLogGroups) {
 			selected := m.filteredCWLogGroups[m.cwLogGroupIdx]
 			m.selectedCWLogGroup = &selected
-			return m.startLoading(m.loadCWLogStreams(selected.Name))
+			return m.startLoading(m.loadCWLogStreams(selected.Name, false))
 		}
 	}
 	return m, nil
@@ -220,11 +244,15 @@ func (m Model) viewCWLogGroupList() string {
 		}
 
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d log groups", len(m.filteredCWLogGroups), len(m.cwLogGroups))))
+		countLine := fmt.Sprintf("  %d/%d log groups", len(m.filteredCWLogGroups), len(m.cwLogGroups))
+		if m.cwLogGroupNextToken != nil {
+			countLine += " • more available"
+		}
+		b.WriteString(dimStyle.Render(countLine))
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: streams • esc: back • H: home"))
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • n: load more • enter: streams • esc: back • H: home"))
 	return b.String()
 }
 
@@ -251,6 +279,10 @@ func (m Model) updateCWLogStreamList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "/":
 		return m, m.activateFilter(filterCWLogStreams)
+	case "n":
+		if m.selectedCWLogGroup != nil && m.cwLogStreamNextToken != nil {
+			return m.startLoading(m.loadCWLogStreams(m.selectedCWLogGroup.Name, true))
+		}
 	case "enter":
 		if len(m.filteredCWLogStreams) > 0 && m.cwLogStreamIdx < len(m.filteredCWLogStreams) {
 			selected := m.filteredCWLogStreams[m.cwLogStreamIdx]
@@ -330,11 +362,15 @@ func (m Model) viewCWLogStreamList() string {
 		}
 
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d streams", len(m.filteredCWLogStreams), len(m.cwLogStreams))))
+		countLine := fmt.Sprintf("  %d/%d streams", len(m.filteredCWLogStreams), len(m.cwLogStreams))
+		if m.cwLogStreamNextToken != nil {
+			countLine += " • more available"
+		}
+		b.WriteString(dimStyle.Render(countLine))
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: view logs • esc: back • H: home"))
+	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • n: load more • enter: view logs • esc: back • H: home"))
 	return b.String()
 }
 
@@ -615,7 +651,7 @@ func sliceCWLogMessage(message string, offset int) string {
 
 // --- Commands ---
 
-func (m Model) loadCWLogGroups() tea.Cmd {
+func (m Model) loadCWLogGroups(appendMode bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -624,18 +660,23 @@ func (m Model) loadCWLogGroups() tea.Cmd {
 		}
 		m.awsRepo = repo
 
-		groups, err := repo.ListLogGroups(ctx)
+		var nextToken *string
+		if appendMode {
+			nextToken = m.cwLogGroupNextToken
+		}
+
+		groups, token, err := repo.ListLogGroupsPage(ctx, nextToken, 10)
 		if err != nil {
 			return errMsg{err: err}
 		}
-		if len(groups) == 0 {
+		if !appendMode && len(groups) == 0 {
 			return errMsg{err: fmt.Errorf("no log groups found")}
 		}
-		return cwLogGroupsLoadedMsg{groups: groups}
+		return cwLogGroupsLoadedMsg{groups: groups, nextToken: token, append: appendMode}
 	}
 }
 
-func (m Model) loadCWLogStreams(logGroupName string) tea.Cmd {
+func (m Model) loadCWLogStreams(logGroupName string, appendMode bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -647,14 +688,19 @@ func (m Model) loadCWLogStreams(logGroupName string) tea.Cmd {
 			}
 		}
 
-		streams, err := repo.ListLogStreams(ctx, logGroupName)
+		var nextToken *string
+		if appendMode {
+			nextToken = m.cwLogStreamNextToken
+		}
+
+		streams, token, err := repo.ListLogStreamsPage(ctx, logGroupName, nextToken, 10)
 		if err != nil {
 			return errMsg{err: err}
 		}
-		if len(streams) == 0 {
+		if !appendMode && len(streams) == 0 {
 			return errMsg{err: fmt.Errorf("no log streams found in %s", logGroupName)}
 		}
-		return cwLogStreamsLoadedMsg{streams: streams}
+		return cwLogStreamsLoadedMsg{streams: streams, nextToken: token, append: appendMode}
 	}
 }
 
