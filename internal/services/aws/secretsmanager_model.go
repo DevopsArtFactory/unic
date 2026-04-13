@@ -3,14 +3,20 @@ package aws
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Secret holds essential information about an AWS Secrets Manager secret.
 type Secret struct {
-	Name        string
-	ARN         string
-	Description string
-	KMSKeyID    string
+	Name             string
+	ARN              string
+	Description      string
+	KMSKeyID         string
+	CreatedDate      time.Time
+	LastChangedDate  time.Time
+	LastRotatedDate  time.Time
+	NextRotationDate time.Time
+	RotationEnabled  bool
 }
 
 // SecretDetail holds the full detail of a secret including its key/value pairs.

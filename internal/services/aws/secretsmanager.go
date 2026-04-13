@@ -22,10 +22,15 @@ func (r *AwsRepository) ListSecrets(ctx context.Context) ([]Secret, error) {
 	secrets := make([]Secret, 0, len(output.SecretList))
 	for _, s := range output.SecretList {
 		secrets = append(secrets, Secret{
-			Name:        awssdk.ToString(s.Name),
-			ARN:         awssdk.ToString(s.ARN),
-			Description: awssdk.ToString(s.Description),
-			KMSKeyID:    awssdk.ToString(s.KmsKeyId),
+			Name:             awssdk.ToString(s.Name),
+			ARN:              awssdk.ToString(s.ARN),
+			Description:      awssdk.ToString(s.Description),
+			KMSKeyID:         awssdk.ToString(s.KmsKeyId),
+			RotationEnabled:  awssdk.ToBool(s.RotationEnabled),
+			CreatedDate:      awssdk.ToTime(s.CreatedDate),
+			LastChangedDate:  awssdk.ToTime(s.LastChangedDate),
+			LastRotatedDate:  awssdk.ToTime(s.LastRotatedDate),
+			NextRotationDate: awssdk.ToTime(s.NextRotationDate),
 		})
 	}
 	return secrets, nil

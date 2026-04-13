@@ -135,7 +135,7 @@ func (m Model) viewInspectorHome() string {
 	b.WriteString("\n\n")
 	b.WriteString(normalStyle.Render("  Run built-in security scans against the active AWS context."))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render("  This slice ships the service shell, scan orchestration, and finding browser."))
+	b.WriteString(normalStyle.Render("  Built-in rule packs cover Security Groups, RDS, IAM access keys, Secrets Manager, and S3 buckets."))
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render(fmt.Sprintf("  Registered rule packs: %d", awsservice.RegisteredSecurityInspectorScannerCount())))
 	b.WriteString("\n")
@@ -160,7 +160,7 @@ func (m Model) viewInspectorScanning() string {
 	b.WriteString("\n\n")
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s Running built-in rule packs...", m.loadingSpinner.View())))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("  The first rule packs land in follow-up issues."))
+	b.WriteString(dimStyle.Render("  Checking network exposure, backups, key age, secret rotation, and S3 bucket posture."))
 	return b.String()
 }
 

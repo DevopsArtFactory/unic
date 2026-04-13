@@ -7,15 +7,18 @@ import (
 
 // RDSInstance holds essential information about an RDS database instance.
 type RDSInstance struct {
-	DBInstanceID  string
-	Engine        string
-	EngineVersion string
-	Status        string
-	InstanceClass string
-	MultiAZ       bool
-	StorageGB     int32
-	Endpoint      string
-	ClusterID     string
+	DBInstanceID          string
+	Engine                string
+	EngineVersion         string
+	Status                string
+	InstanceClass         string
+	MultiAZ               bool
+	StorageGB             int32
+	StorageEncrypted      bool
+	PubliclyAccessible    bool
+	BackupRetentionPeriod int32
+	Endpoint              string
+	ClusterID             string
 }
 
 // DisplayTitle returns a formatted string for list display.

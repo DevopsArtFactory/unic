@@ -11,7 +11,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Drill down into resources with filters, detail views, and action screens
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
-- Open the Security Inspector workflow and review scan results by severity as rule packs are added
+- Open the Security Inspector workflow and review built-in findings for Security Groups, RDS, IAM keys, Secrets Manager, and S3 buckets
 
 ## Documentation Map
 
@@ -185,7 +185,7 @@ CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 | IAM | RotateAccessKey |
 | Inspector | Security Scan |
 
-The Inspector feature currently ships the service shell, scan orchestration, and results browser. The first built-in rule packs land in follow-up issues.
+The Inspector feature ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups, IAM access key age, Secrets Manager rotation age, and S3 public access/versioning checks.
 
 ## TUI Navigation
 

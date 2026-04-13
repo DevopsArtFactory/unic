@@ -13,10 +13,13 @@ import (
 )
 
 type mockS3Client struct {
-	listBucketsFunc       func(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
-	listObjectsV2Func     func(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
-	headObjectFunc        func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
-	getBucketLocationFunc func(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+	listBucketsFunc           func(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
+	listObjectsV2Func         func(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	headObjectFunc            func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+	getBucketLocationFunc     func(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
+	getBucketAclFunc          func(ctx context.Context, params *s3.GetBucketAclInput, optFns ...func(*s3.Options)) (*s3.GetBucketAclOutput, error)
+	getBucketPolicyStatusFunc func(ctx context.Context, params *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error)
+	getBucketVersioningFunc   func(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
 }
 
 func (m *mockS3Client) ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
@@ -32,7 +35,31 @@ func (m *mockS3Client) HeadObject(ctx context.Context, params *s3.HeadObjectInpu
 }
 
 func (m *mockS3Client) GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
-	return m.getBucketLocationFunc(ctx, params, optFns...)
+	if m.getBucketLocationFunc != nil {
+		return m.getBucketLocationFunc(ctx, params, optFns...)
+	}
+	return &s3.GetBucketLocationOutput{}, nil
+}
+
+func (m *mockS3Client) GetBucketAcl(ctx context.Context, params *s3.GetBucketAclInput, optFns ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	if m.getBucketAclFunc != nil {
+		return m.getBucketAclFunc(ctx, params, optFns...)
+	}
+	return &s3.GetBucketAclOutput{}, nil
+}
+
+func (m *mockS3Client) GetBucketPolicyStatus(ctx context.Context, params *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
+	if m.getBucketPolicyStatusFunc != nil {
+		return m.getBucketPolicyStatusFunc(ctx, params, optFns...)
+	}
+	return &s3.GetBucketPolicyStatusOutput{}, nil
+}
+
+func (m *mockS3Client) GetBucketVersioning(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
+	if m.getBucketVersioningFunc != nil {
+		return m.getBucketVersioningFunc(ctx, params, optFns...)
+	}
+	return &s3.GetBucketVersioningOutput{}, nil
 }
 
 func TestListBuckets_Success(t *testing.T) {

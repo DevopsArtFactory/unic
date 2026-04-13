@@ -254,13 +254,16 @@ func TestDescribeDBInstance_Success(t *testing.T) {
 			return &rds.DescribeDBInstancesOutput{
 				DBInstances: []rdstypes.DBInstance{
 					{
-						DBInstanceIdentifier: awssdk.String("my-db"),
-						Engine:               awssdk.String("mysql"),
-						EngineVersion:        awssdk.String("8.0.35"),
-						DBInstanceStatus:     awssdk.String("available"),
-						DBInstanceClass:      awssdk.String("db.t3.micro"),
-						MultiAZ:              awssdk.Bool(false),
-						AllocatedStorage:     awssdk.Int32(20),
+						DBInstanceIdentifier:  awssdk.String("my-db"),
+						Engine:                awssdk.String("mysql"),
+						EngineVersion:         awssdk.String("8.0.35"),
+						DBInstanceStatus:      awssdk.String("available"),
+						DBInstanceClass:       awssdk.String("db.t3.micro"),
+						MultiAZ:               awssdk.Bool(false),
+						AllocatedStorage:      awssdk.Int32(20),
+						StorageEncrypted:      awssdk.Bool(true),
+						PubliclyAccessible:    awssdk.Bool(true),
+						BackupRetentionPeriod: awssdk.Int32(7),
 						Endpoint: &rdstypes.Endpoint{
 							Address: awssdk.String("my-db.abc123.us-east-1.rds.amazonaws.com"),
 							Port:    awssdk.Int32(3306),
@@ -278,6 +281,50 @@ func TestDescribeDBInstance_Success(t *testing.T) {
 	}
 	if inst.DBInstanceID != "my-db" {
 		t.Errorf("expected 'my-db', got %q", inst.DBInstanceID)
+	}
+	if !inst.StorageEncrypted {
+		t.Error("expected storage encryption to be mapped")
+	}
+	if !inst.PubliclyAccessible {
+		t.Error("expected public accessibility to be mapped")
+	}
+	if inst.BackupRetentionPeriod != 7 {
+		t.Errorf("expected backup retention period 7, got %d", inst.BackupRetentionPeriod)
+	}
+}
+
+func TestListDBInstances_MapsInspectorFields(t *testing.T) {
+	mock := &mockRDSClient{
+		describeDBInstancesFunc: func(_ context.Context, _ *rds.DescribeDBInstancesInput, _ ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {
+			return &rds.DescribeDBInstancesOutput{
+				DBInstances: []rdstypes.DBInstance{
+					{
+						DBInstanceIdentifier:  awssdk.String("my-db"),
+						StorageEncrypted:      awssdk.Bool(true),
+						PubliclyAccessible:    awssdk.Bool(false),
+						BackupRetentionPeriod: awssdk.Int32(14),
+					},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{RDSClient: mock}
+	instances, err := repo.ListDBInstances(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(instances) != 1 {
+		t.Fatalf("expected 1 instance, got %d", len(instances))
+	}
+	if !instances[0].StorageEncrypted {
+		t.Error("expected storage encryption to be mapped")
+	}
+	if instances[0].PubliclyAccessible {
+		t.Error("expected public accessibility to be false")
+	}
+	if instances[0].BackupRetentionPeriod != 14 {
+		t.Errorf("expected backup retention period 14, got %d", instances[0].BackupRetentionPeriod)
 	}
 }
 
