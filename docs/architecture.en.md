@@ -89,6 +89,7 @@ Current repository clients include:
 Pattern:
 
 - `repository.go` initializes SDK clients
+- `inspector*.go` owns Security Inspector scan orchestration and finding models
 - `*_model.go` defines UI-facing data models
 - `*.go` implements service operations
 - tests use mock client interfaces per AWS service
@@ -107,6 +108,7 @@ The app remains centered on a root model, but screen-specific rendering is now s
 - `screen_cloudwatchlogs.go`
 - `screen_ecs.go`
 - `screen_s3.go`
+- `screen_inspector.go`
 - `screen_context.go`
 
 Supporting files include `styles.go`, `filter.go`, and `messages.go`.
@@ -155,6 +157,7 @@ Current screen families include:
 - CloudWatch Logs group/stream/viewer flows
 - ECS cluster/service/task/container flows
 - S3 bucket/object/detail flows
+- Inspector home/scanning/results/detail flows
 - context picker and context add flows
 - loading and error screens
 

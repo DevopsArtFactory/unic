@@ -62,6 +62,10 @@ const (
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
+	screenInspectorHome
+	screenInspectorScanning
+	screenInspectorResults
+	screenInspectorFindingDetail
 	screenContextPicker
 	screenContextAdd
 	screenLoading
@@ -252,6 +256,13 @@ type Model struct {
 	s3PrefixStack     []string
 	selectedS3Object  *awsservice.S3ObjectDetail
 
+	// Inspector browser state
+	inspectorReport          *awsservice.SecurityScanReport
+	inspectorFindings        []awsservice.SecurityFinding
+	inspectorIdx             int
+	inspectorSeverityFilter  awsservice.RuleSeverity
+	selectedInspectorFinding *awsservice.SecurityFinding
+
 	// Context picker
 	configPath         string
 	ctxList            []config.ContextInfo
@@ -375,7 +386,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case spinner.TickMsg:
-		if m.screen != screenLoading {
+		if m.screen != screenLoading && m.screen != screenInspectorScanning {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -398,6 +409,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleCloudWatchLogsMsg,
 		m.handleECSMsg,
 		m.handleS3Msg,
+		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
 		if newM, cmd, handled := h(msg); handled {
@@ -484,6 +496,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateS3ObjectList(msg)
 		case screenS3ObjectDetail:
 			return m.updateS3ObjectDetail(msg)
+		case screenInspectorHome:
+			return m.updateInspectorHome(msg)
+		case screenInspectorResults:
+			return m.updateInspectorResults(msg)
+		case screenInspectorFindingDetail:
+			return m.updateInspectorFindingDetail(msg)
 		case screenSecurityGroupList:
 			return m.updateSecurityGroupList(msg)
 		case screenSecurityGroupDetail:
@@ -635,6 +653,14 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.startLoading(m.loadIAMKeys())
 			case domain.FeatureECSExec:
 				return m.startLoading(m.loadECSClusters())
+			case domain.FeatureSecurityScan:
+				m.inspectorReport = nil
+				m.inspectorFindings = nil
+				m.inspectorIdx = 0
+				m.inspectorSeverityFilter = ""
+				m.selectedInspectorFinding = nil
+				m.screen = screenInspectorHome
+				return m, nil
 			}
 		}
 	}
@@ -716,6 +742,14 @@ func (m Model) View() string {
 		v = m.viewS3ObjectList()
 	case screenS3ObjectDetail:
 		v = m.viewS3ObjectDetail()
+	case screenInspectorHome:
+		v = m.viewInspectorHome()
+	case screenInspectorScanning:
+		v = m.viewInspectorScanning()
+	case screenInspectorResults:
+		v = m.viewInspectorResults()
+	case screenInspectorFindingDetail:
+		v = m.viewInspectorFindingDetail()
 	case screenSecurityGroupList:
 		v = m.viewSecurityGroupList()
 	case screenSecurityGroupDetail:

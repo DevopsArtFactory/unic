@@ -1236,6 +1236,115 @@ func TestS3FeatureStartsBucketLoading(t *testing.T) {
 	}
 }
 
+func TestInspectorFeatureEntersHomeScreen(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	for _, svc := range m.services {
+		if svc.Name == domain.ServiceInspector {
+			m.features = svc.Features
+			break
+		}
+	}
+	m.screen = screenFeatureList
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenInspectorHome {
+		t.Fatalf("expected inspector home screen, got %d", model.screen)
+	}
+	if cmd != nil {
+		t.Fatal("expected no loading command when entering inspector home")
+	}
+}
+
+func TestInspectorHomeStartsDedicatedScanFlow(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenInspectorHome
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenInspectorScanning {
+		t.Fatalf("expected inspector scanning screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected security scan command")
+	}
+}
+
+func TestHandleInspectorScanLoadedMsgShowsResults(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	report := &awsservice.SecurityScanReport{
+		ScannerCount: 1,
+		Findings: []awsservice.SecurityFinding{
+			{
+				RuleID:         "sg-public-ssh",
+				RuleName:       "SSH exposed to the internet",
+				Severity:       awsservice.RuleSeverityHigh,
+				ResourceType:   "SecurityGroup",
+				ResourceID:     "sg-123456",
+				Summary:        "Ingress rule allows TCP/22 from 0.0.0.0/0.",
+				Recommendation: "Restrict SSH to trusted sources.",
+			},
+		},
+	}
+
+	updated, _, handled := m.handleInspectorMsg(inspectorScanLoadedMsg{report: report})
+	if !handled {
+		t.Fatal("expected inspector scan message to be handled")
+	}
+
+	model := updated.(Model)
+	if model.screen != screenInspectorResults {
+		t.Fatalf("expected inspector results screen, got %d", model.screen)
+	}
+	if len(model.inspectorFindings) != 1 {
+		t.Fatalf("expected 1 filtered finding, got %d", len(model.inspectorFindings))
+	}
+}
+
+func TestInspectorResultsSeverityFilterNarrowsFindings(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenInspectorResults
+	m.inspectorReport = &awsservice.SecurityScanReport{
+		Findings: []awsservice.SecurityFinding{
+			{RuleName: "Critical finding", Severity: awsservice.RuleSeverityCritical, ResourceID: "sg-1"},
+			{RuleName: "Medium finding", Severity: awsservice.RuleSeverityMedium, ResourceID: "db-1"},
+		},
+	}
+	m.applyInspectorSeverityFilter()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	model := updated.(Model)
+	if model.inspectorSeverityFilter != awsservice.RuleSeverityCritical {
+		t.Fatalf("expected critical severity filter, got %q", model.inspectorSeverityFilter)
+	}
+	if len(model.inspectorFindings) != 1 || model.inspectorFindings[0].Severity != awsservice.RuleSeverityCritical {
+		t.Fatalf("expected only critical findings, got %+v", model.inspectorFindings)
+	}
+}
+
+func TestInspectorResultsEnterShowsDetail(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenInspectorResults
+	m.inspectorFindings = []awsservice.SecurityFinding{
+		{
+			RuleName:       "SSH exposed to the internet",
+			Severity:       awsservice.RuleSeverityHigh,
+			ResourceID:     "sg-123456",
+			Summary:        "Ingress rule allows SSH from anywhere.",
+			Recommendation: "Restrict SSH ingress to trusted sources.",
+		},
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenInspectorFindingDetail {
+		t.Fatalf("expected inspector detail screen, got %d", model.screen)
+	}
+	if model.selectedInspectorFinding == nil {
+		t.Fatal("expected selected inspector finding")
+	}
+}
+
 func TestS3ObjectListEscAtRootReturnsToBucketList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenS3ObjectList
