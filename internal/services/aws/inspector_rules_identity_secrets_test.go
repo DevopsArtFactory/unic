@@ -179,6 +179,7 @@ func TestInspectIAMAccessKeysFlagsStaleActiveKeys(t *testing.T) {
 func TestInspectSecretsManagerRotationFlagsDisabledAndOverdueSecrets(t *testing.T) {
 	now := time.Date(2026, 4, 13, 12, 0, 0, 0, time.UTC)
 	oldRotated := now.AddDate(0, 0, -120)
+	veryOldRotated := now.AddDate(0, 0, -200)
 
 	mockSecrets := &inspectorSecretsMockClient{
 		listSecretsFunc: func(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
@@ -193,6 +194,11 @@ func TestInspectSecretsManagerRotationFlagsDisabledAndOverdueSecrets(t *testing.
 						RotationEnabled: awssdk.Bool(true),
 						LastRotatedDate: &oldRotated,
 					},
+					{
+						Name:            awssdk.String("prod/very-stale-rotation"),
+						RotationEnabled: awssdk.Bool(true),
+						LastRotatedDate: &veryOldRotated,
+					},
 				},
 			}, nil
 		},
@@ -203,8 +209,8 @@ func TestInspectSecretsManagerRotationFlagsDisabledAndOverdueSecrets(t *testing.
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(findings) != 2 {
-		t.Fatalf("expected 2 secret findings, got %d", len(findings))
+	if len(findings) != 3 {
+		t.Fatalf("expected 3 secret findings, got %d", len(findings))
 	}
 
 	if findings[0].ResourceID != "prod/no-rotation" {
@@ -218,5 +224,11 @@ func TestInspectSecretsManagerRotationFlagsDisabledAndOverdueSecrets(t *testing.
 	}
 	if findings[1].Severity != RuleSeverityMedium {
 		t.Fatalf("expected medium severity for stale rotation, got %s", findings[1].Severity)
+	}
+	if findings[2].ResourceID != "prod/very-stale-rotation" {
+		t.Fatalf("expected very overdue rotation finding third, got %+v", findings[2])
+	}
+	if findings[2].Severity != RuleSeverityHigh {
+		t.Fatalf("expected high severity for very stale rotation, got %s", findings[2].Severity)
 	}
 }

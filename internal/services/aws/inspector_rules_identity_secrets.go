@@ -12,6 +12,7 @@ const (
 	inspectorIAMAccessKeyMediumAgeDays = 90
 	inspectorIAMAccessKeyHighAgeDays   = 180
 	inspectorSecretRotationAgeDays     = 90
+	inspectorSecretRotationHighAgeDays = 2 * inspectorSecretRotationAgeDays
 )
 
 func init() {
@@ -107,7 +108,7 @@ func buildIAMAccessKeyFinding(userName string, key AccessKey, now time.Time) (Se
 	}
 
 	severity := RuleSeverityMedium
-	if ageDays >= inspectorIAMAccessKeyHighAgeDays {
+	if ageDays >= inspectorSecretRotationHighAgeDays {
 		severity = RuleSeverityHigh
 	}
 
