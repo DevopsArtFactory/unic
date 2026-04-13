@@ -217,20 +217,28 @@ type Model struct {
 	ecsContainerIdx int
 
 	// CloudWatch Logs browser state
-	cwLogGroups          []awsservice.LogGroup
-	filteredCWLogGroups  []awsservice.LogGroup
-	cwLogGroupIdx        int
-	selectedCWLogGroup   *awsservice.LogGroup
-	cwLogStreams         []awsservice.LogStream
-	filteredCWLogStreams []awsservice.LogStream
-	cwLogStreamIdx       int
-	selectedCWLogStream  *awsservice.LogStream
-	cwLogEvents          []awsservice.LogEvent
-	cwLogScrollOffset    int
-	cwLogNextToken       *string
-	cwLogTimeRange       int  // index into preset time ranges
-	cwLogTailing         bool // live tail active
-	cwLogTailToken       *string
+	cwLogGroups             []awsservice.LogGroup
+	filteredCWLogGroups     []awsservice.LogGroup
+	cwLogGroupIdx           int
+	cwLogGroupFilter        string
+	cwLogGroupFilterActive  bool
+	selectedCWLogGroup      *awsservice.LogGroup
+	cwLogStreams            []awsservice.LogStream
+	filteredCWLogStreams    []awsservice.LogStream
+	cwLogStreamIdx          int
+	cwLogStreamFilter       string
+	cwLogStreamFilterActive bool
+	selectedCWLogStream     *awsservice.LogStream
+	cwLogEvents             []awsservice.LogEvent
+	cwLogScrollOffset       int
+	cwLogNextToken          *string
+	cwLogTimeRange          int // index into preset time ranges
+	cwLogFilterPattern      string
+	cwLogFilterActive       bool // filter pattern input active
+	cwLogTailing            bool // live tail active
+	cwLogTailToken          *string
+	cwLogWrap               bool
+	cwLogHorizontalOffset   int
 
 	// S3 browser state
 	s3Buckets         []awsservice.S3Bucket

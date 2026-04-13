@@ -100,14 +100,14 @@ func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			m.cwLogEvents = appendUniqueCWLogEvents(m.cwLogEvents, msg.events)
 			// Auto-scroll to bottom when tailing
 			if m.cwLogTailing {
-				total := len(m.cwLogEvents)
+				total := len(m.cwLogViewerLines())
 				visibleLines := max(m.height-8, 5)
 				m.cwLogScrollOffset = clampCWLogScrollOffset(total-visibleLines, total, visibleLines)
 			}
 		} else {
 			m.cwLogEvents = msg.events
 			visibleLines := max(m.height-8, 5)
-			m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogEvents), visibleLines)
+			m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogViewerLines()), visibleLines)
 		}
 		if msg.updatePaginationToken {
 			m.cwLogNextToken = msg.nextToken
@@ -259,6 +259,9 @@ func (m Model) updateCWLogStreamList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.resetFilter(filterCWLogViewer)
 			m.cwLogTailing = false
 			m.cwLogTailToken = nil
+			m.cwLogWrap = true
+			m.cwLogHorizontalOffset = 0
+			m.cwLogScrollOffset = 0
 			return m.startLoading(m.loadCWLogEvents(false))
 		}
 	}
@@ -361,7 +364,8 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cwLogScrollOffset--
 		}
 	case "down", "j":
-		maxOffset := clampCWLogScrollOffset(len(m.cwLogEvents)-visibleLines, len(m.cwLogEvents), visibleLines)
+		totalLines := len(m.cwLogViewerLines())
+		maxOffset := clampCWLogScrollOffset(totalLines-visibleLines, totalLines, visibleLines)
 		if m.cwLogScrollOffset < maxOffset {
 			m.cwLogScrollOffset++
 		}
@@ -372,7 +376,7 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "pgdown":
 		m.cwLogScrollOffset += visibleLines
-		m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogEvents), visibleLines)
+		m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogViewerLines()), visibleLines)
 	case "t": // Toggle live tail
 		m.cwLogTailing = !m.cwLogTailing
 		if m.cwLogTailing {
@@ -380,6 +384,20 @@ func (m Model) updateCWLogViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "f": // Filter pattern input
 		return m, m.activateFilter(filterCWLogViewer)
+	case "w":
+		m.cwLogWrap = !m.cwLogWrap
+		if m.cwLogWrap {
+			m.cwLogHorizontalOffset = 0
+		}
+		m.cwLogScrollOffset = clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogViewerLines()), visibleLines)
+	case "h":
+		if !m.cwLogWrap && m.cwLogHorizontalOffset > 0 {
+			m.cwLogHorizontalOffset = max(m.cwLogHorizontalOffset-8, 0)
+		}
+	case "l":
+		if !m.cwLogWrap {
+			m.cwLogHorizontalOffset = min(m.cwLogHorizontalOffset+8, m.maxCWLogHorizontalOffset())
+		}
 	case "n": // Load more (older events)
 		if m.cwLogNextToken != nil {
 			return m, m.loadCWLogEvents(true)
@@ -442,41 +460,157 @@ func (m Model) viewCWLogViewer() string {
 		b.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-8, 5)
-		start := clampCWLogScrollOffset(m.cwLogScrollOffset, len(m.cwLogEvents), visibleLines)
-		end := min(start+visibleLines, len(m.cwLogEvents))
+		lines := m.cwLogViewerLines()
+		start := clampCWLogScrollOffset(m.cwLogScrollOffset, len(lines), visibleLines)
+		end := min(start+visibleLines, len(lines))
 
-		for i := start; i < end; i++ {
-			evt := m.cwLogEvents[i]
-			ts := dimStyle.Render(evt.Timestamp.Local().Format("15:04:05.000"))
-			msg := strings.TrimSpace(evt.Message)
-
-			var levelStr string
-			switch evt.Level {
-			case "ERROR", "FATAL":
-				levelStr = logErrorStyle.Render(fmt.Sprintf("[%s]", evt.Level))
-			case "WARN":
-				levelStr = logWarnStyle.Render("[WARN]")
-			case "INFO":
-				levelStr = logInfoStyle.Render("[INFO]")
-			case "DEBUG":
-				levelStr = logDebugStyle.Render("[DEBUG]")
-			}
-
-			if levelStr != "" {
-				b.WriteString(fmt.Sprintf("  %s %s %s", ts, levelStr, msg))
-			} else {
-				b.WriteString(fmt.Sprintf("  %s %s", ts, msg))
-			}
+		for _, line := range lines[start:end] {
+			b.WriteString(line)
 			b.WriteString("\n")
 		}
 
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d events (showing %d-%d)", len(m.cwLogEvents), start+1, end)))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d events (showing lines %d-%d)", len(m.cwLogEvents), start+1, end)))
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: scroll • pgup/pgdn: page • 1-6: time range • f: filter • t: tail • n: load more • esc: back"))
+	wrapStatus := "off"
+	if m.cwLogWrap {
+		wrapStatus = "on"
+	}
+	hint := fmt.Sprintf("↑/↓: scroll • pgup/pgdn: page • 1-6: time range • f: filter • t: tail • w: wrap (%s)", wrapStatus)
+	if !m.cwLogWrap {
+		hint += fmt.Sprintf(" • h/l: horizontal (%d)", m.cwLogHorizontalOffset)
+	}
+	hint += " • n: load more • esc: back"
+	b.WriteString(dimStyle.Render(hint))
 	return b.String()
+}
+
+func (m Model) cwLogViewerLines() []string {
+	lines := make([]string, 0, len(m.cwLogEvents))
+	for _, evt := range m.cwLogEvents {
+		lines = append(lines, m.renderCWLogEventLines(evt)...)
+	}
+	return lines
+}
+
+func (m Model) renderCWLogEventLines(evt awsservice.LogEvent) []string {
+	tsText := evt.Timestamp.Local().Format("15:04:05.000")
+	tsStyled := dimStyle.Render(tsText)
+
+	levelText := ""
+	levelStyled := ""
+	switch evt.Level {
+	case "ERROR", "FATAL":
+		levelText = fmt.Sprintf("[%s]", evt.Level)
+		levelStyled = logErrorStyle.Render(levelText)
+	case "WARN":
+		levelText = "[WARN]"
+		levelStyled = logWarnStyle.Render(levelText)
+	case "INFO":
+		levelText = "[INFO]"
+		levelStyled = logInfoStyle.Render(levelText)
+	case "DEBUG":
+		levelText = "[DEBUG]"
+		levelStyled = logDebugStyle.Render(levelText)
+	}
+
+	firstPrefixPlain := "  " + tsText
+	firstPrefixStyled := "  " + tsStyled
+	if levelText != "" {
+		firstPrefixPlain += " " + levelText
+		firstPrefixStyled += " " + levelStyled
+	}
+	firstPrefixPlain += " "
+	firstPrefixStyled += " "
+
+	continuationPrefix := strings.Repeat(" ", lipgloss.Width(firstPrefixPlain))
+	messageLines := strings.Split(strings.TrimRight(evt.Message, "\n"), "\n")
+	if len(messageLines) == 0 {
+		messageLines = []string{""}
+	}
+
+	rendered := make([]string, 0, len(messageLines))
+	firstLine := true
+	for _, line := range messageLines {
+		line = strings.TrimRight(line, "\r")
+		if m.cwLogWrap {
+			prefixPlain := continuationPrefix
+			prefixStyled := continuationPrefix
+			if firstLine {
+				prefixPlain = firstPrefixPlain
+				prefixStyled = firstPrefixStyled
+			}
+			wrapped := wrapCWLogMessage(line, max(m.cwLogContentWidth()-lipgloss.Width(prefixPlain), 8))
+			for idx, segment := range wrapped {
+				if firstLine && idx == 0 {
+					rendered = append(rendered, prefixStyled+segment)
+					continue
+				}
+				rendered = append(rendered, continuationPrefix+segment)
+			}
+		} else {
+			segment := sliceCWLogMessage(line, m.cwLogHorizontalOffset)
+			if firstLine {
+				rendered = append(rendered, firstPrefixStyled+segment)
+			} else {
+				rendered = append(rendered, continuationPrefix+segment)
+			}
+		}
+		firstLine = false
+	}
+
+	if len(rendered) == 0 {
+		rendered = append(rendered, firstPrefixStyled)
+	}
+	return rendered
+}
+
+func (m Model) cwLogContentWidth() int {
+	if m.width <= 0 {
+		return 120
+	}
+	return max(m.width-2, 20)
+}
+
+func (m Model) maxCWLogHorizontalOffset() int {
+	maxWidth := 0
+	for _, evt := range m.cwLogEvents {
+		for _, line := range strings.Split(strings.TrimRight(evt.Message, "\n"), "\n") {
+			maxWidth = max(maxWidth, lipgloss.Width(strings.TrimRight(line, "\r")))
+		}
+	}
+	return max(maxWidth-m.cwLogContentWidth()/2, 0)
+}
+
+func wrapCWLogMessage(message string, width int) []string {
+	if width <= 0 {
+		return []string{message}
+	}
+	if message == "" {
+		return []string{""}
+	}
+
+	runes := []rune(message)
+	lines := make([]string, 0, len(runes)/max(width, 1)+1)
+	for len(runes) > 0 {
+		end := min(width, len(runes))
+		lines = append(lines, string(runes[:end]))
+		runes = runes[end:]
+	}
+	return lines
+}
+
+func sliceCWLogMessage(message string, offset int) string {
+	runes := []rune(message)
+	if offset >= len(runes) {
+		return ""
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return string(runes[offset:])
 }
 
 // --- Commands ---
