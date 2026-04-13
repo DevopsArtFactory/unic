@@ -108,7 +108,7 @@ func buildIAMAccessKeyFinding(userName string, key AccessKey, now time.Time) (Se
 	}
 
 	severity := RuleSeverityMedium
-	if ageDays >= inspectorSecretRotationHighAgeDays {
+	if ageDays >= inspectorIAMAccessKeyHighAgeDays {
 		severity = RuleSeverityHigh
 	}
 
@@ -169,7 +169,7 @@ func buildSecretsRotationFinding(secret Secret, now time.Time) (SecurityFinding,
 	}
 
 	severity := RuleSeverityMedium
-	if ageDays >= inspectorIAMAccessKeyHighAgeDays {
+	if ageDays >= inspectorSecretRotationHighAgeDays {
 		severity = RuleSeverityHigh
 	}
 

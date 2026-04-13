@@ -130,7 +130,7 @@ func TestListSecretsMapsRotationMetadata(t *testing.T) {
 
 func TestInspectIAMAccessKeysFlagsStaleActiveKeys(t *testing.T) {
 	now := time.Date(2026, 4, 13, 12, 0, 0, 0, time.UTC)
-	oldCreate := now.AddDate(0, 0, -200)
+	oldCreate := now.AddDate(0, 0, -inspectorIAMAccessKeyHighAgeDays)
 	recentCreate := now.AddDate(0, 0, -30)
 
 	mockIAM := &inspectorIAMMockClient{
@@ -172,14 +172,14 @@ func TestInspectIAMAccessKeysFlagsStaleActiveKeys(t *testing.T) {
 		t.Fatalf("unexpected resource id: %+v", finding)
 	}
 	if finding.Severity != RuleSeverityHigh {
-		t.Fatalf("expected high severity for 200-day-old key, got %s", finding.Severity)
+		t.Fatalf("expected high severity at the IAM high-age threshold, got %s", finding.Severity)
 	}
 }
 
 func TestInspectSecretsManagerRotationFlagsDisabledAndOverdueSecrets(t *testing.T) {
 	now := time.Date(2026, 4, 13, 12, 0, 0, 0, time.UTC)
 	oldRotated := now.AddDate(0, 0, -120)
-	veryOldRotated := now.AddDate(0, 0, -200)
+	veryOldRotated := now.AddDate(0, 0, -inspectorSecretRotationHighAgeDays)
 
 	mockSecrets := &inspectorSecretsMockClient{
 		listSecretsFunc: func(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
@@ -229,6 +229,6 @@ func TestInspectSecretsManagerRotationFlagsDisabledAndOverdueSecrets(t *testing.
 		t.Fatalf("expected very overdue rotation finding third, got %+v", findings[2])
 	}
 	if findings[2].Severity != RuleSeverityHigh {
-		t.Fatalf("expected high severity for very stale rotation, got %s", findings[2].Severity)
+		t.Fatalf("expected high severity at the secrets high-age threshold, got %s", findings[2].Severity)
 	}
 }
