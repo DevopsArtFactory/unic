@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/smithy-go"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	uniclog "unic/internal/log"
 )
@@ -129,7 +130,8 @@ func (r *AwsRepository) ListAvailableIPs(ctx context.Context, subnetID, cidr str
 	return available, nil
 }
 
-// ListReachabilityTargets returns EC2 instances and network interfaces as analysis candidates.
+// ListReachabilityTargets returns the Reachability Analyzer source and destination
+// resource types currently supported by AWS and surfaced by unic.
 func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]ReachabilityTarget, error) {
 	uniclog.Debug("aws", "ListReachabilityTargets called")
 
@@ -173,13 +175,190 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			targets = append(targets, ReachabilityTarget{
 				ID:          derefString(eni.NetworkInterfaceId),
 				Name:        name,
-				Type:        "ENI",
+				Type:        "Network interfaces",
 				VPCID:       derefString(eni.VpcId),
 				SubnetID:    derefString(eni.SubnetId),
 				PrivateIP:   derefString(eni.PrivateIpAddress),
 				Description: fmt.Sprintf("status=%s", eni.Status),
 			})
 		}
+	}
+
+	igwPaginator := ec2.NewDescribeInternetGatewaysPaginator(r.EC2Client, &ec2.DescribeInternetGatewaysInput{})
+	for igwPaginator.HasMorePages() {
+		page, err := igwPaginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe internet gateways: %w", err)
+		}
+		for _, igw := range page.InternetGateways {
+			name := extractNameTag(igw.Tags)
+			if name == "Unknown" {
+				name = derefString(igw.InternetGatewayId)
+			}
+			vpcID := ""
+			if len(igw.Attachments) > 0 {
+				vpcID = derefString(igw.Attachments[0].VpcId)
+			}
+			targets = append(targets, ReachabilityTarget{
+				ID:          derefString(igw.InternetGatewayId),
+				Name:        name,
+				Type:        "Internet gateways",
+				VPCID:       vpcID,
+				Description: describeIGWAttachment(igw.Attachments),
+			})
+		}
+	}
+
+	vpcEndpointPaginator := ec2.NewDescribeVpcEndpointsPaginator(r.EC2Client, &ec2.DescribeVpcEndpointsInput{})
+	for vpcEndpointPaginator.HasMorePages() {
+		page, err := vpcEndpointPaginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe VPC endpoints: %w", err)
+		}
+		for _, endpoint := range page.VpcEndpoints {
+			name := extractNameTag(endpoint.Tags)
+			if name == "Unknown" {
+				name = derefString(endpoint.ServiceName)
+			}
+			if strings.TrimSpace(name) == "" {
+				name = derefString(endpoint.VpcEndpointId)
+			}
+			subnetID := ""
+			if len(endpoint.SubnetIds) > 0 {
+				subnetID = endpoint.SubnetIds[0]
+			}
+			targets = append(targets, ReachabilityTarget{
+				ID:          derefString(endpoint.VpcEndpointId),
+				Name:        name,
+				Type:        "VPC endpoints",
+				VPCID:       derefString(endpoint.VpcId),
+				SubnetID:    subnetID,
+				Description: fmt.Sprintf("type=%s state=%s", endpoint.VpcEndpointType, endpoint.State),
+			})
+		}
+	}
+
+	vpcPeeringPaginator := ec2.NewDescribeVpcPeeringConnectionsPaginator(r.EC2Client, &ec2.DescribeVpcPeeringConnectionsInput{})
+	for vpcPeeringPaginator.HasMorePages() {
+		page, err := vpcPeeringPaginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe VPC peering connections: %w", err)
+		}
+		for _, peering := range page.VpcPeeringConnections {
+			name := extractNameTag(peering.Tags)
+			if name == "Unknown" {
+				name = derefString(peering.VpcPeeringConnectionId)
+			}
+			requester := ""
+			if peering.RequesterVpcInfo != nil {
+				requester = derefString(peering.RequesterVpcInfo.VpcId)
+			}
+			accepter := ""
+			if peering.AccepterVpcInfo != nil {
+				accepter = derefString(peering.AccepterVpcInfo.VpcId)
+			}
+			targets = append(targets, ReachabilityTarget{
+				ID:          derefString(peering.VpcPeeringConnectionId),
+				Name:        name,
+				Type:        "VPC peering connections",
+				VPCID:       fallbackString(requester, accepter),
+				Description: fmt.Sprintf("requester=%s accepter=%s status=%s", fallbackString(requester, "-"), fallbackString(accepter, "-"), fallbackString(derefStateReason(peering.Status), "unknown")),
+			})
+		}
+	}
+
+	transitGatewayPaginator := ec2.NewDescribeTransitGatewaysPaginator(r.EC2Client, &ec2.DescribeTransitGatewaysInput{})
+	for transitGatewayPaginator.HasMorePages() {
+		page, err := transitGatewayPaginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe transit gateways: %w", err)
+		}
+		for _, gateway := range page.TransitGateways {
+			name := extractNameTag(gateway.Tags)
+			if name == "Unknown" {
+				name = derefString(gateway.TransitGatewayId)
+			}
+			targets = append(targets, ReachabilityTarget{
+				ID:          derefString(gateway.TransitGatewayId),
+				Name:        name,
+				Type:        "Transit gateways",
+				Description: fmt.Sprintf("state=%s", fallbackString(string(gateway.State), "unknown")),
+			})
+		}
+	}
+
+	transitAttachmentPaginator := ec2.NewDescribeTransitGatewayAttachmentsPaginator(r.EC2Client, &ec2.DescribeTransitGatewayAttachmentsInput{})
+	for transitAttachmentPaginator.HasMorePages() {
+		page, err := transitAttachmentPaginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe transit gateway attachments: %w", err)
+		}
+		for _, attachment := range page.TransitGatewayAttachments {
+			name := extractNameTag(attachment.Tags)
+			if name == "Unknown" {
+				name = derefString(attachment.TransitGatewayAttachmentId)
+			}
+			vpcID := ""
+			if attachment.ResourceType == types.TransitGatewayAttachmentResourceTypeVpc {
+				vpcID = derefString(attachment.ResourceId)
+			}
+			targets = append(targets, ReachabilityTarget{
+				ID:          derefString(attachment.TransitGatewayAttachmentId),
+				Name:        name,
+				Type:        "Transit gateway attachments",
+				VPCID:       vpcID,
+				Description: fmt.Sprintf("resource=%s/%s state=%s", fallbackString(string(attachment.ResourceType), "unknown"), fallbackString(derefString(attachment.ResourceId), "-"), fallbackString(string(attachment.State), "unknown")),
+			})
+		}
+	}
+
+	vpnGatewaysOut, err := r.EC2Client.DescribeVpnGateways(ctx, &ec2.DescribeVpnGatewaysInput{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe virtual private gateways: %w", err)
+	}
+	for _, gateway := range vpnGatewaysOut.VpnGateways {
+		name := extractNameTag(gateway.Tags)
+		if name == "Unknown" {
+			name = derefString(gateway.VpnGatewayId)
+		}
+		vpcID := ""
+		if len(gateway.VpcAttachments) > 0 {
+			vpcID = derefString(gateway.VpcAttachments[0].VpcId)
+		}
+		targets = append(targets, ReachabilityTarget{
+			ID:          derefString(gateway.VpnGatewayId),
+			Name:        name,
+			Type:        "Virtual private gateways",
+			VPCID:       vpcID,
+			Description: fmt.Sprintf("state=%s", fallbackString(string(gateway.State), "unknown")),
+		})
+	}
+
+	serviceConfigInput := &ec2.DescribeVpcEndpointServiceConfigurationsInput{}
+	for {
+		serviceConfigsOut, err := r.EC2Client.DescribeVpcEndpointServiceConfigurations(ctx, serviceConfigInput)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe VPC endpoint services: %w", err)
+		}
+		for _, service := range serviceConfigsOut.ServiceConfigurations {
+			name := extractNameTag(service.Tags)
+			if name == "Unknown" {
+				name = derefString(service.ServiceName)
+			}
+			if strings.TrimSpace(name) == "" {
+				name = derefString(service.ServiceId)
+			}
+			targets = append(targets, ReachabilityTarget{
+				ID:          derefString(service.ServiceId),
+				Name:        name,
+				Type:        "VPC endpoint services",
+				Description: fmt.Sprintf("service=%s state=%s", fallbackString(derefString(service.ServiceName), "-"), fallbackString(string(service.ServiceState), "unknown")),
+			})
+		}
+		if strings.TrimSpace(derefString(serviceConfigsOut.NextToken)) == "" {
+			break
+		}
+		serviceConfigInput.NextToken = serviceConfigsOut.NextToken
 	}
 
 	sort.Slice(targets, func(i, j int) bool {
@@ -221,15 +400,21 @@ func (r *AwsRepository) RunReachabilityAnalysis(
 	}
 
 	pathInput := &ec2.CreateNetworkInsightsPathInput{
-		ClientToken:     awssdk.String(strconv.FormatInt(time.Now().UnixNano(), 10)),
-		Protocol:        types.Protocol(strings.ToLower(protocol)),
-		Source:          awssdk.String(source.ID),
-		DestinationPort: awssdk.Int32(destinationPort),
+		ClientToken: awssdk.String(strconv.FormatInt(time.Now().UnixNano(), 10)),
+		Protocol:    types.Protocol(strings.ToLower(protocol)),
+		Source:      awssdk.String(source.ID),
 	}
 	if destination.ID != "" {
 		pathInput.Destination = awssdk.String(destination.ID)
+		pathInput.DestinationPort = awssdk.Int32(destinationPort)
 	} else {
-		pathInput.DestinationIp = awssdk.String(destinationIP)
+		pathInput.FilterAtSource = &types.PathRequestFilter{
+			DestinationAddress: awssdk.String(destinationIP),
+			DestinationPortRange: &types.RequestFilterPortRange{
+				FromPort: awssdk.Int32(destinationPort),
+				ToPort:   awssdk.Int32(destinationPort),
+			},
+		}
 	}
 
 	pathOut, err := r.EC2Client.CreateNetworkInsightsPath(ctx, pathInput)
@@ -314,15 +499,59 @@ func formatReachabilityError(prefix string, err error) error {
 		return fmt.Errorf("%s: analysis was cancelled", prefix)
 	}
 
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		switch apiErr.ErrorCode() {
-		case "UnauthorizedOperation", "AccessDenied", "AccessDeniedException", "AuthFailure":
-			return fmt.Errorf("%s: %s (required EC2 permissions: CreateNetworkInsightsPath, StartNetworkInsightsAnalysis, DescribeNetworkInsightsAnalyses, DeleteNetworkInsightsAnalysis, DeleteNetworkInsightsPath)", prefix, apiErr.ErrorMessage())
+	statusPart := ""
+	if respErr := (*smithyhttp.ResponseError)(nil); errors.As(err, &respErr) {
+		statusPart = fmt.Sprintf(" [status:%d", respErr.HTTPStatusCode())
+		if requestID := reachabilityRequestID(respErr.HTTPResponse()); requestID != "" {
+			statusPart += fmt.Sprintf(" request-id:%s", requestID)
 		}
+		statusPart += "]"
 	}
 
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		code := apiErr.ErrorCode()
+		message := fallbackString(apiErr.ErrorMessage(), err.Error())
+		switch code {
+		case "UnauthorizedOperation", "AccessDenied", "AccessDeniedException", "AuthFailure":
+			return fmt.Errorf("%s: %s: %s%s (required EC2 permissions: CreateNetworkInsightsPath, StartNetworkInsightsAnalysis, DescribeNetworkInsightsAnalyses, DeleteNetworkInsightsAnalysis, DeleteNetworkInsightsPath)", prefix, code, message, statusPart)
+		case "InvalidParameterValue", "InvalidParameterCombination", "InvalidParameter":
+			return fmt.Errorf("%s: %s: %s%s (check that the selected source and destination are supported Reachability Analyzer resources in the selected region)", prefix, code, message, statusPart)
+		}
+		return fmt.Errorf("%s: %s: %s%s", prefix, code, message, statusPart)
+	}
+
+	if statusPart != "" {
+		return fmt.Errorf("%s: %v%s", prefix, err, statusPart)
+	}
 	return fmt.Errorf("%s: %w", prefix, err)
+}
+
+func derefStateReason(reason *types.VpcPeeringConnectionStateReason) string {
+	if reason == nil {
+		return ""
+	}
+	return string(reason.Code)
+}
+
+func describeIGWAttachment(attachments []types.InternetGatewayAttachment) string {
+	if len(attachments) == 0 {
+		return "detached"
+	}
+	attachment := attachments[0]
+	return fmt.Sprintf("vpc=%s state=%s", fallbackString(derefString(attachment.VpcId), "-"), fallbackString(string(attachment.State), "unknown"))
+}
+
+func reachabilityRequestID(resp *smithyhttp.Response) string {
+	if resp == nil || resp.Response == nil {
+		return ""
+	}
+	for _, key := range []string{"x-amzn-RequestId", "x-amzn-requestid", "x-amz-request-id"} {
+		if value := resp.Response.Header.Get(key); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func mapReachabilityAnalysis(

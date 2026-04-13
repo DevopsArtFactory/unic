@@ -174,6 +174,31 @@ func TestReachabilityStatusBarUsesOverrideRegion(t *testing.T) {
 	}
 }
 
+func TestReachabilityTargetsLoadedBuildsSourceTypeFilter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	msg := reachabilityTargetsLoadedMsg{
+		targets: []awsservice.ReachabilityTarget{
+			{ID: "i-1", Name: "app", Type: "EC2 instances"},
+			{ID: "eni-1", Name: "db", Type: "Network interfaces"},
+		},
+	}
+
+	updated, _, handled := m.handleEC2VPCMsg(msg)
+	if !handled {
+		t.Fatal("expected message to be handled")
+	}
+	model := updated.(Model)
+	if got := strings.Join(model.reachabilitySourceTypes, ","); got != "EC2 instances,Network interfaces" {
+		t.Fatalf("unexpected source types: %q", got)
+	}
+	if len(model.filteredReachabilityTargets) != 1 {
+		t.Fatalf("expected only EC2 instances to be visible initially, got %d", len(model.filteredReachabilityTargets))
+	}
+	if model.filteredReachabilityTargets[0].Type != "EC2 instances" {
+		t.Fatalf("expected EC2 instances to be prioritized, got %+v", model.filteredReachabilityTargets)
+	}
+}
+
 func TestFeatureListEscGoesBack(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenFeatureList

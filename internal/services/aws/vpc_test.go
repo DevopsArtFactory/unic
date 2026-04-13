@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,8 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	smithy "github.com/aws/smithy-go"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // mockEC2Client implements EC2ClientAPI for testing.
@@ -18,6 +21,13 @@ type mockEC2Client struct {
 	describeSubnetsFunc                 func(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
 	describeInstancesFunc               func(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
 	describeNetworkInterfacesFunc       func(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
+	describeInternetGatewaysFunc        func(ctx context.Context, params *ec2.DescribeInternetGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInternetGatewaysOutput, error)
+	describeVpcEndpointsFunc            func(ctx context.Context, params *ec2.DescribeVpcEndpointsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointsOutput, error)
+	describeVpcPeeringConnectionsFunc   func(ctx context.Context, params *ec2.DescribeVpcPeeringConnectionsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error)
+	describeTransitGatewaysFunc         func(ctx context.Context, params *ec2.DescribeTransitGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error)
+	describeTransitGatewayAttachFunc    func(ctx context.Context, params *ec2.DescribeTransitGatewayAttachmentsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayAttachmentsOutput, error)
+	describeVpnGatewaysFunc             func(ctx context.Context, params *ec2.DescribeVpnGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpnGatewaysOutput, error)
+	describeVpcEndpointServicesFunc     func(ctx context.Context, params *ec2.DescribeVpcEndpointServiceConfigurationsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointServiceConfigurationsOutput, error)
 	createNetworkInsightsPathFunc       func(ctx context.Context, params *ec2.CreateNetworkInsightsPathInput, optFns ...func(*ec2.Options)) (*ec2.CreateNetworkInsightsPathOutput, error)
 	startNetworkInsightsAnalysisFunc    func(ctx context.Context, params *ec2.StartNetworkInsightsAnalysisInput, optFns ...func(*ec2.Options)) (*ec2.StartNetworkInsightsAnalysisOutput, error)
 	describeNetworkInsightsAnalysesFunc func(ctx context.Context, params *ec2.DescribeNetworkInsightsAnalysesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInsightsAnalysesOutput, error)
@@ -50,6 +60,55 @@ func (m *mockEC2Client) DescribeNetworkInterfaces(ctx context.Context, params *e
 		return m.describeNetworkInterfacesFunc(ctx, params, optFns...)
 	}
 	return &ec2.DescribeNetworkInterfacesOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeInternetGateways(ctx context.Context, params *ec2.DescribeInternetGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInternetGatewaysOutput, error) {
+	if m.describeInternetGatewaysFunc != nil {
+		return m.describeInternetGatewaysFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeInternetGatewaysOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeVpcEndpoints(ctx context.Context, params *ec2.DescribeVpcEndpointsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointsOutput, error) {
+	if m.describeVpcEndpointsFunc != nil {
+		return m.describeVpcEndpointsFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeVpcEndpointsOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeVpcPeeringConnections(ctx context.Context, params *ec2.DescribeVpcPeeringConnectionsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+	if m.describeVpcPeeringConnectionsFunc != nil {
+		return m.describeVpcPeeringConnectionsFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeVpcPeeringConnectionsOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeTransitGateways(ctx context.Context, params *ec2.DescribeTransitGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error) {
+	if m.describeTransitGatewaysFunc != nil {
+		return m.describeTransitGatewaysFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeTransitGatewaysOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeTransitGatewayAttachments(ctx context.Context, params *ec2.DescribeTransitGatewayAttachmentsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayAttachmentsOutput, error) {
+	if m.describeTransitGatewayAttachFunc != nil {
+		return m.describeTransitGatewayAttachFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeTransitGatewayAttachmentsOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeVpnGateways(ctx context.Context, params *ec2.DescribeVpnGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpnGatewaysOutput, error) {
+	if m.describeVpnGatewaysFunc != nil {
+		return m.describeVpnGatewaysFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeVpnGatewaysOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeVpcEndpointServiceConfigurations(ctx context.Context, params *ec2.DescribeVpcEndpointServiceConfigurationsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointServiceConfigurationsOutput, error) {
+	if m.describeVpcEndpointServicesFunc != nil {
+		return m.describeVpcEndpointServicesFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeVpcEndpointServiceConfigurationsOutput{}, nil
 }
 
 func (m *mockEC2Client) CreateNetworkInsightsPath(ctx context.Context, params *ec2.CreateNetworkInsightsPathInput, optFns ...func(*ec2.Options)) (*ec2.CreateNetworkInsightsPathOutput, error) {
@@ -355,6 +414,72 @@ func TestListReachabilityTargets_Success(t *testing.T) {
 				},
 			}, nil
 		},
+		describeInternetGatewaysFunc: func(_ context.Context, _ *ec2.DescribeInternetGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeInternetGatewaysOutput, error) {
+			return &ec2.DescribeInternetGatewaysOutput{
+				InternetGateways: []types.InternetGateway{{
+					InternetGatewayId: awssdk.String("igw-123"),
+					Attachments:       []types.InternetGatewayAttachment{{VpcId: awssdk.String("vpc-1"), State: types.AttachmentStatus("available")}},
+				}},
+			}, nil
+		},
+		describeVpcEndpointsFunc: func(_ context.Context, _ *ec2.DescribeVpcEndpointsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointsOutput, error) {
+			return &ec2.DescribeVpcEndpointsOutput{
+				VpcEndpoints: []types.VpcEndpoint{{
+					VpcEndpointId:   awssdk.String("vpce-123"),
+					ServiceName:     awssdk.String("com.amazonaws.vpce.svc-123"),
+					VpcId:           awssdk.String("vpc-1"),
+					SubnetIds:       []string{"subnet-1"},
+					VpcEndpointType: types.VpcEndpointTypeInterface,
+					State:           types.StateAvailable,
+				}},
+			}, nil
+		},
+		describeVpcPeeringConnectionsFunc: func(_ context.Context, _ *ec2.DescribeVpcPeeringConnectionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+			return &ec2.DescribeVpcPeeringConnectionsOutput{
+				VpcPeeringConnections: []types.VpcPeeringConnection{{
+					VpcPeeringConnectionId: awssdk.String("pcx-123"),
+					RequesterVpcInfo:       &types.VpcPeeringConnectionVpcInfo{VpcId: awssdk.String("vpc-1")},
+					AccepterVpcInfo:        &types.VpcPeeringConnectionVpcInfo{VpcId: awssdk.String("vpc-2")},
+					Status:                 &types.VpcPeeringConnectionStateReason{Code: types.VpcPeeringConnectionStateReasonCodeActive},
+				}},
+			}, nil
+		},
+		describeTransitGatewaysFunc: func(_ context.Context, _ *ec2.DescribeTransitGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error) {
+			return &ec2.DescribeTransitGatewaysOutput{
+				TransitGateways: []types.TransitGateway{{
+					TransitGatewayId: awssdk.String("tgw-123"),
+					State:            types.TransitGatewayStateAvailable,
+				}},
+			}, nil
+		},
+		describeTransitGatewayAttachFunc: func(_ context.Context, _ *ec2.DescribeTransitGatewayAttachmentsInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayAttachmentsOutput, error) {
+			return &ec2.DescribeTransitGatewayAttachmentsOutput{
+				TransitGatewayAttachments: []types.TransitGatewayAttachment{{
+					TransitGatewayAttachmentId: awssdk.String("tgw-attach-123"),
+					ResourceType:               types.TransitGatewayAttachmentResourceTypeVpc,
+					ResourceId:                 awssdk.String("vpc-1"),
+					State:                      types.TransitGatewayAttachmentStateAvailable,
+				}},
+			}, nil
+		},
+		describeVpnGatewaysFunc: func(_ context.Context, _ *ec2.DescribeVpnGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpnGatewaysOutput, error) {
+			return &ec2.DescribeVpnGatewaysOutput{
+				VpnGateways: []types.VpnGateway{{
+					VpnGatewayId:   awssdk.String("vgw-123"),
+					State:          types.VpnStateAvailable,
+					VpcAttachments: []types.VpcAttachment{{VpcId: awssdk.String("vpc-1")}},
+				}},
+			}, nil
+		},
+		describeVpcEndpointServicesFunc: func(_ context.Context, _ *ec2.DescribeVpcEndpointServiceConfigurationsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointServiceConfigurationsOutput, error) {
+			return &ec2.DescribeVpcEndpointServiceConfigurationsOutput{
+				ServiceConfigurations: []types.ServiceConfiguration{{
+					ServiceId:    awssdk.String("vpce-svc-123"),
+					ServiceName:  awssdk.String("com.amazonaws.vpce.svc-123"),
+					ServiceState: types.ServiceStateAvailable,
+				}},
+			}, nil
+		},
 	}
 
 	repo := &AwsRepository{EC2Client: mock}
@@ -362,11 +487,31 @@ func TestListReachabilityTargets_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(targets) != 2 {
-		t.Fatalf("expected 2 targets, got %d", len(targets))
+	if len(targets) != 9 {
+		t.Fatalf("expected 9 targets, got %d", len(targets))
 	}
-	if targets[0].Type != "EC2 Instance" || targets[1].Type != "ENI" {
-		t.Fatalf("unexpected targets: %+v", targets)
+	gotTypes := make([]string, 0, len(targets))
+	for _, target := range targets {
+		gotTypes = append(gotTypes, target.Type)
+	}
+	wantTypes := []string{
+		"EC2 instances",
+		"Internet gateways",
+		"Network interfaces",
+		"Transit gateways",
+		"Transit gateway attachments",
+		"Virtual private gateways",
+		"VPC endpoint services",
+		"VPC endpoints",
+		"VPC peering connections",
+	}
+	for _, want := range wantTypes {
+		if !strings.Contains(strings.Join(gotTypes, ","), want) {
+			t.Fatalf("missing target type %q in %+v", want, gotTypes)
+		}
+	}
+	if len(gotTypes) != len(wantTypes) {
+		t.Fatalf("unexpected targets: %+v", gotTypes)
 	}
 }
 
@@ -442,8 +587,8 @@ func TestRunReachabilityAnalysis_Success(t *testing.T) {
 
 	repo := &AwsRepository{EC2Client: mock}
 	result, err := repo.RunReachabilityAnalysis(context.Background(),
-		ReachabilityTarget{ID: "i-src", Name: "source", Type: "EC2 Instance"},
-		ReachabilityTarget{ID: "i-dst", Name: "dest", Type: "EC2 Instance"},
+		ReachabilityTarget{ID: "i-src", Name: "source", Type: "EC2 instances"},
+		ReachabilityTarget{ID: "i-dst", Name: "dest", Type: "EC2 instances"},
 		"",
 		"TCP",
 		443,
@@ -474,11 +619,17 @@ func TestRunReachabilityAnalysis_Success(t *testing.T) {
 func TestRunReachabilityAnalysis_ManualIPv4UsesDestinationIP(t *testing.T) {
 	mock := &mockEC2Client{
 		createNetworkInsightsPathFunc: func(_ context.Context, params *ec2.CreateNetworkInsightsPathInput, _ ...func(*ec2.Options)) (*ec2.CreateNetworkInsightsPathOutput, error) {
-			if awssdk.ToString(params.DestinationIp) != "10.0.2.15" {
-				t.Fatalf("expected destination IP, got %q", awssdk.ToString(params.DestinationIp))
+			if params.DestinationIp != nil {
+				t.Fatalf("expected top-level destination IP to be empty")
 			}
-			if params.FilterAtSource != nil {
-				t.Fatalf("expected no source filter for manual IPv4 destination")
+			if params.FilterAtSource == nil {
+				t.Fatalf("expected source filter for manual IPv4 destination")
+			}
+			if awssdk.ToString(params.FilterAtSource.DestinationAddress) != "10.0.2.15" {
+				t.Fatalf("expected destination filter IP, got %q", awssdk.ToString(params.FilterAtSource.DestinationAddress))
+			}
+			if params.FilterAtSource.DestinationPortRange == nil {
+				t.Fatalf("expected destination port range")
 			}
 			return &ec2.CreateNetworkInsightsPathOutput{
 				NetworkInsightsPath: &types.NetworkInsightsPath{NetworkInsightsPathId: awssdk.String("nip-123")},
@@ -501,7 +652,7 @@ func TestRunReachabilityAnalysis_ManualIPv4UsesDestinationIP(t *testing.T) {
 
 	repo := &AwsRepository{EC2Client: mock}
 	_, err := repo.RunReachabilityAnalysis(context.Background(),
-		ReachabilityTarget{ID: "i-src", Name: "source", Type: "EC2 Instance"},
+		ReachabilityTarget{ID: "i-src", Name: "source", Type: "EC2 instances"},
 		ReachabilityTarget{},
 		"10.0.2.15",
 		"TCP",
@@ -509,6 +660,40 @@ func TestRunReachabilityAnalysis_ManualIPv4UsesDestinationIP(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+type mockAPIError struct {
+	code    string
+	message string
+}
+
+func (m mockAPIError) ErrorCode() string             { return m.code }
+func (m mockAPIError) ErrorMessage() string          { return m.message }
+func (m mockAPIError) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
+func (m mockAPIError) Error() string                 { return m.code + ": " + m.message }
+
+func TestFormatReachabilityError_InvalidParameterAddsHintAndStatus(t *testing.T) {
+	respErr := &smithyhttp.ResponseError{
+		Response: &smithyhttp.Response{Response: &http.Response{
+			StatusCode: 400,
+			Header: http.Header{
+				"x-amzn-RequestId": []string{"req-123"},
+			},
+		}},
+		Err: mockAPIError{code: "InvalidParameter", message: "bad destination"},
+	}
+
+	err := formatReachabilityError("failed to create network insights path", respErr)
+	msg := err.Error()
+	if !strings.Contains(msg, "InvalidParameter: bad destination") {
+		t.Fatalf("expected api error details, got %q", msg)
+	}
+	if !strings.Contains(msg, "status:400") {
+		t.Fatalf("expected status code, got %q", msg)
+	}
+	if !strings.Contains(msg, "supported Reachability Analyzer resources") {
+		t.Fatalf("expected parameter hint, got %q", msg)
 	}
 }
 

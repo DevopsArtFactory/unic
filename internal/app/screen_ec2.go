@@ -40,7 +40,11 @@ func (m Model) handleEC2VPCMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 	case reachabilityTargetsLoadedMsg:
 		m.reachabilityTargets = msg.targets
-		m.filteredReachabilityTargets = msg.targets
+		m.reachabilitySourceTypes = buildReachabilityTargetTypes(msg.targets, false)
+		m.reachabilitySourceTypeIdx = 0
+		m.reachabilityDestTypes = nil
+		m.reachabilityDestTypeIdx = 0
+		m.filteredReachabilityTargets = applyReachabilityTargetFilter(msg.targets, m.selectedReachabilitySourceType(), "")
 		m.reachabilityIdx = 0
 		m.reachabilityFilter = ""
 		m.reachabilityFilterActive = false

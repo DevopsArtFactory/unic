@@ -57,6 +57,23 @@ func applyFilter[T Filterable](items []T, query string) []T {
 	return result
 }
 
+func handleFilterKey(key, current string) (next string, deactivate bool, changed bool) {
+	switch key {
+	case "esc", "enter":
+		return current, true, false
+	case "backspace":
+		if len(current) == 0 {
+			return current, false, false
+		}
+		return current[:len(current)-1], false, true
+	}
+
+	if len(key) == 1 {
+		return current + key, false, true
+	}
+	return current, false, false
+}
+
 func (m *Model) syncFilterInputWidth() {
 	width := m.width - len("Filter: ") - 4
 	if width < 10 {

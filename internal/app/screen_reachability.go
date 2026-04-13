@@ -155,7 +155,7 @@ func (m Model) updateReachabilitySourceList(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			m.reachabilityFilterActive = false
 		}
 		if changed {
-			m.filteredReachabilityTargets = applyFilter(m.reachabilityTargets, m.reachabilityFilter)
+			m.filteredReachabilityTargets = applyReachabilityTargetFilter(m.reachabilityTargets, m.selectedReachabilitySourceType(), m.reachabilityFilter)
 			m.reachabilityIdx = 0
 		}
 		return m, nil
@@ -164,6 +164,18 @@ func (m Model) updateReachabilitySourceList(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	switch key {
 	case "q", "esc":
 		m.screen = screenReachabilityRegionList
+	case "left", "h":
+		if m.reachabilitySourceTypeIdx > 0 {
+			m.reachabilitySourceTypeIdx--
+			m.filteredReachabilityTargets = applyReachabilityTargetFilter(m.reachabilityTargets, m.selectedReachabilitySourceType(), m.reachabilityFilter)
+			m.reachabilityIdx = 0
+		}
+	case "right", "l", "tab":
+		if m.reachabilitySourceTypeIdx < len(m.reachabilitySourceTypes)-1 {
+			m.reachabilitySourceTypeIdx++
+			m.filteredReachabilityTargets = applyReachabilityTargetFilter(m.reachabilityTargets, m.selectedReachabilitySourceType(), m.reachabilityFilter)
+			m.reachabilityIdx = 0
+		}
 	case "up", "k":
 		if m.reachabilityIdx > 0 {
 			m.reachabilityIdx--
@@ -186,7 +198,9 @@ func (m Model) updateReachabilitySourceList(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		m.reachabilityDestinationIP = ""
 		m.reachabilityFilter = ""
 		m.reachabilityFilterActive = false
-		m.filteredReachabilityTargets = append([]awsservice.ReachabilityTarget{manualReachabilityDestination()}, m.reachabilityTargets...)
+		m.reachabilityDestTypes = buildReachabilityTargetTypes(m.reachabilityTargets, true)
+		m.reachabilityDestTypeIdx = 0
+		m.filteredReachabilityTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(m.reachabilityTargets), m.selectedReachabilityDestinationType(), "")
 		m.reachabilityIdx = 0
 		m.screen = screenReachabilityDestinationList
 	}
@@ -202,7 +216,7 @@ func (m Model) updateReachabilityDestinationList(msg tea.KeyMsg) (tea.Model, tea
 			m.reachabilityFilterActive = false
 		}
 		if changed {
-			m.filteredReachabilityTargets = applyFilter(append([]awsservice.ReachabilityTarget{manualReachabilityDestination()}, m.reachabilityTargets...), m.reachabilityFilter)
+			m.filteredReachabilityTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(m.reachabilityTargets), m.selectedReachabilityDestinationType(), m.reachabilityFilter)
 			m.reachabilityIdx = 0
 		}
 		return m, nil
@@ -212,11 +226,23 @@ func (m Model) updateReachabilityDestinationList(msg tea.KeyMsg) (tea.Model, tea
 	case "q":
 		m.screen = screenFeatureList
 	case "esc":
-		m.filteredReachabilityTargets = m.reachabilityTargets
+		m.filteredReachabilityTargets = applyReachabilityTargetFilter(m.reachabilityTargets, m.selectedReachabilitySourceType(), "")
 		m.reachabilityIdx = 0
 		m.reachabilityFilter = ""
 		m.reachabilityFilterActive = false
 		m.screen = screenReachabilitySourceList
+	case "left", "h":
+		if m.reachabilityDestTypeIdx > 0 {
+			m.reachabilityDestTypeIdx--
+			m.filteredReachabilityTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(m.reachabilityTargets), m.selectedReachabilityDestinationType(), m.reachabilityFilter)
+			m.reachabilityIdx = 0
+		}
+	case "right", "l", "tab":
+		if m.reachabilityDestTypeIdx < len(m.reachabilityDestTypes)-1 {
+			m.reachabilityDestTypeIdx++
+			m.filteredReachabilityTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(m.reachabilityTargets), m.selectedReachabilityDestinationType(), m.reachabilityFilter)
+			m.reachabilityIdx = 0
+		}
 	case "up", "k":
 		if m.reachabilityIdx > 0 {
 			m.reachabilityIdx--
@@ -335,11 +361,11 @@ func (m Model) updateReachabilityResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) viewReachabilitySourceList() string {
-	return m.viewReachabilityTargetList("Reachability Analyzer > Source", fmt.Sprintf("Region: %s. Choose the source component that initiates traffic.", m.activeReachabilityRegion()), m.filteredReachabilityTargets, "↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home")
+	return m.viewReachabilityTargetList("Reachability Analyzer > Source", fmt.Sprintf("Region: %s. Supported source types: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, and VPC peering connections.", m.activeReachabilityRegion()), m.filteredReachabilityTargets, m.reachabilitySourceTypes, m.reachabilitySourceTypeIdx, "←/→ or tab: type • ↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home")
 }
 
 func (m Model) viewReachabilityDestinationList() string {
-	return m.viewReachabilityTargetList("Reachability Analyzer > Destination", fmt.Sprintf("Region: %s. Choose the destination component, or select Manual IPv4 destination.", m.activeReachabilityRegion()), m.filteredReachabilityTargets, "↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home")
+	return m.viewReachabilityTargetList("Reachability Analyzer > Destination", fmt.Sprintf("Region: %s. Supported destination types: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, and IP addresses.", m.activeReachabilityRegion()), m.filteredReachabilityTargets, m.reachabilityDestTypes, m.reachabilityDestTypeIdx, "←/→ or tab: type • ↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home")
 }
 
 func (m Model) viewReachabilityRegionList() string {
@@ -388,13 +414,17 @@ func (m Model) viewReachabilityRegionList() string {
 	return b.String()
 }
 
-func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsservice.ReachabilityTarget, footer string) string {
+func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsservice.ReachabilityTarget, typeOptions []string, typeIdx int, footer string) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render(title))
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render(subtitle))
 	b.WriteString("\n")
+	if len(typeOptions) > 0 {
+		b.WriteString(m.renderReachabilityTypeSelector(typeOptions, typeIdx))
+		b.WriteString("\n")
+	}
 	if m.reachabilityFilterActive {
 		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.reachabilityFilter)))
 	} else if m.reachabilityFilter != "" {
@@ -576,10 +606,84 @@ func (m Model) reachabilityResultLines() []string {
 
 func manualReachabilityDestination() awsservice.ReachabilityTarget {
 	return awsservice.ReachabilityTarget{
-		Name:     "Manual IPv4 destination",
-		Type:     "Manual",
+		Name:     "Manual IP address",
+		Type:     "IP addresses",
 		ManualIP: true,
 	}
+}
+
+func reachabilityDestinationCandidates(targets []awsservice.ReachabilityTarget) []awsservice.ReachabilityTarget {
+	return append([]awsservice.ReachabilityTarget{manualReachabilityDestination()}, targets...)
+}
+
+func buildReachabilityTargetTypes(targets []awsservice.ReachabilityTarget, includeManual bool) []string {
+	seen := map[string]struct{}{}
+	ordered := []string{
+		"EC2 instances",
+		"Internet gateways",
+		"Network interfaces",
+		"Transit gateways",
+		"Transit gateway attachments",
+		"Virtual private gateways",
+		"VPC endpoint services",
+		"VPC endpoints",
+		"VPC peering connections",
+	}
+	types := make([]string, 0, len(ordered)+1)
+	for _, target := range targets {
+		if strings.TrimSpace(target.Type) != "" {
+			seen[target.Type] = struct{}{}
+		}
+	}
+	for _, candidate := range ordered {
+		if _, ok := seen[candidate]; ok {
+			types = append(types, candidate)
+		}
+	}
+	if includeManual {
+		types = append(types, "IP addresses")
+	}
+	return types
+}
+
+func applyReachabilityTargetFilter(items []awsservice.ReachabilityTarget, targetType, query string) []awsservice.ReachabilityTarget {
+	filtered := items
+	if targetType != "" {
+		filtered = make([]awsservice.ReachabilityTarget, 0, len(items))
+		for _, item := range items {
+			if item.Type == targetType {
+				filtered = append(filtered, item)
+			}
+		}
+	}
+	return applyFilter(filtered, query)
+}
+
+func (m Model) selectedReachabilitySourceType() string {
+	if len(m.reachabilitySourceTypes) == 0 {
+		return ""
+	}
+	return m.reachabilitySourceTypes[m.reachabilitySourceTypeIdx]
+}
+
+func (m Model) selectedReachabilityDestinationType() string {
+	if len(m.reachabilityDestTypes) == 0 {
+		return ""
+	}
+	return m.reachabilityDestTypes[m.reachabilityDestTypeIdx]
+}
+
+func (m Model) renderReachabilityTypeSelector(options []string, selected int) string {
+	var parts []string
+	for i, option := range options {
+		label := "[" + option + "]"
+		if i == selected {
+			parts = append(parts, selectedStyle.Render(label))
+		} else {
+			parts = append(parts, dimStyle.Render(label))
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func (m Model) activeReachabilityRegion() string {

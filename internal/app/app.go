@@ -112,6 +112,10 @@ type Model struct {
 	reachabilityRegionFiltering bool
 	reachabilityTargets         []awsservice.ReachabilityTarget
 	filteredReachabilityTargets []awsservice.ReachabilityTarget
+	reachabilitySourceTypes     []string
+	reachabilitySourceTypeIdx   int
+	reachabilityDestTypes       []string
+	reachabilityDestTypeIdx     int
 	reachabilityIdx             int
 	reachabilityFilter          string
 	reachabilityFilterActive    bool
