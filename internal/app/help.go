@@ -402,11 +402,14 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"↑/↓, j/k", "Move between contexts"},
 			{"/", "Start filtering contexts"},
 			{"enter", "Switch to the selected context"},
+			{"s", "Set up the selected context for the shell and quit"},
+			{"y", "Copy shell exports for the selected context and quit"},
+			{"u", "Clear shell exports and current context, then quit"},
 			{"a", "Open the add-context wizard"},
 			{"q", "Quit unic"},
 		}
 		if m.cfg.ContextName != "" {
-			shortcuts = append(shortcuts[:4], append([]helpShortcut{{"esc", "Return to the previous screen"}}, shortcuts[4:]...)...)
+			shortcuts = append(shortcuts[:7], append([]helpShortcut{{"esc", "Return to the previous screen"}}, shortcuts[7:]...)...)
 		}
 		return shortcuts
 	case screenContextAdd:
@@ -429,6 +432,20 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"enter", "Save the current field and continue"},
 			{"esc", "Go back to the previous field or auth type"},
 		}
+	case screenContextSSOAccountList:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between AWS accounts"},
+			{"enter", "Select the highlighted account"},
+			{"esc", "Go back to the context picker"},
+			{"q", "Cancel and return to the context picker"},
+		}
+	case screenContextSSORoleList:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between AWS roles"},
+			{"enter", "Select the highlighted role and copy exports"},
+			{"esc", "Go back to the account list"},
+			{"q", "Cancel and return to the context picker"},
+		}
 	case screenLoading:
 		return []helpShortcut{
 			{"Wait", "The current AWS request is still loading"},
@@ -437,6 +454,10 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return []helpShortcut{
 			{"enter / esc", "Return to the service list"},
 			{"q", "Quit unic"},
+		}
+	case screenExitNotice:
+		return []helpShortcut{
+			{"any key", "Close the exit notice and return to the terminal"},
 		}
 	default:
 		return nil
@@ -596,10 +617,16 @@ func (m Model) helpScreenTitle() string {
 		return "Context Picker"
 	case screenContextAdd:
 		return "Add Context"
+	case screenContextSSOAccountList:
+		return "Select SSO Account"
+	case screenContextSSORoleList:
+		return "Select SSO Role"
 	case screenLoading:
 		return "Loading"
 	case screenError:
 		return "Error"
+	case screenExitNotice:
+		return "Exit Notice"
 	default:
 		return "Current Screen"
 	}

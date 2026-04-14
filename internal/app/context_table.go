@@ -96,9 +96,9 @@ func contextTableHeight(terminalHeight int) int {
 		return defaultContextTableHeight
 	}
 	// Context picker layout overhead:
-	// title/filter block (3) + panel border (2) + separator/help bar (2) = 7.
+	// title/current/env/filter block (6) + panel border (2) + separator/help bar (2) = 10.
 	// The table height itself must fit inside the remaining rows.
-	return max(terminalHeight-7, 3)
+	return max(terminalHeight-10, 3)
 }
 
 func contextTableColumns(terminalWidth int) []table.Column {

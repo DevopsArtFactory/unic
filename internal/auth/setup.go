@@ -54,20 +54,12 @@ func SetupContext(ctx context.Context, configPath string, in io.Reader, errOut i
 }
 
 func resolveContextSelection(ctx context.Context, configPath string, selected config.ContextInfo, in *bufio.Reader, errOut io.Writer) (string, error) {
-	if config.AuthType(selected.AuthType) != config.AuthTypeSSO || (selected.SSOAccountID != "" && selected.SSORoleName != "") {
+	if !IsBaseSSOContext(selected) {
 		return selected.Name, nil
-	}
-	if selected.SSOStartURL == "" {
-		return "", fmt.Errorf("context %q is missing sso_start_url", selected.Name)
-	}
-
-	baseCfg, err := config.LoadNamedContext(configPath, selected.Name)
-	if err != nil {
-		return "", err
 	}
 
 	fmt.Fprintf(errOut, "Listing AWS accounts for %s ...\n", selected.Name)
-	accounts, err := listSSOAccountsFn(ctx, baseCfg)
+	accounts, err := ListSSOContextAccounts(ctx, configPath, selected)
 	if err != nil {
 		return "", err
 	}
@@ -81,7 +73,7 @@ func resolveContextSelection(ctx context.Context, configPath string, selected co
 	}
 
 	fmt.Fprintf(errOut, "Listing roles for account %s ...\n", account.ID)
-	roles, err := listSSOAccountRolesFn(ctx, baseCfg, account.ID)
+	roles, err := ListSSOContextRoles(ctx, configPath, selected, account.ID)
 	if err != nil {
 		return "", err
 	}
@@ -94,6 +86,42 @@ func resolveContextSelection(ctx context.Context, configPath string, selected co
 		return "", err
 	}
 
+	return ResolveSSOContextSelection(configPath, selected, account, role)
+}
+
+func IsBaseSSOContext(selected config.ContextInfo) bool {
+	return config.AuthType(selected.AuthType) == config.AuthTypeSSO &&
+		(selected.SSOAccountID == "" || selected.SSORoleName == "")
+}
+
+func ListSSOContextAccounts(ctx context.Context, configPath string, selected config.ContextInfo) ([]awsservice.SSOAccount, error) {
+	if !IsBaseSSOContext(selected) {
+		return nil, fmt.Errorf("context %q is not an SSO base context", selected.Name)
+	}
+	if selected.SSOStartURL == "" {
+		return nil, fmt.Errorf("context %q is missing sso_start_url", selected.Name)
+	}
+
+	baseCfg, err := config.LoadNamedContext(configPath, selected.Name)
+	if err != nil {
+		return nil, err
+	}
+	return listSSOAccountsFn(ctx, baseCfg)
+}
+
+func ListSSOContextRoles(ctx context.Context, configPath string, selected config.ContextInfo, accountID string) ([]awsservice.SSORole, error) {
+	if !IsBaseSSOContext(selected) {
+		return nil, fmt.Errorf("context %q is not an SSO base context", selected.Name)
+	}
+
+	baseCfg, err := config.LoadNamedContext(configPath, selected.Name)
+	if err != nil {
+		return nil, err
+	}
+	return listSSOAccountRolesFn(ctx, baseCfg, accountID)
+}
+
+func ResolveSSOContextSelection(configPath string, selected config.ContextInfo, account awsservice.SSOAccount, role awsservice.SSORole) (string, error) {
 	entry, name, err := buildSSOContextEntry(configPath, selected, account, role)
 	if err != nil {
 		return "", err
