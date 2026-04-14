@@ -37,7 +37,7 @@ func (m Model) viewHelp() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(dimStyle.Render("?: close help • esc: close help • enter: close help"))
+	b.WriteString(m.renderHelpBar("?: close help • esc: close help • enter: close help"))
 	return strings.TrimRight(b.String(), "\n")
 }
 

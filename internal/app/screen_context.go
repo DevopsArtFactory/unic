@@ -169,6 +169,7 @@ func (m Model) doFinalizeContextSwitch() tea.Cmd {
 
 func (m Model) viewContextPicker() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(titleStyle.Render("Select Context"))
 	b.WriteString("\n")
 
@@ -176,13 +177,13 @@ func (m Model) viewContextPicker() string {
 	b.WriteString("\n\n")
 
 	if len(m.ctxList) == 0 {
-		b.WriteString(normalStyle.Render("  No contexts defined."))
-		b.WriteString("\n\n")
-		b.WriteString(dimStyle.Render("  Press 'a' to add your first context."))
-		b.WriteString("\n")
+		panel.WriteString(normalStyle.Render("  No contexts defined."))
+		panel.WriteString("\n\n")
+		panel.WriteString(dimStyle.Render("  Press 'a' to add your first context."))
+		panel.WriteString("\n")
 	} else if len(m.filteredCtxList) == 0 {
-		b.WriteString(dimStyle.Render("  No matching contexts"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching contexts"))
+		panel.WriteString("\n")
 	} else {
 		// Measure max widths for alignment
 		maxName, maxRegion := 4, 6 // "NAME", "REGION"
@@ -199,11 +200,11 @@ func (m Model) viewContextPicker() string {
 		regionCol := lipgloss.NewStyle().Width(maxRegion + 2)
 
 		// Header
-		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + regionCol.Render("REGION") + "AUTH"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + regionCol.Render("REGION") + "AUTH"))
+		panel.WriteString("\n")
 
-		// overhead: title (1) + filter (1) + blank (1) + table header (1) + blank (1) + footer (1) = 6
-		visibleLines := max(m.height-6, 3)
+		// overhead: title (1) + filter (1) + blank (1) + list panel (2) + help bar (1) = 6
+		visibleLines := max(m.height-8, 3)
 		start := 0
 		if m.ctxIdx >= visibleLines {
 			start = m.ctxIdx - visibleLines + 1
@@ -223,16 +224,17 @@ func (m Model) viewContextPicker() string {
 			if ctx.Current {
 				row += dimStyle.Render(" *")
 			}
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 	}
 
-	b.WriteString("\n")
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
 	if m.cfg.ContextName != "" {
-		b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: select • a: add • esc: back • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: select • a: add • esc: back • q: quit"))
 	} else {
-		b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: select • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: select • a: add • q: quit"))
 	}
 	return b.String()
 }

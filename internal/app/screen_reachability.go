@@ -397,6 +397,7 @@ func (m Model) viewReachabilityDestinationList() string {
 
 func (m Model) viewReachabilityRegionList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Reachability Analyzer > Region"))
 	b.WriteString("\n")
@@ -410,10 +411,10 @@ func (m Model) viewReachabilityRegionList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredReachabilityRegions) == 0 {
-		b.WriteString(dimStyle.Render("  No matching regions"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching regions"))
+		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-10, 5)
+		visibleLines := max(m.height-12, 5)
 		start := 0
 		if m.reachabilityRegionIdx >= visibleLines {
 			start = m.reachabilityRegionIdx - visibleLines + 1
@@ -431,18 +432,20 @@ func (m Model) viewReachabilityRegionList() string {
 			if region == m.cfg.Region {
 				label += " [context default]"
 			}
-			b.WriteString(style.Render(cursor + label))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(cursor + label))
+			panel.WriteString("\n")
 		}
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: load targets • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: load targets • esc: back • H: home"))
 	return b.String()
 }
 
 func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsservice.ReachabilityTarget, typeOptions []string, typeIdx int, footer string) string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render(title))
 	b.WriteString("\n")
@@ -460,10 +463,10 @@ func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsser
 	b.WriteString("\n\n")
 
 	if len(items) == 0 {
-		b.WriteString(dimStyle.Render("  No matching targets"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching targets"))
+		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-10, 5)
+		visibleLines := max(m.height-12, 5)
 		start := 0
 		if m.reachabilityIdx >= visibleLines {
 			start = m.reachabilityIdx - visibleLines + 1
@@ -478,15 +481,16 @@ func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsser
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, item.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, item.DisplayTitle())))
+			panel.WriteString("\n")
 		}
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d targets", len(items))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d targets", len(items))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(footer))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar(footer))
 	return b.String()
 }
 
@@ -544,7 +548,7 @@ func (m Model) viewReachabilityConfig() string {
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("Protocol and destination port are part of the path intent. Reachability Analyzer evaluates the shortest matching path and identifies blockers when traffic is not reachable."))
 	b.WriteString("\n\n")
-	b.WriteString(dimStyle.Render("↑/↓ or tab: field • ←/→: protocol • type: edit • enter: analyze • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓ or tab: field • ←/→: protocol • type: edit • enter: analyze • esc: back • H: home"))
 	return b.String()
 }
 
@@ -565,7 +569,7 @@ func (m Model) viewReachabilityResult() string {
 	if len(lines) > 0 {
 		b.WriteString("\n")
 	}
-	b.WriteString(dimStyle.Render("j/k: scroll • r: rerun • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("j/k: scroll • r: rerun • esc: back • H: home"))
 	return b.String()
 }
 

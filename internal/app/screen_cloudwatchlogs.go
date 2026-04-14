@@ -186,6 +186,7 @@ func (m Model) updateCWLogGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewCWLogGroupList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("CloudWatch Log Groups"))
 	b.WriteString("\n")
@@ -194,8 +195,8 @@ func (m Model) viewCWLogGroupList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredCWLogGroups) == 0 {
-		b.WriteString(dimStyle.Render("  No matching log groups"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching log groups"))
+		panel.WriteString("\n")
 	} else {
 		maxName := 4 // "NAME"
 		for _, g := range m.filteredCWLogGroups {
@@ -209,10 +210,10 @@ func (m Model) viewCWLogGroupList() string {
 		nameCol := lipgloss.NewStyle().Width(maxName + 2)
 		retCol := lipgloss.NewStyle().Width(14)
 
-		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + retCol.Render("RETENTION") + "SIZE"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + retCol.Render("RETENTION") + "SIZE"))
+		panel.WriteString("\n")
 
-		visibleLines := max(m.height-9, 5)
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if m.cwLogGroupIdx >= visibleLines {
 			start = m.cwLogGroupIdx - visibleLines + 1
@@ -239,20 +240,21 @@ func (m Model) viewCWLogGroupList() string {
 				nameCol.Inherit(style).Render(name) +
 				retCol.Inherit(dimStyle).Render(retention) +
 				dimStyle.Render(awsservice.FormatBytes(g.StoredBytes))
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
+		panel.WriteString("\n")
 		countLine := fmt.Sprintf("  %d/%d log groups", len(m.filteredCWLogGroups), len(m.cwLogGroups))
 		if m.cwLogGroupNextToken != nil {
 			countLine += " • more available"
 		}
-		b.WriteString(dimStyle.Render(countLine))
+		panel.WriteString(dimStyle.Render(countLine))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • n: load more • enter: streams • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • n: load more • enter: streams • esc: back • H: home"))
 	return b.String()
 }
 
@@ -302,6 +304,7 @@ func (m Model) updateCWLogStreamList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewCWLogStreamList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	groupName := ""
 	if m.selectedCWLogGroup != nil {
@@ -314,8 +317,8 @@ func (m Model) viewCWLogStreamList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredCWLogStreams) == 0 {
-		b.WriteString(dimStyle.Render("  No matching log streams"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching log streams"))
+		panel.WriteString("\n")
 	} else {
 		maxName := 4
 		for _, s := range m.filteredCWLogStreams {
@@ -328,10 +331,10 @@ func (m Model) viewCWLogStreamList() string {
 		}
 		nameCol := lipgloss.NewStyle().Width(maxName + 2)
 
-		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + "LAST EVENT"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + "LAST EVENT"))
+		panel.WriteString("\n")
 
-		visibleLines := max(m.height-9, 5)
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if m.cwLogStreamIdx >= visibleLines {
 			start = m.cwLogStreamIdx - visibleLines + 1
@@ -357,20 +360,21 @@ func (m Model) viewCWLogStreamList() string {
 			row := cursor +
 				nameCol.Inherit(style).Render(name) +
 				dimStyle.Render(lastEvent)
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
+		panel.WriteString("\n")
 		countLine := fmt.Sprintf("  %d/%d streams", len(m.filteredCWLogStreams), len(m.cwLogStreams))
 		if m.cwLogStreamNextToken != nil {
 			countLine += " • more available"
 		}
-		b.WriteString(dimStyle.Render(countLine))
+		panel.WriteString(dimStyle.Render(countLine))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • n: load more • enter: view logs • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • n: load more • enter: view logs • esc: back • H: home"))
 	return b.String()
 }
 
@@ -519,7 +523,7 @@ func (m Model) viewCWLogViewer() string {
 		hint += fmt.Sprintf(" • h/l: horizontal (%d)", m.cwLogHorizontalOffset)
 	}
 	hint += " • n: load more • esc: back"
-	b.WriteString(dimStyle.Render(hint))
+	b.WriteString(m.renderHelpBar(hint))
 	return b.String()
 }
 

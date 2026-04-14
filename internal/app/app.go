@@ -8,8 +8,6 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-
 	"unic/internal/config"
 	"unic/internal/domain"
 	awsservice "unic/internal/services/aws"
@@ -821,12 +819,13 @@ func (m Model) View() string {
 
 func (m Model) viewServiceList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Select AWS Service"))
 	b.WriteString("\n\n")
 
-	// overhead: status bar (2 lines) + title (1) + blank (1) + blank (1) + footer (1) = 6
-	visibleLines := max(m.height-6, 3)
+	// overhead: status bar (2) + title (1) + blank (1) + list panel (2) + blank (1) + help bar (1) = 8
+	visibleLines := max(m.height-8, 3)
 	start := 0
 	if m.svcIdx >= visibleLines {
 		start = m.svcIdx - visibleLines + 1
@@ -841,25 +840,27 @@ func (m Model) viewServiceList() string {
 			cursor = "> "
 			style = selectedStyle
 		}
-		b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, svc.Name)))
-		b.WriteString("\n")
+		panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, svc.Name)))
+		panel.WriteString("\n")
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • esc: context • q: quit"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • esc: context • q: quit"))
 	return b.String()
 }
 
 func (m Model) viewFeatureList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	svcName := m.services[m.svcIdx].Name
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s > Select Feature", svcName)))
 	b.WriteString("\n\n")
 
 	// Each selected item takes 2 lines (name + description), others take 1.
-	// overhead: status bar (2) + title (1) + blank (1) + blank (1) + footer (1) = 6
-	visibleLines := max(m.height-6, 3)
+	// overhead: status bar (2) + title (1) + blank (1) + list panel (2) + blank (1) + help bar (1) = 8
+	visibleLines := max(m.height-8, 3)
 	start := 0
 	// Count lines from start to cursor to determine if we need to scroll
 	linesFromStart := 0
@@ -901,17 +902,18 @@ func (m Model) viewFeatureList() string {
 			cursor = "> "
 			style = selectedStyle
 		}
-		b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, feat.Kind)))
-		b.WriteString("\n")
+		panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, feat.Kind)))
+		panel.WriteString("\n")
 		if i == m.featIdx {
-			b.WriteString(dimStyle.Render(fmt.Sprintf("    %s", feat.Description)))
-			b.WriteString("\n")
+			panel.WriteString(dimStyle.Render(fmt.Sprintf("    %s", feat.Description)))
+			panel.WriteString("\n")
 		}
 		linesUsed += needed
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • esc: back"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • esc: back"))
 	return b.String()
 }
 func (m Model) loadSecrets() tea.Cmd {
@@ -992,6 +994,7 @@ func (m Model) updateSecretDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewSecretList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Secrets Manager"))
 	b.WriteString("\n")
@@ -1000,10 +1003,10 @@ func (m Model) viewSecretList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredSecrets) == 0 {
-		b.WriteString(dimStyle.Render("  No matching secrets"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching secrets"))
+		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.secretIdx >= visibleLines {
 			start = m.secretIdx - visibleLines + 1
@@ -1018,16 +1021,17 @@ func (m Model) viewSecretList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d secrets", len(m.filteredSecrets), len(m.secrets))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d secrets", len(m.filteredSecrets), len(m.secrets))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 
@@ -1041,15 +1045,14 @@ func (m Model) viewSecretDetail() string {
 	b.WriteString(titleStyle.Render("Secret Detail"))
 	b.WriteString("\n\n")
 
-	labelStyle := lipgloss.NewStyle().Width(14)
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Name"), d.Name)))
+	b.WriteString(renderDetailLine("Name", normalStyle.Render(d.Name)))
 	b.WriteString("\n")
 
 	kmsKey := d.KMSKeyID
 	if kmsKey == "" {
 		kmsKey = dimStyle.Render("(aws/secretsmanager)")
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Encryption Key"), kmsKey)))
+	b.WriteString(renderDetailLine("Encryption Key", kmsKey))
 	b.WriteString("\n\n")
 
 	if len(d.Values) > 0 {
@@ -1077,6 +1080,6 @@ func (m Model) viewSecretDetail() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("esc: back • H: home"))
 	return b.String()
 }

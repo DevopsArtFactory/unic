@@ -87,6 +87,7 @@ func (m Model) updateECSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewECSClusterList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("ECS Clusters"))
 	b.WriteString("\n")
@@ -95,11 +96,11 @@ func (m Model) viewECSClusterList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredECSClusters) == 0 {
-		b.WriteString(dimStyle.Render("  No clusters found"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No clusters found"))
+		panel.WriteString("\n")
 	} else {
-		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + count (1) + blank (1) + footer (1) = 8
-		visibleLines := max(m.height-8, 5)
+		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 10
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.ecsClusterIdx >= visibleLines {
 			start = m.ecsClusterIdx - visibleLines + 1
@@ -114,15 +115,16 @@ func (m Model) viewECSClusterList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, c.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, c.DisplayTitle())))
+			panel.WriteString("\n")
 		}
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d clusters", len(m.filteredECSClusters), len(m.ecsClusters))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d clusters", len(m.filteredECSClusters), len(m.ecsClusters))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home"))
 	return b.String()
 }
 
@@ -162,6 +164,7 @@ func (m Model) updateECSServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewECSServiceList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	clusterName := ""
 	if m.selectedECSCluster != nil {
@@ -174,11 +177,11 @@ func (m Model) viewECSServiceList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredECSServices) == 0 {
-		b.WriteString(dimStyle.Render("  No services found"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No services found"))
+		panel.WriteString("\n")
 	} else {
-		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + count (1) + blank (1) + footer (1) = 8
-		visibleLines := max(m.height-8, 5)
+		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 10
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.ecsServiceIdx >= visibleLines {
 			start = m.ecsServiceIdx - visibleLines + 1
@@ -193,15 +196,16 @@ func (m Model) viewECSServiceList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
+			panel.WriteString("\n")
 		}
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d services", len(m.filteredECSServices), len(m.ecsServices))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d services", len(m.filteredECSServices), len(m.ecsServices))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home"))
 	return b.String()
 }
 
@@ -233,6 +237,7 @@ func (m Model) updateECSTaskList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewECSTaskList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	svcName := ""
 	if m.selectedECSService != nil {
@@ -242,11 +247,11 @@ func (m Model) viewECSTaskList() string {
 	b.WriteString("\n\n")
 
 	if len(m.ecsTasks) == 0 {
-		b.WriteString(dimStyle.Render("  No running tasks found"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No running tasks found"))
+		panel.WriteString("\n")
 	} else {
-		// overhead: status bar (2) + title (1) + blank (1) + count (1) + blank (1) + footer (1) = 7
-		visibleLines := max(m.height-7, 5)
+		// overhead: status bar (2) + title (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 9
+		visibleLines := max(m.height-9, 5)
 		start := 0
 		if m.ecsTaskIdx >= visibleLines {
 			start = m.ecsTaskIdx - visibleLines + 1
@@ -261,15 +266,16 @@ func (m Model) viewECSTaskList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, t.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, t.DisplayTitle())))
+			panel.WriteString("\n")
 		}
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d tasks", len(m.ecsTasks))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d tasks", len(m.ecsTasks))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • r: refresh • enter: select • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • r: refresh • enter: select • esc: back • H: home"))
 	return b.String()
 }
 
@@ -306,6 +312,7 @@ func (m Model) updateECSContainerList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewECSContainerList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	taskID := ""
 	if m.selectedECSTask != nil {
@@ -315,11 +322,11 @@ func (m Model) viewECSContainerList() string {
 	b.WriteString("\n\n")
 
 	if len(m.ecsContainers) == 0 {
-		b.WriteString(dimStyle.Render("  No containers found"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No containers found"))
+		panel.WriteString("\n")
 	} else {
-		// overhead: status bar (2) + title (1) + blank (1) + count (1) + blank (1) + footer (1) = 7
-		visibleLines := max(m.height-7, 5)
+		// overhead: status bar (2) + title (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 9
+		visibleLines := max(m.height-9, 5)
 		start := 0
 		if m.ecsContainerIdx >= visibleLines {
 			start = m.ecsContainerIdx - visibleLines + 1
@@ -334,15 +341,16 @@ func (m Model) viewECSContainerList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, c.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, c.DisplayTitle())))
+			panel.WriteString("\n")
 		}
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d containers", len(m.ecsContainers))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d containers", len(m.ecsContainers))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: exec session • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: exec session • esc: back • H: home"))
 	return b.String()
 }
 

@@ -172,6 +172,7 @@ func (m Model) startSSMSession(inst awsservice.EC2Instance) tea.Cmd {
 
 func (m Model) viewInstanceList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("EC2 Instances (Running)"))
 	b.WriteString("\n")
@@ -180,11 +181,11 @@ func (m Model) viewInstanceList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filtered) == 0 {
-		b.WriteString(dimStyle.Render("  No matching instances"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching instances"))
+		panel.WriteString("\n")
 	} else {
 		// Calculate visible range for scrolling
-		visibleLines := max(m.height-8, 5)
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.instIdx >= visibleLines {
 			start = m.instIdx - visibleLines + 1
@@ -199,15 +200,16 @@ func (m Model) viewInstanceList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, inst.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, inst.DisplayTitle())))
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d instances", len(m.filtered), len(m.instances))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d instances", len(m.filtered), len(m.instances))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • r: refresh • enter: connect • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: connect • esc: back • H: home"))
 	return b.String()
 }

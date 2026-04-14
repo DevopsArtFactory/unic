@@ -200,6 +200,7 @@ func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewSecurityGroupList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Security Groups"))
 	b.WriteString("\n")
@@ -208,10 +209,10 @@ func (m Model) viewSecurityGroupList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredSecurityGroups) == 0 {
-		b.WriteString(dimStyle.Render("  No matching security groups"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching security groups"))
+		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.sgIdx >= visibleLines {
 			start = m.sgIdx - visibleLines + 1
@@ -226,16 +227,17 @@ func (m Model) viewSecurityGroupList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, sg.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, sg.DisplayTitle())))
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d security groups", len(m.filteredSecurityGroups), len(m.securityGroups))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d security groups", len(m.filteredSecurityGroups), len(m.securityGroups))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • r: refresh • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 
@@ -299,14 +301,13 @@ func (m Model) viewSecurityGroupDetail() string {
 	b.WriteString(titleStyle.Render("Security Group Detail"))
 	b.WriteString("\n\n")
 
-	labelStyle := lipgloss.NewStyle().Width(16)
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Group ID"), sg.GroupID)))
+	b.WriteString(renderDetailLine("Group ID", normalStyle.Render(sg.GroupID)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Name"), sg.Name)))
+	b.WriteString(renderDetailLine("Name", normalStyle.Render(sg.Name)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Description"), sg.Description)))
+	b.WriteString(renderDetailLine("Description", normalStyle.Render(sg.Description)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("VPC ID"), sg.VPCID)))
+	b.WriteString(renderDetailLine("VPC ID", normalStyle.Render(sg.VPCID)))
 	b.WriteString("\n")
 
 	// Inbound rules
@@ -330,7 +331,7 @@ func (m Model) viewSecurityGroupDetail() string {
 	m.renderRuleTable(&b, sg.EgressRules, "DESTINATION", m.sgRuleSection == "egress")
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: select rule • tab: switch section • a: add rule • d: delete rule • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: select rule • tab: switch section • a: add rule • d: delete rule • esc: back • H: home"))
 	return b.String()
 }
 
@@ -569,9 +570,9 @@ func (m Model) viewSecurityGroupAddRule() string {
 
 	b.WriteString("\n")
 	if m.sgAddField == 0 || m.sgAddField == 1 {
-		b.WriteString(dimStyle.Render("  ↑/↓: select • enter: confirm • esc: cancel"))
+		b.WriteString(m.renderHelpBar("↑/↓: select • enter: confirm • esc: cancel"))
 	} else {
-		b.WriteString(dimStyle.Render("  enter: confirm • esc: cancel"))
+		b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 	}
 	return b.String()
 }
@@ -661,6 +662,6 @@ func (m Model) viewSecurityGroupDeleteConfirm() string {
 	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.sgDeleteConfirm)))
 	b.WriteString("\n\n")
 
-	b.WriteString(dimStyle.Render("  enter: confirm • esc: cancel"))
+	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 	return b.String()
 }
