@@ -56,7 +56,9 @@ cmd/unic/main.go
 쉘 export와 interactive setup 흐름을 담당한다.
 
 - `credential`, `assume_role`, concrete `sso` context용 export 문자열 생성
+- 쉘 export와 cleanup command에 `UNIC_CONTEXT` marker 포함
 - SSO base context setup 실행
+- CLI와 TUI에서 함께 쓰는 SSO account / role resolution helper 제공
 - 사용 가능한 SSO account / role 조회
 - clipboard에 붙여넣기 쉬운 export 문자열 반환
 
@@ -158,7 +160,8 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - ECS cluster/service/task/container
 - S3 bucket/object/detail
 - Inspector home/scanning/results/detail
-- context picker, context add
+- context picker, context add, TUI-native context setup/export/unset
+- SSO account / role selection, exit notice
 - loading, error
 
 ## 기능 확장 패턴
