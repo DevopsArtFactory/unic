@@ -67,16 +67,21 @@ const (
 	screenInspectorFindingDetail
 	screenContextPicker
 	screenContextAdd
+	screenContextSSOAccountList
+	screenContextSSORoleList
 	screenLoading
 	screenError
+	screenExitNotice
 )
 
 // Model is the root Bubbletea model.
 type Model struct {
-	cfg      *config.Config
-	awsRepo  *awsservice.AwsRepository
-	screen   screen
-	quitting bool
+	cfg         *config.Config
+	awsRepo     *awsservice.AwsRepository
+	screen      screen
+	quitting    bool
+	exitMessage string
+	exitTitle   string
 
 	// Service selection
 	services []domain.Service
@@ -272,6 +277,16 @@ type Model struct {
 	contextTable       table.Model
 	ctxPrevScreen      screen
 	pendingContextName string
+	envContextName     string
+	envContextSource   string
+	envContextKnown    bool
+
+	contextSSOBase       config.ContextInfo
+	contextSSOAccounts   []awsservice.SSOAccount
+	contextSSOAccountIdx int
+	contextSSOAccount    awsservice.SSOAccount
+	contextSSORoles      []awsservice.SSORole
+	contextSSORoleIdx    int
 
 	// Context add wizard
 	addStep     int // 0=auth_type select, 1+=field input, -1=confirm
@@ -439,6 +454,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		}
+		if m.screen == screenExitNotice {
+			m.quitting = true
+			return m, tea.Quit
+		}
 		if msg.String() == "?" {
 			m.helpVisible = !m.helpVisible
 			return m, nil
@@ -560,6 +579,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
 			return m.updateContextAdd(msg)
+		case screenContextSSOAccountList:
+			return m.updateContextSSOAccountList(msg)
+		case screenContextSSORoleList:
+			return m.updateContextSSORoleList(msg)
 		case screenError:
 			return m.updateError(msg)
 		}
@@ -812,10 +835,16 @@ func (m Model) View() string {
 		v = m.viewContextPicker()
 	case screenContextAdd:
 		v = m.viewContextAdd()
+	case screenContextSSOAccountList:
+		v = m.viewContextSSOAccountList()
+	case screenContextSSORoleList:
+		v = m.viewContextSSORoleList()
 	case screenLoading:
 		v = m.viewLoading()
 	case screenError:
 		v = m.viewError()
+	case screenExitNotice:
+		v = m.viewExitNotice()
 	}
 
 	return m.fitToHeight(v)

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -16,48 +17,124 @@ import (
 var assumeRoleFn = assumeRoleEnv
 var resolveSSORoleFn = resolveSSORoleEnv
 
+const ContextEnvVar = "UNIC_CONTEXT"
+
+type EnvContextDetection struct {
+	Name   string
+	Source string
+	Known  bool
+}
+
 // BuildEnvExports renders shell export commands for the given context.
 func BuildEnvExports(ctx context.Context, cfg *config.Config) (string, error) {
+	var values map[string]string
+
 	switch cfg.AuthType {
 	case config.AuthTypeSSO:
 		if cfg.SSOAccountID == "" || cfg.SSORoleName == "" {
 			return "", fmt.Errorf("context %q is an SSO base context; run `unic context setup` first", cfg.ContextName)
 		}
-		values, err := resolveSSORoleFn(ctx, cfg)
+		var err error
+		values, err = resolveSSORoleFn(ctx, cfg)
 		if err != nil {
 			return "", err
 		}
 		values["AWS_REGION"] = cfg.Region
 		values["AWS_DEFAULT_REGION"] = cfg.Region
 		values["AWS_PROFILE"] = ""
-		return renderExports(values), nil
 
 	case config.AuthTypeAssumeRole:
-		values, err := assumeRoleFn(ctx, cfg)
+		var err error
+		values, err = assumeRoleFn(ctx, cfg)
 		if err != nil {
 			return "", err
 		}
 		values["AWS_REGION"] = cfg.Region
 		values["AWS_DEFAULT_REGION"] = cfg.Region
 		values["AWS_PROFILE"] = ""
-		return renderExports(values), nil
 
 	case config.AuthTypeCredential, config.AuthTypeDefault:
 		profile := cfg.Profile
 		if profile == "" {
 			profile = "default"
 		}
-		return renderExports(map[string]string{
+		values = map[string]string{
 			"AWS_PROFILE":           profile,
 			"AWS_REGION":            cfg.Region,
 			"AWS_DEFAULT_REGION":    cfg.Region,
 			"AWS_ACCESS_KEY_ID":     "",
 			"AWS_SECRET_ACCESS_KEY": "",
 			"AWS_SESSION_TOKEN":     "",
-		}), nil
+		}
 
 	default:
 		return "", fmt.Errorf("unsupported auth type %q", cfg.AuthType)
+	}
+
+	values[ContextEnvVar] = cfg.ContextName
+	return renderExports(values), nil
+}
+
+func BuildEnvCleanupCommands() string {
+	return renderExports(map[string]string{
+		"AWS_PROFILE":           "",
+		"AWS_REGION":            "",
+		"AWS_DEFAULT_REGION":    "",
+		"AWS_ACCESS_KEY_ID":     "",
+		"AWS_SECRET_ACCESS_KEY": "",
+		"AWS_SESSION_TOKEN":     "",
+		ContextEnvVar:           "",
+	})
+}
+
+func DetectEnvContext(contexts []config.ContextInfo, lookup func(string) string) EnvContextDetection {
+	if lookup == nil {
+		lookup = os.Getenv
+	}
+
+	marker := strings.TrimSpace(lookup(ContextEnvVar))
+	if marker != "" {
+		return EnvContextDetection{
+			Name:   marker,
+			Source: ContextEnvVar,
+			Known:  hasContext(contexts, marker),
+		}
+	}
+
+	profile := strings.TrimSpace(lookup("AWS_PROFILE"))
+	if profile == "" {
+		return EnvContextDetection{}
+	}
+
+	region := strings.TrimSpace(lookup("AWS_REGION"))
+	if region == "" {
+		region = strings.TrimSpace(lookup("AWS_DEFAULT_REGION"))
+	}
+
+	matches := matchContextsByProfile(contexts, profile, region)
+	if len(matches) == 1 {
+		return EnvContextDetection{
+			Name:   matches[0].Name,
+			Source: "AWS_PROFILE",
+			Known:  true,
+		}
+	}
+
+	if region == "" {
+		matches = matchContextsByProfile(contexts, profile, "")
+		if len(matches) == 1 {
+			return EnvContextDetection{
+				Name:   matches[0].Name,
+				Source: "AWS_PROFILE",
+				Known:  true,
+			}
+		}
+	}
+
+	return EnvContextDetection{
+		Name:   profile,
+		Source: "AWS_PROFILE",
+		Known:  false,
 	}
 }
 
@@ -103,6 +180,29 @@ func resolveSSORoleEnv(ctx context.Context, cfg *config.Config) (map[string]stri
 		"AWS_SECRET_ACCESS_KEY": creds.SecretAccessKey,
 		"AWS_SESSION_TOKEN":     creds.SessionToken,
 	}, nil
+}
+
+func hasContext(contexts []config.ContextInfo, name string) bool {
+	for _, ctx := range contexts {
+		if ctx.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func matchContextsByProfile(contexts []config.ContextInfo, profile, region string) []config.ContextInfo {
+	var matches []config.ContextInfo
+	for _, ctx := range contexts {
+		if ctx.Profile != profile {
+			continue
+		}
+		if region != "" && ctx.Region != region {
+			continue
+		}
+		matches = append(matches, ctx)
+	}
+	return matches
 }
 
 func renderExports(values map[string]string) string {

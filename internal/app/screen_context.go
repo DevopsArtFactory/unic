@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,7 +19,17 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.ctxList = msg.contexts
 		m.filteredCtxList = msg.contexts
 		m.ctxIdx = 0
+		m.contextSSOBase = config.ContextInfo{}
+		m.contextSSOAccounts = nil
+		m.contextSSOAccountIdx = 0
+		m.contextSSOAccount = awsservice.SSOAccount{}
+		m.contextSSORoles = nil
+		m.contextSSORoleIdx = 0
 		m.resetFilter(filterContexts)
+		envContext := contextDetectEnvFn(msg.contexts, os.Getenv)
+		m.envContextName = envContext.Name
+		m.envContextSource = envContext.Source
+		m.envContextKnown = envContext.Known
 		for i, ctx := range m.filteredCtxList {
 			if ctx.Current {
 				m.ctxIdx = i
@@ -43,6 +54,27 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.awsRepo = nil
 		m.screen = m.ctxPrevScreen
 		return m, tea.ClearScreen, true
+
+	case contextSSOAccountsLoadedMsg:
+		m.contextSSOBase = msg.base
+		m.contextSSOAccounts = msg.accounts
+		m.contextSSOAccountIdx = 0
+		m.screen = screenContextSSOAccountList
+		return m, nil, true
+
+	case contextSSORolesLoadedMsg:
+		m.contextSSOBase = msg.base
+		m.contextSSOAccount = msg.account
+		m.contextSSORoles = msg.roles
+		m.contextSSORoleIdx = 0
+		m.screen = screenContextSSORoleList
+		return m, nil, true
+
+	case contextTerminalActionDoneMsg:
+		m.exitTitle = msg.title
+		m.exitMessage = msg.message
+		m.screen = screenExitNotice
+		return m, nil, true
 	}
 	return m, nil, false
 }
@@ -87,6 +119,20 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingContextName = selected.Name
 			return m.startLoading(m.switchContext(selected.Name))
 		}
+	case "s":
+		selected, ok := m.selectedContextInfo()
+		if !ok {
+			return m, nil
+		}
+		return m.beginContextSetup(selected)
+	case "y":
+		selected, ok := m.selectedContextInfo()
+		if !ok {
+			return m, nil
+		}
+		return m.beginContextExport(selected)
+	case "u":
+		return m.beginContextUnset()
 	case "a":
 		m.addStep = 0
 		m.addAuthIdx = 0
@@ -175,6 +221,10 @@ func (m Model) viewContextPicker() string {
 	var panel strings.Builder
 	b.WriteString(titleStyle.Render("Select Context"))
 	b.WriteString("\n")
+	b.WriteString(renderDetailLine("UNIC current", displayContextName(m.cfg.ContextName)))
+	b.WriteString("\n")
+	b.WriteString(renderDetailLine("Shell env", m.displayShellEnvContext()))
+	b.WriteString("\n\n")
 
 	b.WriteString(m.renderFilterValue(filterContexts))
 	b.WriteString("\n\n")
@@ -195,9 +245,38 @@ func (m Model) viewContextPicker() string {
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
 	if m.cfg.ContextName != "" {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: select • a: add • esc: back • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • esc: back • q: quit"))
 	} else {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: select • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • q: quit"))
 	}
 	return b.String()
+}
+
+func displayContextName(name string) string {
+	if strings.TrimSpace(name) == "" {
+		return "none"
+	}
+	return name
+}
+
+func (m Model) displayShellEnvContext() string {
+	if strings.TrimSpace(m.envContextName) == "" {
+		return "not detected"
+	}
+
+	summary := m.envContextName
+	switch m.envContextSource {
+	case auth.ContextEnvVar:
+		if !m.envContextKnown {
+			return summary + " (UNIC_CONTEXT, not in config)"
+		}
+		return summary + " (UNIC_CONTEXT)"
+	case "AWS_PROFILE":
+		if !m.envContextKnown {
+			return summary + " (best effort from AWS_PROFILE)"
+		}
+		return summary + " (AWS_PROFILE)"
+	default:
+		return summary
+	}
 }

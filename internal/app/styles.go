@@ -25,6 +25,22 @@ var (
 	listPanelStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
 	helpStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("237"))
 	detailLabelStyle = dimStyle.Copy().Width(14)
+	exitPanelStyle   = lipgloss.NewStyle().
+				Border(lipgloss.DoubleBorder()).
+				BorderForeground(lipgloss.Color("39")).
+				Foreground(lipgloss.Color("252")).
+				Background(lipgloss.Color("236")).
+				Padding(1, 2)
+	exitTitleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("39")).
+			Background(lipgloss.Color("236")).
+			Padding(0, 1)
+	exitBodyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("252"))
+	exitPromptStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")).
+			Bold(true)
 )
 
 func (m Model) renderStatusBar() string {
@@ -174,4 +190,34 @@ func (m Model) viewError() string {
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar("enter/esc: go back • q: quit"))
 	return b.String()
+}
+
+func (m Model) viewExitNotice() string {
+	title := strings.TrimSpace(m.exitTitle)
+	if title == "" {
+		title = "SYSTEM NOTICE"
+	}
+	message := strings.TrimSpace(m.exitMessage)
+	if message == "" {
+		message = "Operation complete."
+	}
+
+	boxWidth := 60
+	if m.width > 0 {
+		boxWidth = min(max(m.width-10, 48), 72)
+	}
+	contentWidth := max(boxWidth-6, 32)
+
+	var body strings.Builder
+	body.WriteString(exitTitleStyle.Copy().Width(contentWidth).Align(lipgloss.Center).Render(title))
+	body.WriteString("\n\n")
+	body.WriteString(exitBodyStyle.Copy().Width(contentWidth).Align(lipgloss.Center).Render(message))
+	body.WriteString("\n\n")
+	body.WriteString(exitPromptStyle.Copy().Width(contentWidth).Align(lipgloss.Center).Render("Press any key to exit unic"))
+
+	modal := exitPanelStyle.Copy().Width(boxWidth).Render(body.String())
+	if m.width <= 0 || m.height <= 0 {
+		return modal
+	}
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modal)
 }

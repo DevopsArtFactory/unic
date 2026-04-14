@@ -105,11 +105,13 @@ func TestContextUnsetClearsCurrentAndCopiesCleanupCommands(t *testing.T) {
 	origEnsure := ensureConfigExistsFn
 	origUnset := unsetCurrentFn
 	origClipboard := copyClipboardFn
+	origCleanup := buildCleanupEnvFn
 	defer func() {
 		defaultPathFn = origDefaultPath
 		ensureConfigExistsFn = origEnsure
 		unsetCurrentFn = origUnset
 		copyClipboardFn = origClipboard
+		buildCleanupEnvFn = origCleanup
 	}()
 
 	defaultPathFn = func() (string, error) { return "/tmp/config.yaml", nil }
@@ -120,12 +122,22 @@ func TestContextUnsetClearsCurrentAndCopiesCleanupCommands(t *testing.T) {
 		}
 		return nil
 	}
+	buildCleanupEnvFn = func() string {
+		return strings.Join([]string{
+			"unset AWS_PROFILE",
+			"unset AWS_SESSION_TOKEN",
+			"unset UNIC_CONTEXT",
+		}, "\n")
+	}
 	copyClipboardFn = func(text string) error {
 		if !strings.Contains(text, "unset AWS_PROFILE") {
 			t.Fatalf("expected cleanup commands, got %q", text)
 		}
 		if !strings.Contains(text, "unset AWS_SESSION_TOKEN") {
 			t.Fatalf("expected session token cleanup, got %q", text)
+		}
+		if !strings.Contains(text, "unset UNIC_CONTEXT") {
+			t.Fatalf("expected UNIC_CONTEXT cleanup, got %q", text)
 		}
 		return nil
 	}

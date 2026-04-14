@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -17,6 +16,7 @@ var (
 	ensureConfigExistsFn = config.EnsureConfigExists
 	setupContextFn       = auth.SetupContext
 	buildEnvFn           = auth.BuildEnvExports
+	buildCleanupEnvFn    = auth.BuildEnvCleanupCommands
 	loadNamedContextFn   = config.LoadNamedContext
 	loadConfigFn         = config.Load
 	unsetCurrentFn       = config.UnsetCurrent
@@ -79,14 +79,7 @@ func newContextUnsetCmd() *cobra.Command {
 				return err
 			}
 
-			exports := strings.Join([]string{
-				"unset AWS_PROFILE",
-				"unset AWS_REGION",
-				"unset AWS_DEFAULT_REGION",
-				"unset AWS_ACCESS_KEY_ID",
-				"unset AWS_SECRET_ACCESS_KEY",
-				"unset AWS_SESSION_TOKEN",
-			}, "\n")
+			exports := buildCleanupEnvFn()
 
 			if err := copyClipboardFn(exports); err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Clipboard unavailable: %v\n", err)

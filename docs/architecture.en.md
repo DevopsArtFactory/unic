@@ -56,7 +56,9 @@ Owns `~/.config/unic/config.yaml` handling:
 Owns shell export and interactive setup workflows:
 
 - build shell exports for `credential`, `assume_role`, and concrete `sso` contexts
+- include a `UNIC_CONTEXT` marker in shell exports and cleanup commands
 - run interactive setup for SSO base contexts
+- share SSO account / role resolution helpers across CLI and TUI flows
 - discover available SSO accounts and roles
 - return clipboard-friendly export strings
 
@@ -158,7 +160,8 @@ Current screen families include:
 - ECS cluster/service/task/container flows
 - S3 bucket/object/detail flows
 - Inspector home/scanning/results/detail flows
-- context picker and context add flows
+- context picker, context add, and TUI-native context setup/export/unset flows
+- SSO account / role selection and exit notice flows
 - loading and error screens
 
 ## Extension Pattern
