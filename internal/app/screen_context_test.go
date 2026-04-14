@@ -543,3 +543,20 @@ contexts:
 		t.Fatalf("expected exit notice dismissal to quit the app")
 	}
 }
+
+func TestContextPickerSetupResolvedSSORejectsInvalidRoleSelection(t *testing.T) {
+	m := New(testConfig(), "/tmp/config.yaml", "dev")
+	m.contextSSOBase = config.ContextInfo{Name: "base-sso", AuthType: "sso"}
+	m.contextSSOAccount = awsservice.SSOAccount{ID: "123456789012", Name: "dev"}
+	m.contextSSORoles = []awsservice.SSORole{{Name: "AdministratorAccess"}}
+	m.contextSSORoleIdx = 3
+
+	msg := m.setupResolvedSSOContextForTerminal()()
+	err, ok := msg.(errMsg)
+	if !ok {
+		t.Fatalf("expected errMsg for invalid role selection, got %T", msg)
+	}
+	if err.err == nil || err.err.Error() != "invalid role selection" {
+		t.Fatalf("unexpected error: %v", err.err)
+	}
+}

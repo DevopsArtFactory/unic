@@ -110,6 +110,9 @@ func (m Model) loadSSOContextRoles(base config.ContextInfo, account awsservice.S
 
 func (m Model) setupResolvedSSOContextForTerminal() tea.Cmd {
 	return func() tea.Msg {
+		if m.contextSSORoleIdx < 0 || m.contextSSORoleIdx >= len(m.contextSSORoles) {
+			return errMsg{err: fmt.Errorf("invalid role selection")}
+		}
 		finalName, err := contextResolveSSOSelectionFn(m.configPath, m.contextSSOBase, m.contextSSOAccount, m.contextSSORoles[m.contextSSORoleIdx])
 		if err != nil {
 			return errMsg{err: err}
