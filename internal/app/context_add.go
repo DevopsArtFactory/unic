@@ -157,7 +157,7 @@ func (m Model) viewContextAdd() string {
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("  ↑/↓: navigate • enter: select • esc: cancel"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • esc: cancel"))
 		return b.String()
 	}
 
@@ -189,10 +189,10 @@ func (m Model) viewContextAdd() string {
 		b.WriteString("\n")
 		b.WriteString(normalStyle.Render("  Save this context?"))
 		b.WriteString("\n\n")
-		b.WriteString(dimStyle.Render("  enter: save • esc: cancel"))
+		b.WriteString(m.renderHelpBar("enter: save • esc: cancel"))
 	} else if m.addStep > 0 {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("  enter: next • esc: back"))
+		b.WriteString(m.renderHelpBar("enter: next • esc: back"))
 	}
 
 	return b.String()

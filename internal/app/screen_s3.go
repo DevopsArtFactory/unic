@@ -202,6 +202,7 @@ func (m Model) updateS3ObjectDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewS3BucketList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("S3 Buckets"))
 	b.WriteString("\n")
@@ -210,8 +211,8 @@ func (m Model) viewS3BucketList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredS3Buckets) == 0 {
-		b.WriteString(dimStyle.Render("  No matching buckets"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching buckets"))
+		panel.WriteString("\n")
 	} else {
 		maxName := 6
 		for _, bucket := range m.filteredS3Buckets {
@@ -224,10 +225,10 @@ func (m Model) viewS3BucketList() string {
 		}
 		nameCol := lipgloss.NewStyle().Width(maxName + 2)
 		regionCol := lipgloss.NewStyle().Width(18)
-		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + regionCol.Render("REGION") + "CREATED"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + regionCol.Render("REGION") + "CREATED"))
+		panel.WriteString("\n")
 
-		visibleLines := max(m.height-9, 5)
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if m.s3BucketIdx >= visibleLines {
 			start = m.s3BucketIdx - visibleLines + 1
@@ -253,21 +254,23 @@ func (m Model) viewS3BucketList() string {
 				nameCol.Inherit(style).Render(name) +
 				regionCol.Inherit(dimStyle).Render(bucket.Region) +
 				dimStyle.Render(created)
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d buckets", len(m.filteredS3Buckets), len(m.s3Buckets))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d buckets", len(m.filteredS3Buckets), len(m.s3Buckets))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: browse • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: browse • esc: back • H: home"))
 	return b.String()
 }
 
 func (m Model) viewS3ObjectList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	bucketName := ""
 	if m.selectedS3Bucket != nil {
@@ -282,8 +285,8 @@ func (m Model) viewS3ObjectList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredS3Objects) == 0 {
-		b.WriteString(dimStyle.Render("  No matching objects or prefixes"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching objects or prefixes"))
+		panel.WriteString("\n")
 	} else {
 		maxName := 6
 		for _, obj := range m.filteredS3Objects {
@@ -297,10 +300,10 @@ func (m Model) viewS3ObjectList() string {
 		nameCol := lipgloss.NewStyle().Width(maxName + 2)
 		sizeCol := lipgloss.NewStyle().Width(10)
 		modCol := lipgloss.NewStyle().Width(18)
-		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + sizeCol.Render("SIZE") + modCol.Render("MODIFIED") + "TYPE"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + sizeCol.Render("SIZE") + modCol.Render("MODIFIED") + "TYPE"))
+		panel.WriteString("\n")
 
-		visibleLines := max(m.height-10, 5)
+		visibleLines := max(m.height-12, 5)
 		start := 0
 		if m.s3ObjectIdx >= visibleLines {
 			start = m.s3ObjectIdx - visibleLines + 1
@@ -339,16 +342,17 @@ func (m Model) viewS3ObjectList() string {
 				sizeCol.Inherit(dimStyle).Render(sizeText) +
 				modCol.Inherit(dimStyle).Render(modified) +
 				dimStyle.Render(typeText)
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d items", len(m.filteredS3Objects))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d items", len(m.filteredS3Objects))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: open • esc: up/back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: open • esc: up/back • H: home"))
 	return b.String()
 }
 
@@ -362,37 +366,36 @@ func (m Model) viewS3ObjectDetail() string {
 	b.WriteString(titleStyle.Render("S3 Object Detail"))
 	b.WriteString("\n\n")
 
-	labelStyle := lipgloss.NewStyle().Width(14)
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Bucket"), o.Bucket)))
+	b.WriteString(renderDetailLine("Bucket", normalStyle.Render(o.Bucket)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Key"), o.Key)))
+	b.WriteString(renderDetailLine("Key", normalStyle.Render(o.Key)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Size"), awsservice.FormatBytes(o.Size))))
+	b.WriteString(renderDetailLine("Size", normalStyle.Render(awsservice.FormatBytes(o.Size))))
 	b.WriteString("\n")
 	modified := "-"
 	if !o.LastModified.IsZero() {
 		modified = o.LastModified.Format("2006-01-02 15:04:05")
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Last Modified"), modified)))
+	b.WriteString(renderDetailLine("Last Modified", normalStyle.Render(modified)))
 	b.WriteString("\n")
 	storageClass := o.StorageClass
 	if storageClass == "" {
 		storageClass = "-"
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Storage Class"), storageClass)))
+	b.WriteString(renderDetailLine("Storage Class", normalStyle.Render(storageClass)))
 	b.WriteString("\n")
 	contentType := o.ContentType
 	if contentType == "" {
 		contentType = "-"
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Content Type"), contentType)))
+	b.WriteString(renderDetailLine("Content Type", normalStyle.Render(contentType)))
 	b.WriteString("\n")
 	etag := o.ETag
 	if etag == "" {
 		etag = "-"
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("ETag"), etag)))
+	b.WriteString(renderDetailLine("ETag", normalStyle.Render(etag)))
 	b.WriteString("\n\n")
-	b.WriteString(dimStyle.Render("esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("esc: back • H: home"))
 	return b.String()
 }

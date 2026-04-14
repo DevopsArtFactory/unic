@@ -510,6 +510,7 @@ func (m Model) updateIAMKeyRotateResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) viewIAMUserList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("IAM Users"))
 	b.WriteString("\n")
@@ -518,8 +519,8 @@ func (m Model) viewIAMUserList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredIAMUsers) == 0 {
-		b.WriteString(dimStyle.Render("  No matching IAM users"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching IAM users"))
+		panel.WriteString("\n")
 	} else {
 		maxName := len("USERNAME")
 		for _, user := range m.filteredIAMUsers {
@@ -532,15 +533,15 @@ func (m Model) viewIAMUserList() string {
 		createdCol := lipgloss.NewStyle().Width(12)
 		pathCol := lipgloss.NewStyle().Width(24)
 
-		b.WriteString(dimStyle.Render(
+		panel.WriteString(dimStyle.Render(
 			"  " +
 				nameCol.Render("USERNAME") +
 				createdCol.Render("CREATED") +
 				"PATH",
 		))
-		b.WriteString("\n")
+		panel.WriteString("\n")
 
-		visibleLines := max(m.height-9, 5)
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if m.iamUserIdx >= visibleLines {
 			start = m.iamUserIdx - visibleLines + 1
@@ -560,36 +561,37 @@ func (m Model) viewIAMUserList() string {
 				nameCol.Inherit(style).Render(user.UserName) +
 				createdCol.Inherit(dimStyle).Render(user.CreateDate.Format(time.DateOnly)) +
 				pathCol.Inherit(dimStyle).Render(truncateIAMPath(user.Path))
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
+		panel.WriteString("\n")
 		status := fmt.Sprintf("  %d/%d loaded IAM users", len(m.filteredIAMUsers), len(m.iamUsers))
 		if m.iamUserHasMore {
 			status += " • more available"
 		}
-		b.WriteString(dimStyle.Render(status))
+		panel.WriteString(dimStyle.Render(status))
 	}
 
 	if m.iamUserLoadingMore {
-		b.WriteString("\n")
+		panel.WriteString("\n")
 		if m.isFiltering(filterIAMUsers) || m.filterValue(filterIAMUsers) != "" {
-			b.WriteString(filterStyle.Render("  Loading remaining IAM usernames for filter..."))
+			panel.WriteString(filterStyle.Render("  Loading remaining IAM usernames for filter..."))
 		} else {
-			b.WriteString(filterStyle.Render("  Loading more IAM users..."))
+			panel.WriteString(filterStyle.Render("  Loading more IAM users..."))
 		}
 	} else if m.iamUserHasMore {
-		b.WriteString("\n")
+		panel.WriteString("\n")
 		if m.isFiltering(filterIAMUsers) || m.filterValue(filterIAMUsers) != "" {
-			b.WriteString(dimStyle.Render("  Continue typing to filter loaded usernames"))
+			panel.WriteString(dimStyle.Render("  Continue typing to filter loaded usernames"))
 		} else {
-			b.WriteString(dimStyle.Render("  Press n to load the next page"))
+			panel.WriteString(dimStyle.Render("  Press n to load the next page"))
 		}
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • n: next page • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • n: next page • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 
@@ -604,29 +606,28 @@ func (m Model) viewIAMUserDetail() string {
 	b.WriteString(titleStyle.Render("IAM User Detail"))
 	b.WriteString("\n\n")
 
-	labelStyle := lipgloss.NewStyle().Width(18)
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("User Name"), u.UserName)))
+	b.WriteString(renderDetailLine("User Name", normalStyle.Render(u.UserName)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("User ID"), u.UserID)))
+	b.WriteString(renderDetailLine("User ID", normalStyle.Render(u.UserID)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("ARN"), u.ARN)))
+	b.WriteString(renderDetailLine("ARN", normalStyle.Render(u.ARN)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Path"), u.Path)))
+	b.WriteString(renderDetailLine("Path", normalStyle.Render(u.Path)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Created"), u.CreateDate.Format(time.DateOnly))))
+	b.WriteString(renderDetailLine("Created", normalStyle.Render(u.CreateDate.Format(time.DateOnly))))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Console Last Used"), u.PasswordLastUsedDisplay())))
+	b.WriteString(renderDetailLine("Console Last Used", normalStyle.Render(u.PasswordLastUsedDisplay())))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Last Activity"), u.LastActivityDisplay())))
+	b.WriteString(renderDetailLine("Last Activity", normalStyle.Render(u.LastActivityDisplay())))
 	b.WriteString("\n")
 
 	mfaText := dimStyle.Render("Disabled")
 	if u.MFAEnabled {
 		mfaText = selectedStyle.Render("Enabled")
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("MFA"), mfaText)))
+	b.WriteString(renderDetailLine("MFA", mfaText))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%d", labelStyle.Render("Access Keys"), len(u.AccessKeys))))
+	b.WriteString(renderDetailLine("Access Keys", normalStyle.Render(fmt.Sprintf("%d", len(u.AccessKeys)))))
 	b.WriteString("\n\n")
 
 	b.WriteString(titleStyle.Render("Groups"))
@@ -644,12 +645,13 @@ func (m Model) viewIAMUserDetail() string {
 	b.WriteString(renderIAMAccessKeyList(u.AccessKeys))
 	b.WriteString("\n\n")
 
-	b.WriteString(dimStyle.Render("esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("esc: back • H: home"))
 	return b.String()
 }
 
 func (m Model) viewIAMKeyList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	title := "IAM Access Keys"
 	if m.iamRotationEnabled {
@@ -664,10 +666,10 @@ func (m Model) viewIAMKeyList() string {
 	}
 
 	if len(m.iamKeys) == 0 {
-		b.WriteString(dimStyle.Render("  No access keys found"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No access keys found"))
+		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.iamKeyIdx >= visibleLines {
 			start = m.iamKeyIdx - visibleLines + 1
@@ -694,16 +696,17 @@ func (m Model) viewIAMKeyList() string {
 			} else {
 				title = fmt.Sprintf("%s%s", cursor, key.DisplayTitle())
 			}
-			b.WriteString(title)
-			b.WriteString("\n")
+			panel.WriteString(title)
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d keys", len(m.iamKeys))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d keys", len(m.iamKeys))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 
@@ -717,8 +720,7 @@ func (m Model) viewIAMKeyDetail() string {
 	b.WriteString(titleStyle.Render("Access Key Detail"))
 	b.WriteString("\n\n")
 
-	labelStyle := lipgloss.NewStyle().Width(16)
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Access Key ID"), k.AccessKeyID)))
+	b.WriteString(renderDetailLine("Access Key ID", normalStyle.Render(k.AccessKeyID)))
 	b.WriteString("\n")
 
 	statusStr := k.Status
@@ -727,28 +729,28 @@ func (m Model) viewIAMKeyDetail() string {
 	} else {
 		statusStr = dimStyle.Render(k.Status)
 	}
-	b.WriteString(fmt.Sprintf("  %s%s", labelStyle.Render("Status"), statusStr))
+	b.WriteString(renderDetailLine("Status", statusStr))
 	b.WriteString("\n")
 
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Created"), k.CreateDate.Format(time.DateOnly))))
+	b.WriteString(renderDetailLine("Created", normalStyle.Render(k.CreateDate.Format(time.DateOnly))))
 	b.WriteString("\n")
 
 	ageStr := fmt.Sprintf("%d days", k.Age())
 	if k.IsAged() {
 		ageStr = errorStyle.Render(fmt.Sprintf("%d days ⚠ (>90 days)", k.Age()))
 	}
-	b.WriteString(fmt.Sprintf("  %s%s", labelStyle.Render("Age"), ageStr))
+	b.WriteString(renderDetailLine("Age", ageStr))
 	b.WriteString("\n")
 
 	lastUsed := dimStyle.Render("Never")
 	if !k.LastUsed.IsZero() {
 		lastUsed = k.LastUsed.Format(time.DateOnly)
 	}
-	b.WriteString(fmt.Sprintf("  %s%s", labelStyle.Render("Last Used"), lastUsed))
+	b.WriteString(renderDetailLine("Last Used", lastUsed))
 	b.WriteString("\n")
 
 	if k.ServiceName != "" && k.ServiceName != "N/A" {
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Last Service"), k.ServiceName)))
+		b.WriteString(renderDetailLine("Last Service", normalStyle.Render(k.ServiceName)))
 		b.WriteString("\n")
 	}
 
@@ -767,7 +769,7 @@ func (m Model) viewIAMKeyDetail() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("esc: back • H: home"))
 	return b.String()
 }
 
@@ -798,7 +800,7 @@ func (m Model) viewIAMKeyRotateConfirm() string {
 	b.WriteString("\n")
 	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.iamRotateConfirm)))
 	b.WriteString("\n\n")
-	b.WriteString(dimStyle.Render("  enter: confirm • esc: cancel"))
+	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 	return b.String()
 }
 
@@ -814,10 +816,9 @@ func (m Model) viewIAMKeyRotateResult() string {
 	b.WriteString(normalStyle.Render("  New credentials (shown once only):"))
 	b.WriteString("\n\n")
 
-	labelStyle := lipgloss.NewStyle().Width(22)
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Access Key ID"), m.iamNewKey.AccessKeyID)))
+	b.WriteString(renderDetailLine("Access Key ID", normalStyle.Render(m.iamNewKey.AccessKeyID)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Secret Access Key"), m.iamNewKey.SecretAccessKey)))
+	b.WriteString(renderDetailLine("Secret Access Key", normalStyle.Render(m.iamNewKey.SecretAccessKey)))
 	b.WriteString("\n\n")
 
 	if m.iamRotationOldKeyID != "" {
@@ -828,9 +829,9 @@ func (m Model) viewIAMKeyRotateResult() string {
 		if m.iamOldKeyDeleted {
 			oldKeyStatus = "Deleted"
 		}
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Old Key"), m.iamRotationOldKeyID)))
+		b.WriteString(renderDetailLine("Old Key", normalStyle.Render(m.iamRotationOldKeyID)))
 		b.WriteString("\n")
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelStyle.Render("Old Key Status"), oldKeyStatus)))
+		b.WriteString(renderDetailLine("Old Key Status", normalStyle.Render(oldKeyStatus)))
 		b.WriteString("\n\n")
 	}
 
@@ -868,7 +869,7 @@ func (m Model) viewIAMKeyRotateResult() string {
 		b.WriteString(dimStyle.Render("  [x] Delete old key (available after deactivation)"))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(dimStyle.Render("  esc: back to key list"))
+	b.WriteString(m.renderHelpBar("esc: back to key list"))
 	return b.String()
 }
 

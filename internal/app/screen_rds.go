@@ -253,6 +253,8 @@ func (m Model) tickRDSPoll(dbInstanceID string) tea.Cmd {
 
 func (m Model) viewRDSList() string {
 	var b strings.Builder
+	var panel strings.Builder
+	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("RDS Instances"))
 	b.WriteString("\n")
 
@@ -260,10 +262,10 @@ func (m Model) viewRDSList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredRDS) == 0 {
-		b.WriteString(dimStyle.Render("  No matching instances"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching instances"))
+		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.rdsIdx >= visibleLines {
 			start = m.rdsIdx - visibleLines + 1
@@ -278,16 +280,17 @@ func (m Model) viewRDSList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, inst.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, inst.DisplayTitle())))
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d instances", len(m.filteredRDS), len(m.rdsInstances))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d instances", len(m.filteredRDS), len(m.rdsInstances))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 
@@ -297,12 +300,13 @@ func (m Model) viewRDSDetail() string {
 	}
 	r := m.selectedRDS
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("RDS Instance Detail"))
 	b.WriteString("\n\n")
 
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Identifier : %s", r.DBInstanceID)))
+	b.WriteString(renderDetailLine("Identifier", normalStyle.Render(r.DBInstanceID)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Engine     : %s %s", r.Engine, r.EngineVersion)))
+	b.WriteString(renderDetailLine("Engine", normalStyle.Render(fmt.Sprintf("%s %s", r.Engine, r.EngineVersion))))
 	b.WriteString("\n")
 
 	// Color-code status
@@ -318,27 +322,27 @@ func (m Model) viewRDSDetail() string {
 	if m.rdsPolling {
 		pollingIndicator = filterStyle.Render(" (polling...)")
 	}
-	b.WriteString(fmt.Sprintf("  Status     : %s%s", statusStr, pollingIndicator))
+	b.WriteString(renderDetailLine("Status", statusStr+pollingIndicator))
 	b.WriteString("\n")
 
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Class      : %s", r.InstanceClass)))
+	b.WriteString(renderDetailLine("Class", normalStyle.Render(r.InstanceClass)))
 	b.WriteString("\n")
 	multiAZStr := "No"
 	if r.MultiAZ {
 		multiAZStr = "Yes"
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Multi-AZ   : %s", multiAZStr)))
+	b.WriteString(renderDetailLine("Multi-AZ", normalStyle.Render(multiAZStr)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Storage    : %d GB", r.StorageGB)))
+	b.WriteString(renderDetailLine("Storage", normalStyle.Render(fmt.Sprintf("%d GB", r.StorageGB))))
 	b.WriteString("\n")
 	endpoint := r.Endpoint
 	if endpoint == "" {
 		endpoint = dimStyle.Render("(unavailable)")
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Endpoint   : %s", endpoint)))
+	b.WriteString(renderDetailLine("Endpoint", endpoint))
 	b.WriteString("\n")
 	if r.ClusterID != "" {
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  Cluster    : %s", r.ClusterID)))
+		b.WriteString(renderDetailLine("Cluster", normalStyle.Render(r.ClusterID)))
 		b.WriteString("\n")
 	}
 
@@ -374,7 +378,7 @@ func (m Model) viewRDSDetail() string {
 	b.WriteString("\n")
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("esc: back • H: home"))
 	return b.String()
 }
 
@@ -393,6 +397,7 @@ func (m Model) viewRDSConfirm() string {
 	}
 
 	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
 	b.WriteString(errorStyle.Render("Confirm Action"))
 	b.WriteString("\n\n")
 
@@ -411,7 +416,7 @@ func (m Model) viewRDSConfirm() string {
 		b.WriteString("\n")
 		b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.rdsConfirmInput)))
 		b.WriteString("\n\n")
-		b.WriteString(dimStyle.Render("  enter: confirm • esc: cancel"))
+		b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 		b.WriteString("\n")
 	}
 	return b.String()

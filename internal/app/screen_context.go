@@ -172,6 +172,7 @@ func (m Model) doFinalizeContextSwitch() tea.Cmd {
 
 func (m Model) viewContextPicker() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(titleStyle.Render("Select Context"))
 	b.WriteString("\n")
 
@@ -179,23 +180,24 @@ func (m Model) viewContextPicker() string {
 	b.WriteString("\n\n")
 
 	if len(m.ctxList) == 0 {
-		b.WriteString(normalStyle.Render("  No contexts defined."))
-		b.WriteString("\n\n")
-		b.WriteString(dimStyle.Render("  Press 'a' to add your first context."))
-		b.WriteString("\n")
+		panel.WriteString(normalStyle.Render("  No contexts defined."))
+		panel.WriteString("\n\n")
+		panel.WriteString(dimStyle.Render("  Press 'a' to add your first context."))
+		panel.WriteString("\n")
 	} else if len(m.filteredCtxList) == 0 {
-		b.WriteString(dimStyle.Render("  No matching contexts"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching contexts"))
+		panel.WriteString("\n")
 	} else {
-		b.WriteString(m.contextTable.View())
-		b.WriteString("\n")
+		panel.WriteString(m.contextTable.View())
+		panel.WriteString("\n")
 	}
 
-	b.WriteString("\n")
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
 	if m.cfg.ContextName != "" {
-		b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: select • a: add • esc: back • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: select • a: add • esc: back • q: quit"))
 	} else {
-		b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: select • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: select • a: add • q: quit"))
 	}
 	return b.String()
 }

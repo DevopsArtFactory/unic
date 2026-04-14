@@ -161,15 +161,16 @@ func (m Model) loadAvailableIPs(subnet awsservice.Subnet) tea.Cmd {
 
 func (m Model) viewVPCList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("VPCs"))
 	b.WriteString("\n\n")
 
 	if len(m.filteredVPCs) == 0 {
-		b.WriteString(dimStyle.Render("  No VPCs found"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No VPCs found"))
+		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.vpcIdx >= visibleLines {
 			start = m.vpcIdx - visibleLines + 1
@@ -184,20 +185,22 @@ func (m Model) viewVPCList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, vpc.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, vpc.DisplayTitle())))
+			panel.WriteString("\n")
 		}
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d VPCs", len(m.filteredVPCs))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d VPCs", len(m.filteredVPCs))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: select • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • esc: back • H: home"))
 	return b.String()
 }
 
 func (m Model) viewSubnetList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	vpcName := ""
 	if m.selectedVPC != nil {
@@ -207,10 +210,10 @@ func (m Model) viewSubnetList() string {
 	b.WriteString("\n\n")
 
 	if len(m.subnets) == 0 {
-		b.WriteString(dimStyle.Render("  No subnets found"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No subnets found"))
+		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-8, 5)
+		visibleLines := max(m.height-10, 5)
 		start := 0
 		if m.subnetIdx >= visibleLines {
 			start = m.subnetIdx - visibleLines + 1
@@ -225,15 +228,16 @@ func (m Model) viewSubnetList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
-			b.WriteString("\n")
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
+			panel.WriteString("\n")
 		}
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d subnets", len(m.subnets))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d subnets", len(m.subnets))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 
@@ -246,15 +250,15 @@ func (m Model) viewSubnetDetail() string {
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Subnet Detail"))
 	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Subnet ID  : %s", s.SubnetID)))
+	b.WriteString(renderDetailLine("Subnet ID", normalStyle.Render(s.SubnetID)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Name       : %s", s.Name)))
+	b.WriteString(renderDetailLine("Name", normalStyle.Render(s.Name)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  CIDR       : %s", s.CIDR)))
+	b.WriteString(renderDetailLine("CIDR", normalStyle.Render(s.CIDR)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  AZ         : %s", s.AvailabilityZone)))
+	b.WriteString(renderDetailLine("AZ", normalStyle.Render(s.AvailabilityZone)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  Available IPs : %d", len(m.availableIPs))))
+	b.WriteString(renderDetailLine("Available IPs", normalStyle.Render(fmt.Sprintf("%d", len(m.availableIPs)))))
 	b.WriteString("\n\n")
 
 	b.WriteString(m.renderFilterValue(filterSubnetIPs))
@@ -277,6 +281,6 @@ func (m Model) viewSubnetDetail() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: scroll • /: filter • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: scroll • /: filter • esc: back • H: home"))
 	return b.String()
 }

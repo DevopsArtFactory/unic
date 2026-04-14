@@ -11,6 +11,8 @@ import (
 const (
 	defaultContextTableWidth  = 52
 	defaultContextTableHeight = 4
+	contextTableColumnCount   = 4
+	contextTableCellPadding   = 2
 )
 
 func newContextTable() table.Model {
@@ -93,12 +95,17 @@ func contextTableHeight(terminalHeight int) int {
 	if terminalHeight <= 0 {
 		return defaultContextTableHeight
 	}
-	visibleRows := max(terminalHeight-6, 3)
-	return visibleRows + 1
+	// Context picker layout overhead:
+	// title/filter block (3) + panel border (2) + separator/help bar (2) = 7.
+	// The table height itself must fit inside the remaining rows.
+	return max(terminalHeight-7, 3)
 }
 
 func contextTableColumns(terminalWidth int) []table.Column {
-	available := contextTableWidth(terminalWidth)
+	available := contextTableWidth(terminalWidth) - contextTableColumnCount*contextTableCellPadding
+	if available < 16 {
+		available = 16
+	}
 
 	currentWidth := 7
 	regionWidth := 12

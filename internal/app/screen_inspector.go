@@ -149,7 +149,7 @@ func (m Model) viewInspectorHome() string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("enter/r: run security scan • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("enter/r: run security scan • esc: back • H: home"))
 	return b.String()
 }
 
@@ -166,6 +166,7 @@ func (m Model) viewInspectorScanning() string {
 
 func (m Model) viewInspectorResults() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Inspector Findings"))
 	b.WriteString("\n")
@@ -184,19 +185,19 @@ func (m Model) viewInspectorResults() string {
 	b.WriteString("\n\n")
 
 	if m.inspectorReport != nil && len(m.inspectorReport.Warnings) > 0 {
-		b.WriteString(errorStyle.Render(fmt.Sprintf("Warnings: %d rule pack(s) reported errors", len(m.inspectorReport.Warnings))))
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("  " + m.inspectorReport.Warnings[0]))
-		b.WriteString("\n\n")
+		panel.WriteString(errorStyle.Render(fmt.Sprintf("Warnings: %d rule pack(s) reported errors", len(m.inspectorReport.Warnings))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  " + m.inspectorReport.Warnings[0]))
+		panel.WriteString("\n\n")
 	}
 
 	if len(m.inspectorFindings) == 0 {
-		b.WriteString(dimStyle.Render("  No matching findings"))
+		panel.WriteString(dimStyle.Render("  No matching findings"))
 		if m.inspectorReport != nil && len(m.inspectorReport.Findings) == 0 && m.inspectorReport.ScannerCount == 0 {
-			b.WriteString("\n")
-			b.WriteString(dimStyle.Render("  No built-in rule packs are registered yet."))
+			panel.WriteString("\n")
+			panel.WriteString(dimStyle.Render("  No built-in rule packs are registered yet."))
 		}
-		b.WriteString("\n")
+		panel.WriteString("\n")
 	} else {
 		resourceWidth := 24
 		for _, finding := range m.inspectorFindings {
@@ -207,10 +208,10 @@ func (m Model) viewInspectorResults() string {
 		}
 		resourceCol := lipgloss.NewStyle().Width(resourceWidth)
 
-		b.WriteString(dimStyle.Render("  SEVERITY   " + resourceCol.Render("RESOURCE") + "RULE"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  SEVERITY   " + resourceCol.Render("RESOURCE") + "RULE"))
+		panel.WriteString("\n")
 
-		visibleLines := max(m.height-11, 5)
+		visibleLines := max(m.height-13, 5)
 		start := 0
 		if m.inspectorIdx >= visibleLines {
 			start = m.inspectorIdx - visibleLines + 1
@@ -232,13 +233,14 @@ func (m Model) viewInspectorResults() string {
 				" " +
 				resourceCol.Inherit(textStyle).Render(resource) +
 				textStyle.Render(finding.RuleName)
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • 1-5: severity • enter: detail • r: rescan • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • 1-5: severity • enter: detail • r: rescan • esc: back • H: home"))
 	return b.String()
 }
 
@@ -253,20 +255,19 @@ func (m Model) viewInspectorFindingDetail() string {
 	b.WriteString(titleStyle.Render("Inspector Finding Detail"))
 	b.WriteString("\n\n")
 
-	labelCol := lipgloss.NewStyle().Width(16)
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelCol.Render("Severity"), renderInspectorSeverity(finding.Severity))))
+	b.WriteString(renderDetailLine("Severity", renderInspectorSeverity(finding.Severity)))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelCol.Render("Rule"), finding.RuleName)))
+	b.WriteString(renderDetailLine("Rule", normalStyle.Render(finding.RuleName)))
 	b.WriteString("\n")
 	if finding.RuleID != "" {
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelCol.Render("Rule ID"), finding.RuleID)))
+		b.WriteString(renderDetailLine("Rule ID", normalStyle.Render(finding.RuleID)))
 		b.WriteString("\n")
 	}
 	if finding.ResourceType != "" {
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelCol.Render("Resource Type"), finding.ResourceType)))
+		b.WriteString(renderDetailLine("Resource Type", normalStyle.Render(finding.ResourceType)))
 		b.WriteString("\n")
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s%s", labelCol.Render("Resource ID"), inspectorFindingResource(*finding))))
+	b.WriteString(renderDetailLine("Resource ID", normalStyle.Render(inspectorFindingResource(*finding))))
 	b.WriteString("\n\n")
 
 	width := 80
@@ -285,7 +286,7 @@ func (m Model) viewInspectorFindingDetail() string {
 	b.WriteString(paragraph.Render("  " + finding.Recommendation))
 	b.WriteString("\n\n")
 
-	b.WriteString(dimStyle.Render("esc: back • r: rescan • H: home"))
+	b.WriteString(m.renderHelpBar("esc: back • r: rescan • H: home"))
 	return b.String()
 }
 

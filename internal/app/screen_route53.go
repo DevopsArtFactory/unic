@@ -217,6 +217,7 @@ func (m Model) loadRoute53Records(zoneID string) tea.Cmd {
 
 func (m Model) viewRoute53ZoneList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Route53 Hosted Zones"))
 	b.WriteString("\n")
@@ -225,8 +226,8 @@ func (m Model) viewRoute53ZoneList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredRoute53Zones) == 0 {
-		b.WriteString(dimStyle.Render("  No matching hosted zones"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching hosted zones"))
+		panel.WriteString("\n")
 	} else {
 		// Measure max widths for column alignment
 		maxName, maxID := 4, 2 // "NAME", "ID"
@@ -243,10 +244,10 @@ func (m Model) viewRoute53ZoneList() string {
 		recordsCol := lipgloss.NewStyle().Width(9) // "RECORDS" + padding
 
 		// Header
-		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + idCol.Render("ID") + recordsCol.Render("RECORDS") + "TYPE"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + idCol.Render("ID") + recordsCol.Render("RECORDS") + "TYPE"))
+		panel.WriteString("\n")
 
-		visibleLines := max(m.height-9, 5)
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if m.route53ZoneIdx >= visibleLines {
 			start = m.route53ZoneIdx - visibleLines + 1
@@ -270,21 +271,23 @@ func (m Model) viewRoute53ZoneList() string {
 				idCol.Inherit(dimStyle).Render(zone.ID) +
 				recordsCol.Inherit(dimStyle).Render(fmt.Sprintf("%d", zone.ResourceRecordCount)) +
 				dimStyle.Render(zoneType)
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d zones", len(m.filteredRoute53Zones), len(m.route53Zones))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d zones", len(m.filteredRoute53Zones), len(m.route53Zones))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • enter: records • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: records • esc: back • H: home"))
 	return b.String()
 }
 
 func (m Model) viewRoute53RecordList() string {
 	var b strings.Builder
+	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	zoneName := ""
 	if m.selectedRoute53Zone != nil {
@@ -297,8 +300,8 @@ func (m Model) viewRoute53RecordList() string {
 	b.WriteString("\n\n")
 
 	if len(m.filteredRoute53Records) == 0 {
-		b.WriteString(dimStyle.Render("  No matching records"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  No matching records"))
+		panel.WriteString("\n")
 	} else {
 		// Measure max widths for column alignment
 		maxName, maxType := 4, 4 // "NAME", "TYPE"
@@ -314,10 +317,10 @@ func (m Model) viewRoute53RecordList() string {
 		typeCol := lipgloss.NewStyle().Width(maxType + 2)
 
 		// Header
-		b.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + typeCol.Render("TYPE") + "VALUE"))
-		b.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + typeCol.Render("TYPE") + "VALUE"))
+		panel.WriteString("\n")
 
-		visibleLines := max(m.height-9, 5)
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if m.route53RecordIdx >= visibleLines {
 			start = m.route53RecordIdx - visibleLines + 1
@@ -346,25 +349,28 @@ func (m Model) viewRoute53RecordList() string {
 				nameCol.Inherit(style).Render(rec.Name) +
 				typeCol.Inherit(filterStyle).Render(rec.Type) +
 				dimStyle.Render(valStr)
-			b.WriteString(row)
-			b.WriteString("\n")
+			panel.WriteString(row)
+			panel.WriteString("\n")
 		}
 
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d records", len(m.filteredRoute53Records), len(m.route53Records))))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d records", len(m.filteredRoute53Records), len(m.route53Records))))
 	}
 
 	// Show change status if polling
 	if m.route53Polling {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("  Change: %s...", m.route53ChangeStatus)))
-		b.WriteString("\n")
+		panel.WriteString("\n")
+		panel.WriteString(filterStyle.Render(fmt.Sprintf("  Change: %s...", m.route53ChangeStatus)))
+		panel.WriteString("\n")
 	} else if m.route53ChangeStatus == "INSYNC" {
-		b.WriteString(dimStyle.Render("  Change: INSYNC"))
-		b.WriteString("\n")
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  Change: INSYNC"))
+		panel.WriteString("\n")
 	}
 
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("↑/↓: navigate • /: filter • c: create • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • c: create • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 
@@ -378,26 +384,24 @@ func (m Model) viewRoute53RecordDetail() string {
 	b.WriteString(titleStyle.Render("DNS Record Detail"))
 	b.WriteString("\n\n")
 
-	labelStyle := dimStyle.Width(10)
-
-	b.WriteString("  " + labelStyle.Render("Name") + normalStyle.Render(r.Name))
+	b.WriteString(renderDetailLine("Name", normalStyle.Render(r.Name)))
 	b.WriteString("\n")
-	b.WriteString("  " + labelStyle.Render("Type") + filterStyle.Render(r.Type))
+	b.WriteString(renderDetailLine("Type", filterStyle.Render(r.Type)))
 	b.WriteString("\n")
 
 	if r.AliasTarget != "" {
-		b.WriteString("  " + labelStyle.Render("Alias") + normalStyle.Render(r.AliasTarget))
+		b.WriteString(renderDetailLine("Alias", normalStyle.Render(r.AliasTarget)))
 		b.WriteString("\n")
 	} else {
-		b.WriteString("  " + labelStyle.Render("TTL") + normalStyle.Render(fmt.Sprintf("%d", r.TTL)))
+		b.WriteString(renderDetailLine("TTL", normalStyle.Render(fmt.Sprintf("%d", r.TTL))))
 		b.WriteString("\n")
 	}
 
 	if len(r.Values) > 0 {
-		b.WriteString("  " + labelStyle.Render("Values"))
+		b.WriteString(renderDetailLine("Values", ""))
 		b.WriteString("\n")
 		for _, v := range r.Values {
-			b.WriteString("  " + labelStyle.Render("") + normalStyle.Render(v))
+			b.WriteString(renderDetailLine("", normalStyle.Render(v)))
 			b.WriteString("\n")
 		}
 	}
@@ -416,7 +420,7 @@ func (m Model) viewRoute53RecordDetail() string {
 		}
 		hints = "c: create • " + hints
 	}
-	b.WriteString(dimStyle.Render(hints))
+	b.WriteString(m.renderHelpBar(hints))
 	return b.String()
 }
 
@@ -570,7 +574,7 @@ func (m Model) viewRoute53RecordCreate() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("enter: next • esc: cancel"))
+	b.WriteString(m.renderHelpBar("enter: next • esc: cancel"))
 	return b.String()
 }
 
@@ -666,7 +670,7 @@ func (m Model) viewRoute53RecordEdit() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("enter: next • esc: cancel"))
+	b.WriteString(m.renderHelpBar("enter: next • esc: cancel"))
 	return b.String()
 }
 
@@ -727,7 +731,7 @@ func (m Model) viewRoute53RecordDeleteConfirm() string {
 	b.WriteString("\n")
 	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.route53ConfirmInput)))
 	b.WriteString("\n\n")
-	b.WriteString(dimStyle.Render("enter: confirm • esc: cancel"))
+	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 	return b.String()
 }
 
