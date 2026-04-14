@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"unic/internal/auth"
 	"unic/internal/config"
@@ -26,6 +25,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 				break
 			}
 		}
+		m.syncContextTable()
 		m.screen = screenContextPicker
 		return m, nil, true
 
@@ -78,19 +78,12 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		}
-	case "up", "k":
-		if m.ctxIdx > 0 {
-			m.ctxIdx--
-		}
-	case "down", "j":
-		if m.ctxIdx < len(m.filteredCtxList)-1 {
-			m.ctxIdx++
-		}
 	case "/":
 		return m, m.activateFilter(filterContexts)
 	case "enter":
-		if len(m.filteredCtxList) > 0 && m.ctxIdx < len(m.filteredCtxList) {
-			selected := m.filteredCtxList[m.ctxIdx]
+		cursor := m.contextTable.Cursor()
+		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
+			selected := m.filteredCtxList[cursor]
 			m.pendingContextName = selected.Name
 			return m.startLoading(m.switchContext(selected.Name))
 		}
@@ -102,6 +95,16 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.addInput = ""
 		m.addValues = make(map[string]string)
 		m.screen = screenContextAdd
+	default:
+		if len(m.filteredCtxList) == 0 {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.contextTable, cmd = m.contextTable.Update(msg)
+		if cursor := m.contextTable.Cursor(); cursor >= 0 {
+			m.ctxIdx = cursor
+		}
+		return m, cmd
 	}
 	return m, nil
 }
@@ -185,48 +188,8 @@ func (m Model) viewContextPicker() string {
 		panel.WriteString(dimStyle.Render("  No matching contexts"))
 		panel.WriteString("\n")
 	} else {
-		// Measure max widths for alignment
-		maxName, maxRegion := 4, 6 // "NAME", "REGION"
-		for _, ctx := range m.filteredCtxList {
-			if len(ctx.Name) > maxName {
-				maxName = len(ctx.Name)
-			}
-			if len(ctx.Region) > maxRegion {
-				maxRegion = len(ctx.Region)
-			}
-		}
-
-		nameCol := lipgloss.NewStyle().Width(maxName + 2)
-		regionCol := lipgloss.NewStyle().Width(maxRegion + 2)
-
-		// Header
-		panel.WriteString(dimStyle.Render("  " + nameCol.Render("NAME") + regionCol.Render("REGION") + "AUTH"))
+		panel.WriteString(m.contextTable.View())
 		panel.WriteString("\n")
-
-		// overhead: title (1) + filter (1) + blank (1) + list panel (2) + help bar (1) = 6
-		visibleLines := max(m.height-8, 3)
-		start := 0
-		if m.ctxIdx >= visibleLines {
-			start = m.ctxIdx - visibleLines + 1
-		}
-		end := min(start+visibleLines, len(m.filteredCtxList))
-
-		for i := start; i < end; i++ {
-			ctx := m.filteredCtxList[i]
-			cursor := "  "
-			style := normalStyle
-			if i == m.ctxIdx {
-				cursor = "> "
-				style = selectedStyle
-			}
-
-			row := cursor + nameCol.Inherit(style).Render(ctx.Name) + regionCol.Inherit(style).Render(ctx.Region) + style.Render(ctx.AuthType)
-			if ctx.Current {
-				row += dimStyle.Render(" *")
-			}
-			panel.WriteString(row)
-			panel.WriteString("\n")
-		}
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))

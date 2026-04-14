@@ -22,7 +22,7 @@ var (
 	pathLineStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("67"))
 	filterStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 	statusBarStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("236"))
-	listPanelStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+	listPanelStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240"))
 	helpStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("237"))
 	detailLabelStyle = dimStyle.Copy().Width(14)
 )
@@ -92,7 +92,7 @@ func (m Model) renderListPanel(content string) string {
 	content = strings.TrimRight(content, "\n")
 	style := listPanelStyle
 	if m.width > 0 {
-		style = style.MaxWidth(max(m.width-2, 1))
+		style = style.MaxWidth(max(m.width, 1))
 	}
 	return style.Render(content)
 }

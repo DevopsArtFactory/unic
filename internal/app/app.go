@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"unic/internal/config"
@@ -268,6 +269,7 @@ type Model struct {
 	ctxList            []config.ContextInfo
 	filteredCtxList    []config.ContextInfo
 	ctxIdx             int
+	contextTable       table.Model
 	ctxPrevScreen      screen
 	pendingContextName string
 
@@ -318,6 +320,7 @@ func New(cfg *config.Config, configPath string, version string) Model {
 		loadingSpinner: newLoadingSpinner(),
 		filterTI:       filterTI,
 		filters:        make(map[filterTarget]string),
+		contextTable:   newContextTable(),
 	}
 }
 
@@ -384,6 +387,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.syncFilterInputWidth()
+		m.syncContextTable()
 		return m, nil
 	case callerIdentityMsg:
 		m.callerIdentity = msg.identity

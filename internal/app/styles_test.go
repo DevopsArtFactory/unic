@@ -87,12 +87,11 @@ func TestContextPickerUsesBorderedPanelAndHelpBar(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 80
 	m.height = 20
-	m.ctxList = styleTestContexts()
-	m.filteredCtxList = styleTestContexts()
-	m.ctxIdx = 1
+	updated, _ := m.Update(contextsLoadedMsg{contexts: styleTestContexts()})
+	m = updated.(Model)
 
 	view := stripANSI(m.viewContextPicker())
-	for _, want := range []string{"╭", "╰", "NAME", "AUTH", "↑/↓: navigate • /: filter • enter: select • a: add • q: quit"} {
+	for _, want := range []string{"╭", "╰", "NAME", "AUTH TYPE", "prod", "↑/↓: navigate • /: filter • enter: select • a: add • q: quit"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected context picker view to contain %q, got %q", want, view)
 		}
