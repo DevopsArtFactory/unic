@@ -74,6 +74,9 @@ func TestRenderListPanelUsesRoundedBorder(t *testing.T) {
 	if !strings.Contains(panel, "row 1") || !strings.Contains(panel, "row 2") {
 		t.Fatalf("expected panel body content, got %q", panel)
 	}
+	if !strings.Contains(panel, "│ row 1") {
+		t.Fatalf("expected list panel to add inner padding, got %q", panel)
+	}
 }
 
 func TestRenderDetailLineUsesStandardWidth(t *testing.T) {
@@ -95,5 +98,54 @@ func TestContextPickerUsesBorderedPanelAndHelpBar(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected context picker view to contain %q, got %q", want, view)
 		}
+	}
+}
+
+func TestContextPickerKeepsCurrentColumnVisible(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 60
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: styleTestContexts()})
+	m = updated.(Model)
+
+	view := stripANSI(m.viewContextPicker())
+	for _, want := range []string{"AUTH TYPE", "CURRENT", "*"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected context picker to keep %q visible at width 60, got %q", want, view)
+		}
+	}
+}
+
+func TestContextPickerPanelDoesNotOverflowHelpBar(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: styleTestContexts()})
+	m = updated.(Model)
+	view := stripANSI(m.View())
+	lines := strings.Split(view, "\n")
+
+	if len(lines) != 20 {
+		t.Fatalf("expected fitted view height 20, got %d lines", len(lines))
+	}
+
+	borderLine := -1
+	helpLine := -1
+	for i, line := range lines {
+		if strings.Contains(line, "╰") {
+			borderLine = i
+		}
+		if strings.Contains(line, "q: quit") {
+			helpLine = i
+		}
+	}
+
+	if borderLine == -1 || helpLine == -1 {
+		t.Fatalf("expected both bottom border and help bar, got %q", view)
+	}
+	if helpLine <= borderLine {
+		t.Fatalf("expected help bar below panel border, got border line %d help line %d in %q", borderLine, helpLine, view)
 	}
 }
