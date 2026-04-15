@@ -102,6 +102,7 @@ unic context unset
 `unic context setup` writes its prompts to `stderr` and copies the generated shell commands to the clipboard.
 `unic env` prints shell commands to `stdout` so it can be used with `eval`.
 Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the TUI can show which shell context is currently active.
+Contexts can be prioritized in the setup picker with an `order` field in config.
 
 ## Configuration
 
@@ -128,6 +129,7 @@ defaults:
 
 contexts:
   - name: dev-sso
+    order: 10
     profile: my-sso-profile
     region: ap-northeast-2
     auth_type: sso
@@ -142,6 +144,7 @@ contexts:
     sso_role_name: DeveloperRole
 
   - name: prod-admin
+    order: 20
     profile: base-profile
     region: us-east-1
     auth_type: assume_role
@@ -161,6 +164,12 @@ contexts:
 | `credential` | Use shared AWS profile credentials | `profile` |
 | `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
 | `sso` | Use AWS IAM Identity Center / SSO | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
+
+Optional context fields:
+
+| Field | Meaning |
+|---|---|
+| `order` | Lower values appear first in the context setup picker. Contexts without `order` fall back after ordered entries in their existing file order. |
 
 Resolution priority:
 
@@ -218,7 +227,7 @@ The Inspector feature ships built-in rule packs for Security Group exposure, RDS
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
-| Context Picker | `a` add context, `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
+| Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
 
 Filtering is currently available on EC2 instances, IAM users, VPCs/subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.
 

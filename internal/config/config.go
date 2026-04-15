@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -44,6 +45,7 @@ const (
 // ContextEntry represents a single context definition in config.yaml.
 type ContextEntry struct {
 	Name         string `yaml:"name"`
+	Order        int    `yaml:"order,omitempty"`
 	Profile      string `yaml:"profile,omitempty"`
 	Region       string `yaml:"region"`
 	AuthType     string `yaml:"auth_type"`
@@ -87,6 +89,7 @@ func normalizeAuthType(value string) AuthType {
 // ContextInfo holds summary information about a context for listing.
 type ContextInfo struct {
 	Name         string
+	Order        int
 	Profile      string
 	Region       string
 	AuthType     string
@@ -245,6 +248,7 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 	for _, ctx := range fc.Contexts {
 		infos = append(infos, ContextInfo{
 			Name:         ctx.Name,
+			Order:        ctx.Order,
 			Profile:      ctx.Profile,
 			Region:       ctx.Region,
 			AuthType:     ctx.AuthType,
@@ -256,6 +260,20 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 			Current:      ctx.Name == fc.Current,
 		})
 	}
+	sort.SliceStable(infos, func(i, j int) bool {
+		left, right := infos[i], infos[j]
+		switch {
+		case left.Order > 0 && right.Order > 0:
+			if left.Order != right.Order {
+				return left.Order < right.Order
+			}
+		case left.Order > 0:
+			return true
+		case right.Order > 0:
+			return false
+		}
+		return false
+	})
 	return infos, nil
 }
 
