@@ -111,6 +111,57 @@ func TestContextPickerFilterUpdatesTableRows(t *testing.T) {
 	}
 }
 
+func TestContextPickerIncrementalFilterStartsOnTyping(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+
+	for _, ch := range []rune("prod") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if !model.isFiltering(filterContexts) {
+		t.Fatal("expected incremental typing to activate context filter")
+	}
+	if got := model.filterValue(filterContexts); got != "prod" {
+		t.Fatalf("expected filter value 'prod', got %q", got)
+	}
+	if got := len(model.filteredCtxList); got != 1 {
+		t.Fatalf("expected 1 filtered context, got %d", got)
+	}
+	if selected := model.contextTable.SelectedRow(); len(selected) == 0 || selected[0] != "prod" {
+		t.Fatalf("expected filtered context prod, got %#v", selected)
+	}
+}
+
+func TestContextPickerEscClearsFilterBeforeBackingOut(t *testing.T) {
+	m := New(&config.Config{ContextName: "prod"}, "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	model = updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+
+	if model.screen != screenContextPicker {
+		t.Fatalf("expected to remain on context picker after clearing filter, got %v", model.screen)
+	}
+	if got := model.filterValue(filterContexts); got != "" {
+		t.Fatalf("expected filter to be cleared, got %q", got)
+	}
+	if got := len(model.filteredCtxList); got != len(testContexts()) {
+		t.Fatalf("expected full context list after clear, got %d", got)
+	}
+}
+
 func TestContextPickerEnterUsesSelectedTableRow(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 80
