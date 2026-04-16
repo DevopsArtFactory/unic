@@ -160,7 +160,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - ECS cluster/service/task/container
 - S3 bucket/object/detail
 - Inspector home/scanning/results/detail
-- context picker, context add, TUI-native context setup/export/unset
+- context picker(즉시 type-to-filter, 명시적 filter 편집 포함), context add, TUI-native context setup/export/unset
 - SSO account / role selection, exit notice
 - loading, error
 

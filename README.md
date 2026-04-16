@@ -198,7 +198,7 @@ The Inspector feature ships built-in rule packs for Security Group exposure, RDS
 | `j` / `k`, `↑` / `↓` | Move selection |
 | `Enter` | Select / drill down |
 | `Esc` | Go back |
-| `q` | Quit from top-level screens |
+| `q` | Quit from top-level screens outside the context picker |
 | `H` | Jump to service list |
 | `C` | Open context picker |
 | `/` | Toggle filter mode on supported screens |
@@ -218,9 +218,11 @@ The Inspector feature ships built-in rule packs for Security Group exposure, RDS
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
-| Context Picker | `a` add context, `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
+| Context Picker | `type` incremental filter, `Backspace` trim filter, `Esc` clear filter before back/quit, `/` edit filter directly, `S` setup selected context and quit, `Y` copy selected exports and quit, `U` clear shell context and quit with a final confirmation message, `A` add context |
 
 Filtering is currently available on EC2 instances, IAM users, VPCs/subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.
+
+The context picker now supports immediate type-to-filter matching against context name, profile, and region. `/` is still available when you want to edit the full query explicitly, including navigation shortcut letters such as `j` and `k`.
 
 Reachability Analyzer starts with a region selection step, defaults to the current context region, and now surfaces the AWS-documented source and destination resource types that unic supports: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, plus IP addresses as destinations. The source and destination pickers support type tabs, keyword filtering, IPv4 destination validation, and automatic cleanup of temporary Network Insights resources after each analysis. During analysis, the loading screen shows a vertical source-to-destination flow and intent summary, and the result view renders path hops and findings in a more readable layout.
 

@@ -160,7 +160,7 @@ Current screen families include:
 - ECS cluster/service/task/container flows
 - S3 bucket/object/detail flows
 - Inspector home/scanning/results/detail flows
-- context picker, context add, and TUI-native context setup/export/unset flows
+- context picker, including incremental type-to-filter, explicit filter editing, context add, and TUI-native context setup/export/unset flows
 - SSO account / role selection and exit notice flows
 - loading and error screens
 

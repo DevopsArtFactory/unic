@@ -94,7 +94,7 @@ func TestContextPickerUsesBorderedPanelAndHelpBar(t *testing.T) {
 	m = updated.(Model)
 
 	view := stripANSI(m.viewContextPicker())
-	for _, want := range []string{"╭", "╰", "NAME", "AUTH TYPE", "prod", "↑/↓: navigate • /: filter • enter: switch • s: setup • y: copy env • u: unset •"} {
+	for _, want := range []string{"╭", "╰", "NAME", "AUTH TYPE", "prod", "type: filter", "S: setup", "copy env", "Q: quit"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected context picker view to contain %q, got %q", want, view)
 		}
@@ -137,7 +137,7 @@ func TestContextPickerPanelDoesNotOverflowHelpBar(t *testing.T) {
 		if strings.Contains(line, "╰") {
 			borderLine = i
 		}
-		if strings.Contains(line, "q: quit") {
+		if strings.Contains(line, "Q: quit") {
 			helpLine = i
 		}
 	}

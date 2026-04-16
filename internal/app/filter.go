@@ -65,13 +65,21 @@ func handleFilterKey(key, current string) (next string, deactivate bool, changed
 		if len(current) == 0 {
 			return current, false, false
 		}
-		return current[:len(current)-1], false, true
+		return trimLastRune(current), false, true
 	}
 
 	if len(key) == 1 {
 		return current + key, false, true
 	}
 	return current, false, false
+}
+
+func trimLastRune(value string) string {
+	runes := []rune(value)
+	if len(runes) == 0 {
+		return value
+	}
+	return string(runes[:len(runes)-1])
 }
 
 func (m *Model) syncFilterInputWidth() {
@@ -132,7 +140,14 @@ func (m *Model) updateSharedFilter(msg tea.KeyMsg, target filterTarget) (tea.Cmd
 	}
 
 	switch msg.String() {
-	case "esc", "enter":
+	case "esc":
+		if target == filterContexts && m.filterTI.Value() != "" {
+			m.resetFilter(target)
+			return nil, true
+		}
+		m.deactivateFilter()
+		return nil, true
+	case "enter":
 		m.deactivateFilter()
 		return nil, true
 	}

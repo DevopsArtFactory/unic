@@ -85,7 +85,114 @@ func TestContextPickerNavigationUsesTableModel(t *testing.T) {
 	}
 }
 
-func TestContextPickerFilterUpdatesTableRows(t *testing.T) {
+func TestContextPickerTypingFiltersTableRows(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+
+	for _, ch := range []rune("prod") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if got := len(model.filteredCtxList); got != 1 {
+		t.Fatalf("expected 1 filtered context, got %d", got)
+	}
+	if got := len(model.contextTable.Rows()); got != 1 {
+		t.Fatalf("expected table to show 1 filtered row, got %d", got)
+	}
+	if selected := model.contextTable.SelectedRow(); len(selected) == 0 || selected[0] != "prod" {
+		t.Fatalf("expected filtered table row for prod, got %#v", selected)
+	}
+}
+
+func TestContextPickerFilterMatchesProfileAndRegionCaseInsensitive(t *testing.T) {
+	contexts := []config.ContextInfo{
+		{Name: "dev", Profile: "Dev-Profile", Region: "us-east-1", AuthType: "credential"},
+		{Name: "ops", Profile: "Ops-Admin", Region: "us-West-2", AuthType: "credential"},
+	}
+
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: contexts})
+	model := updated.(Model)
+
+	for _, ch := range []rune("ops") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if got := len(model.filteredCtxList); got != 1 {
+		t.Fatalf("expected 1 context after profile filter, got %d", got)
+	}
+	if model.filteredCtxList[0].Name != "ops" {
+		t.Fatalf("expected ops context after profile filter, got %q", model.filteredCtxList[0].Name)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	if got := len(model.filteredCtxList); got != 2 {
+		t.Fatalf("expected esc to restore all contexts, got %d", got)
+	}
+
+	for _, ch := range []rune("west-2") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if got := len(model.filteredCtxList); got != 1 {
+		t.Fatalf("expected 1 context after region filter, got %d", got)
+	}
+	if model.filteredCtxList[0].Name != "ops" {
+		t.Fatalf("expected ops context after region filter, got %q", model.filteredCtxList[0].Name)
+	}
+}
+
+func TestContextPickerBackspaceAndEscManageIncrementalFilter(t *testing.T) {
+	m := New(&config.Config{ContextName: "prod", Region: "us-east-1"}, "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+
+	for _, ch := range []rune("prod") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if got := model.filterValue(filterContexts); got != "prod" {
+		t.Fatalf("expected filter query prod, got %q", got)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	model = updated.(Model)
+	if got := model.filterValue(filterContexts); got != "pro" {
+		t.Fatalf("expected backspace to trim filter to pro, got %q", got)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	if got := model.filterValue(filterContexts); got != "" {
+		t.Fatalf("expected esc to clear the filter, got %q", got)
+	}
+	if model.screen != screenContextPicker {
+		t.Fatalf("expected esc with active filter to stay on context picker, got %v", model.screen)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+	if model.screen != screenServiceList {
+		t.Fatalf("expected second esc with empty filter to return to previous screen, got %v", model.screen)
+	}
+}
+
+func TestContextPickerEscClearsSlashFilterQuery(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 80
 	m.height = 20
@@ -100,14 +207,48 @@ func TestContextPickerFilterUpdatesTableRows(t *testing.T) {
 		model = updated.(Model)
 	}
 
-	if got := len(model.filteredCtxList); got != 1 {
-		t.Fatalf("expected 1 filtered context, got %d", got)
+	if !model.isFiltering(filterContexts) {
+		t.Fatal("expected slash filter mode to be active")
 	}
-	if got := len(model.contextTable.Rows()); got != 1 {
-		t.Fatalf("expected table to show 1 filtered row, got %d", got)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+
+	if model.isFiltering(filterContexts) {
+		t.Fatal("expected esc to exit slash filter mode")
 	}
-	if selected := model.contextTable.SelectedRow(); len(selected) == 0 || selected[0] != "prod" {
-		t.Fatalf("expected filtered table row for prod, got %#v", selected)
+	if got := model.filterValue(filterContexts); got != "" {
+		t.Fatalf("expected esc to clear slash filter query, got %q", got)
+	}
+	if got := len(model.filteredCtxList); got != len(testContexts()) {
+		t.Fatalf("expected esc to restore all contexts, got %d", got)
+	}
+}
+
+func TestContextPickerTypingFilterResetsSelectionSafely(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model = updated.(Model)
+
+	for _, ch := range []rune("staging") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if model.ctxIdx != 0 {
+		t.Fatalf("expected filtered cursor to reset to 0, got %d", model.ctxIdx)
+	}
+	if model.contextTable.Cursor() != 0 {
+		t.Fatalf("expected filtered table cursor to reset to 0, got %d", model.contextTable.Cursor())
+	}
+	if selected := model.contextTable.SelectedRow(); len(selected) == 0 || selected[0] != "staging" {
+		t.Fatalf("expected filtered selection for staging, got %#v", selected)
 	}
 }
 
@@ -202,7 +343,7 @@ contexts:
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 	model = updated.(Model)
-	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
 	model = updated.(Model)
 	if model.screen != screenLoading || cmd == nil {
 		t.Fatalf("expected loading command for setup, got screen=%v cmd=%v", model.screen, cmd)
@@ -289,7 +430,7 @@ contexts:
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 	model = updated.(Model)
-	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
 	model = updated.(Model)
 	if model.screen != screenLoading || cmd == nil {
 		t.Fatalf("expected loading command for copy env, got screen=%v cmd=%v", model.screen, cmd)
@@ -364,7 +505,7 @@ contexts:
 	}})
 	model := updated.(Model)
 
-	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'U'}})
 	model = updated.(Model)
 	if model.screen != screenLoading || cmd == nil {
 		t.Fatalf("expected loading command for unset, got screen=%v cmd=%v", model.screen, cmd)
@@ -486,7 +627,7 @@ contexts:
 	}})
 	model := updated.(Model)
 
-	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
 	model = updated.(Model)
 	if model.screen != screenLoading || cmd == nil {
 		t.Fatalf("expected loading command for base SSO setup, got screen=%v cmd=%v", model.screen, cmd)

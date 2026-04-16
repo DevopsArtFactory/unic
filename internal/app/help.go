@@ -103,6 +103,12 @@ func (m Model) helpModeShortcuts() []helpShortcut {
 			{"backspace", "Delete the previous character"},
 			{"enter / esc", "Close target filter mode"},
 		}
+	case m.screen == screenContextPicker && m.filterValue(filterContexts) != "":
+		return []helpShortcut{
+			{"type", "Update the context filter"},
+			{"backspace", "Delete the previous character"},
+			{"esc", "Clear the active filter"},
+		}
 	}
 	return nil
 }
@@ -400,16 +406,22 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 	case screenContextPicker:
 		shortcuts := []helpShortcut{
 			{"↑/↓, j/k", "Move between contexts"},
-			{"/", "Start filtering contexts"},
+			{"type", "Filter contexts incrementally"},
+			{"backspace", "Delete the previous filter character"},
+			{"/", "Edit the context filter directly"},
 			{"enter", "Switch to the selected context"},
-			{"s", "Set up the selected context for the shell and quit"},
-			{"y", "Copy shell exports for the selected context and quit"},
-			{"u", "Clear shell exports and current context, then quit"},
-			{"a", "Open the add-context wizard"},
-			{"q", "Quit unic"},
+			{"S", "Set up the selected context for the shell and quit"},
+			{"Y", "Copy shell exports for the selected context and quit"},
+			{"U", "Clear shell exports and current context, then quit"},
+			{"A", "Open the add-context wizard"},
+			{"Q", "Quit unic"},
 		}
-		if m.cfg.ContextName != "" {
-			shortcuts = append(shortcuts[:7], append([]helpShortcut{{"esc", "Return to the previous screen"}}, shortcuts[7:]...)...)
+		if m.filterValue(filterContexts) != "" {
+			shortcuts = append(shortcuts[:4], append([]helpShortcut{{"esc", "Clear the active filter"}}, shortcuts[4:]...)...)
+		} else if m.cfg.ContextName != "" {
+			shortcuts = append(shortcuts[:4], append([]helpShortcut{{"esc", "Return to the previous screen"}}, shortcuts[4:]...)...)
+		} else {
+			shortcuts = append(shortcuts[:4], append([]helpShortcut{{"esc", "Quit unic"}}, shortcuts[4:]...)...)
 		}
 		return shortcuts
 	case screenContextAdd:

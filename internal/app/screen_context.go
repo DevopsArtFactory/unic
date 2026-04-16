@@ -96,8 +96,12 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	if handled := m.updateIncrementalContextFilter(msg); handled {
+		return m, nil
+	}
+
 	switch key {
-	case "q":
+	case "Q":
 		m.quitting = true
 		return m, tea.Quit
 	case "esc":
@@ -119,21 +123,21 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingContextName = selected.Name
 			return m.startLoading(m.switchContext(selected.Name))
 		}
-	case "s":
+	case "S":
 		selected, ok := m.selectedContextInfo()
 		if !ok {
 			return m, nil
 		}
 		return m.beginContextSetup(selected)
-	case "y":
+	case "Y":
 		selected, ok := m.selectedContextInfo()
 		if !ok {
 			return m, nil
 		}
 		return m.beginContextExport(selected)
-	case "u":
+	case "U":
 		return m.beginContextUnset()
-	case "a":
+	case "A":
 		m.addStep = 0
 		m.addAuthIdx = 0
 		m.addFields = nil
@@ -153,6 +157,47 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+func (m *Model) updateIncrementalContextFilter(msg tea.KeyMsg) bool {
+	query := m.filterValue(filterContexts)
+
+	switch msg.String() {
+	case "backspace":
+		if query == "" {
+			return false
+		}
+		m.storeFilterValue(filterContexts, trimLastRune(query))
+		m.applyFilterTarget(filterContexts)
+		return true
+	case "esc":
+		if query == "" {
+			return false
+		}
+		m.resetFilter(filterContexts)
+		return true
+	}
+
+	if !shouldTypeFilterContext(msg) {
+		return false
+	}
+
+	m.storeFilterValue(filterContexts, query+string(msg.Runes))
+	m.applyFilterTarget(filterContexts)
+	return true
+}
+
+func shouldTypeFilterContext(msg tea.KeyMsg) bool {
+	if len(msg.Runes) == 0 {
+		return false
+	}
+
+	switch msg.String() {
+	case "/", "A", "Q", "S", "U", "Y", "j", "k":
+		return false
+	default:
+		return true
+	}
 }
 
 func (m Model) switchContext(name string) tea.Cmd {
@@ -245,9 +290,9 @@ func (m Model) viewContextPicker() string {
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
 	if m.cfg.ContextName != "" {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • esc: back • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: edit filter • enter: switch • S: setup • Y: copy env • U: unset • A: add • esc: clear/back • Q: quit"))
 	} else {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: edit filter • enter: switch • S: setup • Y: copy env • U: unset • A: add • esc: clear/quit • Q: quit"))
 	}
 	return b.String()
 }
