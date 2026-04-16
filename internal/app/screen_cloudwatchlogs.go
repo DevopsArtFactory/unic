@@ -316,7 +316,7 @@ func (cw cloudWatchLogsModel) viewGroupList(m Model) string {
 				retention = fmt.Sprintf("%d days", g.RetentionDays)
 			}
 			row := cursor +
-				nameCol.Inherit(style).Render(name) +
+				nameCol.Inherit(style).Render(m.renderHighlightedValue(filterCWLogGroups, name)) +
 				retCol.Inherit(dimStyle).Render(retention) +
 				dimStyle.Render(awsservice.FormatBytes(g.StoredBytes))
 			panel.WriteString(row)
@@ -434,7 +434,9 @@ func (cw cloudWatchLogsModel) viewStreamList(m Model) string {
 			if !s.LastEventTime.IsZero() {
 				lastEvent = s.LastEventTime.Local().Format("2006-01-02 15:04:05")
 			}
-			row := cursor + nameCol.Inherit(style).Render(name) + dimStyle.Render(lastEvent)
+			row := cursor +
+				nameCol.Inherit(style).Render(m.renderHighlightedValue(filterCWLogStreams, name)) +
+				dimStyle.Render(lastEvent)
 			panel.WriteString(row)
 			panel.WriteString("\n")
 		}

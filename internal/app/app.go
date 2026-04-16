@@ -104,6 +104,7 @@ type Model struct {
 	filteredVPCs                []awsservice.VPC
 	vpcIdx                      int
 	subnets                     []awsservice.Subnet
+	filteredSubnets             []awsservice.Subnet
 	subnetIdx                   int
 	selectedVPC                 *awsservice.VPC
 	selectedSubnet              *awsservice.Subnet
@@ -1036,7 +1037,7 @@ func (m Model) viewSecretList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSecrets, s.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 

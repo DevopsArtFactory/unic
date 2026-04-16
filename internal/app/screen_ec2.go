@@ -21,13 +21,14 @@ func (m Model) handleEC2VPCMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 	case vpcsLoadedMsg:
 		m.vpcs = msg.vpcs
-		m.filteredVPCs = msg.vpcs
+		m.resetFilter(filterVPCs)
 		m.vpcIdx = 0
 		m.screen = screenVPCList
 		return m, nil, true
 
 	case subnetsLoadedMsg:
 		m.subnets = msg.subnets
+		m.resetFilter(filterSubnets)
 		m.subnetIdx = 0
 		m.screen = screenSubnetList
 		return m, nil, true
@@ -200,7 +201,7 @@ func (m Model) viewInstanceList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, inst.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterInstances, inst.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 

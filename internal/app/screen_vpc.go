@@ -11,10 +11,15 @@ import (
 )
 
 func (m Model) updateVPCList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if cmd, handled := m.updateSharedFilter(msg, filterVPCs); handled {
+		return m, cmd
+	}
+
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenFeatureList
 		m.vpcIdx = 0
+		m.resetFilter(filterVPCs)
 	case "up", "k":
 		if m.vpcIdx > 0 {
 			m.vpcIdx--
@@ -23,6 +28,8 @@ func (m Model) updateVPCList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.vpcIdx < len(m.filteredVPCs)-1 {
 			m.vpcIdx++
 		}
+	case "/":
+		return m, m.activateFilter(filterVPCs)
 	case "enter":
 		if len(m.filteredVPCs) > 0 && m.vpcIdx < len(m.filteredVPCs) {
 			selected := m.filteredVPCs[m.vpcIdx]
@@ -34,21 +41,28 @@ func (m Model) updateVPCList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateSubnetList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if cmd, handled := m.updateSharedFilter(msg, filterSubnets); handled {
+		return m, cmd
+	}
+
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenVPCList
 		m.subnetIdx = 0
+		m.resetFilter(filterSubnets)
 	case "up", "k":
 		if m.subnetIdx > 0 {
 			m.subnetIdx--
 		}
 	case "down", "j":
-		if m.subnetIdx < len(m.subnets)-1 {
+		if m.subnetIdx < len(m.filteredSubnets)-1 {
 			m.subnetIdx++
 		}
+	case "/":
+		return m, m.activateFilter(filterSubnets)
 	case "enter":
-		if len(m.subnets) > 0 && m.subnetIdx < len(m.subnets) {
-			selected := m.subnets[m.subnetIdx]
+		if len(m.filteredSubnets) > 0 && m.subnetIdx < len(m.filteredSubnets) {
+			selected := m.filteredSubnets[m.subnetIdx]
 			m.selectedSubnet = &selected
 			return m.startLoading(m.loadAvailableIPs(selected))
 		}
@@ -164,13 +178,16 @@ func (m Model) viewVPCList() string {
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("VPCs"))
+	b.WriteString("\n")
+
+	b.WriteString(m.renderFilterValue(filterVPCs))
 	b.WriteString("\n\n")
 
 	if len(m.filteredVPCs) == 0 {
-		panel.WriteString(dimStyle.Render("  No VPCs found"))
+		panel.WriteString(dimStyle.Render("  No matching VPCs"))
 		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-10, 5)
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if m.vpcIdx >= visibleLines {
 			start = m.vpcIdx - visibleLines + 1
@@ -185,16 +202,16 @@ func (m Model) viewVPCList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, vpc.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterVPCs, vpc.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d VPCs", len(m.filteredVPCs))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d VPCs", len(m.filteredVPCs), len(m.vpcs))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: select • esc: back • H: home"))
 	return b.String()
 }
 
@@ -207,37 +224,40 @@ func (m Model) viewSubnetList() string {
 		vpcName = fmt.Sprintf(" (%s)", m.selectedVPC.Name)
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Subnets%s", vpcName)))
+	b.WriteString("\n")
+
+	b.WriteString(m.renderFilterValue(filterSubnets))
 	b.WriteString("\n\n")
 
-	if len(m.subnets) == 0 {
-		panel.WriteString(dimStyle.Render("  No subnets found"))
+	if len(m.filteredSubnets) == 0 {
+		panel.WriteString(dimStyle.Render("  No matching subnets"))
 		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-10, 5)
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if m.subnetIdx >= visibleLines {
 			start = m.subnetIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.subnets))
+		end := min(start+visibleLines, len(m.filteredSubnets))
 
 		for i := start; i < end; i++ {
-			s := m.subnets[i]
+			s := m.filteredSubnets[i]
 			cursor := "  "
 			style := normalStyle
 			if i == m.subnetIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSubnets, s.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d subnets", len(m.subnets))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d subnets", len(m.filteredSubnets), len(m.subnets))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
 	return b.String()
 }
 

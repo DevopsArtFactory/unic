@@ -558,9 +558,9 @@ func (m Model) viewIAMUserList() string {
 			}
 
 			row := cursor +
-				nameCol.Inherit(style).Render(user.UserName) +
+				nameCol.Inherit(style).Render(m.renderHighlightedValue(filterIAMUsers, user.UserName)) +
 				createdCol.Inherit(dimStyle).Render(user.CreateDate.Format(time.DateOnly)) +
-				pathCol.Inherit(dimStyle).Render(truncateIAMPath(user.Path))
+				pathCol.Inherit(dimStyle).Render(m.renderHighlightedValue(filterIAMUsers, truncateIAMPath(user.Path)))
 			panel.WriteString(row)
 			panel.WriteString("\n")
 		}
