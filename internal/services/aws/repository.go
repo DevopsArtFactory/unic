@@ -7,9 +7,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/service/configservice"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/elasticache"
+	"github.com/aws/aws-sdk-go-v2/service/guardduty"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -46,8 +50,20 @@ var _ STSClientAPI = (*sts.Client)(nil)
 // Verify *cloudwatchlogs.Client satisfies CloudWatchLogsClientAPI at compile time.
 var _ CloudWatchLogsClientAPI = (*cloudwatchlogs.Client)(nil)
 
+// Verify *cloudtrail.Client satisfies CloudTrailClientAPI at compile time.
+var _ CloudTrailClientAPI = (*cloudtrail.Client)(nil)
+
+// Verify *guardduty.Client satisfies GuardDutyClientAPI at compile time.
+var _ GuardDutyClientAPI = (*guardduty.Client)(nil)
+
+// Verify *configservice.Client satisfies ConfigServiceClientAPI at compile time.
+var _ ConfigServiceClientAPI = (*configservice.Client)(nil)
+
 // Verify *ecs.Client satisfies ECSClientAPI at compile time.
 var _ ECSClientAPI = (*ecs.Client)(nil)
+
+// Verify *elasticache.Client satisfies ElastiCacheClientAPI at compile time.
+var _ ElastiCacheClientAPI = (*elasticache.Client)(nil)
 
 // Verify *s3.Client satisfies S3ClientAPI at compile time.
 var _ S3ClientAPI = (*s3.Client)(nil)
@@ -62,6 +78,10 @@ type SSMClientAPI interface {
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
 type RDSClientAPI interface {
 	DescribeDBInstances(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error)
+	DescribeDBSnapshots(ctx context.Context, params *rds.DescribeDBSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotsOutput, error)
+	DescribeDBSnapshotAttributes(ctx context.Context, params *rds.DescribeDBSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotAttributesOutput, error)
+	DescribeDBClusterSnapshots(ctx context.Context, params *rds.DescribeDBClusterSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotsOutput, error)
+	DescribeDBClusterSnapshotAttributes(ctx context.Context, params *rds.DescribeDBClusterSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error)
 	StopDBInstance(ctx context.Context, params *rds.StopDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StopDBInstanceOutput, error)
 	StartDBInstance(ctx context.Context, params *rds.StartDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StartDBInstanceOutput, error)
 	RebootDBInstance(ctx context.Context, params *rds.RebootDBInstanceInput, optFns ...func(*rds.Options)) (*rds.RebootDBInstanceOutput, error)
@@ -88,6 +108,8 @@ type SecretsManagerClientAPI interface {
 type IAMClientAPI interface {
 	ListUsers(ctx context.Context, params *iam.ListUsersInput, optFns ...func(*iam.Options)) (*iam.ListUsersOutput, error)
 	GetUser(ctx context.Context, params *iam.GetUserInput, optFns ...func(*iam.Options)) (*iam.GetUserOutput, error)
+	GetAccountSummary(ctx context.Context, params *iam.GetAccountSummaryInput, optFns ...func(*iam.Options)) (*iam.GetAccountSummaryOutput, error)
+	GetAccountAuthorizationDetails(ctx context.Context, params *iam.GetAccountAuthorizationDetailsInput, optFns ...func(*iam.Options)) (*iam.GetAccountAuthorizationDetailsOutput, error)
 	ListGroupsForUser(ctx context.Context, params *iam.ListGroupsForUserInput, optFns ...func(*iam.Options)) (*iam.ListGroupsForUserOutput, error)
 	ListAttachedUserPolicies(ctx context.Context, params *iam.ListAttachedUserPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedUserPoliciesOutput, error)
 	ListMFADevices(ctx context.Context, params *iam.ListMFADevicesInput, optFns ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error)
@@ -109,6 +131,24 @@ type CloudWatchLogsClientAPI interface {
 	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
+// CloudTrailClientAPI is the interface for CloudTrail operations used by AwsRepository.
+type CloudTrailClientAPI interface {
+	DescribeTrails(ctx context.Context, params *cloudtrail.DescribeTrailsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.DescribeTrailsOutput, error)
+	GetTrailStatus(ctx context.Context, params *cloudtrail.GetTrailStatusInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.GetTrailStatusOutput, error)
+}
+
+// GuardDutyClientAPI is the interface for GuardDuty operations used by AwsRepository.
+type GuardDutyClientAPI interface {
+	ListDetectors(ctx context.Context, params *guardduty.ListDetectorsInput, optFns ...func(*guardduty.Options)) (*guardduty.ListDetectorsOutput, error)
+	GetDetector(ctx context.Context, params *guardduty.GetDetectorInput, optFns ...func(*guardduty.Options)) (*guardduty.GetDetectorOutput, error)
+}
+
+// ConfigServiceClientAPI is the interface for AWS Config operations used by AwsRepository.
+type ConfigServiceClientAPI interface {
+	DescribeConfigurationRecorders(ctx context.Context, params *configservice.DescribeConfigurationRecordersInput, optFns ...func(*configservice.Options)) (*configservice.DescribeConfigurationRecordersOutput, error)
+	DescribeConfigurationRecorderStatus(ctx context.Context, params *configservice.DescribeConfigurationRecorderStatusInput, optFns ...func(*configservice.Options)) (*configservice.DescribeConfigurationRecorderStatusOutput, error)
+}
+
 // ECSClientAPI is the interface for ECS operations used by AwsRepository.
 type ECSClientAPI interface {
 	ListClusters(ctx context.Context, params *ecs.ListClustersInput, optFns ...func(*ecs.Options)) (*ecs.ListClustersOutput, error)
@@ -126,13 +166,21 @@ type S3ClientAPI interface {
 	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
 	GetBucketLocation(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
 	GetBucketAcl(ctx context.Context, params *s3.GetBucketAclInput, optFns ...func(*s3.Options)) (*s3.GetBucketAclOutput, error)
+	GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
 	GetBucketPolicyStatus(ctx context.Context, params *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error)
 	GetBucketVersioning(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
+}
+
+// ElastiCacheClientAPI is the interface for ElastiCache operations used by AwsRepository.
+type ElastiCacheClientAPI interface {
+	DescribeReplicationGroups(ctx context.Context, params *elasticache.DescribeReplicationGroupsInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error)
 }
 
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
 	ec2.DescribeInstancesAPIClient
+	DescribeSnapshots(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error)
+	DescribeSnapshotAttribute(ctx context.Context, params *ec2.DescribeSnapshotAttributeInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotAttributeOutput, error)
 	DescribeVpcs(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
 	DescribeSubnets(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
 	DescribeNetworkInterfaces(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
@@ -162,7 +210,7 @@ type CallerIdentity struct {
 	UserID  string
 }
 
-// AwsRepository holds AWS SDK clients for EC2, SSM, RDS, Route53, STS, Secrets Manager, IAM, CloudWatch Logs, and ECS.
+// AwsRepository holds AWS SDK clients for the AWS services used throughout unic.
 type AwsRepository struct {
 	EC2Client            EC2ClientAPI
 	SSMClient            SSMClientAPI
@@ -172,7 +220,11 @@ type AwsRepository struct {
 	IAMClient            IAMClientAPI
 	STSClient            STSClientAPI
 	CloudWatchLogsClient CloudWatchLogsClientAPI
+	CloudTrailClient     CloudTrailClientAPI
+	GuardDutyClient      GuardDutyClientAPI
+	ConfigServiceClient  ConfigServiceClientAPI
 	ECSClient            ECSClientAPI
+	ElastiCacheClient    ElastiCacheClientAPI
 	S3Client             S3ClientAPI
 	Region               string
 	Profile              string
@@ -232,7 +284,11 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		IAMClient:            iam.NewFromConfig(awsCfg),
 		STSClient:            sts.NewFromConfig(awsCfg),
 		CloudWatchLogsClient: cloudwatchlogs.NewFromConfig(awsCfg),
+		CloudTrailClient:     cloudtrail.NewFromConfig(awsCfg),
+		GuardDutyClient:      guardduty.NewFromConfig(awsCfg),
+		ConfigServiceClient:  configservice.NewFromConfig(awsCfg),
 		ECSClient:            ecs.NewFromConfig(awsCfg),
+		ElastiCacheClient:    elasticache.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),
 		Region:               cfg.Region,
 		Profile:              cfg.Profile,

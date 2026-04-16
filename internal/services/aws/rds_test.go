@@ -13,17 +13,49 @@ import (
 
 // mockRDSClient implements RDSClientAPI for testing.
 type mockRDSClient struct {
-	describeDBInstancesFunc func(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error)
-	stopDBInstanceFunc      func(ctx context.Context, params *rds.StopDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StopDBInstanceOutput, error)
-	startDBInstanceFunc     func(ctx context.Context, params *rds.StartDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StartDBInstanceOutput, error)
-	rebootDBInstanceFunc    func(ctx context.Context, params *rds.RebootDBInstanceInput, optFns ...func(*rds.Options)) (*rds.RebootDBInstanceOutput, error)
-	stopDBClusterFunc       func(ctx context.Context, params *rds.StopDBClusterInput, optFns ...func(*rds.Options)) (*rds.StopDBClusterOutput, error)
-	startDBClusterFunc      func(ctx context.Context, params *rds.StartDBClusterInput, optFns ...func(*rds.Options)) (*rds.StartDBClusterOutput, error)
-	failoverDBClusterFunc   func(ctx context.Context, params *rds.FailoverDBClusterInput, optFns ...func(*rds.Options)) (*rds.FailoverDBClusterOutput, error)
+	describeDBInstancesFunc            func(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error)
+	describeDBSnapshotsFunc            func(ctx context.Context, params *rds.DescribeDBSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotsOutput, error)
+	describeDBSnapshotAttributesFunc   func(ctx context.Context, params *rds.DescribeDBSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotAttributesOutput, error)
+	describeDBClusterSnapshotsFunc     func(ctx context.Context, params *rds.DescribeDBClusterSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotsOutput, error)
+	describeDBClusterSnapshotAttrsFunc func(ctx context.Context, params *rds.DescribeDBClusterSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error)
+	stopDBInstanceFunc                 func(ctx context.Context, params *rds.StopDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StopDBInstanceOutput, error)
+	startDBInstanceFunc                func(ctx context.Context, params *rds.StartDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StartDBInstanceOutput, error)
+	rebootDBInstanceFunc               func(ctx context.Context, params *rds.RebootDBInstanceInput, optFns ...func(*rds.Options)) (*rds.RebootDBInstanceOutput, error)
+	stopDBClusterFunc                  func(ctx context.Context, params *rds.StopDBClusterInput, optFns ...func(*rds.Options)) (*rds.StopDBClusterOutput, error)
+	startDBClusterFunc                 func(ctx context.Context, params *rds.StartDBClusterInput, optFns ...func(*rds.Options)) (*rds.StartDBClusterOutput, error)
+	failoverDBClusterFunc              func(ctx context.Context, params *rds.FailoverDBClusterInput, optFns ...func(*rds.Options)) (*rds.FailoverDBClusterOutput, error)
 }
 
 func (m *mockRDSClient) DescribeDBInstances(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {
 	return m.describeDBInstancesFunc(ctx, params, optFns...)
+}
+
+func (m *mockRDSClient) DescribeDBSnapshots(ctx context.Context, params *rds.DescribeDBSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotsOutput, error) {
+	if m.describeDBSnapshotsFunc != nil {
+		return m.describeDBSnapshotsFunc(ctx, params, optFns...)
+	}
+	return &rds.DescribeDBSnapshotsOutput{}, nil
+}
+
+func (m *mockRDSClient) DescribeDBSnapshotAttributes(ctx context.Context, params *rds.DescribeDBSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotAttributesOutput, error) {
+	if m.describeDBSnapshotAttributesFunc != nil {
+		return m.describeDBSnapshotAttributesFunc(ctx, params, optFns...)
+	}
+	return &rds.DescribeDBSnapshotAttributesOutput{}, nil
+}
+
+func (m *mockRDSClient) DescribeDBClusterSnapshots(ctx context.Context, params *rds.DescribeDBClusterSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotsOutput, error) {
+	if m.describeDBClusterSnapshotsFunc != nil {
+		return m.describeDBClusterSnapshotsFunc(ctx, params, optFns...)
+	}
+	return &rds.DescribeDBClusterSnapshotsOutput{}, nil
+}
+
+func (m *mockRDSClient) DescribeDBClusterSnapshotAttributes(ctx context.Context, params *rds.DescribeDBClusterSnapshotAttributesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotAttributesOutput, error) {
+	if m.describeDBClusterSnapshotAttrsFunc != nil {
+		return m.describeDBClusterSnapshotAttrsFunc(ctx, params, optFns...)
+	}
+	return &rds.DescribeDBClusterSnapshotAttributesOutput{}, nil
 }
 
 func (m *mockRDSClient) StopDBInstance(ctx context.Context, params *rds.StopDBInstanceInput, optFns ...func(*rds.Options)) (*rds.StopDBInstanceOutput, error) {

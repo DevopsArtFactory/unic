@@ -20,6 +20,8 @@ type mockEC2Client struct {
 	describeVpcsFunc                    func(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
 	describeSubnetsFunc                 func(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
 	describeInstancesFunc               func(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
+	describeSnapshotsFunc               func(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error)
+	describeSnapshotAttributeFunc       func(ctx context.Context, params *ec2.DescribeSnapshotAttributeInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotAttributeOutput, error)
 	describeNetworkInterfacesFunc       func(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
 	describeInternetGatewaysFunc        func(ctx context.Context, params *ec2.DescribeInternetGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInternetGatewaysOutput, error)
 	describeVpcEndpointsFunc            func(ctx context.Context, params *ec2.DescribeVpcEndpointsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointsOutput, error)
@@ -53,6 +55,20 @@ func (m *mockEC2Client) DescribeInstances(ctx context.Context, params *ec2.Descr
 		return m.describeInstancesFunc(ctx, params, optFns...)
 	}
 	return &ec2.DescribeInstancesOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeSnapshots(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error) {
+	if m.describeSnapshotsFunc != nil {
+		return m.describeSnapshotsFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeSnapshotsOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeSnapshotAttribute(ctx context.Context, params *ec2.DescribeSnapshotAttributeInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotAttributeOutput, error) {
+	if m.describeSnapshotAttributeFunc != nil {
+		return m.describeSnapshotAttributeFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeSnapshotAttributeOutput{}, nil
 }
 
 func (m *mockEC2Client) DescribeNetworkInterfaces(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {

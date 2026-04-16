@@ -12,7 +12,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
-- Open the Security Inspector workflow and review built-in findings for Security Groups, RDS, IAM keys, Secrets Manager, and S3 buckets
+- Open the Security Inspector workflow and review built-in findings for network exposure, RDS, IAM, Secrets Manager, S3, snapshot sharing, CloudTrail, GuardDuty, AWS Config, and ElastiCache for Valkey
 
 ## Documentation Map
 
@@ -187,7 +187,7 @@ CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 | IAM | RotateAccessKey |
 | Inspector | Security Scan |
 
-The Inspector feature ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups, IAM access key age, Secrets Manager rotation age, and S3 public access/versioning checks.
+The Inspector feature ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
 
 ## TUI Navigation
 

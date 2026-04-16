@@ -16,6 +16,8 @@ type inspectorIAMMockClient struct {
 	listUsersFunc            func(ctx context.Context, params *iam.ListUsersInput, optFns ...func(*iam.Options)) (*iam.ListUsersOutput, error)
 	listAccessKeysFunc       func(ctx context.Context, params *iam.ListAccessKeysInput, optFns ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error)
 	getAccessKeyLastUsedFunc func(ctx context.Context, params *iam.GetAccessKeyLastUsedInput, optFns ...func(*iam.Options)) (*iam.GetAccessKeyLastUsedOutput, error)
+	getAccountSummaryFunc    func(ctx context.Context, params *iam.GetAccountSummaryInput, optFns ...func(*iam.Options)) (*iam.GetAccountSummaryOutput, error)
+	getAuthzDetailsFunc      func(ctx context.Context, params *iam.GetAccountAuthorizationDetailsInput, optFns ...func(*iam.Options)) (*iam.GetAccountAuthorizationDetailsOutput, error)
 }
 
 func (m *inspectorIAMMockClient) ListUsers(ctx context.Context, params *iam.ListUsersInput, optFns ...func(*iam.Options)) (*iam.ListUsersOutput, error) {
@@ -27,6 +29,20 @@ func (m *inspectorIAMMockClient) ListUsers(ctx context.Context, params *iam.List
 
 func (m *inspectorIAMMockClient) GetUser(context.Context, *iam.GetUserInput, ...func(*iam.Options)) (*iam.GetUserOutput, error) {
 	return &iam.GetUserOutput{}, nil
+}
+
+func (m *inspectorIAMMockClient) GetAccountSummary(ctx context.Context, params *iam.GetAccountSummaryInput, optFns ...func(*iam.Options)) (*iam.GetAccountSummaryOutput, error) {
+	if m.getAccountSummaryFunc != nil {
+		return m.getAccountSummaryFunc(ctx, params, optFns...)
+	}
+	return &iam.GetAccountSummaryOutput{}, nil
+}
+
+func (m *inspectorIAMMockClient) GetAccountAuthorizationDetails(ctx context.Context, params *iam.GetAccountAuthorizationDetailsInput, optFns ...func(*iam.Options)) (*iam.GetAccountAuthorizationDetailsOutput, error) {
+	if m.getAuthzDetailsFunc != nil {
+		return m.getAuthzDetailsFunc(ctx, params, optFns...)
+	}
+	return &iam.GetAccountAuthorizationDetailsOutput{}, nil
 }
 
 func (m *inspectorIAMMockClient) ListGroupsForUser(context.Context, *iam.ListGroupsForUserInput, ...func(*iam.Options)) (*iam.ListGroupsForUserOutput, error) {

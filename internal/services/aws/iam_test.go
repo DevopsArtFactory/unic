@@ -16,6 +16,8 @@ import (
 type mockIAMClient struct {
 	listUsersFunc            func(ctx context.Context, params *iam.ListUsersInput, optFns ...func(*iam.Options)) (*iam.ListUsersOutput, error)
 	getUserFunc              func(ctx context.Context, params *iam.GetUserInput, optFns ...func(*iam.Options)) (*iam.GetUserOutput, error)
+	getAccountSummaryFunc    func(ctx context.Context, params *iam.GetAccountSummaryInput, optFns ...func(*iam.Options)) (*iam.GetAccountSummaryOutput, error)
+	getAuthzDetailsFunc      func(ctx context.Context, params *iam.GetAccountAuthorizationDetailsInput, optFns ...func(*iam.Options)) (*iam.GetAccountAuthorizationDetailsOutput, error)
 	listGroupsForUserFunc    func(ctx context.Context, params *iam.ListGroupsForUserInput, optFns ...func(*iam.Options)) (*iam.ListGroupsForUserOutput, error)
 	listAttachedPoliciesFunc func(ctx context.Context, params *iam.ListAttachedUserPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedUserPoliciesOutput, error)
 	listMFADevicesFunc       func(ctx context.Context, params *iam.ListMFADevicesInput, optFns ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error)
@@ -38,6 +40,20 @@ func (m *mockIAMClient) GetUser(ctx context.Context, params *iam.GetUserInput, o
 		return m.getUserFunc(ctx, params, optFns...)
 	}
 	return &iam.GetUserOutput{}, nil
+}
+
+func (m *mockIAMClient) GetAccountSummary(ctx context.Context, params *iam.GetAccountSummaryInput, optFns ...func(*iam.Options)) (*iam.GetAccountSummaryOutput, error) {
+	if m.getAccountSummaryFunc != nil {
+		return m.getAccountSummaryFunc(ctx, params, optFns...)
+	}
+	return &iam.GetAccountSummaryOutput{}, nil
+}
+
+func (m *mockIAMClient) GetAccountAuthorizationDetails(ctx context.Context, params *iam.GetAccountAuthorizationDetailsInput, optFns ...func(*iam.Options)) (*iam.GetAccountAuthorizationDetailsOutput, error) {
+	if m.getAuthzDetailsFunc != nil {
+		return m.getAuthzDetailsFunc(ctx, params, optFns...)
+	}
+	return &iam.GetAccountAuthorizationDetailsOutput{}, nil
 }
 
 func (m *mockIAMClient) ListGroupsForUser(ctx context.Context, params *iam.ListGroupsForUserInput, optFns ...func(*iam.Options)) (*iam.ListGroupsForUserOutput, error) {

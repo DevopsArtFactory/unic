@@ -18,6 +18,7 @@ type mockS3Client struct {
 	headObjectFunc            func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
 	getBucketLocationFunc     func(ctx context.Context, params *s3.GetBucketLocationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error)
 	getBucketAclFunc          func(ctx context.Context, params *s3.GetBucketAclInput, optFns ...func(*s3.Options)) (*s3.GetBucketAclOutput, error)
+	getPublicAccessBlockFunc  func(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error)
 	getBucketPolicyStatusFunc func(ctx context.Context, params *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error)
 	getBucketVersioningFunc   func(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
 }
@@ -46,6 +47,13 @@ func (m *mockS3Client) GetBucketAcl(ctx context.Context, params *s3.GetBucketAcl
 		return m.getBucketAclFunc(ctx, params, optFns...)
 	}
 	return &s3.GetBucketAclOutput{}, nil
+}
+
+func (m *mockS3Client) GetPublicAccessBlock(ctx context.Context, params *s3.GetPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error) {
+	if m.getPublicAccessBlockFunc != nil {
+		return m.getPublicAccessBlockFunc(ctx, params, optFns...)
+	}
+	return &s3.GetPublicAccessBlockOutput{}, nil
 }
 
 func (m *mockS3Client) GetBucketPolicyStatus(ctx context.Context, params *s3.GetBucketPolicyStatusInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
