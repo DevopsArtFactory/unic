@@ -243,11 +243,18 @@ func reorderContextInfos(contexts []config.ContextInfo, from, to int) []config.C
 	updated := append([]config.ContextInfo(nil), contexts[:from]...)
 	updated = append(updated, contexts[from+1:]...)
 
+	// Adjust 'to' if it comes after 'from' since we removed an element
+	adjustedTo := to
+	if to > from {
+		adjustedTo = to - 1
+	}
+
 	result := make([]config.ContextInfo, 0, len(contexts))
-	result = append(result, updated[:to]...)
+	result = append(result, updated[:adjustedTo]...)
 	result = append(result, item)
-	result = append(result, updated[to:]...)
+	result = append(result, updated[adjustedTo:]...)
 	return result
+}
 }
 
 func contextNames(contexts []config.ContextInfo) []string {
