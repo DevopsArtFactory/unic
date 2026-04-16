@@ -280,7 +280,7 @@ func (m Model) viewRDSList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, inst.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterRDS, inst.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 

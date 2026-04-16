@@ -251,8 +251,8 @@ func (m Model) viewS3BucketList() string {
 				created = bucket.CreationDate.Format(time.DateOnly)
 			}
 			row := cursor +
-				nameCol.Inherit(style).Render(name) +
-				regionCol.Inherit(dimStyle).Render(bucket.Region) +
+				nameCol.Inherit(style).Render(m.renderHighlightedValue(filterS3Buckets, name)) +
+				regionCol.Inherit(dimStyle).Render(m.renderHighlightedValue(filterS3Buckets, bucket.Region)) +
 				dimStyle.Render(created)
 			panel.WriteString(row)
 			panel.WriteString("\n")
@@ -338,10 +338,10 @@ func (m Model) viewS3ObjectList() string {
 				}
 			}
 			row := cursor +
-				nameCol.Inherit(style).Render(name) +
+				nameCol.Inherit(style).Render(m.renderHighlightedValue(filterS3Objects, name)) +
 				sizeCol.Inherit(dimStyle).Render(sizeText) +
 				modCol.Inherit(dimStyle).Render(modified) +
-				dimStyle.Render(typeText)
+				dimStyle.Render(m.renderHighlightedValue(filterS3Objects, typeText))
 			panel.WriteString(row)
 			panel.WriteString("\n")
 		}

@@ -134,6 +134,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_context.go`
 
 Supporting files include `styles.go`, `filter.go`, and `messages.go`.
+`filter.go` and `filter_match.go` now centralize shared list filtering, fuzzy match ordering, and inline match highlighting across common list screens, including the VPC and subnet lists.
 
 ## Authentication Model
 
