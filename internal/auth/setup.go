@@ -18,6 +18,19 @@ var (
 	buildEnvExportsFn     = BuildEnvExports
 )
 
+// SelectContext interactively selects a context without changing current state.
+func SelectContext(configPath string, in io.Reader, errOut io.Writer) (config.ContextInfo, error) {
+	reader := bufio.NewReader(in)
+	contexts, err := config.Contexts(configPath)
+	if err != nil {
+		return config.ContextInfo{}, err
+	}
+	if len(contexts) == 0 {
+		return config.ContextInfo{}, fmt.Errorf("no contexts found in %s", configPath)
+	}
+	return chooseContext(in, reader, errOut, contexts)
+}
+
 // SetupContext interactively selects a context, resolves any required SSO account/role,
 // sets it as current, and returns shell exports for eval.
 func SetupContext(ctx context.Context, configPath string, in io.Reader, errOut io.Writer) (string, error) {
@@ -30,12 +43,12 @@ func SetupContext(ctx context.Context, configPath string, in io.Reader, errOut i
 		return "", fmt.Errorf("no contexts found in %s", configPath)
 	}
 
-	selected, err := chooseContext(reader, errOut, contexts)
+	selected, err := chooseContext(in, reader, errOut, contexts)
 	if err != nil {
 		return "", err
 	}
 
-	finalName, err := resolveContextSelection(ctx, configPath, selected, reader, errOut)
+	finalName, err := resolveContextSelection(ctx, configPath, selected, in, reader, errOut)
 	if err != nil {
 		return "", err
 	}
@@ -53,7 +66,7 @@ func SetupContext(ctx context.Context, configPath string, in io.Reader, errOut i
 	return buildEnvExportsFn(ctx, finalCfg)
 }
 
-func resolveContextSelection(ctx context.Context, configPath string, selected config.ContextInfo, in *bufio.Reader, errOut io.Writer) (string, error) {
+func resolveContextSelection(ctx context.Context, configPath string, selected config.ContextInfo, rawIn io.Reader, in *bufio.Reader, errOut io.Writer) (string, error) {
 	if !IsBaseSSOContext(selected) {
 		return selected.Name, nil
 	}
@@ -67,7 +80,7 @@ func resolveContextSelection(ctx context.Context, configPath string, selected co
 		return "", fmt.Errorf("no SSO accounts available for %q", selected.Name)
 	}
 
-	account, err := chooseSSOAccount(in, errOut, accounts)
+	account, err := chooseSSOAccount(rawIn, in, errOut, accounts)
 	if err != nil {
 		return "", err
 	}
@@ -81,7 +94,7 @@ func resolveContextSelection(ctx context.Context, configPath string, selected co
 		return "", fmt.Errorf("no SSO roles available for account %s", account.ID)
 	}
 
-	role, err := chooseSSORole(in, errOut, roles)
+	role, err := chooseSSORole(rawIn, in, errOut, roles)
 	if err != nil {
 		return "", err
 	}
@@ -132,50 +145,34 @@ func ResolveSSOContextSelection(configPath string, selected config.ContextInfo, 
 	return name, nil
 }
 
-func chooseContext(in *bufio.Reader, errOut io.Writer, contexts []config.ContextInfo) (config.ContextInfo, error) {
-	fmt.Fprintln(errOut, "Available contexts:")
-	for i, ctx := range contexts {
-		current := ""
-		if ctx.Current {
-			current = " (current)"
-		}
-		fmt.Fprintf(errOut, "  %d) %s [%s]%s\n", i+1, ctx.Name, displayAuthType(ctx.AuthType), current)
-	}
-
-	index, err := chooseIndex(in, errOut, "Select context", len(contexts))
+func chooseContext(rawIn io.Reader, in *bufio.Reader, errOut io.Writer, contexts []config.ContextInfo) (config.ContextInfo, error) {
+	index, err := chooseFilteredIndex(rawIn, in, errOut, "contexts", contexts, renderContextChoice, func(ctx config.ContextInfo, query string) bool {
+		return strings.Contains(strings.ToLower(ctx.FilterText()), strings.ToLower(strings.TrimSpace(query)))
+	})
 	if err != nil {
 		return config.ContextInfo{}, err
 	}
 	return contexts[index], nil
 }
 
-func chooseSSOAccount(in *bufio.Reader, errOut io.Writer, accounts []awsservice.SSOAccount) (awsservice.SSOAccount, error) {
-	fmt.Fprintln(errOut, "Available AWS accounts:")
-	for i, account := range accounts {
+func chooseSSOAccount(rawIn io.Reader, in *bufio.Reader, errOut io.Writer, accounts []awsservice.SSOAccount) (awsservice.SSOAccount, error) {
+	index, err := chooseFilteredIndex(rawIn, in, errOut, "AWS accounts", accounts, renderAccountChoice, func(account awsservice.SSOAccount, query string) bool {
 		label := account.Name
 		if label == "" {
 			label = account.ID
 		}
-		if account.Email != "" {
-			label = fmt.Sprintf("%s <%s>", label, account.Email)
-		}
-		fmt.Fprintf(errOut, "  %d) %s (%s)\n", i+1, label, account.ID)
-	}
-
-	index, err := chooseIndex(in, errOut, "Select account", len(accounts))
+		return containsFold(label, query) || containsFold(account.ID, query) || containsFold(account.Email, query)
+	})
 	if err != nil {
 		return awsservice.SSOAccount{}, err
 	}
 	return accounts[index], nil
 }
 
-func chooseSSORole(in *bufio.Reader, errOut io.Writer, roles []awsservice.SSORole) (awsservice.SSORole, error) {
-	fmt.Fprintln(errOut, "Available AWS roles:")
-	for i, role := range roles {
-		fmt.Fprintf(errOut, "  %d) %s\n", i+1, role.Name)
-	}
-
-	index, err := chooseIndex(in, errOut, "Select role", len(roles))
+func chooseSSORole(rawIn io.Reader, in *bufio.Reader, errOut io.Writer, roles []awsservice.SSORole) (awsservice.SSORole, error) {
+	index, err := chooseFilteredIndex(rawIn, in, errOut, "AWS roles", roles, renderRoleChoice, func(role awsservice.SSORole, query string) bool {
+		return containsFold(role.Name, query)
+	})
 	if err != nil {
 		return awsservice.SSORole{}, err
 	}
@@ -197,6 +194,110 @@ func chooseIndex(in *bufio.Reader, errOut io.Writer, label string, count int) (i
 		}
 		return index - 1, nil
 	}
+}
+
+func chooseFilteredIndex[T any](
+	rawIn io.Reader,
+	in *bufio.Reader,
+	errOut io.Writer,
+	label string,
+	items []T,
+	render func(T) string,
+	matches func(T, string) bool,
+) (int, error) {
+	if ttyIn, ttyOut, ok := interactiveChoiceIO(rawIn, errOut); ok {
+		return chooseInteractiveIndex(ttyIn, ttyOut, label, items, render, matches)
+	}
+	return chooseLineFilteredIndex(in, errOut, label, items, render, matches)
+}
+
+func chooseLineFilteredIndex[T any](
+	in *bufio.Reader,
+	errOut io.Writer,
+	label string,
+	items []T,
+	render func(T) string,
+	matches func(T, string) bool,
+) (int, error) {
+	filtered := make([]int, len(items))
+	for i := range items {
+		filtered[i] = i
+	}
+	query := ""
+
+	for {
+		fmt.Fprintf(errOut, "Available %s", label)
+		if query != "" {
+			fmt.Fprintf(errOut, " (filtered by %q)", query)
+		}
+		fmt.Fprintln(errOut, ":")
+		for i, originalIdx := range filtered {
+			fmt.Fprintf(errOut, "  %d) %s\n", i+1, render(items[originalIdx]))
+		}
+
+		fmt.Fprintf(errOut, "Select %s [1-%d, search text, / to reset]: ", strings.TrimSuffix(label, "s"), len(filtered))
+		raw, err := in.ReadString('\n')
+		if err != nil {
+			return 0, err
+		}
+		raw = strings.TrimSpace(raw)
+		if raw == "/" {
+			filtered = filtered[:0]
+			for i := range items {
+				filtered = append(filtered, i)
+			}
+			query = ""
+			continue
+		}
+
+		index := 0
+		if _, err := fmt.Sscanf(raw, "%d", &index); err == nil && index >= 1 && index <= len(filtered) {
+			return filtered[index-1], nil
+		}
+
+		query = raw
+		filtered = filtered[:0]
+		for i, item := range items {
+			if matches(item, query) {
+				filtered = append(filtered, i)
+			}
+		}
+		if len(filtered) == 0 {
+			fmt.Fprintf(errOut, "No %s match %q\n", label, query)
+			filtered = make([]int, len(items))
+			for i := range items {
+				filtered[i] = i
+			}
+			query = ""
+		}
+	}
+}
+
+func renderContextChoice(ctx config.ContextInfo) string {
+	current := ""
+	if ctx.Current {
+		current = " (current)"
+	}
+	return fmt.Sprintf("%s [%s]%s", ctx.Name, displayAuthType(ctx.AuthType), current)
+}
+
+func renderAccountChoice(account awsservice.SSOAccount) string {
+	label := account.Name
+	if label == "" {
+		label = account.ID
+	}
+	if account.Email != "" {
+		label = fmt.Sprintf("%s <%s>", label, account.Email)
+	}
+	return fmt.Sprintf("%s (%s)", label, account.ID)
+}
+
+func renderRoleChoice(role awsservice.SSORole) string {
+	return role.Name
+}
+
+func containsFold(value, query string) bool {
+	return strings.Contains(strings.ToLower(value), strings.ToLower(strings.TrimSpace(query)))
 }
 
 func buildSSOContextEntry(configPath string, base config.ContextInfo, account awsservice.SSOAccount, role awsservice.SSORole) (config.ContextEntry, string, error) {

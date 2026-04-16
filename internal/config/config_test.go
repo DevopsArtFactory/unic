@@ -287,6 +287,32 @@ contexts:
 	}
 }
 
+func TestSetContextOrder(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+contexts:
+  - name: dev
+    profile: dev-profile
+  - name: prod
+    profile: prod-profile
+`)
+
+	if err := SetContextOrder(path, "prod", 5); err != nil {
+		t.Fatal(err)
+	}
+
+	infos, err := Contexts(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if infos[0].Name != "prod" {
+		t.Fatalf("expected prod to move first after ordering, got %q", infos[0].Name)
+	}
+	if infos[0].Order != 5 {
+		t.Fatalf("expected prod order 5, got %#v", infos[0].Order)
+	}
+}
+
 func TestSetCurrent(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `

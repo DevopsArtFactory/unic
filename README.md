@@ -95,6 +95,12 @@ eval "$(unic env prod-admin)"
 # Interactively choose/setup a context and copy exports to clipboard
 unic context setup
 
+# Set a display order for a context
+unic context order prod-admin 10
+
+# Or open reorder mode, then move the selected context with arrow keys and save
+unic context order
+
 # Clear current context and copy cleanup commands to clipboard
 unic context unset
 ```
@@ -103,6 +109,8 @@ unic context unset
 `unic env` prints shell commands to `stdout` so it can be used with `eval`.
 Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the TUI can show which shell context is currently active.
 Contexts can be prioritized in the setup picker with an `order` field in config.
+In the CLI `unic context setup` flow, the picker now filters contexts, SSO accounts, and SSO roles as you type, with arrow-key navigation and Enter to confirm.
+Use `unic context order` to open reorder mode, choose a context with `↑/↓` or `j/k`, press `Enter` to start moving it, then press `Enter` again to save. `unic context order <name> <number>` still works for direct updates.
 
 ## Configuration
 
@@ -176,6 +184,12 @@ Resolution priority:
 ```text
 CLI flags > selected context > config defaults > hardcoded default (us-east-1)
 ```
+
+Context ordering:
+
+- Lower `order` values appear first
+- Contexts without `order` appear after ordered contexts
+- Contexts with the same `order` keep their file order
 
 ## Current Features
 

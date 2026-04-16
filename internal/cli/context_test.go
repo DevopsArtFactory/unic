@@ -15,11 +15,112 @@ func TestRootIncludesContextAndEnvCommands(t *testing.T) {
 	if _, _, err := cmd.Find([]string{"context", "setup"}); err != nil {
 		t.Fatalf("expected context setup command: %v", err)
 	}
+	if _, _, err := cmd.Find([]string{"context", "order"}); err != nil {
+		t.Fatalf("expected context order command: %v", err)
+	}
 	if _, _, err := cmd.Find([]string{"context", "unset"}); err != nil {
 		t.Fatalf("expected context unset command: %v", err)
 	}
 	if _, _, err := cmd.Find([]string{"env"}); err != nil {
 		t.Fatalf("expected env command: %v", err)
+	}
+}
+
+func TestContextOrderUpdatesConfiguredOrder(t *testing.T) {
+	origDefaultPath := defaultPathFn
+	origEnsure := ensureConfigExistsFn
+	origSetOrder := setContextOrderFn
+	origSetOrders := setContextOrdersFn
+	origReorder := reorderContextsFn
+	defer func() {
+		defaultPathFn = origDefaultPath
+		ensureConfigExistsFn = origEnsure
+		setContextOrderFn = origSetOrder
+		setContextOrdersFn = origSetOrders
+		reorderContextsFn = origReorder
+	}()
+
+	defaultPathFn = func() (string, error) { return "/tmp/config.yaml", nil }
+	ensureConfigExistsFn = func(string) error { return nil }
+	setContextOrderFn = func(path, name string, order int) error {
+		if path != "/tmp/config.yaml" {
+			t.Fatalf("unexpected path: %q", path)
+		}
+		if name != "prod-admin" {
+			t.Fatalf("unexpected context name: %q", name)
+		}
+		if order != 10 {
+			t.Fatalf("unexpected order: %d", order)
+		}
+		return nil
+	}
+
+	cmd := NewRootCmd()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"context", "order", "prod-admin", "10"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(stdout.String()) != "" {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "Updated context prod-admin to order 10.") {
+		t.Fatalf("expected confirmation message, got %q", stderr.String())
+	}
+}
+
+func TestContextOrderInteractiveSelectionAndPrompt(t *testing.T) {
+	origDefaultPath := defaultPathFn
+	origEnsure := ensureConfigExistsFn
+	origSetOrder := setContextOrderFn
+	origSetOrders := setContextOrdersFn
+	origReorder := reorderContextsFn
+	defer func() {
+		defaultPathFn = origDefaultPath
+		ensureConfigExistsFn = origEnsure
+		setContextOrderFn = origSetOrder
+		setContextOrdersFn = origSetOrders
+		reorderContextsFn = origReorder
+	}()
+
+	defaultPathFn = func() (string, error) { return "/tmp/config.yaml", nil }
+	ensureConfigExistsFn = func(string) error { return nil }
+	reorderContextsFn = func(path string, in io.Reader, errOut io.Writer) ([]string, error) {
+		if path != "/tmp/config.yaml" {
+			t.Fatalf("unexpected path: %q", path)
+		}
+		return []string{"lgi-prod", "prod-admin"}, nil
+	}
+	setContextOrdersFn = func(path string, names []string) error {
+		if path != "/tmp/config.yaml" {
+			t.Fatalf("unexpected path: %q", path)
+		}
+		if len(names) != 2 || names[0] != "lgi-prod" || names[1] != "prod-admin" {
+			t.Fatalf("unexpected context order: %#v", names)
+		}
+		return nil
+	}
+
+	cmd := NewRootCmd()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"context", "order"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(stdout.String()) != "" {
+		t.Fatalf("expected no stdout output, got %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "Updated context order.") {
+		t.Fatalf("expected update message, got %q", stderr.String())
 	}
 }
 

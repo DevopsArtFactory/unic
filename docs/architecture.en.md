@@ -39,6 +39,8 @@ Owns non-TUI commands:
 - `unic update`
 - `unic env [context]`
 - `unic context setup`
+  - live incremental filtering for large context/account/role lists
+  - interactive context ordering via `unic context order`
 - `unic context unset`
 
 ### `internal/config/`
