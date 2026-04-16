@@ -255,7 +255,6 @@ func reorderContextInfos(contexts []config.ContextInfo, from, to int) []config.C
 	result = append(result, updated[adjustedTo:]...)
 	return result
 }
-}
 
 func contextNames(contexts []config.ContextInfo) []string {
 	names := make([]string, 0, len(contexts))
