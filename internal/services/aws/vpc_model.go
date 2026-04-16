@@ -31,6 +31,7 @@ func (v VPC) FilterText() string {
 type Subnet struct {
 	SubnetID         string
 	Name             string
+	VPCID            string
 	CIDR             string
 	AvailabilityZone string
 	AvailableIPCount int32

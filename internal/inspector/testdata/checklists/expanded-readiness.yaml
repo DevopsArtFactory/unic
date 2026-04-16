@@ -1,0 +1,54 @@
+name: Expanded Production Readiness
+description: Covers the extended Checklist Inspector static resource checks.
+checks:
+  - id: private-zone
+    type: hosted_zone
+    resource: example.internal
+    expect:
+      private_zone: true
+
+  - id: api-record
+    type: route53_record
+    resource: api.example.internal
+    expect:
+      zone: example.internal
+      record_type: A
+      alias_target: internal-alb-123.ap-northeast-2.elb.amazonaws.com
+
+  - id: primary-vpc
+    type: vpc
+    resource: main-vpc
+    expect:
+      cidr: 10.0.0.0/16
+      default_vpc: false
+      subnet_count: 2
+
+  - id: app-subnet-a
+    type: subnet
+    resource: app-a
+    expect:
+      vpc: main-vpc
+      availability_zone: ap-northeast-2a
+      available_ip_count_min: 10
+
+  - id: app-log-group
+    type: cloudwatch_log_group
+    resource: /aws/ecs/app
+    expect:
+      retention_days: 30
+
+  - id: cloudtrail-baseline
+    type: cloudtrail_baseline
+    resource: cloudtrail
+
+  - id: guardduty-baseline
+    type: guardduty_baseline
+    resource: guardduty
+
+  - id: config-baseline
+    type: config_baseline
+    resource: config
+
+  - id: valkey-baseline
+    type: elasticache_valkey_baseline
+    resource: valkey

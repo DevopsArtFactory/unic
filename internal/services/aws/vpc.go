@@ -70,6 +70,7 @@ func (r *AwsRepository) ListSubnets(ctx context.Context, vpcID string) ([]Subnet
 		subnets = append(subnets, Subnet{
 			SubnetID:         awssdk.ToString(s.SubnetId),
 			Name:             extractNameTag(s.Tags),
+			VPCID:            awssdk.ToString(s.VpcId),
 			CIDR:             awssdk.ToString(s.CidrBlock),
 			AvailabilityZone: awssdk.ToString(s.AvailabilityZone),
 			AvailableIPCount: awssdk.ToInt32(s.AvailableIpAddressCount),
