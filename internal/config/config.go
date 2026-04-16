@@ -480,6 +480,79 @@ func UpsertContext(configPath string, entry ContextEntry) error {
 	return nil
 }
 
+// SetContextOrder updates the display order for a named context.
+func SetContextOrder(configPath, name string, order int) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config: %w", err)
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+
+	found := false
+	for i := range fc.Contexts {
+		if fc.Contexts[i].Name == name {
+			fc.Contexts[i].Order = order
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("context %q not found in config", name)
+	}
+
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	return nil
+}
+
+// SetContextOrders rewrites all context orders based on the provided name order.
+func SetContextOrders(configPath string, names []string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config: %w", err)
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+
+	if len(names) != len(fc.Contexts) {
+		return fmt.Errorf("expected %d context names, got %d", len(fc.Contexts), len(names))
+	}
+
+	orderMap := make(map[string]int, len(names))
+	for i, name := range names {
+		orderMap[name] = i + 1
+	}
+
+	for i := range fc.Contexts {
+		order, ok := orderMap[fc.Contexts[i].Name]
+		if !ok {
+			return fmt.Errorf("context %q missing from order list", fc.Contexts[i].Name)
+		}
+		fc.Contexts[i].Order = order
+	}
+
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	return nil
+}
+
 // DefaultPath returns the default config file path following XDG Base Directory spec.
 func DefaultPath() (string, error) {
 	dir := os.Getenv("XDG_CONFIG_HOME")

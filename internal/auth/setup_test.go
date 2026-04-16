@@ -109,3 +109,113 @@ contexts:
 		t.Fatalf("expected entry name %q, got %q", name, entry.Name)
 	}
 }
+
+func TestSetupContextSupportsSearchBeforeSelectingContext(t *testing.T) {
+	origBuild := buildEnvExportsFn
+	defer func() {
+		buildEnvExportsFn = origBuild
+	}()
+
+	buildEnvExportsFn = func(ctx context.Context, cfg *config.Config) (string, error) {
+		return "export UNIC_CONTEXT='" + cfg.ContextName + "'", nil
+	}
+
+	dir := t.TempDir()
+	path := writeConfig(t, dir, `
+current: prod
+defaults:
+  region: ap-northeast-2
+contexts:
+  - name: dev
+    auth_type: credential
+    profile: dev
+    region: ap-northeast-2
+  - name: prod
+    auth_type: credential
+    profile: prod
+    region: us-east-1
+  - name: staging
+    auth_type: credential
+    profile: staging
+    region: ap-southeast-1
+`)
+
+	var stderr strings.Builder
+	exports, err := SetupContext(context.Background(), path, strings.NewReader("stag\n1\n"), &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exports != "export UNIC_CONTEXT='staging'" {
+		t.Fatalf("unexpected exports: %q", exports)
+	}
+
+	cfg, err := config.Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ContextName != "staging" {
+		t.Fatalf("expected current context staging, got %q", cfg.ContextName)
+	}
+	if !strings.Contains(stderr.String(), `Available contexts (filtered by "stag")`) {
+		t.Fatalf("expected filtered context list in stderr, got %q", stderr.String())
+	}
+}
+
+func TestSetupContextSupportsSearchBeforeSelectingSSOAccountAndRole(t *testing.T) {
+	origAccounts := listSSOAccountsFn
+	origRoles := listSSOAccountRolesFn
+	origBuild := buildEnvExportsFn
+	defer func() {
+		listSSOAccountsFn = origAccounts
+		listSSOAccountRolesFn = origRoles
+		buildEnvExportsFn = origBuild
+	}()
+
+	listSSOAccountsFn = func(ctx context.Context, cfg *config.Config) ([]awsservice.SSOAccount, error) {
+		return []awsservice.SSOAccount{
+			{ID: "111111111111", Name: "sandbox"},
+			{ID: "222222222222", Name: "production"},
+		}, nil
+	}
+	listSSOAccountRolesFn = func(ctx context.Context, cfg *config.Config, accountID string) ([]awsservice.SSORole, error) {
+		return []awsservice.SSORole{
+			{Name: "ReadOnly"},
+			{Name: "AdministratorAccess"},
+		}, nil
+	}
+	buildEnvExportsFn = func(ctx context.Context, cfg *config.Config) (string, error) {
+		return "export AWS_REGION='ap-northeast-2'", nil
+	}
+
+	dir := t.TempDir()
+	path := writeConfig(t, dir, `
+defaults:
+  region: ap-northeast-2
+contexts:
+  - name: base-sso
+    auth_type: sso
+    sso_start_url: https://example.awsapps.com/start
+    region: ap-northeast-2
+`)
+
+	var stderr strings.Builder
+	_, err := SetupContext(context.Background(), path, strings.NewReader("1\nprod\n1\nadmin\n1\n"), &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ContextName != "base-sso-222222222222-administratoraccess" {
+		t.Fatalf("expected resolved SSO context, got %q", cfg.ContextName)
+	}
+	output := stderr.String()
+	if !strings.Contains(output, `Available AWS accounts (filtered by "prod")`) {
+		t.Fatalf("expected filtered account list, got %q", output)
+	}
+	if !strings.Contains(output, `Available AWS roles (filtered by "admin")`) {
+		t.Fatalf("expected filtered role list, got %q", output)
+	}
+}

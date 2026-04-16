@@ -39,6 +39,8 @@ cmd/unic/main.go
 - `unic update`
 - `unic env [context]`
 - `unic context setup`
+  - 많은 context/account/role 목록에서 live incremental filtering 지원
+  - `unic context order`를 통한 interactive context ordering 지원
 - `unic context unset`
 
 ### `internal/config/`

@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -20,6 +22,9 @@ var (
 	loadNamedContextFn   = config.LoadNamedContext
 	loadConfigFn         = config.Load
 	unsetCurrentFn       = config.UnsetCurrent
+	setContextOrderFn    = config.SetContextOrder
+	setContextOrdersFn   = config.SetContextOrders
+	reorderContextsFn    = reorderContexts
 	copyClipboardFn      = clipboard.Copy
 )
 
@@ -30,8 +35,67 @@ func newContextCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newContextSetupCmd())
+	cmd.AddCommand(newContextOrderCmd())
 	cmd.AddCommand(newContextUnsetCmd())
 	return cmd
+}
+
+func newContextOrderCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "order [context-name] [number]",
+		Short: "Set the display order for a context",
+		Args:  cobra.MaximumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := defaultPathFn()
+			if err != nil {
+				return err
+			}
+			if err := ensureConfigExistsFn(configPath); err != nil {
+				return err
+			}
+
+			message, err := applyContextOrder(configPath, cmd.InOrStdin(), cmd.ErrOrStderr(), args)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.ErrOrStderr(), message)
+			return nil
+		},
+	}
+}
+
+func applyContextOrder(configPath string, in io.Reader, errOut io.Writer, args []string) (string, error) {
+	switch len(args) {
+	case 2:
+		order, err := parseContextOrder(args[1])
+		if err != nil {
+			return "", err
+		}
+		if err := setContextOrderFn(configPath, args[0], order); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Updated context %s to order %d.", args[0], order), nil
+	case 0:
+		names, err := reorderContextsFn(configPath, in, errOut)
+		if err != nil {
+			return "", err
+		}
+		if err := setContextOrdersFn(configPath, names); err != nil {
+			return "", err
+		}
+		return "Updated context order.", nil
+	default:
+		return "", fmt.Errorf("expected either no arguments or <context-name> <number>")
+	}
+}
+
+func parseContextOrder(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	order := 0
+	if _, err := fmt.Sscanf(raw, "%d", &order); err != nil {
+		return 0, fmt.Errorf("invalid order %q", raw)
+	}
+	return order, nil
 }
 
 func newContextSetupCmd() *cobra.Command {
