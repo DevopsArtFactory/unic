@@ -12,7 +12,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
-- Open the Security Inspector workflow and review built-in findings for network exposure, RDS, IAM, Secrets Manager, S3, snapshot sharing, CloudTrail, GuardDuty, AWS Config, and ElastiCache for Valkey
+- Press `i` from the service picker to enter Inspector mode, then open the Security Inspector workflow for built-in findings across network exposure, RDS, IAM, Secrets Manager, S3, snapshot sharing, CloudTrail, GuardDuty, AWS Config, and ElastiCache for Valkey
 
 ## Documentation Map
 
@@ -193,6 +193,8 @@ Context ordering:
 
 ## Current Features
 
+### AWS Service Catalog
+
 | Service | Feature |
 |---|---|
 | EC2 | SSM Session Manager |
@@ -208,9 +210,15 @@ Context ordering:
 | IAM | IAM User Browser |
 | IAM | ListAccessKeys |
 | IAM | RotateAccessKey |
-| Inspector | Security Scan |
 
-The Inspector feature ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
+### Inspector Mode
+
+| Workflow | Status | Notes |
+|---|---|---|
+| Security Inspector | Ready | Runs built-in rule packs and opens severity-filtered findings |
+| Checklist Inspector | Planned | Reserved Inspector-mode slot for future checklist-style workflows |
+
+Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
 
 ## TUI Navigation
 
@@ -223,6 +231,7 @@ The Inspector feature ships built-in rule packs for Security Group exposure, RDS
 | `Esc` | Go back |
 | `q` | Quit from top-level screens |
 | `H` | Jump to service list |
+| `i` | Enter Inspector mode from the service list |
 | `C` | Open context picker |
 | `/` | Toggle filter mode on supported screens |
 | `?` | Toggle context-aware shortcut help |
@@ -240,7 +249,8 @@ The Inspector feature ships built-in rule packs for Security Group exposure, RDS
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
-| Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
+| Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow |
+| Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
 
 Shared list filters now use fuzzy matching with inline match highlighting. Filtering is currently available on EC2 instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.

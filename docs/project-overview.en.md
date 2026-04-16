@@ -19,15 +19,15 @@ Implemented service areas currently include:
 - CloudWatch Logs
 - ECS
 - S3
-- Inspector
+- Inspector mode
 
 The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens.
 
 ## Primary User Flows
 
 1. Run `unic` to enter the TUI
-2. Select a service and feature from the catalog
-3. Drill into resource lists and detail views
+2. Select an AWS service and feature from the catalog, or press `i` to enter Inspector mode
+3. Drill into resource lists, inspector workflows, and detail views
 4. Execute supported actions when available
 5. Use `unic env` or `unic context setup` when shell exports are needed
 
@@ -49,8 +49,9 @@ cmd/unic/                 entrypoint
 internal/cli/             Cobra commands
 internal/config/          config load/save and context helpers
 internal/auth/            env export and interactive setup logic
-internal/domain/          service catalog and feature enums
+internal/domain/          AWS service catalog and feature enums
 internal/services/aws/    AWS repository, models, and service operations
+internal/inspector/       cross-service inspector workflows, findings, and rule packs
 internal/app/             Bubble Tea model, screens, styles, messages
 ```
 

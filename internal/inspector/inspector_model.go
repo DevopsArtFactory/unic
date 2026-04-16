@@ -1,10 +1,66 @@
-package aws
+package inspector
 
 import (
 	"fmt"
 	"strings"
 	"time"
+
+	awsservice "unic/internal/services/aws"
 )
+
+type WorkflowKind string
+
+const (
+	WorkflowSecurity  WorkflowKind = "security"
+	WorkflowChecklist WorkflowKind = "checklist"
+)
+
+type Workflow struct {
+	Kind        WorkflowKind
+	Title       string
+	Description string
+	Available   bool
+}
+
+func Workflows() []Workflow {
+	return []Workflow{
+		{
+			Kind:        WorkflowSecurity,
+			Title:       "Security Inspector",
+			Description: "Cross-service security findings for network exposure, identity, storage, logging, and baseline posture.",
+			Available:   true,
+		},
+		{
+			Kind:        WorkflowChecklist,
+			Title:       "Checklist Inspector",
+			Description: "Planned guided readiness and rollout checks for infrastructure workflows that span multiple AWS services.",
+			Available:   false,
+		},
+	}
+}
+
+func (w Workflow) StatusLabel() string {
+	if w.Available {
+		return "READY"
+	}
+	return "PLANNED"
+}
+
+type AwsRepository = awsservice.AwsRepository
+type AccessKey = awsservice.AccessKey
+type CloudTrailClientAPI = awsservice.CloudTrailClientAPI
+type ConfigServiceClientAPI = awsservice.ConfigServiceClientAPI
+type EC2ClientAPI = awsservice.EC2ClientAPI
+type ElastiCacheClientAPI = awsservice.ElastiCacheClientAPI
+type GuardDutyClientAPI = awsservice.GuardDutyClientAPI
+type IAMClientAPI = awsservice.IAMClientAPI
+type RDSClientAPI = awsservice.RDSClientAPI
+type S3Bucket = awsservice.S3Bucket
+type Secret = awsservice.Secret
+type SecurityGroup = awsservice.SecurityGroup
+type SecurityGroupRule = awsservice.SecurityGroupRule
+type SecretsManagerClientAPI = awsservice.SecretsManagerClientAPI
+type RDSInstance = awsservice.RDSInstance
 
 type RuleSeverity string
 

@@ -100,14 +100,5 @@ func Catalog() []Service {
 				},
 			},
 		},
-		{
-			Name: ServiceInspector,
-			Features: []Feature{
-				{
-					Kind:        FeatureSecurityScan,
-					Description: "Run built-in security scans and review findings by severity",
-				},
-			},
-		},
 	}
 }

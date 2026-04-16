@@ -93,10 +93,20 @@ repository와 서비스별 AWS 연동 계층이다.
 패턴:
 
 - `repository.go`에서 SDK client 초기화
-- `inspector*.go`에서 Security Inspector 스캔 orchestration과 finding 모델 관리
 - `*_model.go`에서 UI 친화적 모델 정의
 - `*.go`에서 실제 서비스 로직 구현
 - 테스트에서는 AWS 서비스별 mock interface 사용
+
+### `internal/inspector/`
+
+cross-service inspector workflow와 rule pack을 담당한다.
+
+패턴:
+
+- workflow 전용 finding/report 모델은 여기서 관리
+- Security Inspector 스캔 orchestration과 rule 등록은 여기서 관리
+- rule pack은 raw SDK setup 대신 `internal/services/aws` repository 메서드와 client interface에 의존
+- Checklist Inspector 같은 후속 inspector workflow도 이 패턴으로 확장
 
 ### `internal/app/`
 
@@ -170,7 +180,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - CloudWatch Logs group/stream/viewer
 - ECS cluster/service/task/container
 - S3 bucket/object/detail
-- Inspector home/scanning/results/detail
+- Inspector mode home, workflow placeholder, security findings/detail
 - context picker, context add, TUI-native context setup/export/unset
 - SSO account / role selection, exit notice
 - loading, error
@@ -182,6 +192,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 1. `internal/domain/model.go`에 service/feature 상수 추가
 2. `internal/domain/catalog.go`에 등록
 3. `internal/services/aws/`에 repository 메서드와 모델 추가
-4. `internal/app/`에 화면 전환 연결
-5. repository 로직과 app 전환 테스트 작성
+4. cross-service inspector 작업이면 `internal/inspector/`에 workflow/rule 로직 추가
+5. `internal/app/`에 화면 전환 연결
+6. repository 로직과 app 전환 테스트 작성
 6. 사용자에게 보이는 동작이면 README와 `docs/` 갱신

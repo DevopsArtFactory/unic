@@ -93,10 +93,20 @@ Current repository clients include:
 Pattern:
 
 - `repository.go` initializes SDK clients
-- `inspector*.go` owns Security Inspector scan orchestration and finding models
 - `*_model.go` defines UI-facing data models
 - `*.go` implements service operations
 - tests use mock client interfaces per AWS service
+
+### `internal/inspector/`
+
+Cross-service inspector workflows and rule packs.
+
+Pattern:
+
+- workflow-local finding/report models live here
+- Security Inspector scan orchestration and rule registration live here
+- rule packs still depend on `internal/services/aws` repository methods and client interfaces rather than raw SDK setup
+- this package is the growth path for future inspector workflows such as Checklist Inspector
 
 ### `internal/app/`
 
@@ -170,7 +180,7 @@ Current screen families include:
 - CloudWatch Logs group/stream/viewer flows
 - ECS cluster/service/task/container flows
 - S3 bucket/object/detail flows
-- Inspector home/scanning/results/detail flows
+- Inspector mode home, workflow placeholder, and security findings/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
 - SSO account / role selection and exit notice flows
 - loading and error screens
@@ -182,6 +192,7 @@ When adding a feature:
 1. add service or feature constants in `internal/domain/model.go`
 2. register them in `internal/domain/catalog.go`
 3. add repository methods and models under `internal/services/aws/`
-4. wire the screen flow in `internal/app/`
-5. add tests for repository logic and app transitions
+4. for cross-service inspector work, add workflow/rule logic under `internal/inspector/`
+5. wire the screen flow in `internal/app/`
+6. add tests for repository logic and app transitions
 6. update README and `docs/` if behavior is user-visible

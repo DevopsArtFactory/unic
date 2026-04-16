@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"unic/internal/inspector"
 	awsservice "unic/internal/services/aws"
 )
 
@@ -18,12 +19,38 @@ var (
 	inspectorSeverityLowStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("114")).Bold(true)
 )
 
-var inspectorSeverityFilters = []awsservice.RuleSeverity{
+var inspectorSeverityFilters = []inspector.RuleSeverity{
 	"",
-	awsservice.RuleSeverityCritical,
-	awsservice.RuleSeverityHigh,
-	awsservice.RuleSeverityMedium,
-	awsservice.RuleSeverityLow,
+	inspector.RuleSeverityCritical,
+	inspector.RuleSeverityHigh,
+	inspector.RuleSeverityMedium,
+	inspector.RuleSeverityLow,
+}
+
+func (m *Model) ensureInspectorWorkflows() {
+	if len(m.inspectorWorkflows) == 0 {
+		m.inspectorWorkflows = inspector.Workflows()
+	}
+	if m.inspectorWorkflowIdx >= len(m.inspectorWorkflows) {
+		m.inspectorWorkflowIdx = 0
+	}
+}
+
+func (m *Model) enterInspectorMode() {
+	m.ensureInspectorWorkflows()
+	m.screen = screenInspectorHome
+	m.selectedInspectorFinding = nil
+	m.inspectorIdx = 0
+}
+
+func (m Model) currentInspectorWorkflow() inspector.Workflow {
+	if len(m.inspectorWorkflows) == 0 {
+		return inspector.Workflow{}
+	}
+	if m.inspectorWorkflowIdx < 0 || m.inspectorWorkflowIdx >= len(m.inspectorWorkflows) {
+		return m.inspectorWorkflows[0]
+	}
+	return m.inspectorWorkflows[m.inspectorWorkflowIdx]
 }
 
 func (m Model) handleInspectorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -41,9 +68,47 @@ func (m Model) handleInspectorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 func (m Model) updateInspectorHome(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
-		m.screen = screenFeatureList
-	case "enter", "r":
+		m.screen = screenServiceList
+	case "up", "k":
+		if m.inspectorWorkflowIdx > 0 {
+			m.inspectorWorkflowIdx--
+		}
+	case "down", "j":
+		if m.inspectorWorkflowIdx < len(m.inspectorWorkflows)-1 {
+			m.inspectorWorkflowIdx++
+		}
+	case "r":
+		if m.currentInspectorWorkflow().Kind == inspector.WorkflowSecurity {
+			return m.startInspectorScan()
+		}
+	case "enter":
+		return m.openInspectorWorkflow()
+	}
+	return m, nil
+}
+
+func (m Model) openInspectorWorkflow() (tea.Model, tea.Cmd) {
+	workflow := m.currentInspectorWorkflow()
+	switch workflow.Kind {
+	case inspector.WorkflowSecurity:
+		if m.inspectorReport != nil {
+			m.applyInspectorSeverityFilter()
+			m.screen = screenInspectorResults
+			return m, nil
+		}
 		return m.startInspectorScan()
+	case inspector.WorkflowChecklist:
+		m.screen = screenInspectorWorkflowPlaceholder
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+
+func (m Model) updateInspectorWorkflowPlaceholder(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.screen = screenInspectorHome
 	}
 	return m, nil
 }
@@ -104,7 +169,7 @@ func (m Model) loadSecurityScan() tea.Cmd {
 			return errMsg{err: err}
 		}
 
-		report, err := repo.RunSecurityScan(ctx)
+		report, err := inspector.RunSecurityScan(ctx, repo)
 		if err != nil {
 			return errMsg{err: err}
 		}
@@ -119,7 +184,7 @@ func (m *Model) applyInspectorSeverityFilter() {
 		return
 	}
 
-	var filtered []awsservice.SecurityFinding
+	var filtered []inspector.SecurityFinding
 	for _, finding := range m.inspectorReport.Findings {
 		if finding.MatchesSeverity(m.inspectorSeverityFilter) {
 			filtered = append(filtered, finding)
@@ -129,38 +194,97 @@ func (m *Model) applyInspectorSeverityFilter() {
 }
 
 func (m Model) viewInspectorHome() string {
+	selected := m.currentInspectorWorkflow()
+
+	var b strings.Builder
+	var panel strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(m.renderModeTitle("Inspector Mode"))
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("Cross-service workflows with inspection-focused chrome and shared AWS context."))
+	b.WriteString("\n\n")
+
+	for i, workflow := range m.inspectorWorkflows {
+		cursor := "  "
+		nameStyle := normalStyle
+		badgeStyle := inspectorReadyStyle
+		if !workflow.Available {
+			badgeStyle = inspectorPlannedStyle
+		}
+		if i == m.inspectorWorkflowIdx {
+			cursor = "> "
+			nameStyle = inspectorSelectedStyle
+		}
+
+		row := fmt.Sprintf("%s%-22s %s", cursor, workflow.Title, badgeStyle.Render("["+workflow.StatusLabel()+"]"))
+		panel.WriteString(nameStyle.Render(row))
+		panel.WriteString("\n")
+		if i == m.inspectorWorkflowIdx {
+			panel.WriteString(dimStyle.Render("    " + workflow.Description))
+			panel.WriteString("\n")
+		}
+	}
+
+	panel.WriteString("\n")
+	panel.WriteString(inspectorSectionStyle.Render("Selected Workflow"))
+	panel.WriteString("\n")
+	switch selected.Kind {
+	case inspector.WorkflowSecurity:
+		panel.WriteString(normalStyle.Render("  Run the built-in security rule packs across the active AWS context."))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  Registered rule packs: %d", inspector.RegisteredSecurityInspectorScannerCount())))
+		panel.WriteString("\n")
+		if m.inspectorReport != nil {
+			panel.WriteString(dimStyle.Render(fmt.Sprintf(
+				"  Last scan: %s • findings:%d • warnings:%d",
+				m.inspectorReport.ScannedAt.Local().Format("2006-01-02 15:04:05"),
+				len(m.inspectorReport.Findings),
+				len(m.inspectorReport.Warnings),
+			)))
+			panel.WriteString("\n")
+		}
+		panel.WriteString(inspectorAccentStyle.Render("  Enter opens the latest findings or starts a fresh scan. Press r to force a new scan."))
+	case inspector.WorkflowChecklist:
+		panel.WriteString(normalStyle.Render("  Checklist Inspector will live in this mode shell once the workflow engine ships."))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  The dedicated Inspector mode is now separate from the AWS service picker so future cross-service audits do not pretend to be a service."))
+	default:
+		panel.WriteString(dimStyle.Render("  No inspector workflows are registered."))
+	}
+
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: choose workflow • enter: open • r: run security workflow • esc: services • H: home"))
+	return b.String()
+}
+
+func (m Model) viewInspectorWorkflowPlaceholder() string {
+	workflow := m.currentInspectorWorkflow()
+
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Inspector"))
+	b.WriteString(m.renderModeTitle(workflow.Title))
 	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render("  Run built-in security scans against the active AWS context."))
+	b.WriteString(normalStyle.Render("  This workflow now has a dedicated place in Inspector mode, but the underlying engine is not implemented yet."))
 	b.WriteString("\n")
-	b.WriteString(normalStyle.Render("  Built-in rule packs cover Security Groups, RDS, IAM access keys, Secrets Manager, and S3 buckets."))
+	b.WriteString(dimStyle.Render("  Security Inspector is live today; Checklist Inspector will plug into this same shell when #60 lands."))
+	b.WriteString("\n\n")
+	b.WriteString(renderDetailLine("Status", inspectorPlannedStyle.Render(workflow.StatusLabel())))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(fmt.Sprintf("  Registered rule packs: %d", awsservice.RegisteredSecurityInspectorScannerCount())))
-	b.WriteString("\n")
-	if m.inspectorReport != nil {
-		b.WriteString(dimStyle.Render(fmt.Sprintf(
-			"  Last scan: %s • findings:%d • warnings:%d",
-			m.inspectorReport.ScannedAt.Local().Format("2006-01-02 15:04:05"),
-			len(m.inspectorReport.Findings),
-			len(m.inspectorReport.Warnings),
-		)))
-		b.WriteString("\n")
-	}
-	b.WriteString("\n")
-	b.WriteString(m.renderHelpBar("enter/r: run security scan • esc: back • H: home"))
+	b.WriteString(renderDetailLine("Description", normalStyle.Render(workflow.Description)))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("esc: back • H: home"))
 	return b.String()
 }
 
 func (m Model) viewInspectorScanning() string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Inspector — Security Scan"))
+	b.WriteString(m.renderModeTitle("Inspector Mode — Security Scan"))
 	b.WriteString("\n\n")
-	b.WriteString(titleStyle.Render(fmt.Sprintf("%s Running built-in rule packs...", m.loadingSpinner.View())))
+	b.WriteString(inspectorTitleStyle.Render(fmt.Sprintf("%s Running built-in rule packs...", m.loadingSpinner.View())))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("  Checking network exposure, backups, key age, secret rotation, and S3 bucket posture."))
+	b.WriteString(dimStyle.Render("  Checking network exposure, backups, key age, secret rotation, logging baselines, and bucket posture."))
 	return b.String()
 }
 
@@ -168,7 +292,7 @@ func (m Model) viewInspectorResults() string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Inspector Findings"))
+	b.WriteString(m.renderModeTitle("Security Inspector Findings"))
 	b.WriteString("\n")
 
 	if m.inspectorReport != nil {
@@ -224,7 +348,7 @@ func (m Model) viewInspectorResults() string {
 			textStyle := normalStyle
 			if i == m.inspectorIdx {
 				cursor = "> "
-				textStyle = selectedStyle
+				textStyle = inspectorSelectedStyle
 			}
 
 			resource := inspectorShorten(inspectorFindingResource(finding), resourceWidth)
@@ -240,7 +364,7 @@ func (m Model) viewInspectorResults() string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • 1-5: severity • enter: detail • r: rescan • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • 1-5: severity • enter: detail • r: rescan • esc: Inspector mode • H: home"))
 	return b.String()
 }
 
@@ -252,7 +376,7 @@ func (m Model) viewInspectorFindingDetail() string {
 	finding := m.selectedInspectorFinding
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Inspector Finding Detail"))
+	b.WriteString(m.renderModeTitle("Security Inspector Finding"))
 	b.WriteString("\n\n")
 
 	b.WriteString(renderDetailLine("Severity", renderInspectorSeverity(finding.Severity)))
@@ -276,12 +400,12 @@ func (m Model) viewInspectorFindingDetail() string {
 	}
 	paragraph := lipgloss.NewStyle().Width(width)
 
-	b.WriteString(titleStyle.Render("Summary"))
+	b.WriteString(inspectorSectionStyle.Render("Summary"))
 	b.WriteString("\n\n")
 	b.WriteString(paragraph.Render("  " + finding.Summary))
 	b.WriteString("\n\n")
 
-	b.WriteString(titleStyle.Render("Recommendation"))
+	b.WriteString(inspectorSectionStyle.Render("Recommendation"))
 	b.WriteString("\n\n")
 	b.WriteString(paragraph.Render("  " + finding.Recommendation))
 	b.WriteString("\n\n")
@@ -295,7 +419,7 @@ func (m Model) renderInspectorSeveritySelector() string {
 	for idx, severity := range inspectorSeverityFilters {
 		label := fmt.Sprintf("%d:%s", idx+1, severity.Label())
 		if severity == m.inspectorSeverityFilter {
-			parts = append(parts, selectedStyle.Render("["+label+"]"))
+			parts = append(parts, inspectorSelectedStyle.Render("["+label+"]"))
 		} else {
 			parts = append(parts, dimStyle.Render(" "+label+" "))
 		}
@@ -303,7 +427,7 @@ func (m Model) renderInspectorSeveritySelector() string {
 	return strings.Join(parts, " ")
 }
 
-func inspectorFindingResource(finding awsservice.SecurityFinding) string {
+func inspectorFindingResource(finding inspector.SecurityFinding) string {
 	if finding.ResourceID != "" {
 		return finding.ResourceID
 	}
@@ -313,15 +437,15 @@ func inspectorFindingResource(finding awsservice.SecurityFinding) string {
 	return "-"
 }
 
-func renderInspectorSeverity(severity awsservice.RuleSeverity) string {
+func renderInspectorSeverity(severity inspector.RuleSeverity) string {
 	switch severity {
-	case awsservice.RuleSeverityCritical:
+	case inspector.RuleSeverityCritical:
 		return inspectorSeverityCriticalStyle.Render(string(severity))
-	case awsservice.RuleSeverityHigh:
+	case inspector.RuleSeverityHigh:
 		return inspectorSeverityHighStyle.Render(string(severity))
-	case awsservice.RuleSeverityMedium:
+	case inspector.RuleSeverityMedium:
 		return inspectorSeverityMediumStyle.Render(string(severity))
-	case awsservice.RuleSeverityLow:
+	case inspector.RuleSeverityLow:
 		return inspectorSeverityLowStyle.Render(string(severity))
 	default:
 		return dimStyle.Render(string(severity))

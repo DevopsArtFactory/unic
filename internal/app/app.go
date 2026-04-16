@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"unic/internal/config"
 	"unic/internal/domain"
+	"unic/internal/inspector"
 	awsservice "unic/internal/services/aws"
 	"unic/internal/update"
 )
@@ -62,6 +63,7 @@ const (
 	screenS3ObjectList
 	screenS3ObjectDetail
 	screenInspectorHome
+	screenInspectorWorkflowPlaceholder
 	screenInspectorScanning
 	screenInspectorResults
 	screenInspectorFindingDetail
@@ -241,11 +243,13 @@ type Model struct {
 	selectedS3Object  *awsservice.S3ObjectDetail
 
 	// Inspector browser state
-	inspectorReport          *awsservice.SecurityScanReport
-	inspectorFindings        []awsservice.SecurityFinding
+	inspectorWorkflows       []inspector.Workflow
+	inspectorWorkflowIdx     int
+	inspectorReport          *inspector.SecurityScanReport
+	inspectorFindings        []inspector.SecurityFinding
 	inspectorIdx             int
-	inspectorSeverityFilter  awsservice.RuleSeverity
-	selectedInspectorFinding *awsservice.SecurityFinding
+	inspectorSeverityFilter  inspector.RuleSeverity
+	selectedInspectorFinding *inspector.SecurityFinding
 
 	// Context picker
 	configPath         string
@@ -304,16 +308,17 @@ func New(cfg *config.Config, configPath string, version string) Model {
 	services := domain.Catalog()
 	filterTI := newFilterInput()
 	model := Model{
-		cfg:            cfg,
-		configPath:     configPath,
-		currentVersion: version,
-		screen:         screenContextPicker,
-		ctxPrevScreen:  screenServiceList,
-		services:       services,
-		loadingSpinner: newLoadingSpinner(),
-		filterTI:       filterTI,
-		filters:        make(map[filterTarget]string),
-		contextTable:   newContextTable(),
+		cfg:                cfg,
+		configPath:         configPath,
+		currentVersion:     version,
+		screen:             screenContextPicker,
+		ctxPrevScreen:      screenServiceList,
+		services:           services,
+		inspectorWorkflows: inspector.Workflows(),
+		loadingSpinner:     newLoadingSpinner(),
+		filterTI:           filterTI,
+		filters:            make(map[filterTarget]string),
+		contextTable:       newContextTable(),
 	}
 	model.cwLogs = newCloudWatchLogsModel()
 	return model
@@ -527,6 +532,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateS3ObjectDetail(msg)
 		case screenInspectorHome:
 			return m.updateInspectorHome(msg)
+		case screenInspectorWorkflowPlaceholder:
+			return m.updateInspectorWorkflowPlaceholder(msg)
 		case screenInspectorResults:
 			return m.updateInspectorResults(msg)
 		case screenInspectorFindingDetail:
@@ -614,6 +621,8 @@ func (m Model) updateServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.svcIdx < len(m.services)-1 {
 			m.svcIdx++
 		}
+	case "i":
+		m.enterInspectorMode()
 	case "enter":
 		if m.svcIdx < len(m.services) {
 			m.features = m.services[m.svcIdx].Features
@@ -686,14 +695,6 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.startLoading(m.loadIAMKeys())
 			case domain.FeatureECSExec:
 				return m.startLoading(m.loadECSClusters())
-			case domain.FeatureSecurityScan:
-				m.inspectorReport = nil
-				m.inspectorFindings = nil
-				m.inspectorIdx = 0
-				m.inspectorSeverityFilter = ""
-				m.selectedInspectorFinding = nil
-				m.screen = screenInspectorHome
-				return m, nil
 			}
 		}
 	}
@@ -780,6 +781,8 @@ func (m Model) View() string {
 		v = m.viewS3ObjectDetail()
 	case screenInspectorHome:
 		v = m.viewInspectorHome()
+	case screenInspectorWorkflowPlaceholder:
+		v = m.viewInspectorWorkflowPlaceholder()
 	case screenInspectorScanning:
 		v = m.viewInspectorScanning()
 	case screenInspectorResults:
@@ -862,7 +865,7 @@ func (m Model) viewServiceList() string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • esc: context • q: quit"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • i: Inspector mode • esc: context • q: quit"))
 	return b.String()
 }
 

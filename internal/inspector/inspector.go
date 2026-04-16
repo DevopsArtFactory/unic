@@ -1,4 +1,4 @@
-package aws
+package inspector
 
 import (
 	"context"
@@ -44,7 +44,7 @@ func RegisteredSecurityInspectorScannerCount() int {
 	return len(listSecurityInspectorScanners())
 }
 
-func (r *AwsRepository) RunSecurityScan(ctx context.Context) (*SecurityScanReport, error) {
+func RunSecurityScan(ctx context.Context, repo *AwsRepository) (*SecurityScanReport, error) {
 	scanners := listSecurityInspectorScanners()
 	report := &SecurityScanReport{
 		ScannerCount: len(scanners),
@@ -58,7 +58,7 @@ func (r *AwsRepository) RunSecurityScan(ctx context.Context) (*SecurityScanRepor
 		default:
 		}
 
-		findings, err := scanner.Run(ctx, r)
+		findings, err := scanner.Run(ctx, repo)
 		if err != nil {
 			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %v", scanner.Name, err))
 			continue

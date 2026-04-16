@@ -10,6 +10,7 @@ import (
 
 	"unic/internal/config"
 	"unic/internal/domain"
+	"unic/internal/inspector"
 	awsservice "unic/internal/services/aws"
 )
 
@@ -1333,17 +1334,11 @@ func TestS3FeatureStartsBucketLoading(t *testing.T) {
 	}
 }
 
-func TestInspectorFeatureEntersHomeScreen(t *testing.T) {
+func TestServiceListInspectorKeyEntersHomeScreen(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	for _, svc := range m.services {
-		if svc.Name == domain.ServiceInspector {
-			m.features = svc.Features
-			break
-		}
-	}
-	m.screen = screenFeatureList
+	m.screen = screenServiceList
 
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
 	model := updated.(Model)
 	if model.screen != screenInspectorHome {
 		t.Fatalf("expected inspector home screen, got %d", model.screen)
@@ -1369,13 +1364,13 @@ func TestInspectorHomeStartsDedicatedScanFlow(t *testing.T) {
 
 func TestHandleInspectorScanLoadedMsgShowsResults(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	report := &awsservice.SecurityScanReport{
+	report := &inspector.SecurityScanReport{
 		ScannerCount: 1,
-		Findings: []awsservice.SecurityFinding{
+		Findings: []inspector.SecurityFinding{
 			{
 				RuleID:         "sg-public-ssh",
 				RuleName:       "SSH exposed to the internet",
-				Severity:       awsservice.RuleSeverityHigh,
+				Severity:       inspector.RuleSeverityHigh,
 				ResourceType:   "SecurityGroup",
 				ResourceID:     "sg-123456",
 				Summary:        "Ingress rule allows TCP/22 from 0.0.0.0/0.",
@@ -1401,20 +1396,20 @@ func TestHandleInspectorScanLoadedMsgShowsResults(t *testing.T) {
 func TestInspectorResultsSeverityFilterNarrowsFindings(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenInspectorResults
-	m.inspectorReport = &awsservice.SecurityScanReport{
-		Findings: []awsservice.SecurityFinding{
-			{RuleName: "Critical finding", Severity: awsservice.RuleSeverityCritical, ResourceID: "sg-1"},
-			{RuleName: "Medium finding", Severity: awsservice.RuleSeverityMedium, ResourceID: "db-1"},
+	m.inspectorReport = &inspector.SecurityScanReport{
+		Findings: []inspector.SecurityFinding{
+			{RuleName: "Critical finding", Severity: inspector.RuleSeverityCritical, ResourceID: "sg-1"},
+			{RuleName: "Medium finding", Severity: inspector.RuleSeverityMedium, ResourceID: "db-1"},
 		},
 	}
 	m.applyInspectorSeverityFilter()
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
 	model := updated.(Model)
-	if model.inspectorSeverityFilter != awsservice.RuleSeverityCritical {
+	if model.inspectorSeverityFilter != inspector.RuleSeverityCritical {
 		t.Fatalf("expected critical severity filter, got %q", model.inspectorSeverityFilter)
 	}
-	if len(model.inspectorFindings) != 1 || model.inspectorFindings[0].Severity != awsservice.RuleSeverityCritical {
+	if len(model.inspectorFindings) != 1 || model.inspectorFindings[0].Severity != inspector.RuleSeverityCritical {
 		t.Fatalf("expected only critical findings, got %+v", model.inspectorFindings)
 	}
 }
@@ -1422,10 +1417,10 @@ func TestInspectorResultsSeverityFilterNarrowsFindings(t *testing.T) {
 func TestInspectorResultsEnterShowsDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenInspectorResults
-	m.inspectorFindings = []awsservice.SecurityFinding{
+	m.inspectorFindings = []inspector.SecurityFinding{
 		{
 			RuleName:       "SSH exposed to the internet",
-			Severity:       awsservice.RuleSeverityHigh,
+			Severity:       inspector.RuleSeverityHigh,
 			ResourceID:     "sg-123456",
 			Summary:        "Ingress rule allows SSH from anywhere.",
 			Recommendation: "Restrict SSH ingress to trusted sources.",
@@ -1439,6 +1434,21 @@ func TestInspectorResultsEnterShowsDetail(t *testing.T) {
 	}
 	if model.selectedInspectorFinding == nil {
 		t.Fatal("expected selected inspector finding")
+	}
+}
+
+func TestInspectorHomeChecklistEntersPlaceholder(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenInspectorHome
+	m.inspectorWorkflowIdx = 1
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenInspectorWorkflowPlaceholder {
+		t.Fatalf("expected checklist placeholder screen, got %d", model.screen)
+	}
+	if cmd != nil {
+		t.Fatal("expected no command for placeholder workflow")
 	}
 }
 

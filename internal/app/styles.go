@@ -10,23 +10,32 @@ import (
 )
 
 var (
-	titleStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	selectedStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
-	normalStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	dimStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	errorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
-	successStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-	warningStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
-	infoStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("117"))
-	pathNodeStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true)
-	pathLineStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("67"))
-	filterStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	matchStyle       = lipgloss.NewStyle().Bold(true).Underline(true)
-	statusBarStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("236"))
-	listPanelStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
-	helpStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("237"))
-	detailLabelStyle = dimStyle.Copy().Width(14)
-	exitPanelStyle   = lipgloss.NewStyle().
+	titleStyle              = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	selectedStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
+	normalStyle             = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	dimStyle                = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	errorStyle              = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	successStyle            = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+	warningStyle            = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+	infoStyle               = lipgloss.NewStyle().Foreground(lipgloss.Color("117"))
+	pathNodeStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true)
+	pathLineStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("67"))
+	filterStyle             = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	matchStyle              = lipgloss.NewStyle().Bold(true).Underline(true)
+	statusBarStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("236"))
+	listPanelStyle          = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+	helpStyle               = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("237"))
+	inspectorTitleStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("203"))
+	inspectorSelectedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("216")).Bold(true)
+	inspectorAccentStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("209"))
+	inspectorSectionStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("173")).Bold(true)
+	inspectorReadyStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("215")).Bold(true)
+	inspectorPlannedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("95")).Bold(true)
+	inspectorStatusBarStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Background(lipgloss.Color("52"))
+	inspectorListPanelStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("160")).Padding(0, 1)
+	inspectorHelpStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Background(lipgloss.Color("53"))
+	detailLabelStyle        = dimStyle.Copy().Width(14)
+	exitPanelStyle          = lipgloss.NewStyle().
 				Border(lipgloss.DoubleBorder()).
 				BorderForeground(lipgloss.Color("39")).
 				Foreground(lipgloss.Color("252")).
@@ -43,6 +52,43 @@ var (
 			Foreground(lipgloss.Color("214")).
 			Bold(true)
 )
+
+func (m Model) inspectorModeActive() bool {
+	switch m.screen {
+	case screenInspectorHome, screenInspectorWorkflowPlaceholder, screenInspectorScanning, screenInspectorResults, screenInspectorFindingDetail:
+		return true
+	default:
+		return false
+	}
+}
+
+func (m Model) currentStatusBarStyle() lipgloss.Style {
+	if m.inspectorModeActive() {
+		return inspectorStatusBarStyle
+	}
+	return statusBarStyle
+}
+
+func (m Model) currentListPanelStyle() lipgloss.Style {
+	if m.inspectorModeActive() {
+		return inspectorListPanelStyle
+	}
+	return listPanelStyle
+}
+
+func (m Model) currentHelpStyle() lipgloss.Style {
+	if m.inspectorModeActive() {
+		return inspectorHelpStyle
+	}
+	return helpStyle
+}
+
+func (m Model) renderModeTitle(title string) string {
+	if m.inspectorModeActive() {
+		return inspectorTitleStyle.Render(title)
+	}
+	return titleStyle.Render(title)
+}
 
 func (m Model) renderStatusBar() string {
 	var leftParts []string
@@ -66,6 +112,9 @@ func (m Model) renderStatusBar() string {
 	if m.callerIdentity != nil && m.callerIdentity.Account != "" {
 		leftParts = append(leftParts, fmt.Sprintf("account:%s", m.callerIdentity.Account))
 	}
+	if m.inspectorModeActive() {
+		leftParts = append(leftParts, inspectorAccentStyle.Render("mode:inspector"))
+	}
 
 	if m.updateAvailable != "" {
 		hint := "unic update"
@@ -88,7 +137,7 @@ func (m Model) renderStatusBar() string {
 		width = leftMinWidth + rightMinWidth
 	}
 	if rightText == "" {
-		return statusBarStyle.Copy().Width(width).Align(lipgloss.Left).Render(leftText) + "\n\n"
+		return m.currentStatusBarStyle().Copy().Width(width).Align(lipgloss.Left).Render(leftText) + "\n\n"
 	}
 
 	leftWidth := width - rightMinWidth
@@ -99,15 +148,15 @@ func (m Model) renderStatusBar() string {
 
 	bar := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		statusBarStyle.Copy().Width(leftWidth).Align(lipgloss.Left).Render(leftText),
-		statusBarStyle.Copy().Width(rightWidth).Align(lipgloss.Right).Render(rightText),
+		m.currentStatusBarStyle().Copy().Width(leftWidth).Align(lipgloss.Left).Render(leftText),
+		m.currentStatusBarStyle().Copy().Width(rightWidth).Align(lipgloss.Right).Render(rightText),
 	)
 	return bar + "\n\n"
 }
 
 func (m Model) renderListPanel(content string) string {
 	content = strings.TrimRight(content, "\n")
-	style := listPanelStyle
+	style := m.currentListPanelStyle()
 	if m.width > 0 {
 		style = style.MaxWidth(max(m.width, 1))
 	}
@@ -116,7 +165,7 @@ func (m Model) renderListPanel(content string) string {
 
 func (m Model) renderHelpBar(content string) string {
 	content = " " + strings.TrimSpace(content)
-	style := helpStyle
+	style := m.currentHelpStyle()
 	if m.width > 0 {
 		style = style.Width(m.width)
 	}
