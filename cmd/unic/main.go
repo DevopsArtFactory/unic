@@ -43,7 +43,7 @@ func main() {
 			"auth_type", string(cfg.AuthType),
 		)
 
-		p := tea.NewProgram(app.New(cfg, configPath, cli.Version), tea.WithAltScreen())
+		p := tea.NewProgram(app.New(cfg, configPath, cli.Version, cli.Checklist()), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("TUI error: %w", err)
 		}

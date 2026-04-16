@@ -1,0 +1,43 @@
+name: Production Readiness
+description: Baseline readiness checks for the primary production stack.
+checks:
+  - id: prod-db-baseline
+    title: Production database baseline
+    type: rds
+    resource: prod-db
+    expect:
+      status: available
+      engine: postgres
+      engine_version: "16.2"
+      instance_class: db.t4g.medium
+      multi_az: true
+      storage_encrypted: true
+      publicly_accessible: false
+      backup_retention_days: 7
+
+  - id: web-sg-locked-down
+    title: Web security group exposure
+    type: security_group
+    resource: sg-web
+    expect:
+      ingress_present:
+        - protocol: tcp
+          from_port: 443
+          to_port: 443
+          referenced_sg_id: sg-alb
+      ingress_absent:
+        - protocol: tcp
+          from_port: 22
+          to_port: 22
+          cidr: 0.0.0.0/0
+
+  - id: app-secret-ready
+    title: App secret rotation and keys
+    type: secret
+    resource: prod/app
+    expect:
+      kms_key_id: alias/prod-secrets
+      rotation_enabled: true
+      value_keys:
+        - username
+        - password

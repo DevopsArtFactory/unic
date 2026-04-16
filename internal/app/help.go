@@ -382,15 +382,25 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between inspector workflows"},
 			{"enter", "Open the selected inspector workflow"},
+			{"l", "Open the checklist file picker when Checklist Inspector is selected"},
+			{"r", "Run the selected workflow when it is configured"},
 			{"q / esc", "Return to the service list"},
 		}
 	case screenInspectorWorkflowPlaceholder:
 		return []helpShortcut{
+			{"enter / l", "Open the checklist file picker"},
+			{"q / esc", "Go back to Inspector mode"},
+		}
+	case screenInspectorChecklistPicker:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between checklist folders and files"},
+			{"/", "Start filtering entries"},
+			{"enter", "Open the selected folder or load the selected checklist"},
 			{"q / esc", "Go back to Inspector mode"},
 		}
 	case screenInspectorScanning:
 		return []helpShortcut{
-			{"Wait", "The security scan is still running"},
+			{"Wait", "The selected inspector workflow is still running"},
 		}
 	case screenInspectorResults:
 		return []helpShortcut{
@@ -404,6 +414,20 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return []helpShortcut{
 			{"r", "Run the security scan again"},
 			{"q / esc", "Go back to the findings list"},
+		}
+	case screenInspectorChecklistResults:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between checklist results"},
+			{"enter", "Open the selected checklist result"},
+			{"l", "Open the checklist file picker"},
+			{"r", "Run the checklist again"},
+			{"q / esc", "Go back to Inspector mode"},
+		}
+	case screenInspectorChecklistDetail:
+		return []helpShortcut{
+			{"l", "Open the checklist file picker"},
+			{"r", "Run the checklist again"},
+			{"q / esc", "Go back to the checklist results"},
 		}
 	case screenContextPicker:
 		shortcuts := []helpShortcut{
@@ -616,13 +640,19 @@ func (m Model) helpScreenTitle() string {
 	case screenInspectorHome:
 		return "Inspector Mode"
 	case screenInspectorWorkflowPlaceholder:
-		return "Inspector Workflow"
+		return "Inspector Workflow Setup"
+	case screenInspectorChecklistPicker:
+		return "Checklist File Picker"
 	case screenInspectorScanning:
-		return "Inspector Scanning"
+		return "Inspector Workflow Scan"
 	case screenInspectorResults:
 		return "Inspector Findings"
 	case screenInspectorFindingDetail:
 		return "Inspector Finding Detail"
+	case screenInspectorChecklistResults:
+		return "Checklist Inspector Results"
+	case screenInspectorChecklistDetail:
+		return "Checklist Inspector Detail"
 	case screenContextPicker:
 		return "Context Picker"
 	case screenContextAdd:

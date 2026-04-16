@@ -28,6 +28,10 @@ func TestRootCmdHasFlags(t *testing.T) {
 	if vf == nil {
 		t.Error("expected --verbose flag")
 	}
+	cf := cmd.PersistentFlags().Lookup("checklist")
+	if cf == nil {
+		t.Error("expected --checklist flag")
+	}
 	if vf != nil && vf.Shorthand != "v" {
 		t.Errorf("expected --verbose shorthand 'v', got '%s'", vf.Shorthand)
 	}

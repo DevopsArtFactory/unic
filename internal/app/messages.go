@@ -203,3 +203,7 @@ type ecsExecDoneMsg struct {
 type inspectorScanLoadedMsg struct {
 	report *inspector.SecurityScanReport
 }
+
+type inspectorChecklistLoadedMsg struct {
+	report *inspector.ChecklistReport
+}
