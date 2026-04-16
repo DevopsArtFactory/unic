@@ -20,9 +20,18 @@ type Workflow struct {
 	Title       string
 	Description string
 	Available   bool
+	Status      string
 }
 
-func Workflows() []Workflow {
+func Workflows(checklistPath string) []Workflow {
+	checklistAvailable := strings.TrimSpace(checklistPath) != ""
+	checklistStatus := "ADD FILE"
+	checklistDescription := "Pass --checklist <path> to load a YAML checklist for readiness checks across RDS, security groups, and Secrets Manager."
+	if checklistAvailable {
+		checklistStatus = ""
+		checklistDescription = "Run a user-supplied YAML checklist to verify infrastructure readiness across RDS, security groups, and Secrets Manager."
+	}
+
 	return []Workflow{
 		{
 			Kind:        WorkflowSecurity,
@@ -33,8 +42,9 @@ func Workflows() []Workflow {
 		{
 			Kind:        WorkflowChecklist,
 			Title:       "Checklist Inspector",
-			Description: "Planned guided readiness and rollout checks for infrastructure workflows that span multiple AWS services.",
-			Available:   false,
+			Description: checklistDescription,
+			Available:   checklistAvailable,
+			Status:      checklistStatus,
 		},
 	}
 }
@@ -42,6 +52,9 @@ func Workflows() []Workflow {
 func (w Workflow) StatusLabel() string {
 	if w.Available {
 		return "READY"
+	}
+	if w.Status != "" {
+		return w.Status
 	}
 	return "PLANNED"
 }
@@ -57,6 +70,7 @@ type IAMClientAPI = awsservice.IAMClientAPI
 type RDSClientAPI = awsservice.RDSClientAPI
 type S3Bucket = awsservice.S3Bucket
 type Secret = awsservice.Secret
+type SecretDetail = awsservice.SecretDetail
 type SecurityGroup = awsservice.SecurityGroup
 type SecurityGroupRule = awsservice.SecurityGroupRule
 type SecretsManagerClientAPI = awsservice.SecretsManagerClientAPI

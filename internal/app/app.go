@@ -64,9 +64,12 @@ const (
 	screenS3ObjectDetail
 	screenInspectorHome
 	screenInspectorWorkflowPlaceholder
+	screenInspectorChecklistPicker
 	screenInspectorScanning
 	screenInspectorResults
 	screenInspectorFindingDetail
+	screenInspectorChecklistResults
+	screenInspectorChecklistDetail
 	screenContextPicker
 	screenContextAdd
 	screenContextSSOAccountList
@@ -243,13 +246,22 @@ type Model struct {
 	selectedS3Object  *awsservice.S3ObjectDetail
 
 	// Inspector browser state
-	inspectorWorkflows       []inspector.Workflow
-	inspectorWorkflowIdx     int
-	inspectorReport          *inspector.SecurityScanReport
-	inspectorFindings        []inspector.SecurityFinding
-	inspectorIdx             int
-	inspectorSeverityFilter  inspector.RuleSeverity
-	selectedInspectorFinding *inspector.SecurityFinding
+	inspectorWorkflows        []inspector.Workflow
+	inspectorWorkflowIdx      int
+	inspectorChecklistPath    string
+	inspectorChecklistDir     string
+	inspectorChecklistFiles   []checklistPickerEntry
+	filteredChecklistFiles    []checklistPickerEntry
+	inspectorChecklistFileIdx int
+	inspectorChecklistError   string
+	inspectorReport           *inspector.SecurityScanReport
+	inspectorFindings         []inspector.SecurityFinding
+	inspectorIdx              int
+	inspectorSeverityFilter   inspector.RuleSeverity
+	selectedInspectorFinding  *inspector.SecurityFinding
+	inspectorChecklistReport  *inspector.ChecklistReport
+	inspectorChecklistIdx     int
+	selectedChecklistResult   *inspector.ChecklistResult
 
 	// Context picker
 	configPath         string
@@ -304,21 +316,26 @@ type Model struct {
 }
 
 // New creates a new app Model.
-func New(cfg *config.Config, configPath string, version string) Model {
+func New(cfg *config.Config, configPath string, version string, checklistPath ...string) Model {
 	services := domain.Catalog()
 	filterTI := newFilterInput()
+	var configuredChecklistPath string
+	if len(checklistPath) > 0 {
+		configuredChecklistPath = checklistPath[0]
+	}
 	model := Model{
-		cfg:                cfg,
-		configPath:         configPath,
-		currentVersion:     version,
-		screen:             screenContextPicker,
-		ctxPrevScreen:      screenServiceList,
-		services:           services,
-		inspectorWorkflows: inspector.Workflows(),
-		loadingSpinner:     newLoadingSpinner(),
-		filterTI:           filterTI,
-		filters:            make(map[filterTarget]string),
-		contextTable:       newContextTable(),
+		cfg:                    cfg,
+		configPath:             configPath,
+		currentVersion:         version,
+		screen:                 screenContextPicker,
+		ctxPrevScreen:          screenServiceList,
+		services:               services,
+		inspectorChecklistPath: configuredChecklistPath,
+		inspectorWorkflows:     inspector.Workflows(configuredChecklistPath),
+		loadingSpinner:         newLoadingSpinner(),
+		filterTI:               filterTI,
+		filters:                make(map[filterTarget]string),
+		contextTable:           newContextTable(),
 	}
 	model.cwLogs = newCloudWatchLogsModel()
 	return model
@@ -534,10 +551,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateInspectorHome(msg)
 		case screenInspectorWorkflowPlaceholder:
 			return m.updateInspectorWorkflowPlaceholder(msg)
+		case screenInspectorChecklistPicker:
+			return m.updateInspectorChecklistPicker(msg)
 		case screenInspectorResults:
 			return m.updateInspectorResults(msg)
 		case screenInspectorFindingDetail:
 			return m.updateInspectorFindingDetail(msg)
+		case screenInspectorChecklistResults:
+			return m.updateInspectorChecklistResults(msg)
+		case screenInspectorChecklistDetail:
+			return m.updateInspectorChecklistDetail(msg)
 		case screenSecurityGroupList:
 			return m.updateSecurityGroupList(msg)
 		case screenSecurityGroupDetail:
@@ -783,12 +806,18 @@ func (m Model) View() string {
 		v = m.viewInspectorHome()
 	case screenInspectorWorkflowPlaceholder:
 		v = m.viewInspectorWorkflowPlaceholder()
+	case screenInspectorChecklistPicker:
+		v = m.viewInspectorChecklistPicker()
 	case screenInspectorScanning:
 		v = m.viewInspectorScanning()
 	case screenInspectorResults:
 		v = m.viewInspectorResults()
 	case screenInspectorFindingDetail:
 		v = m.viewInspectorFindingDetail()
+	case screenInspectorChecklistResults:
+		v = m.viewInspectorChecklistResults()
+	case screenInspectorChecklistDetail:
+		v = m.viewInspectorChecklistDetail()
 	case screenSecurityGroupList:
 		v = m.viewSecurityGroupList()
 	case screenSecurityGroupDetail:

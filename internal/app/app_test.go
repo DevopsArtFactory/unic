@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,16 @@ import (
 
 func testConfig() *config.Config {
 	return &config.Config{Profile: "default", Region: "us-east-1"}
+}
+
+func writeChecklistFile(t *testing.T, dir, name, content string) string {
+	t.Helper()
+
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write checklist file %s: %v", path, err)
+	}
+	return path
 }
 
 func TestNewModelNotQuitting(t *testing.T) {
@@ -1393,6 +1405,20 @@ func TestHandleInspectorScanLoadedMsgShowsResults(t *testing.T) {
 	}
 }
 
+func TestNewModelMarksChecklistWorkflowReadyWhenConfigured(t *testing.T) {
+	m := New(testConfig(), "", "dev", "/tmp/checklist.yaml")
+
+	if len(m.inspectorWorkflows) < 2 {
+		t.Fatalf("expected checklist workflow to be present, got %d workflows", len(m.inspectorWorkflows))
+	}
+	if !m.inspectorWorkflows[1].Available {
+		t.Fatalf("expected checklist workflow to be available, got %+v", m.inspectorWorkflows[1])
+	}
+	if got := m.inspectorWorkflows[1].StatusLabel(); got != "READY" {
+		t.Fatalf("expected READY status label, got %q", got)
+	}
+}
+
 func TestInspectorResultsSeverityFilterNarrowsFindings(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenInspectorResults
@@ -1437,18 +1463,187 @@ func TestInspectorResultsEnterShowsDetail(t *testing.T) {
 	}
 }
 
-func TestInspectorHomeChecklistEntersPlaceholder(t *testing.T) {
-	m := New(testConfig(), "", "dev")
+func TestHandleInspectorChecklistLoadedMsgShowsResults(t *testing.T) {
+	m := New(testConfig(), "", "dev", "/tmp/checklist.yaml")
+	report := &inspector.ChecklistReport{
+		ChecklistName: "Readiness",
+		Results: []inspector.ChecklistResult{
+			{
+				CheckID:  "secret-ready",
+				Title:    "Secret readiness",
+				Type:     inspector.ChecklistCheckSecret,
+				Resource: "prod/app",
+				Passed:   false,
+				Summary:  "1 expectation(s) did not match.",
+				Details:  []string{"missing value key \"password\""},
+			},
+		},
+	}
+
+	updated, _, handled := m.handleInspectorMsg(inspectorChecklistLoadedMsg{report: report})
+	if !handled {
+		t.Fatal("expected checklist scan message to be handled")
+	}
+
+	model := updated.(Model)
+	if model.screen != screenInspectorChecklistResults {
+		t.Fatalf("expected checklist results screen, got %d", model.screen)
+	}
+	if model.inspectorChecklistReport == nil || len(model.inspectorChecklistReport.Results) != 1 {
+		t.Fatalf("expected stored checklist report, got %+v", model.inspectorChecklistReport)
+	}
+}
+
+func TestInspectorHomeChecklistStartsDedicatedScanWhenConfigured(t *testing.T) {
+	m := New(testConfig(), "", "dev", "/tmp/checklist.yaml")
 	m.screen = screenInspectorHome
 	m.inspectorWorkflowIdx = 1
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
-	if model.screen != screenInspectorWorkflowPlaceholder {
-		t.Fatalf("expected checklist placeholder screen, got %d", model.screen)
+	if model.screen != screenInspectorScanning {
+		t.Fatalf("expected inspector scanning screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected checklist scan command")
+	}
+}
+
+func TestInspectorHomeChecklistOpensPickerWhenUnconfigured(t *testing.T) {
+	dir := t.TempDir()
+	checklistPath := writeChecklistFile(t, dir, "readiness.yaml", `
+name: Readiness
+checks:
+  - type: secret
+    resource: prod/app
+    expect:
+      rotation_enabled: true
+`)
+
+	m := New(testConfig(), "", "dev")
+	m.screen = screenInspectorHome
+	m.inspectorWorkflowIdx = 1
+	m.inspectorChecklistDir = dir
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenInspectorChecklistPicker {
+		t.Fatalf("expected checklist picker screen, got %d", model.screen)
 	}
 	if cmd != nil {
-		t.Fatal("expected no command for placeholder workflow")
+		t.Fatal("expected no command when opening the checklist picker")
+	}
+	if len(model.filteredChecklistFiles) == 0 {
+		t.Fatal("expected checklist picker entries to be loaded")
+	}
+
+	found := false
+	for _, entry := range model.filteredChecklistFiles {
+		if entry.Path == checklistPath {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected picker to include %s, got %+v", checklistPath, model.filteredChecklistFiles)
+	}
+}
+
+func TestInspectorChecklistPickerEnterFileStartsScan(t *testing.T) {
+	dir := t.TempDir()
+	checklistPath := writeChecklistFile(t, dir, "readiness.yaml", `
+name: Readiness
+checks:
+  - type: secret
+    resource: prod/app
+    expect:
+      rotation_enabled: true
+`)
+
+	m := New(testConfig(), "", "dev")
+	m.screen = screenInspectorHome
+	m.inspectorWorkflowIdx = 1
+	m.inspectorChecklistDir = dir
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	for i, entry := range model.filteredChecklistFiles {
+		if entry.Path == checklistPath {
+			model.inspectorChecklistFileIdx = i
+			break
+		}
+	}
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenInspectorScanning {
+		t.Fatalf("expected checklist scan screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected checklist scan command")
+	}
+	if model.inspectorChecklistPath != checklistPath {
+		t.Fatalf("expected checklist path %q, got %q", checklistPath, model.inspectorChecklistPath)
+	}
+	if !model.inspectorWorkflows[1].Available {
+		t.Fatalf("expected checklist workflow to be available after load, got %+v", model.inspectorWorkflows[1])
+	}
+}
+
+func TestInspectorChecklistPickerInvalidFileStaysOnPicker(t *testing.T) {
+	dir := t.TempDir()
+	checklistPath := writeChecklistFile(t, dir, "broken.yaml", "not: [valid")
+
+	m := New(testConfig(), "", "dev")
+	m.screen = screenInspectorHome
+	m.inspectorWorkflowIdx = 1
+	m.inspectorChecklistDir = dir
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	for i, entry := range model.filteredChecklistFiles {
+		if entry.Path == checklistPath {
+			model.inspectorChecklistFileIdx = i
+			break
+		}
+	}
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenInspectorChecklistPicker {
+		t.Fatalf("expected checklist picker screen, got %d", model.screen)
+	}
+	if cmd != nil {
+		t.Fatal("expected no checklist scan command for an invalid file")
+	}
+	if model.inspectorChecklistError == "" {
+		t.Fatal("expected checklist picker error for invalid YAML")
+	}
+}
+
+func TestInspectorChecklistResultsEnterShowsDetail(t *testing.T) {
+	m := New(testConfig(), "", "dev", "/tmp/checklist.yaml")
+	m.screen = screenInspectorChecklistResults
+	m.inspectorChecklistReport = &inspector.ChecklistReport{
+		Results: []inspector.ChecklistResult{
+			{
+				CheckID:  "db-ready",
+				Title:    "Database baseline",
+				Type:     inspector.ChecklistCheckRDS,
+				Resource: "prod-db",
+				Passed:   true,
+				Summary:  "All expectations matched.",
+			},
+		},
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenInspectorChecklistDetail {
+		t.Fatalf("expected checklist detail screen, got %d", model.screen)
+	}
+	if model.selectedChecklistResult == nil {
+		t.Fatal("expected selected checklist result")
 	}
 }
 

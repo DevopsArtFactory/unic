@@ -8,9 +8,10 @@ var (
 	// Version is set via ldflags at build time.
 	Version = "dev"
 
-	profile string
-	region  string
-	verbose bool
+	profile   string
+	region    string
+	verbose   bool
+	checklist string
 )
 
 func NewRootCmd() *cobra.Command {
@@ -24,6 +25,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "AWS profile to use")
 	cmd.PersistentFlags().StringVar(&region, "region", "", "AWS region to use")
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose debug logging")
+	cmd.PersistentFlags().StringVar(&checklist, "checklist", "", "Path to a checklist YAML file for Checklist Inspector")
 
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newContextCmd())
@@ -52,4 +54,9 @@ func Region() *string {
 // Verbose returns true if --verbose was passed.
 func Verbose() bool {
 	return verbose
+}
+
+// Checklist returns the CLI checklist path, or an empty string if not set.
+func Checklist() string {
+	return checklist
 }

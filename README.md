@@ -12,7 +12,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
-- Press `i` from the service picker to enter Inspector mode, then open the Security Inspector workflow for built-in findings across network exposure, RDS, IAM, Secrets Manager, S3, snapshot sharing, CloudTrail, GuardDuty, AWS Config, and ElastiCache for Valkey
+- Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in findings or the Checklist Inspector workflow for YAML-driven readiness checks across RDS, security groups, and secrets. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
 ## Documentation Map
 
@@ -72,6 +72,7 @@ make build
 unic
 unic --profile my-profile
 unic --region ap-northeast-2
+unic --checklist ./checklists/readiness.yaml   # optional: pre-load a checklist at startup
 unic --verbose
 ```
 
@@ -216,9 +217,45 @@ Context ordering:
 | Workflow | Status | Notes |
 |---|---|---|
 | Security Inspector | Ready | Runs built-in rule packs and opens severity-filtered findings |
-| Checklist Inspector | Planned | Reserved Inspector-mode slot for future checklist-style workflows |
+| Checklist Inspector | Ready | Runs a YAML checklist and reports pass/fail per check with resource context and mismatch details |
 
 Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
+
+Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup, and currently supports three check types:
+
+- `rds` for expected DB instance state such as status, engine, class, Multi-AZ, encryption, public access, and backup retention
+- `security_group` for required or forbidden ingress/egress rule matchers
+- `secret` for rotation state, KMS key ID, and required JSON value keys
+
+Minimal checklist example:
+
+```yaml
+name: Production Readiness
+checks:
+  - type: rds
+    resource: prod-db
+    expect:
+      publicly_accessible: false
+      storage_encrypted: true
+      backup_retention_days: 7
+
+  - type: security_group
+    resource: sg-web
+    expect:
+      ingress_absent:
+        - protocol: tcp
+          from_port: 22
+          to_port: 22
+          cidr: 0.0.0.0/0
+
+  - type: secret
+    resource: prod/app
+    expect:
+      rotation_enabled: true
+      value_keys:
+        - username
+        - password
+```
 
 ## TUI Navigation
 
@@ -249,8 +286,9 @@ Security Inspector ships built-in rule packs for Security Group exposure, RDS en
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
-| Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow |
+| Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
+| Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
 | Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
 
 Shared list filters now use fuzzy matching with inline match highlighting. Filtering is currently available on EC2 instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.

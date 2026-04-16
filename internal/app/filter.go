@@ -27,6 +27,7 @@ const (
 	filterContexts
 	filterVPCs
 	filterSubnets
+	filterInspectorChecklistFiles
 )
 
 // Filterable is implemented by any type that supports text-based filtering.
@@ -183,6 +184,9 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterSubnets:
 		m.filteredSubnets = applyFilter(m.subnets, m.filterValue(target))
 		m.subnetIdx = 0
+	case filterInspectorChecklistFiles:
+		m.filteredChecklistFiles = applyFilter(m.inspectorChecklistFiles, m.filterValue(target))
+		m.inspectorChecklistFileIdx = 0
 	}
 }
 

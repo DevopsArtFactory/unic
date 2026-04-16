@@ -27,9 +27,10 @@ The application already includes interactive mutation flows, polling-based statu
 
 1. Run `unic` to enter the TUI
 2. Select an AWS service and feature from the catalog, or press `i` to enter Inspector mode
-3. Drill into resource lists, inspector workflows, and detail views
-4. Execute supported actions when available
-5. Use `unic env` or `unic context setup` when shell exports are needed
+3. Optionally start `unic --checklist <path>` to pre-load Checklist Inspector, or load a YAML readiness file from the in-TUI checklist picker
+4. Drill into resource lists, inspector workflows, and detail views
+5. Execute supported actions when available
+6. Use `unic env` or `unic context setup` when shell exports are needed
 
 ## Configuration and Auth
 

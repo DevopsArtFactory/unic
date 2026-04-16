@@ -27,9 +27,10 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 
 1. `unic`으로 TUI에 진입한다
 2. 카탈로그에서 AWS 서비스와 기능을 선택하거나 `i`로 Inspector mode에 진입한다
-3. 리소스 목록, inspector workflow, 상세 화면으로 drill-down 한다
-4. 가능한 액션을 수행한다
-5. 쉘 export가 필요하면 `unic env` 또는 `unic context setup`을 사용한다
+3. Checklist Inspector가 필요하면 `unic --checklist <path>`로 미리 넘겨 실행하거나, TUI 내부 checklist picker에서 YAML readiness 파일을 불러온다
+4. 리소스 목록, inspector workflow, 상세 화면으로 drill-down 한다
+5. 가능한 액션을 수행한다
+6. 쉘 export가 필요하면 `unic env` 또는 `unic context setup`을 사용한다
 
 ## 설정과 인증
 

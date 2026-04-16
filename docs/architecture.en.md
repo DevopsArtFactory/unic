@@ -105,8 +105,9 @@ Pattern:
 
 - workflow-local finding/report models live here
 - Security Inspector scan orchestration and rule registration live here
+- Checklist Inspector YAML schema loading, checklist result models, and readiness runners live here
 - rule packs still depend on `internal/services/aws` repository methods and client interfaces rather than raw SDK setup
-- this package is the growth path for future inspector workflows such as Checklist Inspector
+- this package remains the growth path for future inspector workflows beyond Security and Checklist Inspector
 
 ### `internal/app/`
 
@@ -180,7 +181,7 @@ Current screen families include:
 - CloudWatch Logs group/stream/viewer flows
 - ECS cluster/service/task/container flows
 - S3 bucket/object/detail flows
-- Inspector mode home, workflow placeholder, and security findings/detail flows
+- Inspector mode home, checklist setup, security findings/detail, and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
 - SSO account / role selection and exit notice flows
 - loading and error screens

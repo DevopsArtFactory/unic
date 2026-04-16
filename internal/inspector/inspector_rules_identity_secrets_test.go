@@ -84,7 +84,8 @@ func (m *inspectorIAMMockClient) DeleteAccessKey(context.Context, *iam.DeleteAcc
 }
 
 type inspectorSecretsMockClient struct {
-	listSecretsFunc func(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error)
+	listSecretsFunc    func(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error)
+	getSecretValueFunc func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
 }
 
 func (m *inspectorSecretsMockClient) ListSecrets(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
@@ -94,7 +95,10 @@ func (m *inspectorSecretsMockClient) ListSecrets(ctx context.Context, params *se
 	return &secretsmanager.ListSecretsOutput{}, nil
 }
 
-func (m *inspectorSecretsMockClient) GetSecretValue(context.Context, *secretsmanager.GetSecretValueInput, ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+func (m *inspectorSecretsMockClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+	if m.getSecretValueFunc != nil {
+		return m.getSecretValueFunc(ctx, params, optFns...)
+	}
 	return &secretsmanager.GetSecretValueOutput{}, nil
 }
 

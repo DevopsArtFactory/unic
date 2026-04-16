@@ -105,8 +105,9 @@ cross-service inspector workflow와 rule pack을 담당한다.
 
 - workflow 전용 finding/report 모델은 여기서 관리
 - Security Inspector 스캔 orchestration과 rule 등록은 여기서 관리
+- Checklist Inspector YAML schema 로딩, checklist 결과 모델, readiness runner도 여기서 관리
 - rule pack은 raw SDK setup 대신 `internal/services/aws` repository 메서드와 client interface에 의존
-- Checklist Inspector 같은 후속 inspector workflow도 이 패턴으로 확장
+- Security / Checklist Inspector 이후의 후속 inspector workflow도 이 패턴으로 확장
 
 ### `internal/app/`
 
@@ -180,7 +181,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - CloudWatch Logs group/stream/viewer
 - ECS cluster/service/task/container
 - S3 bucket/object/detail
-- Inspector mode home, workflow placeholder, security findings/detail
+- Inspector mode home, checklist setup, security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
 - SSO account / role selection, exit notice
 - loading, error

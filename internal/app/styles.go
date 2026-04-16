@@ -55,7 +55,7 @@ var (
 
 func (m Model) inspectorModeActive() bool {
 	switch m.screen {
-	case screenInspectorHome, screenInspectorWorkflowPlaceholder, screenInspectorScanning, screenInspectorResults, screenInspectorFindingDetail:
+	case screenInspectorHome, screenInspectorWorkflowPlaceholder, screenInspectorChecklistPicker, screenInspectorScanning, screenInspectorResults, screenInspectorFindingDetail, screenInspectorChecklistResults, screenInspectorChecklistDetail:
 		return true
 	default:
 		return false
