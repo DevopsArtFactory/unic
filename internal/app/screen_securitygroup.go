@@ -227,7 +227,7 @@ func (m Model) viewSecurityGroupList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, sg.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSecurityGroups, sg.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 

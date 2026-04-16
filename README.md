@@ -243,7 +243,7 @@ The Inspector feature ships built-in rule packs for Security Group exposure, RDS
 | Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
 
-Filtering is currently available on EC2 instances, IAM users, VPCs/subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.
+Shared list filters now use fuzzy matching with inline match highlighting. Filtering is currently available on EC2 instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.
 
 Reachability Analyzer starts with a region selection step, defaults to the current context region, and now surfaces the AWS-documented source and destination resource types that unic supports: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, plus IP addresses as destinations. The source and destination pickers support type tabs, keyword filtering, IPv4 destination validation, and automatic cleanup of temporary Network Insights resources after each analysis. During analysis, the loading screen shows a vertical source-to-destination flow and intent summary, and the result view renders path hops and findings in a more readable layout.
 

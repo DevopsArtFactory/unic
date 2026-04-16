@@ -127,12 +127,14 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 	case screenVPCList:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between VPCs"},
+			{"/", "Start filtering VPCs"},
 			{"enter", "Open the subnet list for the selected VPC"},
 			{"q / esc", "Go back to the feature list"},
 		}
 	case screenSubnetList:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between subnets"},
+			{"/", "Start filtering subnets"},
 			{"enter", "Open subnet IP details"},
 			{"q / esc", "Go back to the VPC list"},
 		}

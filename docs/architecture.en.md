@@ -116,6 +116,7 @@ The app remains centered on a root model, but screen-specific rendering is now s
 - `screen_context.go`
 
 Supporting files include `styles.go`, `filter.go`, and `messages.go`.
+`filter.go` and `filter_match.go` now centralize shared list filtering, fuzzy match ordering, and inline match highlighting across common list screens, including the VPC and subnet lists.
 
 ## Authentication Model
 

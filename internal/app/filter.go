@@ -1,8 +1,6 @@
 package app
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -27,6 +25,8 @@ const (
 	filterS3Buckets
 	filterS3Objects
 	filterContexts
+	filterVPCs
+	filterSubnets
 )
 
 // Filterable is implemented by any type that supports text-based filtering.
@@ -39,22 +39,6 @@ func newFilterInput() textinput.Model {
 	ti.Prompt = ""
 	ti.CharLimit = 256
 	return ti
-}
-
-// applyFilter returns items matching the query via case-insensitive substring on FilterText.
-// Returns the full slice unchanged if query is empty.
-func applyFilter[T Filterable](items []T, query string) []T {
-	if query == "" {
-		return items
-	}
-	q := strings.ToLower(query)
-	var result []T
-	for _, item := range items {
-		if strings.Contains(strings.ToLower(item.FilterText()), q) {
-			result = append(result, item)
-		}
-	}
-	return result
 }
 
 func handleFilterKey(key, current string) (next string, deactivate bool, changed bool) {
@@ -193,6 +177,12 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 		m.filteredCtxList = applyFilter(m.ctxList, m.filterValue(target))
 		m.ctxIdx = 0
 		m.syncContextTable()
+	case filterVPCs:
+		m.filteredVPCs = applyFilter(m.vpcs, m.filterValue(target))
+		m.vpcIdx = 0
+	case filterSubnets:
+		m.filteredSubnets = applyFilter(m.subnets, m.filterValue(target))
+		m.subnetIdx = 0
 	}
 }
 
@@ -204,4 +194,8 @@ func (m Model) renderFilterValue(target filterTarget) string {
 		return dimStyle.Render("Filter: " + value)
 	}
 	return ""
+}
+
+func (m Model) renderHighlightedValue(target filterTarget, value string) string {
+	return renderHighlightedMatch(value, m.filterValue(target))
 }

@@ -115,7 +115,7 @@ func (m Model) viewECSClusterList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, c.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterECSClusters, c.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
@@ -196,7 +196,7 @@ func (m Model) viewECSServiceList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, s.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterECSServices, s.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")

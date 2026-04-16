@@ -25,6 +25,9 @@ Treat the prompt as one of:
 - If the user gave an issue number, read it with `gh issue view <number>`.
 - When an issue number is known, also search open PRs for that issue first
   (title, body, or branch naming) before starting implementation.
+- Once the issue to implement is known and you have confirmed there is no open
+  PR already covering it, claim the issue before coding by commenting
+  `@unic-bot: assign me` on the issue.
 - If the user gave a description, search open issues first with
   `gh issue list --state open --search '<terms>' --limit 20`.
 - For description-based requests, also search open PRs with the same terms

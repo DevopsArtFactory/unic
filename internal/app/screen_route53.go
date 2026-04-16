@@ -267,10 +267,10 @@ func (m Model) viewRoute53ZoneList() string {
 				zoneType = "Private"
 			}
 			row := cursor +
-				nameCol.Inherit(style).Render(zone.Name) +
-				idCol.Inherit(dimStyle).Render(zone.ID) +
+				nameCol.Inherit(style).Render(m.renderHighlightedValue(filterRoute53Zones, zone.Name)) +
+				idCol.Inherit(dimStyle).Render(m.renderHighlightedValue(filterRoute53Zones, zone.ID)) +
 				recordsCol.Inherit(dimStyle).Render(fmt.Sprintf("%d", zone.ResourceRecordCount)) +
-				dimStyle.Render(zoneType)
+				dimStyle.Render(m.renderHighlightedValue(filterRoute53Zones, zoneType))
 			panel.WriteString(row)
 			panel.WriteString("\n")
 		}
@@ -346,9 +346,9 @@ func (m Model) viewRoute53RecordList() string {
 				valStr = valStr[:57] + "..."
 			}
 			row := cursor +
-				nameCol.Inherit(style).Render(rec.Name) +
-				typeCol.Inherit(filterStyle).Render(rec.Type) +
-				dimStyle.Render(valStr)
+				nameCol.Inherit(style).Render(m.renderHighlightedValue(filterRoute53Records, rec.Name)) +
+				typeCol.Inherit(filterStyle).Render(m.renderHighlightedValue(filterRoute53Records, rec.Type)) +
+				dimStyle.Render(m.renderHighlightedValue(filterRoute53Records, valStr))
 			panel.WriteString(row)
 			panel.WriteString("\n")
 		}
