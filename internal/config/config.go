@@ -264,9 +264,7 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 		left, right := infos[i], infos[j]
 		switch {
 		case left.Order > 0 && right.Order > 0:
-			if left.Order != right.Order {
-				return left.Order < right.Order
-			}
+			return left.Order < right.Order
 		case left.Order > 0:
 			return true
 		case right.Order > 0:
