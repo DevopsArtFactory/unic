@@ -95,7 +95,11 @@ func parseContextOrder(raw string) (int, error) {
 	if _, err := fmt.Sscanf(raw, "%d", &order); err != nil {
 		return 0, fmt.Errorf("invalid order %q", raw)
 	}
+	if order < 1 {
+		return 0, fmt.Errorf("order must be a positive integer, got %d", order)
+	}
 	return order, nil
+}
 }
 
 func newContextSetupCmd() *cobra.Command {
