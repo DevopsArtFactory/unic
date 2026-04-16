@@ -2,6 +2,7 @@ package app
 
 import (
 	"unic/internal/config"
+	"unic/internal/inspector"
 	awsservice "unic/internal/services/aws"
 )
 
@@ -200,5 +201,5 @@ type ecsExecDoneMsg struct {
 }
 
 type inspectorScanLoadedMsg struct {
-	report *awsservice.SecurityScanReport
+	report *inspector.SecurityScanReport
 }

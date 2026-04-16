@@ -19,15 +19,15 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 - CloudWatch Logs
 - ECS
 - S3
-- Inspector
+- Inspector mode
 
 애플리케이션은 이미 상호작용형 변경 작업 플로우, polling 기반 상태 확인, context helper, 서비스별 drill-down 화면을 포함한다.
 
 ## 주요 사용자 흐름
 
 1. `unic`으로 TUI에 진입한다
-2. 카탈로그에서 서비스와 기능을 선택한다
-3. 리소스 목록과 상세 화면으로 drill-down 한다
+2. 카탈로그에서 AWS 서비스와 기능을 선택하거나 `i`로 Inspector mode에 진입한다
+3. 리소스 목록, inspector workflow, 상세 화면으로 drill-down 한다
 4. 가능한 액션을 수행한다
 5. 쉘 export가 필요하면 `unic env` 또는 `unic context setup`을 사용한다
 
@@ -49,8 +49,9 @@ cmd/unic/                 진입점
 internal/cli/             Cobra 명령
 internal/config/          config 로드/저장, context helper
 internal/auth/            env export, interactive setup
-internal/domain/          서비스 카탈로그와 feature enum
+internal/domain/          AWS 서비스 카탈로그와 feature enum
 internal/services/aws/    AWS repository, 모델, 서비스 로직
+internal/inspector/       cross-service inspector workflow, finding, rule pack
 internal/app/             Bubble Tea 모델, 화면, 스타일, 메시지
 ```
 

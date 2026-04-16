@@ -1,4 +1,4 @@
-package aws
+package inspector
 
 import (
 	"context"
@@ -45,7 +45,7 @@ func inspectIAMAccessKeyAges(ctx context.Context, repo *AwsRepository, now time.
 		}
 
 		for _, user := range page.Users {
-			keys, err := repo.listUserAccessKeys(ctx, user.UserName)
+			keys, err := repo.ListUserAccessKeys(ctx, user.UserName)
 			if err != nil {
 				return nil, err
 			}

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -43,6 +44,46 @@ func TestRenderStatusBarUsesFullWidthAndUpdateHint(t *testing.T) {
 		if !strings.Contains(plain, want) {
 			t.Fatalf("expected status bar to contain %q, got %q", want, plain)
 		}
+	}
+}
+
+func TestInspectorModeStatusBarAddsModeMarkerAndDifferentChrome(t *testing.T) {
+	regular := New(testConfig(), "", "dev")
+	regular.width = 80
+	regular.cfg.ContextName = "prod"
+	regular.screen = screenServiceList
+
+	inspectorMode := New(testConfig(), "", "dev")
+	inspectorMode.width = 80
+	inspectorMode.cfg.ContextName = "prod"
+	inspectorMode.screen = screenInspectorHome
+
+	regularBar := regular.renderStatusBar()
+	inspectorBar := inspectorMode.renderStatusBar()
+	if regularBar == inspectorBar {
+		t.Fatal("expected inspector mode status bar styling to differ from the regular service flow")
+	}
+	if !strings.Contains(stripANSI(inspectorBar), "mode:inspector") {
+		t.Fatalf("expected inspector status bar to include mode marker, got %q", stripANSI(inspectorBar))
+	}
+}
+
+func TestInspectorModeHelpBarUsesDifferentStyling(t *testing.T) {
+	regular := New(testConfig(), "", "dev")
+	regular.width = 48
+	regular.screen = screenServiceList
+
+	inspectorMode := New(testConfig(), "", "dev")
+	inspectorMode.width = 48
+	inspectorMode.screen = screenInspectorHome
+
+	regularBar := regular.renderHelpBar("esc: back • H: home")
+	inspectorBar := inspectorMode.renderHelpBar("esc: back • H: home")
+	if reflect.DeepEqual(regular.currentHelpStyle(), inspectorMode.currentHelpStyle()) {
+		t.Fatal("expected inspector help bar styling to differ from the regular service flow")
+	}
+	if stripANSI(regularBar) != stripANSI(inspectorBar) {
+		t.Fatalf("expected inspector styling to keep the visible help text unchanged, got regular=%q inspector=%q", stripANSI(regularBar), stripANSI(inspectorBar))
 	}
 }
 

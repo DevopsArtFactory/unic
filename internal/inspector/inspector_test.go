@@ -1,4 +1,4 @@
-package aws
+package inspector
 
 import (
 	"context"
@@ -63,7 +63,7 @@ func TestRunSecurityScanSortsFindingsBySeverityAndResource(t *testing.T) {
 		},
 	})
 
-	report, err := (&AwsRepository{}).RunSecurityScan(context.Background())
+	report, err := RunSecurityScan(context.Background(), &AwsRepository{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestRunSecurityScanCollectsWarningsAndContinues(t *testing.T) {
 		},
 	})
 
-	report, err := (&AwsRepository{}).RunSecurityScan(context.Background())
+	report, err := RunSecurityScan(context.Background(), &AwsRepository{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestRunSecurityScanStopsWhenContextCanceledBetweenScanners(t *testing.T) {
 		},
 	})
 
-	report, err := (&AwsRepository{}).RunSecurityScan(ctx)
+	report, err := RunSecurityScan(ctx, &AwsRepository{})
 	if err == nil {
 		t.Fatal("expected context cancellation error")
 	}

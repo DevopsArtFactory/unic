@@ -18,7 +18,7 @@ type helpSection struct {
 func (m Model) viewHelp() string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Keyboard Shortcuts"))
+	b.WriteString(m.renderModeTitle("Keyboard Shortcuts"))
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render(fmt.Sprintf("Screen: %s", m.helpScreenTitle())))
 	b.WriteString("\n\n")
@@ -113,6 +113,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between AWS services"},
 			{"enter", "Open the selected service"},
+			{"i", "Open Inspector mode"},
 			{"esc", "Open the context picker"},
 			{"q", "Quit unic"},
 		}
@@ -377,8 +378,13 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		}
 	case screenInspectorHome:
 		return []helpShortcut{
-			{"enter / r", "Run the security scan"},
-			{"q / esc", "Go back to the feature list"},
+			{"↑/↓, j/k", "Move between inspector workflows"},
+			{"enter", "Open the selected inspector workflow"},
+			{"q / esc", "Return to the service list"},
+		}
+	case screenInspectorWorkflowPlaceholder:
+		return []helpShortcut{
+			{"q / esc", "Go back to Inspector mode"},
 		}
 	case screenInspectorScanning:
 		return []helpShortcut{
@@ -390,7 +396,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"1-5", "Filter findings by severity"},
 			{"enter", "Open the selected finding detail"},
 			{"r", "Run the security scan again"},
-			{"q / esc", "Go back to the Inspector home screen"},
+			{"q / esc", "Go back to Inspector mode"},
 		}
 	case screenInspectorFindingDetail:
 		return []helpShortcut{
@@ -606,7 +612,9 @@ func (m Model) helpScreenTitle() string {
 	case screenS3ObjectDetail:
 		return "S3 Object Detail"
 	case screenInspectorHome:
-		return "Inspector Home"
+		return "Inspector Mode"
+	case screenInspectorWorkflowPlaceholder:
+		return "Inspector Workflow"
 	case screenInspectorScanning:
 		return "Inspector Scanning"
 	case screenInspectorResults:

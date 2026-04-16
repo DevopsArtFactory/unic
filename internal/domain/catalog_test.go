@@ -160,21 +160,12 @@ func TestCatalogContainsS3BrowserFeature(t *testing.T) {
 	t.Error("S3 service not found in catalog")
 }
 
-func TestCatalogContainsInspectorSecurityScanFeature(t *testing.T) {
+func TestCatalogDoesNotContainInspectorPseudoService(t *testing.T) {
 	services := Catalog()
 
 	for _, svc := range services {
-		if svc.Name != ServiceInspector {
-			continue
+		if svc.Name == "Inspector" {
+			t.Fatal("inspector should not be listed as a regular AWS service")
 		}
-		if len(svc.Features) != 1 {
-			t.Fatalf("expected 1 Inspector feature, got %d", len(svc.Features))
-		}
-		if svc.Features[0].Kind != FeatureSecurityScan {
-			t.Fatalf("expected Security Scan feature, got %s", svc.Features[0].Kind)
-		}
-		return
 	}
-
-	t.Error("Inspector service not found in catalog")
 }

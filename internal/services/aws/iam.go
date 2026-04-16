@@ -289,6 +289,10 @@ func (r *AwsRepository) listUserAccessKeys(ctx context.Context, userName string)
 	return keys, nil
 }
 
+func (r *AwsRepository) ListUserAccessKeys(ctx context.Context, userName string) ([]AccessKey, error) {
+	return r.listUserAccessKeys(ctx, userName)
+}
+
 func (r *AwsRepository) listUserGroups(ctx context.Context, userName string) ([]string, error) {
 	input := &iam.ListGroupsForUserInput{
 		UserName: awssdk.String(userName),
