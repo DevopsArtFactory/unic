@@ -341,7 +341,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"n", "Load older log events"},
 			{"q / esc", "Go back to the stream list"},
 		}
-		if !m.cwLogWrap {
+		if !m.cwLogs.wrap {
 			shortcuts = append(shortcuts[:6], append([]helpShortcut{{"h / l", "Scroll horizontally through long log lines"}}, shortcuts[6:]...)...)
 		}
 		return shortcuts

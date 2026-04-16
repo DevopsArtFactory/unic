@@ -101,7 +101,15 @@ Pattern:
 ### `internal/app/`
 
 Bubble Tea application state, navigation, and rendering.
-The app remains centered on a root model, but screen-specific rendering is now split across dedicated files such as:
+The app remains centered on a root model, but feature-specific behavior is gradually moving behind submodel contracts so the root model can stay focused on boot, global navigation, shared chrome, and screen switching.
+
+Current direction:
+
+- `app.go` keeps the root model and global event loop
+- feature submodels handle feature-local state, message handling, key handling, and view rendering
+- CloudWatch Logs is the first representative flow extracted into this pattern
+
+Screen-specific rendering still lives in dedicated files such as:
 
 - `screen_ec2.go`
 - `screen_vpc.go`
