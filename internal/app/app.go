@@ -224,31 +224,8 @@ type Model struct {
 	ecsContainers   []awsservice.ECSContainer
 	ecsContainerIdx int
 
-	// CloudWatch Logs browser state
-	cwLogGroups             []awsservice.LogGroup
-	filteredCWLogGroups     []awsservice.LogGroup
-	cwLogGroupIdx           int
-	cwLogGroupFilter        string
-	cwLogGroupFilterActive  bool
-	selectedCWLogGroup      *awsservice.LogGroup
-	cwLogStreams            []awsservice.LogStream
-	filteredCWLogStreams    []awsservice.LogStream
-	cwLogStreamIdx          int
-	cwLogStreamFilter       string
-	cwLogStreamFilterActive bool
-	cwLogStreamNextToken    *string
-	selectedCWLogStream     *awsservice.LogStream
-	cwLogEvents             []awsservice.LogEvent
-	cwLogScrollOffset       int
-	cwLogGroupNextToken     *string
-	cwLogNextToken          *string
-	cwLogTimeRange          int // index into preset time ranges
-	cwLogFilterPattern      string
-	cwLogFilterActive       bool // filter pattern input active
-	cwLogTailing            bool // live tail active
-	cwLogTailToken          *string
-	cwLogWrap               bool
-	cwLogHorizontalOffset   int
+	// Feature submodels
+	cwLogs cloudWatchLogsModel
 
 	// S3 browser state
 	s3Buckets         []awsservice.S3Bucket
@@ -325,7 +302,7 @@ type Model struct {
 func New(cfg *config.Config, configPath string, version string) Model {
 	services := domain.Catalog()
 	filterTI := newFilterInput()
-	return Model{
+	model := Model{
 		cfg:            cfg,
 		configPath:     configPath,
 		currentVersion: version,
@@ -337,6 +314,8 @@ func New(cfg *config.Config, configPath string, version string) Model {
 		filters:        make(map[filterTarget]string),
 		contextTable:   newContextTable(),
 	}
+	model.cwLogs = newCloudWatchLogsModel()
+	return model
 }
 
 func newLoadingSpinner() spinner.Model {
@@ -436,13 +415,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleSecurityGroupMsg,
 		m.handleIAMMsg,
 		m.handleSecretMsg,
-		m.handleCloudWatchLogsMsg,
 		m.handleECSMsg,
 		m.handleS3Msg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
 		if newM, cmd, handled := h(msg); handled {
+			return newM, cmd
+		}
+	}
+	for _, submodel := range m.featureSubmodels() {
+		if newM, cmd, handled := submodel.HandleMessage(&m, msg); handled {
 			return newM, cmd
 		}
 	}
@@ -482,6 +465,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.deactivateFilter()
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
+		}
+
+		for _, submodel := range m.featureSubmodels() {
+			if newM, cmd, handled := submodel.HandleKey(&m, msg); handled {
+				return newM, cmd
+			}
 		}
 
 		switch m.screen {
@@ -529,12 +518,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecretList(msg)
 		case screenSecretDetail:
 			return m.updateSecretDetail(msg)
-		case screenCWLogGroupList:
-			return m.updateCWLogGroupList(msg)
-		case screenCWLogStreamList:
-			return m.updateCWLogStreamList(msg)
-		case screenCWLogViewer:
-			return m.updateCWLogViewer(msg)
 		case screenS3BucketList:
 			return m.updateS3BucketList(msg)
 		case screenS3ObjectList:
@@ -687,7 +670,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureSecretsBrowser:
 				return m.startLoading(m.loadSecrets())
 			case domain.FeatureCloudWatchLogsBrowser:
-				return m.startLoading(m.loadCWLogGroups(false))
+				return m.cwLogs.Start(&m)
 			case domain.FeatureS3Browser:
 				return m.startLoading(m.loadS3Buckets())
 			case domain.FeatureSecurityGroupBrowser:
@@ -738,6 +721,11 @@ func (m Model) View() string {
 	}
 
 	var v string
+	for _, submodel := range m.featureSubmodels() {
+		if view, handled := submodel.View(m); handled {
+			return m.fitToHeight(view)
+		}
+	}
 	switch m.screen {
 	case screenServiceList:
 		v = m.viewServiceList()
@@ -783,12 +771,6 @@ func (m Model) View() string {
 		v = m.viewSecretList()
 	case screenSecretDetail:
 		v = m.viewSecretDetail()
-	case screenCWLogGroupList:
-		v = m.viewCWLogGroupList()
-	case screenCWLogStreamList:
-		v = m.viewCWLogStreamList()
-	case screenCWLogViewer:
-		v = m.viewCWLogViewer()
 	case screenS3BucketList:
 		v = m.viewS3BucketList()
 	case screenS3ObjectList:

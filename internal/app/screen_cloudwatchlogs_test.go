@@ -11,8 +11,8 @@ import (
 func TestCWLogViewerLinesWrapLongMessages(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 32
-	m.cwLogWrap = true
-	m.cwLogEvents = []awsservice.LogEvent{
+	m.cwLogs.wrap = true
+	m.cwLogs.events = []awsservice.LogEvent{
 		{
 			Timestamp: time.Date(2026, 4, 11, 10, 0, 0, 0, time.UTC),
 			Message:   "this-is-a-very-long-log-line-that-should-wrap",
@@ -29,9 +29,9 @@ func TestCWLogViewerLinesWrapLongMessages(t *testing.T) {
 func TestCWLogViewerLinesHorizontalOffsetWhenWrapDisabled(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 80
-	m.cwLogWrap = false
-	m.cwLogHorizontalOffset = 8
-	m.cwLogEvents = []awsservice.LogEvent{
+	m.cwLogs.wrap = false
+	m.cwLogs.horizontalOffset = 8
+	m.cwLogs.events = []awsservice.LogEvent{
 		{
 			Timestamp: time.Date(2026, 4, 11, 10, 0, 0, 0, time.UTC),
 			Message:   "0123456789abcdef",

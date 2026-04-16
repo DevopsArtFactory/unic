@@ -1471,17 +1471,17 @@ func TestCWLogViewerDownDoesNotOverflowShortEventList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenCWLogViewer
 	m.height = 20
-	m.cwLogEvents = []awsservice.LogEvent{
+	m.cwLogs.events = []awsservice.LogEvent{
 		{Timestamp: time.Unix(0, 0), Message: "one"},
 		{Timestamp: time.Unix(1, 0), Message: "two"},
 		{Timestamp: time.Unix(2, 0), Message: "three"},
 	}
-	m.cwLogScrollOffset = 0
+	m.cwLogs.scrollOffset = 0
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
-	if model.cwLogScrollOffset != 0 {
-		t.Fatalf("expected scroll offset to remain 0, got %d", model.cwLogScrollOffset)
+	if model.cwLogs.scrollOffset != 0 {
+		t.Fatalf("expected scroll offset to remain 0, got %d", model.cwLogs.scrollOffset)
 	}
 }
 
@@ -1489,9 +1489,9 @@ func TestCWLogTailAppendClampsScrollOffsetForShortEventList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.height = 20
 	m.screen = screenCWLogViewer
-	m.cwLogTailing = true
-	m.cwLogScrollOffset = 7
-	m.cwLogEvents = []awsservice.LogEvent{
+	m.cwLogs.tailing = true
+	m.cwLogs.scrollOffset = 7
+	m.cwLogs.events = []awsservice.LogEvent{
 		{Timestamp: time.Unix(0, 0), Message: "one"},
 		{Timestamp: time.Unix(1, 0), Message: "two"},
 	}
@@ -1507,15 +1507,15 @@ func TestCWLogTailAppendClampsScrollOffsetForShortEventList(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if model.cwLogScrollOffset != 0 {
-		t.Fatalf("expected clamped scroll offset 0, got %d", model.cwLogScrollOffset)
+	if model.cwLogs.scrollOffset != 0 {
+		t.Fatalf("expected clamped scroll offset 0, got %d", model.cwLogs.scrollOffset)
 	}
 }
 
 func TestCWLogTailTickSchedulesPollAndNextTick(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.cwLogTailing = true
-	m.selectedCWLogGroup = &awsservice.LogGroup{Name: "/aws/lambda/test"}
+	m.cwLogs.tailing = true
+	m.cwLogs.selectedGroup = &awsservice.LogGroup{Name: "/aws/lambda/test"}
 
 	updated, cmd, handled := m.handleCloudWatchLogsMsg(cwLogTailTickMsg{})
 	if !handled {
@@ -1526,7 +1526,7 @@ func TestCWLogTailTickSchedulesPollAndNextTick(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if !model.cwLogTailing {
+	if !model.cwLogs.tailing {
 		t.Fatal("expected tailing to remain enabled")
 	}
 
@@ -1544,8 +1544,8 @@ func TestCWLogTailAppendDeduplicatesExistingEventIDs(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.height = 20
 	m.screen = screenCWLogViewer
-	m.cwLogTailing = true
-	m.cwLogEvents = []awsservice.LogEvent{
+	m.cwLogs.tailing = true
+	m.cwLogs.events = []awsservice.LogEvent{
 		{EventID: "evt-1", Timestamp: time.Unix(0, 0), Message: "one"},
 		{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"},
 	}
@@ -1562,11 +1562,11 @@ func TestCWLogTailAppendDeduplicatesExistingEventIDs(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if len(model.cwLogEvents) != 3 {
-		t.Fatalf("expected 3 deduplicated events, got %d", len(model.cwLogEvents))
+	if len(model.cwLogs.events) != 3 {
+		t.Fatalf("expected 3 deduplicated events, got %d", len(model.cwLogs.events))
 	}
-	if model.cwLogEvents[2].EventID != "evt-3" {
-		t.Fatalf("expected final event to be evt-3, got %q", model.cwLogEvents[2].EventID)
+	if model.cwLogs.events[2].EventID != "evt-3" {
+		t.Fatalf("expected final event to be evt-3, got %q", model.cwLogs.events[2].EventID)
 	}
 }
 
@@ -1574,8 +1574,8 @@ func TestCWLogTailAppendDeduplicatesEventsWithoutEventIDs(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.height = 20
 	m.screen = screenCWLogViewer
-	m.cwLogTailing = true
-	m.cwLogEvents = []awsservice.LogEvent{
+	m.cwLogs.tailing = true
+	m.cwLogs.events = []awsservice.LogEvent{
 		{Timestamp: time.Unix(1, 0), Message: "duplicate"},
 	}
 
@@ -1591,18 +1591,18 @@ func TestCWLogTailAppendDeduplicatesEventsWithoutEventIDs(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if len(model.cwLogEvents) != 2 {
-		t.Fatalf("expected 2 deduplicated events, got %d", len(model.cwLogEvents))
+	if len(model.cwLogs.events) != 2 {
+		t.Fatalf("expected 2 deduplicated events, got %d", len(model.cwLogs.events))
 	}
-	if got := strings.TrimSpace(model.cwLogEvents[1].Message); got != "new event" {
+	if got := strings.TrimSpace(model.cwLogs.events[1].Message); got != "new event" {
 		t.Fatalf("expected final event to be new event, got %q", got)
 	}
 }
 
 func TestCWLogLoadMoreDoesNotOverwriteTailToken(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.cwLogTailToken = stringPtr("tail-token")
-	m.cwLogNextToken = stringPtr("page-token")
+	m.cwLogs.tailToken = stringPtr("tail-token")
+	m.cwLogs.nextToken = stringPtr("page-token")
 
 	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
 		append:                true,
@@ -1615,18 +1615,18 @@ func TestCWLogLoadMoreDoesNotOverwriteTailToken(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if got := derefString(model.cwLogTailToken); got != "tail-token" {
+	if got := derefString(model.cwLogs.tailToken); got != "tail-token" {
 		t.Fatalf("expected tail token to remain unchanged, got %q", got)
 	}
-	if got := derefString(model.cwLogNextToken); got != "older-page-token" {
+	if got := derefString(model.cwLogs.nextToken); got != "older-page-token" {
 		t.Fatalf("expected pagination token to update, got %q", got)
 	}
 }
 
 func TestCWLogTailAppendDoesNotOverwritePaginationToken(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.cwLogNextToken = stringPtr("page-token")
-	m.cwLogTailToken = stringPtr("tail-token")
+	m.cwLogs.nextToken = stringPtr("page-token")
+	m.cwLogs.tailToken = stringPtr("tail-token")
 
 	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
 		append:          true,
@@ -1639,10 +1639,10 @@ func TestCWLogTailAppendDoesNotOverwritePaginationToken(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if got := derefString(model.cwLogNextToken); got != "page-token" {
+	if got := derefString(model.cwLogs.nextToken); got != "page-token" {
 		t.Fatalf("expected pagination token to remain unchanged, got %q", got)
 	}
-	if got := derefString(model.cwLogTailToken); got != "new-tail-token" {
+	if got := derefString(model.cwLogs.tailToken); got != "new-tail-token" {
 		t.Fatalf("expected tail token to update, got %q", got)
 	}
 }
@@ -1662,17 +1662,17 @@ func TestCWLogGroupsLoadedReplacesInitialPageAndStoresNextToken(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if len(model.cwLogGroups) != 2 {
-		t.Fatalf("expected 2 groups, got %d", len(model.cwLogGroups))
+	if len(model.cwLogs.groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d", len(model.cwLogs.groups))
 	}
-	if got := derefString(model.cwLogGroupNextToken); got != "page-2" {
+	if got := derefString(model.cwLogs.groupNextToken); got != "page-2" {
 		t.Fatalf("expected next token page-2, got %q", got)
 	}
 }
 
 func TestCWLogGroupsLoadedAppendExtendsExistingList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.cwLogGroups = []awsservice.LogGroup{{Name: "/aws/lambda/a"}}
+	m.cwLogs.groups = []awsservice.LogGroup{{Name: "/aws/lambda/a"}}
 
 	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogGroupsLoadedMsg{
 		append: true,
@@ -1686,17 +1686,17 @@ func TestCWLogGroupsLoadedAppendExtendsExistingList(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if len(model.cwLogGroups) != 3 {
-		t.Fatalf("expected 3 groups, got %d", len(model.cwLogGroups))
+	if len(model.cwLogs.groups) != 3 {
+		t.Fatalf("expected 3 groups, got %d", len(model.cwLogs.groups))
 	}
-	if model.cwLogGroups[2].Name != "/aws/lambda/c" {
-		t.Fatalf("expected appended group /aws/lambda/c, got %q", model.cwLogGroups[2].Name)
+	if model.cwLogs.groups[2].Name != "/aws/lambda/c" {
+		t.Fatalf("expected appended group /aws/lambda/c, got %q", model.cwLogs.groups[2].Name)
 	}
 }
 
 func TestCWLogStreamsLoadedAppendExtendsExistingList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.cwLogStreams = []awsservice.LogStream{{Name: "stream-a"}}
+	m.cwLogs.streams = []awsservice.LogStream{{Name: "stream-a"}}
 
 	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogStreamsLoadedMsg{
 		append: true,
@@ -1711,10 +1711,10 @@ func TestCWLogStreamsLoadedAppendExtendsExistingList(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if len(model.cwLogStreams) != 3 {
-		t.Fatalf("expected 3 streams, got %d", len(model.cwLogStreams))
+	if len(model.cwLogs.streams) != 3 {
+		t.Fatalf("expected 3 streams, got %d", len(model.cwLogs.streams))
 	}
-	if got := derefString(model.cwLogStreamNextToken); got != "stream-page-3" {
+	if got := derefString(model.cwLogs.streamNextToken); got != "stream-page-3" {
 		t.Fatalf("expected next token stream-page-3, got %q", got)
 	}
 }
