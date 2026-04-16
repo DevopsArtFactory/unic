@@ -192,7 +192,7 @@ func (m *Model) loadChecklistPickerEntries(dir string) error {
 	return nil
 }
 
-func (m Model) openChecklistPicker() (tea.Model, tea.Cmd) {
+func (m Model) openChecklistPicker() (Model, tea.Cmd) {
 	if err := m.loadChecklistPickerEntries(m.initialChecklistPickerDir()); err != nil {
 		m.errMsg = err.Error()
 		m.screen = screenError

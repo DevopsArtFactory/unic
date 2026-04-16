@@ -1621,6 +1621,31 @@ func TestInspectorChecklistPickerInvalidFileStaysOnPicker(t *testing.T) {
 	}
 }
 
+func TestOpenChecklistPickerErrorReturnsUpdatedModel(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	lockedDir := filepath.Join(t.TempDir(), "locked")
+	if err := os.Mkdir(lockedDir, 0o755); err != nil {
+		t.Fatalf("failed to create locked checklist dir: %v", err)
+	}
+	if err := os.Chmod(lockedDir, 0o000); err != nil {
+		t.Fatalf("failed to lock checklist dir: %v", err)
+	}
+	defer os.Chmod(lockedDir, 0o755)
+
+	m.inspectorChecklistDir = lockedDir
+
+	updated, cmd := m.openChecklistPicker()
+	if cmd != nil {
+		t.Fatal("expected no command when checklist picker loading fails")
+	}
+	if updated.screen != screenError {
+		t.Fatalf("expected error screen, got %d", updated.screen)
+	}
+	if updated.errMsg == "" {
+		t.Fatal("expected error message when checklist picker directory cannot be loaded")
+	}
+}
+
 func TestInspectorChecklistResultsEnterShowsDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev", "/tmp/checklist.yaml")
 	m.screen = screenInspectorChecklistResults
