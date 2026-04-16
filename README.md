@@ -102,7 +102,7 @@ unic context unset
 `unic context setup` writes its prompts to `stderr` and copies the generated shell commands to the clipboard.
 `unic env` prints shell commands to `stdout` so it can be used with `eval`.
 Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the TUI can show which shell context is currently active.
-In the TUI context picker, typing starts an incremental filter immediately.
+Contexts can be prioritized in the setup picker with an `order` field in config.
 
 ## Configuration
 
@@ -129,6 +129,7 @@ defaults:
 
 contexts:
   - name: dev-sso
+    order: 10
     profile: my-sso-profile
     region: ap-northeast-2
     auth_type: sso
@@ -143,6 +144,7 @@ contexts:
     sso_role_name: DeveloperRole
 
   - name: prod-admin
+    order: 20
     profile: base-profile
     region: us-east-1
     auth_type: assume_role
@@ -162,6 +164,12 @@ contexts:
 | `credential` | Use shared AWS profile credentials | `profile` |
 | `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
 | `sso` | Use AWS IAM Identity Center / SSO | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
+
+Optional context fields:
+
+| Field | Meaning |
+|---|---|
+| `order` | Lower values appear first in the context setup picker. Contexts without `order` fall back after ordered entries in their existing file order. |
 
 Resolution priority:
 

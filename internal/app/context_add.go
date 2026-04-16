@@ -20,6 +20,7 @@ var authTypes = []string{"sso", "credential", "assume_role"}
 var fieldsByAuthType = map[string][]fieldDef{
 	"sso": {
 		{key: "name", label: "Name", required: true},
+		{key: "order", label: "Display Order (optional, lower first)", required: false},
 		{key: "region", label: "Region", required: true},
 		{key: "sso_start_url", label: "SSO Start URL", required: true},
 		{key: "sso_account_id", label: "SSO Account ID", required: true},
@@ -27,11 +28,13 @@ var fieldsByAuthType = map[string][]fieldDef{
 	},
 	"credential": {
 		{key: "name", label: "Name", required: true},
+		{key: "order", label: "Display Order (optional, lower first)", required: false},
 		{key: "region", label: "Region", required: true},
 		{key: "profile", label: "Profile", required: true},
 	},
 	"assume_role": {
 		{key: "name", label: "Name", required: true},
+		{key: "order", label: "Display Order (optional, lower first)", required: false},
 		{key: "region", label: "Region", required: true},
 		{key: "profile", label: "Profile", required: true},
 		{key: "role_arn", label: "Role ARN", required: true},
@@ -117,8 +120,13 @@ func (m Model) updateContextAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) saveContext() tea.Cmd {
 	return func() tea.Msg {
+		order, err := parseOptionalContextOrder(m.addValues["order"])
+		if err != nil {
+			return errMsg{err: err}
+		}
 		entry := config.ContextEntry{
 			Name:         m.addValues["name"],
+			Order:        order,
 			AuthType:     m.addValues["auth_type"],
 			Region:       m.addValues["region"],
 			Profile:      m.addValues["profile"],
@@ -135,6 +143,18 @@ func (m Model) saveContext() tea.Cmd {
 		contexts, _ := config.Contexts(m.configPath)
 		return contextsLoadedMsg{contexts: contexts}
 	}
+}
+
+func parseOptionalContextOrder(raw string) (int, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return 0, nil
+	}
+	var order int
+	if _, err := fmt.Sscanf(value, "%d", &order); err != nil || order < 0 {
+		return 0, fmt.Errorf("display order must be a non-negative integer")
+	}
+	return order, nil
 }
 
 func (m Model) viewContextAdd() string {

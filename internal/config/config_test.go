@@ -257,6 +257,36 @@ contexts:
 	}
 }
 
+func TestContextsRespectsExplicitOrderBeforeFallbackOrder(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: dev
+contexts:
+  - name: prod
+    profile: prod-profile
+  - name: staging
+    profile: staging-profile
+    order: 20
+  - name: dev
+    profile: dev-profile
+    order: 10
+`)
+
+	infos, err := Contexts(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 3 {
+		t.Fatalf("expected 3 contexts, got %d", len(infos))
+	}
+	if infos[0].Name != "dev" || infos[1].Name != "staging" || infos[2].Name != "prod" {
+		t.Fatalf("unexpected ordered contexts: %#v", infos)
+	}
+	if infos[0].Order != 10 || infos[1].Order != 20 || infos[2].Order != 0 {
+		t.Fatalf("unexpected order values: %#v", infos)
+	}
+}
+
 func TestSetCurrent(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `
@@ -496,6 +526,7 @@ contexts:
 
 	err := UpsertContext(path, ContextEntry{
 		Name:     "prod",
+		Order:    5,
 		Profile:  "prod-profile",
 		Region:   "ap-northeast-2",
 		AuthType: "credential",
@@ -511,8 +542,8 @@ contexts:
 	if len(infos) != 2 {
 		t.Fatalf("expected 2 contexts, got %d", len(infos))
 	}
-	if infos[1].Name != "prod" {
-		t.Fatalf("expected appended context prod, got %q", infos[1].Name)
+	if infos[0].Name != "prod" {
+		t.Fatalf("expected ordered context prod to sort first, got %q", infos[0].Name)
 	}
 }
 
