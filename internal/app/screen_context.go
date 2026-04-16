@@ -92,8 +92,23 @@ func (m Model) loadContexts() tea.Cmd {
 func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
+	if m.isFiltering(filterContexts) && key == "esc" {
+		if strings.TrimSpace(m.filterValue(filterContexts)) != "" {
+			m.resetFilter(filterContexts)
+			m.syncContextTable()
+			return m, nil
+		}
+		m.deactivateFilter()
+		return m, nil
+	}
+
 	if cmd, handled := m.updateSharedFilter(msg, filterContexts); handled {
+		m.syncContextTable()
 		return m, cmd
+	}
+
+	if shouldStartContextIncrementalFilter(msg) {
+		return m.startContextIncrementalFilter(msg)
 	}
 
 	switch key {
@@ -245,11 +260,35 @@ func (m Model) viewContextPicker() string {
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
 	if m.cfg.ContextName != "" {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • esc: back • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • esc: clear/back • q: quit"))
 	} else {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • q: quit"))
 	}
 	return b.String()
+}
+
+func shouldStartContextIncrementalFilter(msg tea.KeyMsg) bool {
+	if len(msg.Runes) != 1 {
+		return false
+	}
+	switch msg.String() {
+	case "/", "q", "s", "y", "u", "a", "j", "k":
+		return false
+	}
+	r := msg.Runes[0]
+	return r >= 32 && r != 127
+}
+
+func (m Model) startContextIncrementalFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	value := string(msg.Runes)
+	m.activeFilter = filterContexts
+	m.filterTI.SetValue(value)
+	m.filterTI.CursorEnd()
+	m.syncFilterInputWidth()
+	m.storeFilterValue(filterContexts, value)
+	m.applyFilterTarget(filterContexts)
+	m.syncContextTable()
+	return m, m.filterTI.Focus()
 }
 
 func displayContextName(name string) string {

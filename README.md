@@ -102,6 +102,7 @@ unic context unset
 `unic context setup` writes its prompts to `stderr` and copies the generated shell commands to the clipboard.
 `unic env` prints shell commands to `stdout` so it can be used with `eval`.
 Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the TUI can show which shell context is currently active.
+In the TUI context picker, typing starts an incremental filter immediately.
 
 ## Configuration
 
@@ -218,7 +219,7 @@ The Inspector feature ships built-in rule packs for Security Group exposure, RDS
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
-| Context Picker | `a` add context, `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
+| Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
 
 Filtering is currently available on EC2 instances, IAM users, VPCs/subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.
 
