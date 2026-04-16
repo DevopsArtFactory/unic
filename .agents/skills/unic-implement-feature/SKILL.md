@@ -16,9 +16,19 @@ Treat the prompt as one of:
 ## Workflow
 
 1. Resolve scope first.
+- Before implementing anything, inspect open pull requests with
+  `gh pr list --state open --limit 50`.
+- If the target issue or feature already has an open PR in progress, stop and
+  tell the user instead of implementing duplicate scope. Only continue if the
+  user explicitly asks to work on that existing PR or to intentionally create a
+  follow-up.
 - If the user gave an issue number, read it with `gh issue view <number>`.
+- When an issue number is known, also search open PRs for that issue first
+  (title, body, or branch naming) before starting implementation.
 - If the user gave a description, search open issues first with
   `gh issue list --state open --search '<terms>' --limit 20`.
+- For description-based requests, also search open PRs with the same terms
+  before choosing the feature to implement.
 - If the user did not name a concrete feature, inspect the current backlog with
   `gh issue list --state open --limit 50` and prefer an open issue over
   inventing new scope from `PLAN.md`.
