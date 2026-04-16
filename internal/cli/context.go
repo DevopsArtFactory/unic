@@ -100,7 +100,6 @@ func parseContextOrder(raw string) (int, error) {
 	}
 	return order, nil
 }
-}
 
 func newContextSetupCmd() *cobra.Command {
 	return &cobra.Command{
