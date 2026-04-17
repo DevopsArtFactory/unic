@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	awsservice "unic/internal/services/aws"
 )
 
@@ -78,6 +79,52 @@ func TestCloudWatchMetricsApplyFilter(t *testing.T) {
 	}
 }
 
+func TestCloudWatchMetricsPresetFiltersResourceGroups(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cwMetrics.metrics = []awsservice.CloudWatchMetric{
+		{Namespace: "AWS/EC2", MetricName: "CPUUtilization"},
+		{Namespace: "AWS/EC2", MetricName: "NetworkIn"},
+		{Namespace: "AWS/RDS", MetricName: "DatabaseConnections"},
+		{Namespace: "AWS/ECS", MetricName: "CPUUtilization"},
+		{Namespace: "ECS/ContainerInsights", MetricName: "RunningTaskCount"},
+	}
+
+	m.cwMetrics.presetIdx = 1
+	m.applyFilterTarget(filterCWMetrics)
+
+	if len(m.cwMetrics.filteredCWMetrics) != 2 {
+		t.Fatalf("expected 2 EC2 preset metrics, got %d", len(m.cwMetrics.filteredCWMetrics))
+	}
+	for _, metric := range m.cwMetrics.filteredCWMetrics {
+		if metric.Namespace != "AWS/EC2" {
+			t.Fatalf("expected only AWS/EC2 metrics, got %+v", metric)
+		}
+	}
+}
+
+func TestCloudWatchMetricListCyclePreset(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenCWMetricList
+	m.cwMetrics.metrics = []awsservice.CloudWatchMetric{
+		{Namespace: "AWS/EC2", MetricName: "CPUUtilization"},
+		{Namespace: "AWS/RDS", MetricName: "DatabaseConnections"},
+	}
+	m.cwMetrics.filteredCWMetrics = m.cwMetrics.metrics
+
+	updated, _ := m.cwMetrics.updateMetricList(&m, keyMsg("g"))
+	model := updated.(Model)
+
+	if model.cwMetrics.presetIdx != 1 {
+		t.Fatalf("expected preset index 1, got %d", model.cwMetrics.presetIdx)
+	}
+	if len(model.cwMetrics.filteredCWMetrics) != 1 {
+		t.Fatalf("expected preset-filtered metrics to shrink to 1, got %d", len(model.cwMetrics.filteredCWMetrics))
+	}
+	if got := model.cwMetrics.filteredCWMetrics[0].Namespace; got != "AWS/EC2" {
+		t.Fatalf("expected EC2 metric after preset cycle, got %q", got)
+	}
+}
+
 func TestCloudWatchMetricDetailViewShowsNoDataMessage(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 90
@@ -101,4 +148,50 @@ func TestCloudWatchMetricDetailViewShowsNoDataMessage(t *testing.T) {
 	if !strings.Contains(view, "No datapoints returned for the selected time window.") {
 		t.Fatalf("expected no-data message, got %q", view)
 	}
+	if !strings.Contains(view, "Try t to widen the range, p to change the period, or s to switch the statistic.") {
+		t.Fatalf("expected no-data controls hint, got %q", view)
+	}
+}
+
+func TestCloudWatchMetricDetailControlChangeStartsReload(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenCWMetricDetail
+	metric := awsservice.CloudWatchMetric{
+		Namespace:  "AWS/EC2",
+		MetricName: "CPUUtilization",
+	}
+	m.cwMetrics.selectedMetric = &metric
+	m.cwMetrics.selectedSeries = &awsservice.CloudWatchMetricSeriesData{Metric: metric, Stat: "Average"}
+
+	updated, cmd := m.cwMetrics.updateMetricDetail(&m, keyMsg("s"))
+	model := updated.(Model)
+
+	if model.screen != screenLoading {
+		t.Fatalf("expected screenLoading after statistic change, got %v", model.screen)
+	}
+	if model.cwMetrics.statIdx != 1 {
+		t.Fatalf("expected stat index to advance to 1, got %d", model.cwMetrics.statIdx)
+	}
+	if model.loadingTitle != "Refreshing CloudWatch metric series..." {
+		t.Fatalf("unexpected loading title %q", model.loadingTitle)
+	}
+	if cmd == nil {
+		t.Fatal("expected reload command after statistic change")
+	}
+}
+
+func TestCloudWatchMetricListViewShowsGlobalEmptyState(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 90
+	m.height = 24
+	m.screen = screenCWMetricList
+
+	view := m.cwMetrics.viewMetricList(m)
+	if !strings.Contains(view, "No CloudWatch metrics were found in this account/region.") {
+		t.Fatalf("expected global empty-state copy, got %q", view)
+	}
+}
+
+func keyMsg(value string) tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(value), Alt: false}
 }

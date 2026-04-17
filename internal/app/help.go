@@ -331,11 +331,22 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q / esc", "Return to the access key list"},
 		}
 	case screenCWMetricList:
-		return listScreenShortcuts("open the selected metric series", "go back to the feature list", true, true)
+		shortcuts := listScreenShortcuts("open the selected metric series", "go back to the feature list", true, true)
+		shortcuts = append(shortcuts[:3],
+			append([]helpShortcut{
+				{"g", "Cycle the preset metric group"},
+				{"t", "Cycle the chart time range"},
+				{"p", "Cycle the datapoint period"},
+				{"s", "Cycle the statistic"},
+			}, shortcuts[3:]...)...)
+		return shortcuts
 	case screenCWMetricDetail:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Scroll the metric detail"},
 			{"pgup / pgdn", "Scroll by one page"},
+			{"t", "Cycle the chart time range"},
+			{"p", "Cycle the datapoint period"},
+			{"s", "Cycle the statistic"},
 			{"r", "Refresh the selected metric series"},
 			{"q / esc", "Go back to the metric list"},
 		}

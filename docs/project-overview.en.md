@@ -23,7 +23,7 @@ Implemented service areas currently include:
 - Lambda
 - Inspector mode
 
-The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens.
+The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens. CloudWatch Metrics now includes resource-centric preset groups plus time-range, period, and statistic controls for faster terminal triage.
 Inspector mode now includes built-in security scans plus checklist-driven readiness checks for RDS, security groups, secrets, Route53, VPCs/subnets, CloudWatch Logs, and baseline posture wrappers.
 
 ## Primary User Flows
