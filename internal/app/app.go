@@ -63,6 +63,10 @@ const (
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
+	screenLambdaFunctionList
+	screenLambdaFunctionDetail
+	screenLambdaInvokeInput
+	screenLambdaInvokeResult
 	screenInspectorHome
 	screenInspectorWorkflowPlaceholder
 	screenInspectorChecklistPicker
@@ -247,6 +251,17 @@ type Model struct {
 	s3CurrentPrefix   string
 	s3PrefixStack     []string
 	selectedS3Object  *awsservice.S3ObjectDetail
+
+	// Lambda browser state
+	lambdaFunctions         []awsservice.LambdaFunction
+	filteredLambdaFunctions []awsservice.LambdaFunction
+	lambdaFunctionIdx       int
+	selectedLambdaFunction  *awsservice.LambdaFunction
+	lambdaInvokePayload     string
+	lambdaInvokeAsync       bool
+	lambdaInvokeResult      *awsservice.LambdaInvokeResult
+	lambdaPayloadSource     lambdaPayloadSource
+	lambdaInvokeStep        int // 0=source select, 1=text input
 
 	// Inspector browser state
 	inspectorWorkflows        []inspector.Workflow
@@ -443,6 +458,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleSecretMsg,
 		m.handleECSMsg,
 		m.handleS3Msg,
+		m.handleLambdaMsg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
@@ -480,14 +496,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Global home — return to service list from any screen (skip text-input screens)
 		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
-			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm {
+			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
+			m.screen != screenLambdaInvokeInput {
 			m.deactivateFilter()
 			m.screen = screenServiceList
 			return m, nil
 		}
 		// Global context switch — C key opens context picker (skip text-input screens)
 		if msg.String() == "C" && m.screen != screenContextPicker &&
-			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm {
+			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
+			m.screen != screenLambdaInvokeInput {
 			m.deactivateFilter()
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
@@ -550,6 +568,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateS3ObjectList(msg)
 		case screenS3ObjectDetail:
 			return m.updateS3ObjectDetail(msg)
+		case screenLambdaFunctionList:
+			return m.updateLambdaFunctionList(msg)
+		case screenLambdaFunctionDetail:
+			return m.updateLambdaFunctionDetail(msg)
+		case screenLambdaInvokeInput:
+			return m.updateLambdaInvokeInput(msg)
+		case screenLambdaInvokeResult:
+			return m.updateLambdaInvokeResult(msg)
 		case screenInspectorHome:
 			return m.updateInspectorHome(msg)
 		case screenInspectorWorkflowPlaceholder:
@@ -723,6 +749,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.startLoading(m.loadIAMKeys())
 			case domain.FeatureECSExec:
 				return m.startLoading(m.loadECSClusters())
+			case domain.FeatureLambdaBrowser:
+				return m.startLoading(m.loadLambdaFunctions())
 			}
 		}
 	}
@@ -807,6 +835,14 @@ func (m Model) View() string {
 		v = m.viewS3ObjectList()
 	case screenS3ObjectDetail:
 		v = m.viewS3ObjectDetail()
+	case screenLambdaFunctionList:
+		v = m.viewLambdaFunctionList()
+	case screenLambdaFunctionDetail:
+		v = m.viewLambdaFunctionDetail()
+	case screenLambdaInvokeInput:
+		v = m.viewLambdaInvokeInput()
+	case screenLambdaInvokeResult:
+		v = m.viewLambdaInvokeResult()
 	case screenInspectorHome:
 		v = m.viewInspectorHome()
 	case screenInspectorWorkflowPlaceholder:

@@ -52,6 +52,7 @@ type cloudWatchLogsModel struct {
 	tailToken        *string
 	wrap             bool
 	horizontalOffset int
+	lambdaSource     bool // true when entered from Lambda browser
 }
 
 func newCloudWatchLogsModel() cloudWatchLogsModel {
@@ -70,7 +71,23 @@ func (cw *cloudWatchLogsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	cw.tailToken = nil
 	cw.tailing = false
 	cw.streamNextToken = nil
+	cw.lambdaSource = false
 	return m.startLoading(cw.loadGroups(*m, false))
+}
+
+// StartFromLambda enters the CW logs flow scoped to a Lambda function's log group.
+func (cw *cloudWatchLogsModel) StartFromLambda(m *Model, functionName string) (tea.Model, tea.Cmd) {
+	logGroupName := "/aws/lambda/" + functionName
+	cw.selectedGroup = &awsservice.LogGroup{Name: logGroupName}
+	cw.selectedStream = nil
+	cw.events = nil
+	cw.scrollOffset = 0
+	cw.nextToken = nil
+	cw.tailToken = nil
+	cw.tailing = false
+	cw.streamNextToken = nil
+	cw.lambdaSource = true
+	return m.startLoading(cw.loadStreams(*m, logGroupName, false))
 }
 
 func (cw *cloudWatchLogsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -346,7 +363,12 @@ func (cw *cloudWatchLogsModel) updateStreamList(m *Model, msg tea.KeyMsg) (tea.M
 
 	switch key {
 	case "q", "esc":
-		m.screen = screenCWLogGroupList
+		if cw.lambdaSource {
+			cw.lambdaSource = false
+			m.screen = screenLambdaFunctionList
+		} else {
+			m.screen = screenCWLogGroupList
+		}
 		m.resetFilter(filterCWLogStreams)
 	case "up", "k":
 		if cw.streamIdx > 0 {

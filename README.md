@@ -208,6 +208,7 @@ Context ordering:
 | CloudWatch Logs | Logs Browser |
 | ECS | ECS Browser & Exec |
 | S3 | S3 Browser |
+| Lambda | Lambda Browser |
 | IAM | IAM User Browser |
 | IAM | ListAccessKeys |
 | IAM | RotateAccessKey |
@@ -312,13 +313,15 @@ checks:
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
+| ECS Exec | `r` refresh, `Enter` drill down / exec |
 | ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
 | Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
+| Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
-Shared list filters now use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on EC2 instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, and the context picker.
+Shared list filters now use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on EC2 instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, Lambda functions, and the context picker.
 
 Reachability Analyzer starts with a region selection step, defaults to the current context region, and now surfaces the AWS-documented source and destination resource types that unic supports: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, plus IP addresses as destinations. The source and destination pickers support type tabs, keyword filtering, IPv4 destination validation, and automatic cleanup of temporary Network Insights resources after each analysis. During analysis, the loading screen shows a vertical source-to-destination flow and intent summary, and the result view renders path hops and findings in a more readable layout.
 

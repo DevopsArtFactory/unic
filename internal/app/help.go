@@ -67,11 +67,13 @@ func (m Model) helpSections() []helpSection {
 func (m Model) globalHelpShortcuts() []helpShortcut {
 	var shortcuts []helpShortcut
 	if m.screen != screenServiceList && m.screen != screenContextPicker &&
-		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm {
+		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
+		m.screen != screenLambdaInvokeInput {
 		shortcuts = append(shortcuts, helpShortcut{"H", "Jump to the service list"})
 	}
 	if m.screen != screenContextPicker &&
-		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm {
+		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
+		m.screen != screenLambdaInvokeInput {
 		shortcuts = append(shortcuts, helpShortcut{"C", "Open the context picker"})
 	}
 	return shortcuts
@@ -387,6 +389,42 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"esc", "Go back to the object list"},
 			{"q", "Go back to the feature list"},
 		}
+	case screenLambdaFunctionList:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between functions"},
+			{"/", "Start filtering functions"},
+			{"r", "Refresh the function list"},
+			{"enter", "Invoke the selected function"},
+			{"d", "View function detail"},
+			{"l", "View CloudWatch Logs for the selected function"},
+			{"q / esc", "Go back to the feature list"},
+		}
+	case screenLambdaFunctionDetail:
+		return []helpShortcut{
+			{"i", "Invoke the selected function"},
+			{"l", "View CloudWatch Logs for this function"},
+			{"q / esc", "Go back to the function list"},
+		}
+	case screenLambdaInvokeInput:
+		if m.lambdaInvokeStep == 0 {
+			return []helpShortcut{
+				{"↑/↓, j/k", "Select payload source"},
+				{"enter", "Confirm the selected source"},
+				{"esc", "Go back to the function list"},
+			}
+		}
+		return []helpShortcut{
+			{"type", "Edit the payload or file path"},
+			{"backspace", "Delete the previous character"},
+			{"enter", "Invoke the function"},
+			{"esc", "Go back to source selection"},
+		}
+	case screenLambdaInvokeResult:
+		return []helpShortcut{
+			{"i", "Invoke the function again"},
+			{"l", "View CloudWatch Logs for this function"},
+			{"q / esc", "Go back to the function list"},
+		}
 	case screenInspectorHome:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between inspector workflows"},
@@ -648,6 +686,14 @@ func (m Model) helpScreenTitle() string {
 		return "S3 Objects"
 	case screenS3ObjectDetail:
 		return "S3 Object Detail"
+	case screenLambdaFunctionList:
+		return "Lambda Functions"
+	case screenLambdaFunctionDetail:
+		return "Lambda Function Detail"
+	case screenLambdaInvokeInput:
+		return "Lambda Invoke"
+	case screenLambdaInvokeResult:
+		return "Lambda Invoke Result"
 	case screenInspectorHome:
 		return "Inspector Mode"
 	case screenInspectorWorkflowPlaceholder:
