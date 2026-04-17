@@ -86,7 +86,9 @@ func (r *AwsRepository) InvokeFunction(ctx context.Context, functionName, payloa
 	}
 	if out.LogResult != nil {
 		decoded, err := base64.StdEncoding.DecodeString(awssdk.ToString(out.LogResult))
-		if err == nil {
+		if err != nil {
+			result.LogResult = fmt.Sprintf("Error decoding log result: %v", err)
+		} else {
 			result.LogResult = string(decoded)
 		}
 	}
