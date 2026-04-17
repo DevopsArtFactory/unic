@@ -16,6 +16,7 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 - Route53
 - Secrets Manager
 - IAM
+- CloudWatch Metrics
 - CloudWatch Logs
 - ECS
 - S3

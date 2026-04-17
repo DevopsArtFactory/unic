@@ -85,6 +85,7 @@ Current repository clients include:
 - Route53
 - Secrets Manager
 - IAM
+- CloudWatch Metrics
 - STS
 - CloudWatch Logs
 - ECS
@@ -128,6 +129,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
+- `screen_cloudwatchmetrics.go`
 - `screen_cloudwatchlogs.go`
 - `screen_ecs.go`
 - `screen_s3.go`
@@ -178,6 +180,7 @@ Current screen families include:
 - Secrets Manager list/detail
 - Security Group list/detail/edit flows
 - IAM user, key, and key-rotation flows
+- CloudWatch metric list/detail flows
 - CloudWatch Logs group/stream/viewer flows
 - ECS cluster/service/rollout detail/task/container flows
 - S3 bucket/object/detail flows

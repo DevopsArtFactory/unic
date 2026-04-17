@@ -19,6 +19,7 @@ const (
 	filterSecurityGroups
 	filterECSClusters
 	filterECSServices
+	filterCWMetrics
 	filterCWLogGroups
 	filterCWLogStreams
 	filterCWLogViewer

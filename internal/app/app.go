@@ -52,6 +52,8 @@ const (
 	screenIAMKeyDetail
 	screenIAMKeyRotateConfirm
 	screenIAMKeyRotateResult
+	screenCWMetricList
+	screenCWMetricDetail
 	screenCWLogGroupList
 	screenCWLogStreamList
 	screenCWLogViewer
@@ -238,7 +240,8 @@ type Model struct {
 	ecsContainerIdx int
 
 	// Feature submodels
-	cwLogs cloudWatchLogsModel
+	cwMetrics cloudWatchMetricsModel
+	cwLogs    cloudWatchLogsModel
 
 	// S3 browser state
 	s3Buckets         []awsservice.S3Bucket
@@ -355,6 +358,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		filters:                make(map[filterTarget]string),
 		contextTable:           newContextTable(),
 	}
+	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	return model
 }
@@ -733,6 +737,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.startLoading(m.loadRoute53Zones())
 			case domain.FeatureSecretsBrowser:
 				return m.startLoading(m.loadSecrets())
+			case domain.FeatureCloudWatchMetrics:
+				return m.cwMetrics.Start(&m)
 			case domain.FeatureCloudWatchLogsBrowser:
 				return m.cwLogs.Start(&m)
 			case domain.FeatureS3Browser:
