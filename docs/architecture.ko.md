@@ -85,6 +85,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - Route53
 - Secrets Manager
 - IAM
+- CloudWatch Metrics
 - STS
 - CloudWatch Logs
 - ECS
@@ -128,6 +129,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
+- `screen_cloudwatchmetrics.go`
 - `screen_cloudwatchlogs.go`
 - `screen_ecs.go`
 - `screen_s3.go`
@@ -178,6 +180,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - Secrets Manager list/detail
 - Security Group list/detail/edit
 - IAM user, key, key rotation
+- CloudWatch metric list/detail
 - CloudWatch Logs group/stream/viewer
 - ECS cluster/service/rollout detail/task/container
 - S3 bucket/object/detail

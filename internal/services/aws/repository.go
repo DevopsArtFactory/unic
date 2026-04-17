@@ -8,6 +8,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/configservice"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -50,6 +51,9 @@ var _ STSClientAPI = (*sts.Client)(nil)
 
 // Verify *cloudwatchlogs.Client satisfies CloudWatchLogsClientAPI at compile time.
 var _ CloudWatchLogsClientAPI = (*cloudwatchlogs.Client)(nil)
+
+// Verify *cloudwatch.Client satisfies CloudWatchClientAPI at compile time.
+var _ CloudWatchClientAPI = (*cloudwatch.Client)(nil)
 
 // Verify *cloudtrail.Client satisfies CloudTrailClientAPI at compile time.
 var _ CloudTrailClientAPI = (*cloudtrail.Client)(nil)
@@ -126,6 +130,12 @@ type IAMClientAPI interface {
 
 type STSClientAPI interface {
 	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+// CloudWatchClientAPI is the interface for CloudWatch metrics operations used by AwsRepository.
+type CloudWatchClientAPI interface {
+	ListMetrics(ctx context.Context, params *cloudwatch.ListMetricsInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error)
+	GetMetricData(ctx context.Context, params *cloudwatch.GetMetricDataInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error)
 }
 
 // CloudWatchLogsClientAPI is the interface for CloudWatch Logs operations used by AwsRepository.
@@ -231,6 +241,7 @@ type AwsRepository struct {
 	SecretsManagerClient SecretsManagerClientAPI
 	IAMClient            IAMClientAPI
 	STSClient            STSClientAPI
+	CloudWatchClient     CloudWatchClientAPI
 	CloudWatchLogsClient CloudWatchLogsClientAPI
 	CloudTrailClient     CloudTrailClientAPI
 	GuardDutyClient      GuardDutyClientAPI
@@ -296,6 +307,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		SecretsManagerClient: secretsmanager.NewFromConfig(awsCfg),
 		IAMClient:            iam.NewFromConfig(awsCfg),
 		STSClient:            sts.NewFromConfig(awsCfg),
+		CloudWatchClient:     cloudwatch.NewFromConfig(awsCfg),
 		CloudWatchLogsClient: cloudwatchlogs.NewFromConfig(awsCfg),
 		CloudTrailClient:     cloudtrail.NewFromConfig(awsCfg),
 		GuardDutyClient:      guardduty.NewFromConfig(awsCfg),

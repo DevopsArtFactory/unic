@@ -103,6 +103,15 @@ type cwLogGroupsLoadedMsg struct {
 	append    bool
 }
 
+type cwMetricsLoadedMsg struct {
+	metrics []awsservice.CloudWatchMetric
+}
+
+type cwMetricDataLoadedMsg struct {
+	metric awsservice.CloudWatchMetric
+	series *awsservice.CloudWatchMetricSeriesData
+}
+
 type cwLogStreamsLoadedMsg struct {
 	streams   []awsservice.LogStream
 	nextToken *string

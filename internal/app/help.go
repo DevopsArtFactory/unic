@@ -330,6 +330,15 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"x", "Delete the old access key after deactivation"},
 			{"q / esc", "Return to the access key list"},
 		}
+	case screenCWMetricList:
+		return listScreenShortcuts("open the selected metric series", "go back to the feature list", true, true)
+	case screenCWMetricDetail:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Scroll the metric detail"},
+			{"pgup / pgdn", "Scroll by one page"},
+			{"r", "Refresh the selected metric series"},
+			{"q / esc", "Go back to the metric list"},
+		}
 	case screenCWLogGroupList:
 		return listScreenShortcuts("open log streams for the selected group", "go back to the feature list", true, false)
 	case screenCWLogStreamList:
@@ -670,6 +679,10 @@ func (m Model) helpScreenTitle() string {
 		return "CloudWatch Log Streams"
 	case screenCWLogViewer:
 		return "CloudWatch Log Viewer"
+	case screenCWMetricList:
+		return "CloudWatch Metrics"
+	case screenCWMetricDetail:
+		return "CloudWatch Metric Detail"
 	case screenECSClusterList:
 		return "ECS Clusters"
 	case screenECSServiceList:

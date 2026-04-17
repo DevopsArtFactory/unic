@@ -16,6 +16,7 @@ Implemented service areas currently include:
 - Route53
 - Secrets Manager
 - IAM
+- CloudWatch Metrics
 - CloudWatch Logs
 - ECS
 - S3
