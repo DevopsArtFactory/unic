@@ -12,7 +12,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
-- Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in findings or the Checklist Inspector workflow for YAML-driven readiness checks across RDS, security groups, and secrets. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
+- Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
 ## Documentation Map
 
@@ -221,11 +221,17 @@ Context ordering:
 
 Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
 
-Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup, and currently supports three check types:
+Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup, and currently supports:
 
 - `rds` for expected DB instance state such as status, engine, class, Multi-AZ, encryption, public access, and backup retention
 - `security_group` for required or forbidden ingress/egress rule matchers
 - `secret` for rotation state, KMS key ID, and required JSON value keys
+- `hosted_zone` for hosted zone existence and private/public scope checks
+- `route53_record` for DNS record existence, type, TTL, values, and alias target checks within `expect.zone`
+- `vpc` for VPC existence, CIDR, default-VPC posture, and subnet-count checks
+- `subnet` for subnet existence, optional `expect.vpc` scoping, CIDR, availability zone, and minimum available-IP checks
+- `cloudwatch_log_group` for log-group existence and retention-days checks
+- `cloudtrail_baseline`, `guardduty_baseline`, `config_baseline`, and `elasticache_valkey_baseline` for checklist-driven pass/fail wrappers around the built-in baseline security scanners
 
 Minimal checklist example:
 
@@ -255,6 +261,27 @@ checks:
       value_keys:
         - username
         - password
+
+  - type: route53_record
+    resource: api.example.internal
+    expect:
+      zone: example.internal
+      record_type: A
+      alias_target: internal-alb-123.ap-northeast-2.elb.amazonaws.com
+
+  - type: vpc
+    resource: main-vpc
+    expect:
+      cidr: 10.0.0.0/16
+      subnet_count: 2
+
+  - type: cloudwatch_log_group
+    resource: /aws/ecs/app
+    expect:
+      retention_days: 30
+
+  - type: cloudtrail_baseline
+    resource: cloudtrail
 ```
 
 ## TUI Navigation

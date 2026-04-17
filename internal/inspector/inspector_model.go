@@ -26,10 +26,10 @@ type Workflow struct {
 func Workflows(checklistPath string) []Workflow {
 	checklistAvailable := strings.TrimSpace(checklistPath) != ""
 	checklistStatus := "ADD FILE"
-	checklistDescription := "Pass --checklist <path> to load a YAML checklist for readiness checks across RDS, security groups, and Secrets Manager."
+	checklistDescription := "Pass --checklist <path> to load a YAML checklist for readiness checks across infrastructure resources and baseline posture."
 	if checklistAvailable {
 		checklistStatus = ""
-		checklistDescription = "Run a user-supplied YAML checklist to verify infrastructure readiness across RDS, security groups, and Secrets Manager."
+		checklistDescription = "Run a user-supplied YAML checklist to verify infrastructure readiness across databases, network resources, DNS, logging, secrets, and baseline posture."
 	}
 
 	return []Workflow{
@@ -62,11 +62,15 @@ func (w Workflow) StatusLabel() string {
 type AwsRepository = awsservice.AwsRepository
 type AccessKey = awsservice.AccessKey
 type CloudTrailClientAPI = awsservice.CloudTrailClientAPI
+type CloudWatchLogsClientAPI = awsservice.CloudWatchLogsClientAPI
 type ConfigServiceClientAPI = awsservice.ConfigServiceClientAPI
+type DNSRecord = awsservice.DNSRecord
 type EC2ClientAPI = awsservice.EC2ClientAPI
 type ElastiCacheClientAPI = awsservice.ElastiCacheClientAPI
 type GuardDutyClientAPI = awsservice.GuardDutyClientAPI
+type HostedZone = awsservice.HostedZone
 type IAMClientAPI = awsservice.IAMClientAPI
+type LogGroup = awsservice.LogGroup
 type RDSClientAPI = awsservice.RDSClientAPI
 type S3Bucket = awsservice.S3Bucket
 type Secret = awsservice.Secret
@@ -75,6 +79,9 @@ type SecurityGroup = awsservice.SecurityGroup
 type SecurityGroupRule = awsservice.SecurityGroupRule
 type SecretsManagerClientAPI = awsservice.SecretsManagerClientAPI
 type RDSInstance = awsservice.RDSInstance
+type Route53ClientAPI = awsservice.Route53ClientAPI
+type Subnet = awsservice.Subnet
+type VPC = awsservice.VPC
 
 type RuleSeverity string
 

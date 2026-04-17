@@ -597,7 +597,7 @@ func (m Model) viewInspectorWorkflowPlaceholder() string {
 	if workflow.Kind == inspector.WorkflowChecklist {
 		b.WriteString(normalStyle.Render("  Checklist Inspector needs a checklist file before it can run."))
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("  Press enter or l to open the file picker and load a YAML checklist for RDS, security groups, and secrets."))
+		b.WriteString(dimStyle.Render("  Press enter or l to open the file picker and load a YAML checklist for resource readiness and baseline posture checks."))
 		b.WriteString("\n\n")
 		b.WriteString(renderDetailLine("Status", inspectorPlannedStyle.Render(workflow.StatusLabel())))
 		b.WriteString("\n")

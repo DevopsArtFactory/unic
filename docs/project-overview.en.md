@@ -22,6 +22,7 @@ Implemented service areas currently include:
 - Inspector mode
 
 The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens.
+Inspector mode now includes built-in security scans plus checklist-driven readiness checks for RDS, security groups, secrets, Route53, VPCs/subnets, CloudWatch Logs, and baseline posture wrappers.
 
 ## Primary User Flows
 
