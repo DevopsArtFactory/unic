@@ -25,6 +25,20 @@ func TestRenderMetricSparklineUsesBlockChars(t *testing.T) {
 	}
 }
 
+func TestRenderMetricSparklineConstantSeries(t *testing.T) {
+	points := []awsservice.CloudWatchMetricDatapoint{
+		{Timestamp: time.Unix(0, 0), Value: 5},
+		{Timestamp: time.Unix(1, 0), Value: 5},
+		{Timestamp: time.Unix(2, 0), Value: 5},
+		{Timestamp: time.Unix(3, 0), Value: 5},
+	}
+
+	sparkline := renderMetricSparkline(points, 4)
+	if sparkline != "████" {
+		t.Fatalf("expected constant positive series to render as a flat filled sparkline, got %q", sparkline)
+	}
+}
+
 func TestCloudWatchMetricsHandleMessageLoadsMetrics(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	updated, _, handled := m.cwMetrics.HandleMessage(&m, cwMetricsLoadedMsg{

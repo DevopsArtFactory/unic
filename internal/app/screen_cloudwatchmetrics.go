@@ -384,8 +384,9 @@ func renderMetricSparkline(points []awsservice.CloudWatchMetricDatapoint, width 
 
 	var b strings.Builder
 	scale := float64(len(cwMetricSparklineBlocks) - 1)
+	denominator := maxValue - minValue
 	for _, value := range values {
-		position := (value - minValue) / (maxValue - minValue)
+		position := (value - minValue) / denominator
 		idx := int(math.Round(position * scale))
 		if idx < 0 {
 			idx = 0
