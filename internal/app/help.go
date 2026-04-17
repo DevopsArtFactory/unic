@@ -351,12 +351,20 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return listScreenShortcuts("open the selected ECS cluster", "go back to the feature list", true, true)
 	case screenECSServiceList:
 		return listScreenShortcuts("open the selected ECS service", "go back to the cluster list", true, true)
+	case screenECSServiceDetail:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Scroll the service rollout detail"},
+			{"pgup / pgdn", "Scroll by one page"},
+			{"r", "Refresh the service rollout detail"},
+			{"enter", "Open running tasks for the selected service"},
+			{"q / esc", "Go back to the service list"},
+		}
 	case screenECSTaskList:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between tasks"},
 			{"r", "Refresh the task list"},
 			{"enter", "Open the selected task"},
-			{"q / esc", "Go back to the service list"},
+			{"q / esc", "Go back to the service detail"},
 		}
 	case screenECSContainerList:
 		return []helpShortcut{
@@ -628,6 +636,8 @@ func (m Model) helpScreenTitle() string {
 		return "ECS Clusters"
 	case screenECSServiceList:
 		return "ECS Services"
+	case screenECSServiceDetail:
+		return "ECS Service Detail"
 	case screenECSTaskList:
 		return "ECS Tasks"
 	case screenECSContainerList:

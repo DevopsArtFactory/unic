@@ -179,7 +179,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - Security Group list/detail/edit
 - IAM user, key, key rotation
 - CloudWatch Logs group/stream/viewer
-- ECS cluster/service/task/container
+- ECS cluster/service/rollout detail/task/container
 - S3 bucket/object/detail
 - Inspector mode home, checklist setup, security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
