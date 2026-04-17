@@ -30,7 +30,7 @@ const (
 	FeatureListAccessKeys        FeatureKind = "ListAccessKeys"
 	FeatureRotateAccessKey       FeatureKind = "RotateAccessKey"
 	FeatureCloudWatchLogsBrowser FeatureKind = "CloudWatch Logs Browser"
-	FeatureECSExec               FeatureKind = "ECS Exec Sessions"
+	FeatureECSExec               FeatureKind = "ECS Browser & Exec"
 	FeatureS3Browser             FeatureKind = "S3 Browser"
 )
 

@@ -57,6 +57,7 @@ const (
 	screenCWLogViewer
 	screenECSClusterList
 	screenECSServiceList
+	screenECSServiceDetail
 	screenECSTaskList
 	screenECSContainerList
 	screenS3BucketList
@@ -222,6 +223,8 @@ type Model struct {
 	filteredECSServices []awsservice.ECSService
 	ecsServiceIdx       int
 	selectedECSService  *awsservice.ECSService
+	selectedECSDetail   *awsservice.ECSServiceDetail
+	ecsDetailScroll     int
 
 	ecsTasks        []awsservice.ECSTask
 	ecsTaskIdx      int
@@ -585,6 +588,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateECSClusterList(msg)
 		case screenECSServiceList:
 			return m.updateECSServiceList(msg)
+		case screenECSServiceDetail:
+			return m.updateECSServiceDetail(msg)
 		case screenECSTaskList:
 			return m.updateECSTaskList(msg)
 		case screenECSContainerList:
@@ -842,6 +847,8 @@ func (m Model) View() string {
 		v = m.viewECSClusterList()
 	case screenECSServiceList:
 		v = m.viewECSServiceList()
+	case screenECSServiceDetail:
+		v = m.viewECSServiceDetail()
 	case screenECSTaskList:
 		v = m.viewECSTaskList()
 	case screenECSContainerList:

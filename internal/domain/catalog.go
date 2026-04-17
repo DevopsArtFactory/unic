@@ -70,7 +70,7 @@ func Catalog() []Service {
 			Features: []Feature{
 				{
 					Kind:        FeatureECSExec,
-					Description: "Browse ECS clusters, services, tasks, and launch exec sessions",
+					Description: "Browse ECS clusters, service rollouts, tasks, and launch exec sessions",
 				},
 			},
 		},

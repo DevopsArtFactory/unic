@@ -11,7 +11,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Drill down into resources with filters, detail views, and action screens
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
-- Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
+- Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS rollout inspection/exec, and IAM access key rotation
 - Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
 ## Documentation Map
@@ -206,7 +206,7 @@ Context ordering:
 | Route53 | Route53 Browser |
 | Secrets Manager | Secrets Browser |
 | CloudWatch Logs | Logs Browser |
-| ECS | ECS Exec Sessions |
+| ECS | ECS Browser & Exec |
 | S3 | S3 Browser |
 | IAM | IAM User Browser |
 | IAM | ListAccessKeys |
@@ -312,7 +312,7 @@ checks:
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
-| ECS Exec | `r` refresh, `Enter` drill down / exec |
+| ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
