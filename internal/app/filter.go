@@ -59,6 +59,15 @@ func handleFilterKey(key, current string) (next string, deactivate bool, changed
 	return current, false, false
 }
 
+func isFilterNavigationKey(key string) bool {
+	switch key {
+	case "up", "down":
+		return true
+	default:
+		return false
+	}
+}
+
 func (m *Model) syncFilterInputWidth() {
 	width := m.width - len("Filter: ") - 4
 	if width < 10 {
@@ -113,6 +122,10 @@ func (m *Model) resetFilter(target filterTarget) {
 
 func (m *Model) updateSharedFilter(msg tea.KeyMsg, target filterTarget) (tea.Cmd, bool) {
 	if !m.isFiltering(target) {
+		return nil, false
+	}
+
+	if isFilterNavigationKey(msg.String()) {
 		return nil, false
 	}
 

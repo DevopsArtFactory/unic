@@ -83,6 +83,7 @@ func (m Model) helpModeShortcuts() []helpShortcut {
 		shortcuts := []helpShortcut{
 			{"type", "Update the filter query"},
 			{"backspace", "Delete the previous character"},
+			{"↑/↓", "Move through filtered results"},
 		}
 		if m.screen == screenCWLogViewer {
 			shortcuts = append(shortcuts, helpShortcut{"enter", "Apply the log filter and reload events"})

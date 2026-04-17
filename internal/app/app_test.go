@@ -312,6 +312,7 @@ func TestHelpViewShowsFilterModeShortcuts(t *testing.T) {
 		"Current Mode",
 		"Update the filter query",
 		"Delete the previous character",
+		"Move through filtered results",
 		"Close filter mode",
 	} {
 		if !strings.Contains(view, want) {
@@ -504,6 +505,76 @@ func TestRDSListFilter(t *testing.T) {
 	}
 	if model.filteredRDS[0].DBInstanceID != "prod-db" {
 		t.Errorf("expected 'prod-db', got %q", model.filteredRDS[0].DBInstanceID)
+	}
+}
+
+func TestRDSListFilterAllowsNavigationWhileFocused(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenRDSList
+	m.rdsInstances = []awsservice.RDSInstance{
+		{DBInstanceID: "prod-api-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
+		{DBInstanceID: "prod-worker-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
+		{DBInstanceID: "dev-db", Engine: "postgres", Status: "stopped", InstanceClass: "db.t3.small"},
+	}
+	m.filteredRDS = m.rdsInstances
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model := updated.(Model)
+
+	for _, ch := range "prod" {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if !model.isFiltering(filterRDS) {
+		t.Fatal("expected RDS filter to stay active after typing")
+	}
+	if got := len(model.filteredRDS); got != 2 {
+		t.Fatalf("expected 2 filtered instances, got %d", got)
+	}
+	if model.rdsIdx != 0 {
+		t.Fatalf("expected selection to reset to the first filtered row, got %d", model.rdsIdx)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = updated.(Model)
+
+	if !model.isFiltering(filterRDS) {
+		t.Fatal("expected RDS filter to remain active while navigating")
+	}
+	if model.rdsIdx != 1 {
+		t.Fatalf("expected down arrow to move selection to index 1, got %d", model.rdsIdx)
+	}
+	if got := model.filteredRDS[model.rdsIdx].DBInstanceID; got != "prod-worker-db" {
+		t.Fatalf("expected selection to move to prod-worker-db, got %q", got)
+	}
+}
+
+func TestRDSListFilterStillAcceptsJKCharacters(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenRDSList
+	m.rdsInstances = []awsservice.RDSInstance{
+		{DBInstanceID: "proj-jk-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
+		{DBInstanceID: "prod-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
+	}
+	m.filteredRDS = m.rdsInstances
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model := updated.(Model)
+
+	for _, ch := range "jk" {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if got := model.filterValue(filterRDS); got != "jk" {
+		t.Fatalf("expected filter query to accept j/k characters, got %q", got)
+	}
+	if got := len(model.filteredRDS); got != 1 {
+		t.Fatalf("expected 1 filtered instance after typing jk, got %d", got)
+	}
+	if got := model.filteredRDS[0].DBInstanceID; got != "proj-jk-db" {
+		t.Fatalf("expected proj-jk-db to match typed jk filter, got %q", got)
 	}
 }
 
