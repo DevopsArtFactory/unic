@@ -28,6 +28,7 @@ const (
 	filterVPCs
 	filterSubnets
 	filterInspectorChecklistFiles
+	filterLambdaFunctions
 )
 
 // Filterable is implemented by any type that supports text-based filtering.
@@ -200,6 +201,9 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterInspectorChecklistFiles:
 		m.filteredChecklistFiles = applyFilter(m.inspectorChecklistFiles, m.filterValue(target))
 		m.inspectorChecklistFileIdx = 0
+	case filterLambdaFunctions:
+		m.filteredLambdaFunctions = applyFilter(m.lambdaFunctions, m.filterValue(target))
+		m.lambdaFunctionIdx = 0
 	}
 }
 

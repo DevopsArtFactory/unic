@@ -84,6 +84,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceLambda,
+			Features: []Feature{
+				{
+					Kind:        FeatureLambdaBrowser,
+					Description: "Browse Lambda functions, view config, and invoke with payload",
+				},
+			},
+		},
+		{
 			Name: ServiceIAM,
 			Features: []Feature{
 				{

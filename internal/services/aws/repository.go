@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/guardduty"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -67,6 +68,9 @@ var _ ElastiCacheClientAPI = (*elasticache.Client)(nil)
 
 // Verify *s3.Client satisfies S3ClientAPI at compile time.
 var _ S3ClientAPI = (*s3.Client)(nil)
+
+// Verify *lambda.Client satisfies LambdaClientAPI at compile time.
+var _ LambdaClientAPI = (*lambda.Client)(nil)
 
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
@@ -176,6 +180,13 @@ type ElastiCacheClientAPI interface {
 	DescribeReplicationGroups(ctx context.Context, params *elasticache.DescribeReplicationGroupsInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error)
 }
 
+// LambdaClientAPI is the interface for Lambda operations used by AwsRepository.
+type LambdaClientAPI interface {
+	ListFunctions(ctx context.Context, params *lambda.ListFunctionsInput, optFns ...func(*lambda.Options)) (*lambda.ListFunctionsOutput, error)
+	GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error)
+	Invoke(ctx context.Context, params *lambda.InvokeInput, optFns ...func(*lambda.Options)) (*lambda.InvokeOutput, error)
+}
+
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
 	ec2.DescribeInstancesAPIClient
@@ -226,6 +237,7 @@ type AwsRepository struct {
 	ECSClient            ECSClientAPI
 	ElastiCacheClient    ElastiCacheClientAPI
 	S3Client             S3ClientAPI
+	LambdaClient         LambdaClientAPI
 	Region               string
 	Profile              string
 	awsCfg               aws.Config
@@ -290,6 +302,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		ECSClient:            ecs.NewFromConfig(awsCfg),
 		ElastiCacheClient:    elasticache.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),
+		LambdaClient:         lambda.NewFromConfig(awsCfg),
 		Region:               cfg.Region,
 		Profile:              cfg.Profile,
 		awsCfg:               awsCfg,

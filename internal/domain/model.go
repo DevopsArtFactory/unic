@@ -13,6 +13,7 @@ const (
 	ServiceCloudWatchLogs AwsService = "CloudWatch Logs"
 	ServiceECS            AwsService = "ECS"
 	ServiceS3             AwsService = "S3"
+	ServiceLambda         AwsService = "Lambda"
 )
 
 // FeatureKind represents a specific feature within a service.
@@ -32,6 +33,7 @@ const (
 	FeatureCloudWatchLogsBrowser FeatureKind = "CloudWatch Logs Browser"
 	FeatureECSExec               FeatureKind = "ECS Exec Sessions"
 	FeatureS3Browser             FeatureKind = "S3 Browser"
+	FeatureLambdaBrowser         FeatureKind = "Lambda Browser"
 )
 
 // Feature describes a selectable feature under an AWS service.

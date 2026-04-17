@@ -19,6 +19,7 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 - CloudWatch Logs
 - ECS
 - S3
+- Lambda
 - Inspector mode
 
 애플리케이션은 이미 상호작용형 변경 작업 플로우, polling 기반 상태 확인, context helper, 서비스별 drill-down 화면을 포함한다.

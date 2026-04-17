@@ -19,6 +19,7 @@ Implemented service areas currently include:
 - CloudWatch Logs
 - ECS
 - S3
+- Lambda
 - Inspector mode
 
 The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens.

@@ -207,3 +207,11 @@ type inspectorScanLoadedMsg struct {
 type inspectorChecklistLoadedMsg struct {
 	report *inspector.ChecklistReport
 }
+
+type lambdaFunctionsLoadedMsg struct {
+	functions []awsservice.LambdaFunction
+}
+
+type lambdaInvokeResultMsg struct {
+	result *awsservice.LambdaInvokeResult
+}
