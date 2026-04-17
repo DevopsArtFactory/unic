@@ -135,7 +135,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_context.go`
 
 보조 파일로 `styles.go`, `filter.go`, `messages.go` 등이 있다.
-`filter.go`와 `filter_match.go`는 공통 리스트 화면의 필터링, fuzzy match 정렬, inline match highlighting을 중앙에서 처리하며 VPC / subnet 리스트에도 같은 흐름을 적용한다.
+`filter.go`와 `filter_match.go`는 공통 리스트 화면의 필터링, fuzzy match 정렬, inline match highlighting을 중앙에서 처리하며 VPC / subnet 리스트에도 같은 흐름을 적용한다. shared filter가 활성화된 상태에서도 방향키 이동은 현재 리스트 선택으로 전달되어, filter mode를 먼저 닫지 않아도 필터링된 결과를 바로 탐색할 수 있다.
 
 ## 인증 모델
 
