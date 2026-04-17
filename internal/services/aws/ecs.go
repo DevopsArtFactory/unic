@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -100,12 +101,128 @@ func (r *AwsRepository) ListServices(ctx context.Context, clusterARN string) ([]
 				Status:       awssdk.ToString(s.Status),
 				RunningCount: s.RunningCount,
 				DesiredCount: s.DesiredCount,
+				PendingCount: s.PendingCount,
 				LaunchType:   string(s.LaunchType),
 			}
 			services = append(services, svc)
 		}
 	}
 	return services, nil
+}
+
+// DescribeServiceDetail returns rollout, task definition, and recent event detail for one ECS service.
+func (r *AwsRepository) DescribeServiceDetail(ctx context.Context, clusterARN, serviceARN string) (*ECSServiceDetail, error) {
+	uniclog.Debug("aws", "DescribeServiceDetail called", "cluster", clusterARN, "service", serviceARN)
+
+	out, err := r.ECSClient.DescribeServices(ctx, &ecs.DescribeServicesInput{
+		Cluster:  awssdk.String(clusterARN),
+		Services: []string{serviceARN},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe ECS service %s: %w", serviceARN, err)
+	}
+
+	if len(out.Services) == 0 {
+		return nil, fmt.Errorf("ECS service not found: %s", serviceARN)
+	}
+
+	service := out.Services[0]
+	detail := &ECSServiceDetail{
+		Name:                 awssdk.ToString(service.ServiceName),
+		ARN:                  awssdk.ToString(service.ServiceArn),
+		Status:               awssdk.ToString(service.Status),
+		LaunchType:           string(service.LaunchType),
+		SchedulingStrategy:   string(service.SchedulingStrategy),
+		DesiredCount:         service.DesiredCount,
+		RunningCount:         service.RunningCount,
+		PendingCount:         service.PendingCount,
+		EnableExecuteCommand: service.EnableExecuteCommand,
+		PlatformVersion:      awssdk.ToString(service.PlatformVersion),
+		TaskDefinitionARN:    awssdk.ToString(service.TaskDefinition),
+	}
+	if service.DeploymentController != nil {
+		detail.DeploymentControllerType = string(service.DeploymentController.Type)
+	}
+
+	for _, deployment := range service.Deployments {
+		item := ECSDeployment{
+			ID:                 awssdk.ToString(deployment.Id),
+			Status:             awssdk.ToString(deployment.Status),
+			RolloutState:       string(deployment.RolloutState),
+			RolloutStateReason: awssdk.ToString(deployment.RolloutStateReason),
+			TaskDefinition:     shortECSResourceRef(awssdk.ToString(deployment.TaskDefinition)),
+			RunningCount:       deployment.RunningCount,
+			DesiredCount:       deployment.DesiredCount,
+			PendingCount:       deployment.PendingCount,
+			FailedTasks:        deployment.FailedTasks,
+		}
+		if deployment.CreatedAt != nil {
+			item.CreatedAt = *deployment.CreatedAt
+		}
+		if deployment.UpdatedAt != nil {
+			item.UpdatedAt = *deployment.UpdatedAt
+		}
+		detail.Deployments = append(detail.Deployments, item)
+	}
+	sort.SliceStable(detail.Deployments, func(i, j int) bool {
+		left := detail.Deployments[i]
+		right := detail.Deployments[j]
+		if left.Status == "PRIMARY" && right.Status != "PRIMARY" {
+			return true
+		}
+		if left.Status != "PRIMARY" && right.Status == "PRIMARY" {
+			return false
+		}
+		if !left.UpdatedAt.Equal(right.UpdatedAt) {
+			return left.UpdatedAt.After(right.UpdatedAt)
+		}
+		return normalizedSortKey(left.ID, left.TaskDefinition) < normalizedSortKey(right.ID, right.TaskDefinition)
+	})
+
+	for _, event := range service.Events {
+		item := ECSServiceEvent{
+			ID:      awssdk.ToString(event.Id),
+			Message: awssdk.ToString(event.Message),
+		}
+		if event.CreatedAt != nil {
+			item.CreatedAt = *event.CreatedAt
+		}
+		detail.Events = append(detail.Events, item)
+	}
+	sort.SliceStable(detail.Events, func(i, j int) bool {
+		return detail.Events[i].CreatedAt.After(detail.Events[j].CreatedAt)
+	})
+
+	if detail.TaskDefinitionARN != "" {
+		taskDefOut, err := r.ECSClient.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+			TaskDefinition: awssdk.String(detail.TaskDefinitionARN),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe ECS task definition %s: %w", detail.TaskDefinitionARN, err)
+		}
+		if taskDefOut.TaskDefinition != nil {
+			taskDef := taskDefOut.TaskDefinition
+			detail.TaskDefinitionFamily = awssdk.ToString(taskDef.Family)
+			detail.TaskDefinitionRevision = taskDef.Revision
+			detail.NetworkMode = string(taskDef.NetworkMode)
+			for _, compatibility := range taskDef.RequiresCompatibilities {
+				detail.RequiresCompatibilities = append(detail.RequiresCompatibilities, string(compatibility))
+			}
+			for _, container := range taskDef.ContainerDefinitions {
+				detail.ContainerImages = append(detail.ContainerImages, ECSContainerImage{
+					Name:  awssdk.ToString(container.Name),
+					Image: awssdk.ToString(container.Image),
+				})
+			}
+			sort.SliceStable(detail.ContainerImages, func(i, j int) bool {
+				left := detail.ContainerImages[i]
+				right := detail.ContainerImages[j]
+				return normalizedSortKey(left.Name, left.Image) < normalizedSortKey(right.Name, right.Image)
+			})
+		}
+	}
+
+	return detail, nil
 }
 
 // ListTasks returns running tasks in the given cluster and service.
@@ -214,4 +331,14 @@ func (r *AwsRepository) describeTasksFromARNs(ctx context.Context, clusterARN st
 		}
 	}
 	return tasks, nil
+}
+
+func shortECSResourceRef(value string) string {
+	if value == "" {
+		return value
+	}
+	if idx := strings.LastIndex(value, "/"); idx >= 0 && idx < len(value)-1 {
+		return value[idx+1:]
+	}
+	return value
 }

@@ -188,6 +188,10 @@ type ecsServicesLoadedMsg struct {
 	services []awsservice.ECSService
 }
 
+type ecsServiceDetailLoadedMsg struct {
+	detail *awsservice.ECSServiceDetail
+}
+
 type ecsTasksLoadedMsg struct {
 	tasks []awsservice.ECSTask
 }

@@ -11,7 +11,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Drill down into resources with filters, detail views, and action screens
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
-- Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS exec, and IAM access key rotation
+- Perform operational workflows such as SSM sessions, RDS control, Route53 record changes, ECS rollout inspection/exec, and IAM access key rotation
 - Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
 ## Documentation Map
@@ -206,7 +206,7 @@ Context ordering:
 | Route53 | Route53 Browser |
 | Secrets Manager | Secrets Browser |
 | CloudWatch Logs | Logs Browser |
-| ECS | ECS Exec Sessions |
+| ECS | ECS Browser & Exec |
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
 | IAM | IAM User Browser |
@@ -314,11 +314,12 @@ checks:
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
-| Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
+| ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
 | Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
+| Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
 Shared list filters now use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on EC2 instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, Lambda functions, and the context picker.
 

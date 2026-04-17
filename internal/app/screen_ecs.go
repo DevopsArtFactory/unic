@@ -20,6 +20,9 @@ func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.ecsClusters = msg.clusters
 		m.filteredECSClusters = msg.clusters
 		m.ecsClusterIdx = 0
+		m.selectedECSService = nil
+		m.selectedECSDetail = nil
+		m.ecsDetailScroll = 0
 		m.resetFilter(filterECSClusters)
 		m.screen = screenECSClusterList
 		return m, nil, true
@@ -28,8 +31,27 @@ func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.ecsServices = msg.services
 		m.filteredECSServices = msg.services
 		m.ecsServiceIdx = 0
+		m.selectedECSService = nil
+		m.selectedECSDetail = nil
+		m.ecsDetailScroll = 0
 		m.resetFilter(filterECSServices)
 		m.screen = screenECSServiceList
+		return m, nil, true
+
+	case ecsServiceDetailLoadedMsg:
+		m.selectedECSDetail = msg.detail
+		m.ecsDetailScroll = 0
+		if msg.detail != nil {
+			summary := msg.detail.Summary()
+			m.selectedECSService = &summary
+			for i, svc := range m.ecsServices {
+				if svc.ARN == summary.ARN {
+					m.ecsServices[i] = summary
+				}
+			}
+			m.filteredECSServices = applyFilter(m.ecsServices, m.filterValue(filterECSServices))
+		}
+		m.screen = screenECSServiceDetail
 		return m, nil, true
 
 	case ecsTasksLoadedMsg:
@@ -156,7 +178,7 @@ func (m Model) updateECSServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filteredECSServices) > 0 && m.ecsServiceIdx < len(m.filteredECSServices) {
 			svc := m.filteredECSServices[m.ecsServiceIdx]
 			m.selectedECSService = &svc
-			return m.startLoading(m.loadECSTasks())
+			return m.startLoading(m.loadECSServiceDetail())
 		}
 	}
 	return m, nil
@@ -205,8 +227,149 @@ func (m Model) viewECSServiceList() string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: detail • esc: back • H: home"))
 	return b.String()
+}
+
+// --- Service Detail ---
+
+func (m Model) updateECSServiceDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	lines := m.ecsServiceDetailLines()
+	visibleLines := max(m.height-9, 5)
+	maxOffset := max(len(lines)-visibleLines, 0)
+
+	switch msg.String() {
+	case "q", "esc":
+		m.screen = screenECSServiceList
+	case "up", "k":
+		if m.ecsDetailScroll > 0 {
+			m.ecsDetailScroll--
+		}
+	case "down", "j":
+		if m.ecsDetailScroll < maxOffset {
+			m.ecsDetailScroll++
+		}
+	case "pgup":
+		m.ecsDetailScroll -= visibleLines
+		if m.ecsDetailScroll < 0 {
+			m.ecsDetailScroll = 0
+		}
+	case "pgdown":
+		m.ecsDetailScroll += visibleLines
+		if m.ecsDetailScroll > maxOffset {
+			m.ecsDetailScroll = maxOffset
+		}
+	case "r":
+		return m.startLoading(m.loadECSServiceDetail())
+	case "enter":
+		return m.startLoading(m.loadECSTasks())
+	}
+	return m, nil
+}
+
+func (m Model) viewECSServiceDetail() string {
+	if m.selectedECSDetail == nil {
+		return ""
+	}
+
+	var b strings.Builder
+	var panel strings.Builder
+	detail := m.selectedECSDetail
+
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Service Rollout — %s", detail.Name)))
+	b.WriteString("\n\n")
+
+	lines := m.ecsServiceDetailLines()
+	if len(lines) == 0 {
+		panel.WriteString(dimStyle.Render("  No rollout detail available"))
+		panel.WriteString("\n")
+	} else {
+		visibleLines := max(m.height-9, 5)
+		start := m.ecsDetailScroll
+		maxOffset := max(len(lines)-visibleLines, 0)
+		if start > maxOffset {
+			start = maxOffset
+		}
+		if start < 0 {
+			start = 0
+		}
+		end := min(start+visibleLines, len(lines))
+		for _, line := range lines[start:end] {
+			panel.WriteString(line)
+			panel.WriteString("\n")
+		}
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  lines %d-%d/%d", start+1, end, len(lines))))
+	}
+
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • enter: tasks • r: refresh • esc: back • H: home"))
+	return b.String()
+}
+
+func (m Model) ecsServiceDetailLines() []string {
+	if m.selectedECSDetail == nil {
+		return nil
+	}
+
+	detail := m.selectedECSDetail
+	lines := []string{
+		renderDetailLine("Status", renderECSServiceStatus(detail.Status)),
+		renderDetailLine("Launch", renderECSValue(detail.LaunchType)),
+		renderDetailLine("Tasks", renderECSValue(fmt.Sprintf("running:%d desired:%d pending:%d", detail.RunningCount, detail.DesiredCount, detail.PendingCount))),
+		renderDetailLine("Deploy Ctrl", renderECSValue(zeroFallback(detail.DeploymentControllerType, "-"))),
+		renderDetailLine("Schedule", renderECSValue(zeroFallback(detail.SchedulingStrategy, "-"))),
+		renderDetailLine("Task Def", renderECSValue(detail.TaskDefinitionLabel())),
+		renderDetailLine("Platform", renderECSValue(zeroFallback(detail.PlatformVersion, "-"))),
+		renderDetailLine("Network", renderECSValue(zeroFallback(detail.NetworkMode, "-"))),
+		renderDetailLine("Compat", renderECSValue(detail.CompatibilityLabel())),
+	}
+
+	execStatus := "Disabled"
+	if detail.EnableExecuteCommand {
+		execStatus = "Enabled"
+	}
+	lines = append(lines, renderDetailLine("Exec", renderECSExecStatus(execStatus)))
+
+	lines = append(lines, "")
+	lines = append(lines, titleStyle.Render("Deployments"))
+	if len(detail.Deployments) == 0 {
+		lines = append(lines, dimStyle.Render("  No deployments found"))
+	} else {
+		for _, deployment := range detail.Deployments {
+			lines = append(lines, renderECSDeploymentSummary(deployment))
+			if deployment.RolloutStateReason != "" {
+				lines = append(lines, "    "+dimStyle.Render(deployment.RolloutStateReason))
+			}
+			if !deployment.UpdatedAt.IsZero() {
+				lines = append(lines, "    "+dimStyle.Render("Updated "+deployment.UpdatedAt.Local().Format("2006-01-02 15:04:05")))
+			}
+		}
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, titleStyle.Render("Task Definition Images"))
+	if len(detail.ContainerImages) == 0 {
+		lines = append(lines, dimStyle.Render("  No container images found"))
+	} else {
+		for _, image := range detail.ContainerImages {
+			lines = append(lines, renderDetailLine(image.Name, normalStyle.Render(image.Image)))
+		}
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, titleStyle.Render("Recent Service Events"))
+	if len(detail.Events) == 0 {
+		lines = append(lines, dimStyle.Render("  No recent service events"))
+	} else {
+		for _, event := range detail.Events {
+			lines = append(lines, "  "+normalStyle.Render(event.DisplayTitle()))
+		}
+	}
+
+	return lines
 }
 
 // --- Task List ---
@@ -214,7 +377,7 @@ func (m Model) viewECSServiceList() string {
 func (m Model) updateECSTaskList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
-		m.screen = screenECSServiceList
+		m.screen = screenECSServiceDetail
 	case "up", "k":
 		if m.ecsTaskIdx > 0 {
 			m.ecsTaskIdx--
@@ -275,7 +438,7 @@ func (m Model) viewECSTaskList() string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • r: refresh • enter: select • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • r: refresh • enter: select • esc: service detail • H: home"))
 	return b.String()
 }
 
@@ -422,6 +585,25 @@ func (m Model) loadECSTasks() tea.Cmd {
 	}
 }
 
+func (m Model) loadECSServiceDetail() tea.Cmd {
+	return func() tea.Msg {
+		if m.selectedECSCluster == nil || m.selectedECSService == nil {
+			return errMsg{err: fmt.Errorf("no cluster or service selected")}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		defer cancel()
+		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		detail, err := repo.DescribeServiceDetail(ctx, m.selectedECSCluster.ARN, m.selectedECSService.ARN)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return ecsServiceDetailLoadedMsg{detail: detail}
+	}
+}
+
 func (m Model) loadECSContainers() tea.Cmd {
 	return func() tea.Msg {
 		if m.selectedECSCluster == nil || m.selectedECSTask == nil {
@@ -480,4 +662,69 @@ func (m Model) startECSExec(container awsservice.ECSContainer) tea.Cmd {
 		})
 		return execCmd()
 	}
+}
+
+func renderECSValue(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return dimStyle.Render("-")
+	}
+	return normalStyle.Render(value)
+}
+
+func renderECSExecStatus(value string) string {
+	if value == "Enabled" {
+		return successStyle.Render(value)
+	}
+	return dimStyle.Render(value)
+}
+
+func renderECSServiceStatus(status string) string {
+	switch status {
+	case "ACTIVE":
+		return successStyle.Render(status)
+	case "DRAINING":
+		return warningStyle.Render(status)
+	case "INACTIVE":
+		return errorStyle.Render(status)
+	default:
+		return normalStyle.Render(status)
+	}
+}
+
+func renderECSRolloutState(state string) string {
+	switch state {
+	case "COMPLETED":
+		return successStyle.Render(state)
+	case "IN_PROGRESS":
+		return warningStyle.Render(state)
+	case "FAILED":
+		return errorStyle.Render(state)
+	default:
+		return normalStyle.Render(zeroFallback(state, "-"))
+	}
+}
+
+func renderECSDeploymentSummary(deployment awsservice.ECSDeployment) string {
+	prefix := "  "
+	if deployment.Status == "PRIMARY" {
+		prefix = selectedStyle.Render("▸ ")
+	}
+	return prefix +
+		normalStyle.Render(fmt.Sprintf("%-9s rollout:", deployment.Status)) +
+		renderECSRolloutState(deployment.RolloutState) +
+		normalStyle.Render(fmt.Sprintf(
+			"  tasks:%d/%d pending:%d failed:%d  td:%s",
+			deployment.RunningCount,
+			deployment.DesiredCount,
+			deployment.PendingCount,
+			deployment.FailedTasks,
+			zeroFallback(deployment.TaskDefinition, "-"),
+		))
+}
+
+func zeroFallback(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }

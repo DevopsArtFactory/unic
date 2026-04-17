@@ -179,7 +179,7 @@ Current screen families include:
 - Security Group list/detail/edit flows
 - IAM user, key, and key-rotation flows
 - CloudWatch Logs group/stream/viewer flows
-- ECS cluster/service/task/container flows
+- ECS cluster/service/rollout detail/task/container flows
 - S3 bucket/object/detail flows
 - Inspector mode home, checklist setup, security findings/detail, and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
