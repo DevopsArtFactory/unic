@@ -377,6 +377,11 @@ func (m Model) loadLambdaFunctions() tea.Cmd {
 }
 
 func (m Model) invokeLambdaFunction() tea.Cmd {
+	if m.selectedLambdaFunction == nil {
+		return func() tea.Msg {
+			return errMsg{err: fmt.Errorf("no function selected")}
+		}
+	}
 	payloadSource := m.lambdaPayloadSource
 	payloadInput := m.lambdaInvokePayload
 	fnName := m.selectedLambdaFunction.Name
