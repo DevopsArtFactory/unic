@@ -403,6 +403,14 @@ func (m Model) invokeLambdaFunction() tea.Cmd {
 			payload = string(data)
 		}
 
+		// Validate JSON format if payload is provided
+		if payload != "" {
+			var jsonCheck interface{}
+			if err := json.Unmarshal([]byte(payload), &jsonCheck); err != nil {
+				return errMsg{err: fmt.Errorf("invalid JSON payload: %w", err)}
+			}
+		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), lambdaAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
