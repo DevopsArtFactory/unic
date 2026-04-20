@@ -34,7 +34,11 @@ func BuildConsoleLoginCmd(cfg *config.Config) (*exec.Cmd, error) {
 	if cfg.Region != "" {
 		args = append(args, "--region", cfg.Region)
 	}
-	return exec.Command("aws", args...), nil
+	awsPath, err := exec.LookPath("aws")
+	if err != nil {
+		return nil, fmt.Errorf("aws CLI not found in PATH: %w", err)
+	}
+	return exec.Command(awsPath, args...), nil
 }
 
 func ValidateConsoleLoginContext(cfg *config.Config) error {
