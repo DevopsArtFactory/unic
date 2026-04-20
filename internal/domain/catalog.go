@@ -61,7 +61,7 @@ func Catalog() []Service {
 			Features: []Feature{
 				{
 					Kind:        FeatureCloudWatchMetrics,
-					Description: "Browse CloudWatch metric series and view a single-series chart",
+					Description: "Browse CloudWatch metric series with presets, controls, and a single-series chart",
 				},
 			},
 		},
