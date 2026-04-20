@@ -1039,6 +1039,28 @@ func TestBedrockKeyResultEscReloadsList(t *testing.T) {
 	}
 }
 
+func TestBedrockKeyResultDoesNotRenderSecret(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyResult
+	m.bedrockGeneratedKey = &awsservice.GeneratedBedrockAPIKey{
+		BedrockAPIKey: awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user"},
+		Secret:        "secret-token",
+	}
+
+	view := m.viewBedrockKeyResult()
+	if strings.Contains(view, "secret-token") {
+		t.Fatalf("result view should not render raw secret, got %q", view)
+	}
+	if strings.Contains(view, "AWS_BEARER_TOKEN_BEDROCK=secret-token") {
+		t.Fatalf("result view should not render raw env export, got %q", view)
+	}
+	for _, want := range []string{"copy-only", "[hidden] press c to copy", "[hidden] press e to copy export"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected %q in result view, got %q", want, view)
+		}
+	}
+}
+
 func TestFitToHeight(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 

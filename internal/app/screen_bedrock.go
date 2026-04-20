@@ -696,6 +696,8 @@ func (m Model) viewBedrockKeyResult() string {
 	b.WriteString("\n\n")
 
 	b.WriteString(errorStyle.Render("  Store this secret now. It cannot be retrieved after leaving this screen."))
+	b.WriteString("\n")
+	b.WriteString(warningStyle.Render("  The secret is copy-only and is not printed to avoid terminal logs/history."))
 	b.WriteString("\n\n")
 	b.WriteString(renderDetailLine("Alias", normalStyle.Render(alias)))
 	b.WriteString("\n")
@@ -705,9 +707,9 @@ func (m Model) viewBedrockKeyResult() string {
 	b.WriteString("\n")
 	b.WriteString(renderDetailLine("Expires", normalStyle.Render(key.ExpiresDisplay())))
 	b.WriteString("\n")
-	b.WriteString(renderDetailLine("Secret", normalStyle.Render(key.Secret)))
+	b.WriteString(renderDetailLine("Secret", normalStyle.Render("[hidden] press c to copy")))
 	b.WriteString("\n")
-	b.WriteString(renderDetailLine("Env", normalStyle.Render(key.EnvExport())))
+	b.WriteString(renderDetailLine("Env", normalStyle.Render("[hidden] press e to copy export")))
 	b.WriteString("\n")
 	if m.bedrockCopyMsg != "" {
 		b.WriteString("\n")
