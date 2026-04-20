@@ -67,6 +67,74 @@ func (r *AwsRepository) ListMetrics(ctx context.Context) ([]CloudWatchMetric, er
 func (r *AwsRepository) GetMetricData(ctx context.Context, metric CloudWatchMetric, startTime, endTime time.Time, period time.Duration, stat string) (*CloudWatchMetricSeriesData, error) {
 	uniclog.Debug("aws", "GetMetricData called", "namespace", metric.Namespace, "metric", metric.MetricName, "stat", stat)
 
+	series, err := r.GetMetricDataSeries(ctx, []CloudWatchMetric{metric}, startTime, endTime, period, stat)
+	if err != nil {
+		return nil, err
+	}
+	if len(series) == 0 {
+		return &CloudWatchMetricSeriesData{
+			Metric:    metric,
+			Stat:      stat,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Period:    period,
+		}, nil
+	}
+	return series[0], nil
+}
+
+// GetMetricDataSeries returns data for a small set of metric series over the same time window.
+func (r *AwsRepository) GetMetricDataSeries(ctx context.Context, metrics []CloudWatchMetric, startTime, endTime time.Time, period time.Duration, stat string) ([]*CloudWatchMetricSeriesData, error) {
+	if len(metrics) == 0 {
+		return nil, nil
+	}
+
+	uniclog.Debug("aws", "GetMetricDataSeries called", "series_count", len(metrics), "stat", stat)
+
+	periodSeconds := int32(period / time.Second)
+	queries := make([]cwtypes.MetricDataQuery, 0, len(metrics))
+	series := make([]*CloudWatchMetricSeriesData, 0, len(metrics))
+	indexByID := make(map[string]int, len(metrics))
+
+	for i, metric := range metrics {
+		queryID := fmt.Sprintf("m%d", i+1)
+		indexByID[queryID] = i
+		queries = append(queries, cloudWatchMetricDataQuery(queryID, metric, periodSeconds, stat))
+		series = append(series, &CloudWatchMetricSeriesData{
+			Metric:    metric,
+			Stat:      stat,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Period:    period,
+		})
+	}
+
+	output, err := r.CloudWatchClient.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
+		StartTime:         awssdk.Time(startTime),
+		EndTime:           awssdk.Time(endTime),
+		MetricDataQueries: queries,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CloudWatch metric data: %w", err)
+	}
+
+	for _, result := range output.MetricDataResults {
+		resultID := awssdk.ToString(result.Id)
+		if resultID == "" && len(series) == 1 {
+			fillMetricSeriesData(series[0], result)
+			continue
+		}
+		index, ok := indexByID[resultID]
+		if !ok {
+			continue
+		}
+		fillMetricSeriesData(series[index], result)
+	}
+
+	return series, nil
+}
+
+func cloudWatchMetricDataQuery(id string, metric CloudWatchMetric, periodSeconds int32, stat string) cwtypes.MetricDataQuery {
 	dimensions := make([]cwtypes.Dimension, 0, len(metric.Dimensions))
 	for _, dim := range metric.Dimensions {
 		dimensions = append(dimensions, cwtypes.Dimension{
@@ -75,45 +143,26 @@ func (r *AwsRepository) GetMetricData(ctx context.Context, metric CloudWatchMetr
 		})
 	}
 
-	periodSeconds := int32(period / time.Second)
-	output, err := r.CloudWatchClient.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
-		StartTime: awssdk.Time(startTime),
-		EndTime:   awssdk.Time(endTime),
-		MetricDataQueries: []cwtypes.MetricDataQuery{
-			{
-				Id: awssdk.String("m1"),
-				MetricStat: &cwtypes.MetricStat{
-					Metric: &cwtypes.Metric{
-						Namespace:  awssdk.String(metric.Namespace),
-						MetricName: awssdk.String(metric.MetricName),
-						Dimensions: dimensions,
-					},
-					Period: awssdk.Int32(periodSeconds),
-					Stat:   awssdk.String(stat),
-				},
-				Label:      awssdk.String(metric.DisplayTitle()),
-				ReturnData: awssdk.Bool(true),
+	return cwtypes.MetricDataQuery{
+		Id: awssdk.String(id),
+		MetricStat: &cwtypes.MetricStat{
+			Metric: &cwtypes.Metric{
+				Namespace:  awssdk.String(metric.Namespace),
+				MetricName: awssdk.String(metric.MetricName),
+				Dimensions: dimensions,
 			},
+			Period: awssdk.Int32(periodSeconds),
+			Stat:   awssdk.String(stat),
 		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get CloudWatch metric data for %s/%s: %w", metric.Namespace, metric.MetricName, err)
+		Label:      awssdk.String(metric.DisplayTitle()),
+		ReturnData: awssdk.Bool(true),
 	}
+}
 
-	series := &CloudWatchMetricSeriesData{
-		Metric:    metric,
-		Stat:      stat,
-		StartTime: startTime,
-		EndTime:   endTime,
-		Period:    period,
-	}
-	if len(output.MetricDataResults) == 0 {
-		return series, nil
-	}
-
-	result := output.MetricDataResults[0]
+func fillMetricSeriesData(series *CloudWatchMetricSeriesData, result cwtypes.MetricDataResult) {
 	series.Label = awssdk.ToString(result.Label)
 	series.StatusCode = string(result.StatusCode)
+	series.Messages = nil
 	for _, message := range result.Messages {
 		if code := awssdk.ToString(message.Code); code != "" {
 			series.Messages = append(series.Messages, fmt.Sprintf("%s: %s", code, awssdk.ToString(message.Value)))
@@ -137,6 +186,4 @@ func (r *AwsRepository) GetMetricData(ctx context.Context, metric CloudWatchMetr
 	sort.Slice(series.Datapoints, func(i, j int) bool {
 		return series.Datapoints[i].Timestamp.Before(series.Datapoints[j].Timestamp)
 	})
-
-	return series, nil
 }

@@ -181,6 +181,80 @@ func TestGetMetricData_Success(t *testing.T) {
 	}
 }
 
+func TestGetMetricDataSeries_Success(t *testing.T) {
+	startTime := time.Date(2026, 4, 17, 9, 0, 0, 0, time.UTC)
+	endTime := startTime.Add(time.Hour)
+	older := startTime.Add(10 * time.Minute)
+	newer := startTime.Add(20 * time.Minute)
+
+	mock := &mockCloudWatchClient{
+		getMetricDataFunc: func(_ context.Context, params *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+			if len(params.MetricDataQueries) != 2 {
+				t.Fatalf("expected 2 metric queries, got %d", len(params.MetricDataQueries))
+			}
+			first := params.MetricDataQueries[0]
+			second := params.MetricDataQueries[1]
+			if got := awssdk.ToString(first.Id); got != "m1" {
+				t.Fatalf("unexpected first query id %q", got)
+			}
+			if got := awssdk.ToString(second.Id); got != "m2" {
+				t.Fatalf("unexpected second query id %q", got)
+			}
+			if got := awssdk.ToString(first.MetricStat.Metric.Dimensions[0].Value); got != "i-1" {
+				t.Fatalf("unexpected first dimension value %q", got)
+			}
+			if got := awssdk.ToString(second.MetricStat.Metric.Dimensions[0].Value); got != "i-2" {
+				t.Fatalf("unexpected second dimension value %q", got)
+			}
+
+			return &cloudwatch.GetMetricDataOutput{
+				MetricDataResults: []cwtypes.MetricDataResult{
+					{
+						Id:         awssdk.String("m2"),
+						Label:      awssdk.String("instance-two"),
+						StatusCode: cwtypes.StatusCode("Complete"),
+						Timestamps: []time.Time{newer, older},
+						Values:     []float64{20, 10},
+					},
+					{
+						Id:         awssdk.String("m1"),
+						Label:      awssdk.String("instance-one"),
+						StatusCode: cwtypes.StatusCode("Complete"),
+						Timestamps: []time.Time{older, newer},
+						Values:     []float64{30, 40},
+					},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{CloudWatchClient: mock}
+	series, err := repo.GetMetricDataSeries(context.Background(), []CloudWatchMetric{
+		{
+			Namespace:  "AWS/EC2",
+			MetricName: "CPUUtilization",
+			Dimensions: []CloudWatchMetricDimension{{Name: "InstanceId", Value: "i-1"}},
+		},
+		{
+			Namespace:  "AWS/EC2",
+			MetricName: "CPUUtilization",
+			Dimensions: []CloudWatchMetricDimension{{Name: "InstanceId", Value: "i-2"}},
+		},
+	}, startTime, endTime, time.Minute, "Average")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(series) != 2 {
+		t.Fatalf("expected 2 series, got %d", len(series))
+	}
+	if series[0].Label != "instance-one" || series[1].Label != "instance-two" {
+		t.Fatalf("expected response data to preserve request order, got %q and %q", series[0].Label, series[1].Label)
+	}
+	if series[1].Datapoints[0].Value != 10 || series[1].Datapoints[1].Value != 20 {
+		t.Fatalf("expected second series datapoints to be sorted ascending, got %+v", series[1].Datapoints)
+	}
+}
+
 func TestGetMetricData_Error(t *testing.T) {
 	mock := &mockCloudWatchClient{
 		getMetricDataFunc: func(_ context.Context, _ *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
