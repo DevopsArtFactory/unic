@@ -21,49 +21,122 @@ const (
 	bedrockCreateFieldExpiration
 )
 
-func (m Model) handleBedrockMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+type bedrockModel struct {
+	keys         []awsservice.BedrockAPIKey
+	filteredKeys []awsservice.BedrockAPIKey
+	keyIdx       int
+	selectedKey  *awsservice.BedrockAPIKey
+
+	action       string // "create", "rotate", "delete"
+	confirm      string
+	createField  int
+	createMode   int // 0=current IAM user, 1=another IAM user
+	createInput  string
+	createValues map[string]string
+	generatedKey *awsservice.GeneratedBedrockAPIKey
+	copyMsg      string
+	status       string
+}
+
+func newBedrockModel() bedrockModel {
+	return bedrockModel{}
+}
+
+func (bm *bedrockModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(bm.loadAPIKeys(*m))
+}
+
+func (bm *bedrockModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case bedrockKeysLoadedMsg:
-		m.bedrockKeys = msg.keys
-		m.filteredBedrockKeys = applyFilter(m.bedrockKeys, m.filterValue(filterBedrockKeys))
-		m.bedrockKeyIdx = 0
+		bm.keys = msg.keys
+		bm.filteredKeys = applyFilter(bm.keys, m.filterValue(filterBedrockKeys))
+		bm.keyIdx = 0
 		m.screen = screenBedrockKeyList
-		return m, nil, true
+		return *m, nil, true
 
 	case bedrockCreateIdentityMsg:
 		if msg.err == nil && msg.identity != nil {
 			m.callerIdentity = msg.identity
 		}
-		m.enterBedrockCreateFlow()
-		return m, nil, true
+		bm.enterCreateFlow(m)
+		return *m, nil, true
 
 	case bedrockKeyGeneratedMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			m.screen = screenError
-			return m, nil, true
+			return *m, nil, true
 		}
-		m.bedrockGeneratedKey = msg.key
-		m.bedrockCopyMsg = ""
-		m.bedrockStatus = fmt.Sprintf("Bedrock API key %s complete", msg.action)
+		bm.generatedKey = msg.key
+		bm.copyMsg = ""
+		bm.status = fmt.Sprintf("Bedrock API key %s complete", msg.action)
 		m.screen = screenBedrockKeyResult
-		return m, nil, true
+		return *m, nil, true
 
 	case bedrockKeyDeletedMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			m.screen = screenError
-			return m, nil, true
+			return *m, nil, true
 		}
-		m.selectedBedrockKey = nil
-		m.bedrockStatus = fmt.Sprintf("Deleted Bedrock API key %s", msg.credentialID)
-		newM, cmd := m.startLoading(m.loadBedrockAPIKeys())
+		bm.selectedKey = nil
+		bm.status = fmt.Sprintf("Deleted Bedrock API key %s", msg.credentialID)
+		newM, cmd := m.startLoading(bm.loadAPIKeys(*m))
 		return newM, cmd, true
 	}
-	return m, nil, false
+	return *m, nil, false
 }
 
-func (m Model) loadBedrockAPIKeys() tea.Cmd {
+func (bm *bedrockModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenBedrockKeyList:
+		newM, cmd := bm.updateList(m, msg)
+		return newM, cmd, true
+	case screenBedrockKeyDetail:
+		newM, cmd := bm.updateDetail(m, msg)
+		return newM, cmd, true
+	case screenBedrockKeyCreate:
+		newM, cmd := bm.updateCreate(m, msg)
+		return newM, cmd, true
+	case screenBedrockKeyConfirm:
+		newM, cmd := bm.updateConfirm(m, msg)
+		return newM, cmd, true
+	case screenBedrockKeyResult:
+		newM, cmd := bm.updateResult(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (bm bedrockModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenBedrockKeyList:
+		return bm.viewList(m), true
+	case screenBedrockKeyDetail:
+		return bm.viewDetail(m), true
+	case screenBedrockKeyCreate:
+		return bm.viewCreate(m), true
+	case screenBedrockKeyConfirm:
+		return bm.viewConfirm(m), true
+	case screenBedrockKeyResult:
+		return bm.viewResult(m), true
+	default:
+		return "", false
+	}
+}
+
+func (bm *bedrockModel) ApplyFilter(m *Model, target filterTarget) bool {
+	if target != filterBedrockKeys {
+		return false
+	}
+	bm.filteredKeys = applyFilter(bm.keys, m.filterValue(target))
+	bm.keyIdx = 0
+	return true
+}
+
+func (bm bedrockModel) loadAPIKeys(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -80,7 +153,7 @@ func (m Model) loadBedrockAPIKeys() tea.Cmd {
 	}
 }
 
-func (m Model) loadBedrockCreateIdentity() tea.Cmd {
+func (bm bedrockModel) loadCreateIdentity(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -97,7 +170,7 @@ func (m Model) loadBedrockCreateIdentity() tea.Cmd {
 	}
 }
 
-func (m Model) createBedrockAPIKey(userName string, ageDays int32) tea.Cmd {
+func (bm bedrockModel) createAPIKey(m Model, userName string, ageDays int32) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -114,7 +187,7 @@ func (m Model) createBedrockAPIKey(userName string, ageDays int32) tea.Cmd {
 	}
 }
 
-func (m Model) rotateBedrockAPIKey(key awsservice.BedrockAPIKey) tea.Cmd {
+func (bm bedrockModel) rotateAPIKey(m Model, key awsservice.BedrockAPIKey) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -131,7 +204,7 @@ func (m Model) rotateBedrockAPIKey(key awsservice.BedrockAPIKey) tea.Cmd {
 	}
 }
 
-func (m Model) deleteBedrockAPIKey(key awsservice.BedrockAPIKey) tea.Cmd {
+func (bm bedrockModel) deleteAPIKey(m Model, key awsservice.BedrockAPIKey) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -148,236 +221,236 @@ func (m Model) deleteBedrockAPIKey(key awsservice.BedrockAPIKey) tea.Cmd {
 	}
 }
 
-func (m Model) updateBedrockKeyList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (bm *bedrockModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterBedrockKeys); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.selectedBedrockKey = nil
+		bm.selectedKey = nil
 		m.resetFilter(filterBedrockKeys)
 	case "up", "k":
-		if m.bedrockKeyIdx > 0 {
-			m.bedrockKeyIdx--
+		if bm.keyIdx > 0 {
+			bm.keyIdx--
 		}
 	case "down", "j":
-		if m.bedrockKeyIdx < len(m.filteredBedrockKeys)-1 {
-			m.bedrockKeyIdx++
+		if bm.keyIdx < len(bm.filteredKeys)-1 {
+			bm.keyIdx++
 		}
 	case "/":
-		return m, m.activateFilter(filterBedrockKeys)
+		return *m, m.activateFilter(filterBedrockKeys)
 	case "c":
 		if m.callerIdentity == nil {
-			return m.startLoadingWithMessage("Resolving caller identity...", nil, m.loadBedrockCreateIdentity())
+			return m.startLoadingWithMessage("Resolving caller identity...", nil, bm.loadCreateIdentity(*m))
 		}
-		m.enterBedrockCreateFlow()
+		bm.enterCreateFlow(m)
 		m.screen = screenBedrockKeyCreate
 	case "enter":
-		if len(m.filteredBedrockKeys) > 0 && m.bedrockKeyIdx < len(m.filteredBedrockKeys) {
-			selected := m.filteredBedrockKeys[m.bedrockKeyIdx]
-			m.selectedBedrockKey = &selected
+		if len(bm.filteredKeys) > 0 && bm.keyIdx < len(bm.filteredKeys) {
+			selected := bm.filteredKeys[bm.keyIdx]
+			bm.selectedKey = &selected
 			m.screen = screenBedrockKeyDetail
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m *Model) enterBedrockCreateFlow() {
-	m.bedrockAction = "create"
-	m.bedrockConfirm = ""
-	m.bedrockCreateField = bedrockCreateFieldMode
-	m.bedrockCreateInput = ""
-	m.bedrockCreateMode = 0
-	m.bedrockCreateValues = map[string]string{}
-	m.bedrockStatus = ""
-	if _, ok := m.currentIAMUserName(); !ok {
-		m.bedrockCreateField = bedrockCreateFieldUser
-		m.bedrockCreateMode = 1
+func (bm *bedrockModel) enterCreateFlow(m *Model) {
+	bm.action = "create"
+	bm.confirm = ""
+	bm.createField = bedrockCreateFieldMode
+	bm.createInput = ""
+	bm.createMode = 0
+	bm.createValues = map[string]string{}
+	bm.status = ""
+	if _, ok := currentIAMUserName(*m); !ok {
+		bm.createField = bedrockCreateFieldUser
+		bm.createMode = 1
 	}
 	m.screen = screenBedrockKeyCreate
 }
 
-func (m Model) updateBedrockKeyDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (bm *bedrockModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenBedrockKeyList
 	case "r":
-		if m.selectedBedrockKey != nil && m.selectedBedrockKey.Status == "Active" {
-			m.bedrockAction = "rotate"
-			m.bedrockConfirm = ""
-			m.bedrockStatus = ""
+		if bm.selectedKey != nil && bm.selectedKey.Status == "Active" {
+			bm.action = "rotate"
+			bm.confirm = ""
+			bm.status = ""
 			m.screen = screenBedrockKeyConfirm
 		}
 	case "d":
-		if m.selectedBedrockKey != nil {
-			m.bedrockAction = "delete"
-			m.bedrockConfirm = ""
-			m.bedrockStatus = ""
+		if bm.selectedKey != nil {
+			bm.action = "delete"
+			bm.confirm = ""
+			bm.status = ""
 			m.screen = screenBedrockKeyConfirm
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateBedrockKeyCreate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (bm *bedrockModel) updateCreate(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenBedrockKeyList
-		m.bedrockStatus = ""
+		bm.status = ""
 	case "up", "k":
-		if m.bedrockCreateField == bedrockCreateFieldMode && m.bedrockCreateMode > 0 {
-			m.bedrockCreateMode--
+		if bm.createField == bedrockCreateFieldMode && bm.createMode > 0 {
+			bm.createMode--
 		}
 	case "down", "j":
-		if m.bedrockCreateField == bedrockCreateFieldMode && m.bedrockCreateMode < 1 {
-			m.bedrockCreateMode++
+		if bm.createField == bedrockCreateFieldMode && bm.createMode < 1 {
+			bm.createMode++
 		}
 	case "enter":
-		if m.bedrockCreateValues == nil {
-			m.bedrockCreateValues = map[string]string{}
+		if bm.createValues == nil {
+			bm.createValues = map[string]string{}
 		}
-		if m.bedrockCreateField == bedrockCreateFieldMode {
-			if m.bedrockCreateMode == 0 {
-				userName, ok := m.currentIAMUserName()
+		if bm.createField == bedrockCreateFieldMode {
+			if bm.createMode == 0 {
+				userName, ok := currentIAMUserName(*m)
 				if !ok {
-					m.bedrockStatus = "Current IAM user could not be inferred for this context"
-					m.bedrockCreateMode = 1
-					m.bedrockCreateField = bedrockCreateFieldUser
-					return m, nil
+					bm.status = "Current IAM user could not be inferred for this context"
+					bm.createMode = 1
+					bm.createField = bedrockCreateFieldUser
+					return *m, nil
 				}
-				m.bedrockCreateValues["user"] = userName
-				m.bedrockCreateValues["user_source"] = "current"
-				m.bedrockCreateField = bedrockCreateFieldExpiration
-				m.bedrockCreateInput = "30"
-				m.bedrockStatus = ""
-				return m, nil
+				bm.createValues["user"] = userName
+				bm.createValues["user_source"] = "current"
+				bm.createField = bedrockCreateFieldExpiration
+				bm.createInput = "30"
+				bm.status = ""
+				return *m, nil
 			}
-			m.bedrockCreateField = bedrockCreateFieldUser
-			m.bedrockCreateInput = ""
-			m.bedrockStatus = ""
-			return m, nil
+			bm.createField = bedrockCreateFieldUser
+			bm.createInput = ""
+			bm.status = ""
+			return *m, nil
 		}
-		if m.bedrockCreateField == bedrockCreateFieldUser {
-			userName := strings.TrimSpace(m.bedrockCreateInput)
+		if bm.createField == bedrockCreateFieldUser {
+			userName := strings.TrimSpace(bm.createInput)
 			if userName == "" {
-				m.bedrockStatus = "IAM user name is required"
-				return m, nil
+				bm.status = "IAM user name is required"
+				return *m, nil
 			}
-			m.bedrockCreateValues["user"] = userName
-			m.bedrockCreateValues["user_source"] = "custom"
-			m.bedrockCreateField = bedrockCreateFieldExpiration
-			m.bedrockCreateInput = "30"
-			m.bedrockStatus = ""
-			return m, nil
+			bm.createValues["user"] = userName
+			bm.createValues["user_source"] = "custom"
+			bm.createField = bedrockCreateFieldExpiration
+			bm.createInput = "30"
+			bm.status = ""
+			return *m, nil
 		}
 
-		days := strings.TrimSpace(m.bedrockCreateInput)
+		days := strings.TrimSpace(bm.createInput)
 		if _, err := parseBedrockAgeDays(days); err != nil {
-			m.bedrockStatus = err.Error()
-			return m, nil
+			bm.status = err.Error()
+			return *m, nil
 		}
-		m.bedrockCreateValues["days"] = days
-		m.bedrockAction = "create"
-		m.bedrockConfirm = ""
-		m.bedrockStatus = ""
+		bm.createValues["days"] = days
+		bm.action = "create"
+		bm.confirm = ""
+		bm.status = ""
 		m.screen = screenBedrockKeyConfirm
 	case "backspace":
-		if m.bedrockCreateField != bedrockCreateFieldMode && len(m.bedrockCreateInput) > 0 {
-			m.bedrockCreateInput = m.bedrockCreateInput[:len(m.bedrockCreateInput)-1]
+		if bm.createField != bedrockCreateFieldMode && len(bm.createInput) > 0 {
+			bm.createInput = bm.createInput[:len(bm.createInput)-1]
 		}
 	default:
-		if runes := msg.Runes; m.bedrockCreateField != bedrockCreateFieldMode && len(runes) > 0 {
-			m.bedrockCreateInput += string(runes)
+		if runes := msg.Runes; bm.createField != bedrockCreateFieldMode && len(runes) > 0 {
+			bm.createInput += string(runes)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateBedrockKeyConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	target := m.bedrockConfirmTarget()
+func (bm *bedrockModel) updateConfirm(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	target := bm.confirmTarget()
 	switch msg.String() {
 	case "esc":
-		if m.bedrockAction == "create" {
+		if bm.action == "create" {
 			m.screen = screenBedrockKeyCreate
 		} else {
 			m.screen = screenBedrockKeyDetail
 		}
 	case "enter":
-		if target == "" || m.bedrockConfirm != target {
-			return m, nil
+		if target == "" || bm.confirm != target {
+			return *m, nil
 		}
-		switch m.bedrockAction {
+		switch bm.action {
 		case "create":
-			userName := m.bedrockCreateValues["user"]
-			ageDays, err := parseBedrockAgeDays(m.bedrockCreateValues["days"])
+			userName := bm.createValues["user"]
+			ageDays, err := parseBedrockAgeDays(bm.createValues["days"])
 			if err != nil {
-				m.bedrockStatus = err.Error()
+				bm.status = err.Error()
 				m.screen = screenBedrockKeyCreate
-				return m, nil
+				return *m, nil
 			}
-			return m.startLoadingWithMessage("Generating Bedrock API key...", []string{"The secret will be shown once."}, m.createBedrockAPIKey(userName, ageDays))
+			return m.startLoadingWithMessage("Generating Bedrock API key...", []string{"The secret will be shown once."}, bm.createAPIKey(*m, userName, ageDays))
 		case "rotate":
-			if m.selectedBedrockKey != nil {
-				return m.startLoadingWithMessage("Rotating Bedrock API key...", []string{"The old secret will be invalidated immediately."}, m.rotateBedrockAPIKey(*m.selectedBedrockKey))
+			if bm.selectedKey != nil {
+				return m.startLoadingWithMessage("Rotating Bedrock API key...", []string{"The old secret will be invalidated immediately."}, bm.rotateAPIKey(*m, *bm.selectedKey))
 			}
 		case "delete":
-			if m.selectedBedrockKey != nil {
-				return m.startLoadingWithMessage("Deleting Bedrock API key...", nil, m.deleteBedrockAPIKey(*m.selectedBedrockKey))
+			if bm.selectedKey != nil {
+				return m.startLoadingWithMessage("Deleting Bedrock API key...", nil, bm.deleteAPIKey(*m, *bm.selectedKey))
 			}
 		}
 	case "backspace":
-		if len(m.bedrockConfirm) > 0 {
-			m.bedrockConfirm = m.bedrockConfirm[:len(m.bedrockConfirm)-1]
+		if len(bm.confirm) > 0 {
+			bm.confirm = bm.confirm[:len(bm.confirm)-1]
 		}
 	default:
 		if runes := msg.Runes; len(runes) > 0 {
-			m.bedrockConfirm += string(runes)
+			bm.confirm += string(runes)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateBedrockKeyResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.bedrockGeneratedKey == nil {
-		return m.startLoading(m.loadBedrockAPIKeys())
+func (bm *bedrockModel) updateResult(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if bm.generatedKey == nil {
+		return m.startLoading(bm.loadAPIKeys(*m))
 	}
 
 	switch msg.String() {
 	case "c":
-		if err := clipboard.Copy(m.bedrockGeneratedKey.Secret); err != nil {
-			m.bedrockCopyMsg = fmt.Sprintf("Clipboard error: %s", err)
+		if err := clipboard.Copy(bm.generatedKey.Secret); err != nil {
+			bm.copyMsg = fmt.Sprintf("Clipboard error: %s", err)
 		} else {
-			m.bedrockCopyMsg = "Copied API key to clipboard"
+			bm.copyMsg = "Copied API key to clipboard"
 		}
 	case "e":
-		if err := clipboard.Copy(m.bedrockGeneratedKey.EnvExport()); err != nil {
-			m.bedrockCopyMsg = fmt.Sprintf("Clipboard error: %s", err)
+		if err := clipboard.Copy(bm.generatedKey.EnvExport()); err != nil {
+			bm.copyMsg = fmt.Sprintf("Clipboard error: %s", err)
 		} else {
-			m.bedrockCopyMsg = "Copied shell export to clipboard"
+			bm.copyMsg = "Copied shell export to clipboard"
 		}
 	case "q", "esc":
-		m.bedrockGeneratedKey = nil
-		m.bedrockCopyMsg = ""
-		return m.startLoading(m.loadBedrockAPIKeys())
+		bm.generatedKey = nil
+		bm.copyMsg = ""
+		return m.startLoading(bm.loadAPIKeys(*m))
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) bedrockConfirmTarget() string {
-	if m.bedrockAction == "create" && m.bedrockCreateValues != nil {
-		return m.bedrockCreateValues["user"]
+func (bm bedrockModel) confirmTarget() string {
+	if bm.action == "create" && bm.createValues != nil {
+		return bm.createValues["user"]
 	}
-	if m.selectedBedrockKey != nil {
-		return m.selectedBedrockKey.CredentialID
+	if bm.selectedKey != nil {
+		return bm.selectedKey.CredentialID
 	}
 	return ""
 }
 
-func (m Model) currentIAMUserName() (string, bool) {
+func currentIAMUserName(m Model) (string, bool) {
 	if m.callerIdentity == nil {
 		return "", false
 	}
@@ -410,7 +483,7 @@ func parseBedrockAgeDays(value string) (int32, error) {
 	return int32(days), nil
 }
 
-func (m Model) viewBedrockKeyList() string {
+func (bm bedrockModel) viewList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -420,13 +493,13 @@ func (m Model) viewBedrockKeyList() string {
 	b.WriteString(m.renderFilterValue(filterBedrockKeys))
 	b.WriteString("\n\n")
 
-	if len(m.filteredBedrockKeys) == 0 {
+	if len(bm.filteredKeys) == 0 {
 		panel.WriteString(dimStyle.Render("  No Bedrock API keys found"))
 		panel.WriteString("\n")
 	} else {
 		aliasWidth := len("ALIAS")
 		userWidth := len("USER")
-		for _, key := range m.filteredBedrockKeys {
+		for _, key := range bm.filteredKeys {
 			alias := key.Alias
 			if alias == "" {
 				alias = "-"
@@ -463,20 +536,20 @@ func (m Model) viewBedrockKeyList() string {
 
 		visibleLines := max(m.height-12, 5)
 		start := 0
-		if m.bedrockKeyIdx >= visibleLines {
-			start = m.bedrockKeyIdx - visibleLines + 1
+		if bm.keyIdx >= visibleLines {
+			start = bm.keyIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredBedrockKeys))
+		end := min(start+visibleLines, len(bm.filteredKeys))
 
 		for i := start; i < end; i++ {
-			key := m.filteredBedrockKeys[i]
+			key := bm.filteredKeys[i]
 			alias := key.Alias
 			if alias == "" {
 				alias = "-"
 			}
 			cursor := "  "
 			style := normalStyle
-			if i == m.bedrockKeyIdx {
+			if i == bm.keyIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -491,12 +564,12 @@ func (m Model) viewBedrockKeyList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d keys", len(m.filteredBedrockKeys), len(m.bedrockKeys))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d keys", len(bm.filteredKeys), len(bm.keys))))
 	}
 
-	if m.bedrockStatus != "" {
+	if bm.status != "" {
 		panel.WriteString("\n")
-		panel.WriteString(selectedStyle.Render("  " + m.bedrockStatus))
+		panel.WriteString(selectedStyle.Render("  " + bm.status))
 		panel.WriteString("\n")
 	}
 
@@ -506,11 +579,11 @@ func (m Model) viewBedrockKeyList() string {
 	return b.String()
 }
 
-func (m Model) viewBedrockKeyDetail() string {
-	if m.selectedBedrockKey == nil {
+func (bm bedrockModel) viewDetail(m Model) string {
+	if bm.selectedKey == nil {
 		return ""
 	}
-	key := m.selectedBedrockKey
+	key := bm.selectedKey
 	alias := key.Alias
 	if alias == "" {
 		alias = "(unavailable)"
@@ -550,14 +623,14 @@ func (m Model) viewBedrockKeyDetail() string {
 	return b.String()
 }
 
-func (m Model) viewBedrockKeyCreate() string {
+func (bm bedrockModel) viewCreate(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Generate Bedrock API Key"))
 	b.WriteString("\n\n")
 
-	if m.bedrockCreateField == bedrockCreateFieldMode {
-		currentUser, _ := m.currentIAMUserName()
+	if bm.createField == bedrockCreateFieldMode {
+		currentUser, _ := currentIAMUserName(m)
 		options := []string{
 			fmt.Sprintf("Current IAM user (%s)", currentUser),
 			"Another IAM user",
@@ -567,7 +640,7 @@ func (m Model) viewBedrockKeyCreate() string {
 		for i, opt := range options {
 			cursor := "  "
 			style := normalStyle
-			if i == m.bedrockCreateMode {
+			if i == bm.createMode {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -578,20 +651,20 @@ func (m Model) viewBedrockKeyCreate() string {
 	} else {
 		userValue := ""
 		userSource := ""
-		if m.bedrockCreateValues != nil {
-			userValue = m.bedrockCreateValues["user"]
-			userSource = m.bedrockCreateValues["user_source"]
+		if bm.createValues != nil {
+			userValue = bm.createValues["user"]
+			userSource = bm.createValues["user_source"]
 		}
 
 		userLine := userValue
-		if m.bedrockCreateField == bedrockCreateFieldUser {
-			userLine = m.bedrockCreateInput + "▏"
+		if bm.createField == bedrockCreateFieldUser {
+			userLine = bm.createInput + "▏"
 		}
 		if userSource == "current" && userLine != "" {
 			userLine += " (current)"
 		}
 
-		if m.bedrockCreateField == bedrockCreateFieldUser && userSource != "current" {
+		if bm.createField == bedrockCreateFieldUser && userSource != "current" {
 			b.WriteString(dimStyle.Render("  Current AWS identity is not an IAM user."))
 			b.WriteString("\n")
 			b.WriteString(dimStyle.Render("  Bedrock API keys must be generated for an IAM user."))
@@ -599,37 +672,37 @@ func (m Model) viewBedrockKeyCreate() string {
 		}
 
 		daysLine := "(next)"
-		if m.bedrockCreateField == bedrockCreateFieldExpiration {
-			daysLine = m.bedrockCreateInput + "▏"
-		} else if m.bedrockCreateValues != nil {
-			daysLine = m.bedrockCreateValues["days"]
+		if bm.createField == bedrockCreateFieldExpiration {
+			daysLine = bm.createInput + "▏"
+		} else if bm.createValues != nil {
+			daysLine = bm.createValues["days"]
 		}
-		if strings.TrimSpace(daysLine) == "" && m.bedrockCreateField != bedrockCreateFieldExpiration && userValue != "" {
+		if strings.TrimSpace(daysLine) == "" && bm.createField != bedrockCreateFieldExpiration && userValue != "" {
 			daysLine = "(never)"
 		}
 
 		b.WriteString(renderDetailLine("IAM User", normalStyle.Render(userLine)))
 		b.WriteString("\n")
-		if m.bedrockCreateField != bedrockCreateFieldUser {
+		if bm.createField != bedrockCreateFieldUser {
 			b.WriteString(renderDetailLine("Expiration Days", normalStyle.Render(daysLine)))
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
 	}
 
-	if m.bedrockCreateField != bedrockCreateFieldUser {
+	if bm.createField != bedrockCreateFieldUser {
 		b.WriteString(dimStyle.Render("  Blank or 0 expiration creates a key with no expiration."))
 		b.WriteString("\n")
 	}
 	b.WriteString(dimStyle.Render("  The generated secret is shown only once."))
 	b.WriteString("\n")
-	if m.bedrockStatus != "" {
+	if bm.status != "" {
 		b.WriteString("\n")
-		b.WriteString(errorStyle.Render("  " + m.bedrockStatus))
+		b.WriteString(errorStyle.Render("  " + bm.status))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	if m.bedrockCreateField == bedrockCreateFieldMode {
+	if bm.createField == bedrockCreateFieldMode {
 		b.WriteString(m.renderHelpBar("↑/↓: select target • enter: continue • esc: cancel"))
 	} else {
 		b.WriteString(m.renderHelpBar("type: edit • enter: continue • esc: cancel"))
@@ -637,11 +710,11 @@ func (m Model) viewBedrockKeyCreate() string {
 	return b.String()
 }
 
-func (m Model) viewBedrockKeyConfirm() string {
-	target := m.bedrockConfirmTarget()
+func (bm bedrockModel) viewConfirm(m Model) string {
+	target := bm.confirmTarget()
 	targetLabel := "API key ID"
-	action := m.bedrockAction
-	switch m.bedrockAction {
+	action := bm.action
+	switch bm.action {
 	case "create":
 		targetLabel = "IAM user name"
 		action = "generate a Bedrock API key for"
@@ -660,31 +733,31 @@ func (m Model) viewBedrockKeyConfirm() string {
 	b.WriteString("\n")
 	b.WriteString(selectedStyle.Render(fmt.Sprintf("  %s", target)))
 	b.WriteString("\n\n")
-	if m.bedrockAction == "rotate" {
+	if bm.action == "rotate" {
 		b.WriteString(dimStyle.Render("  Rotation immediately invalidates the previous secret."))
 		b.WriteString("\n\n")
 	}
-	if m.bedrockAction == "create" {
+	if bm.action == "create" {
 		b.WriteString(dimStyle.Render("  The generated secret will be shown only once."))
 		b.WriteString("\n\n")
-		if m.bedrockCreateValues != nil && m.bedrockCreateValues["user_source"] == "custom" {
+		if bm.createValues != nil && bm.createValues["user_source"] == "custom" {
 			b.WriteString(errorStyle.Render("  Cross-user generation is explicit; confirm the target IAM user carefully."))
 			b.WriteString("\n\n")
 		}
 	}
 	b.WriteString(normalStyle.Render(fmt.Sprintf("  Type the %s to confirm:", targetLabel)))
 	b.WriteString("\n")
-	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.bedrockConfirm)))
+	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", bm.confirm)))
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 	return b.String()
 }
 
-func (m Model) viewBedrockKeyResult() string {
-	if m.bedrockGeneratedKey == nil {
+func (bm bedrockModel) viewResult(m Model) string {
+	if bm.generatedKey == nil {
 		return ""
 	}
-	key := m.bedrockGeneratedKey
+	key := bm.generatedKey
 	alias := key.Alias
 	if alias == "" {
 		alias = "(unavailable)"
@@ -711,9 +784,9 @@ func (m Model) viewBedrockKeyResult() string {
 	b.WriteString("\n")
 	b.WriteString(renderDetailLine("Env", normalStyle.Render("[hidden] press e to copy export")))
 	b.WriteString("\n")
-	if m.bedrockCopyMsg != "" {
+	if bm.copyMsg != "" {
 		b.WriteString("\n")
-		b.WriteString(selectedStyle.Render("  " + m.bedrockCopyMsg))
+		b.WriteString(selectedStyle.Render("  " + bm.copyMsg))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")

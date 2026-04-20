@@ -461,12 +461,12 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"d", "Delete the selected API key"},
 			{"q / esc", "Go back to the API key list"},
 		}
-		if m.selectedBedrockKey != nil && m.selectedBedrockKey.Status == "Active" {
+		if m.bedrock.selectedKey != nil && m.bedrock.selectedKey.Status == "Active" {
 			shortcuts = append([]helpShortcut{{"r", "Rotate the selected API key secret"}}, shortcuts...)
 		}
 		return shortcuts
 	case screenBedrockKeyCreate:
-		if m.bedrockCreateField == bedrockCreateFieldMode {
+		if m.bedrock.createField == bedrockCreateFieldMode {
 			return []helpShortcut{
 				{"↑/↓, j/k", "Choose current IAM user or another IAM user"},
 				{"enter", "Confirm the selected target mode"},
