@@ -12,11 +12,9 @@ If a user-facing behavior, architecture boundary, or development workflow change
 - [Development Guide](development.md)
 - [Branch Naming Harness](branch-naming-harness.md)
 - [Documentation Harness](documentation-harness.md)
-- [Roadmap Notes](roadmap.md)
 
 ## Suggested Reading Order
 
 1. Start with the project overview
 2. Read the architecture doc for module boundaries
 3. Use the development guide when adding features or changing workflows
-4. Use roadmap notes for maintenance themes, not implementation truth

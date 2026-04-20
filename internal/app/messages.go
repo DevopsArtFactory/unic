@@ -108,8 +108,8 @@ type cwMetricsLoadedMsg struct {
 }
 
 type cwMetricDataLoadedMsg struct {
-	metric awsservice.CloudWatchMetric
-	series *awsservice.CloudWatchMetricSeriesData
+	metrics []awsservice.CloudWatchMetric
+	series  []*awsservice.CloudWatchMetricSeriesData
 }
 
 type cwLogStreamsLoadedMsg struct {

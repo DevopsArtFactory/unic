@@ -14,6 +14,8 @@ import (
 
 var cwMetricSparklineBlocks = []rune("▁▂▃▄▅▆▇█")
 
+const maxCWMetricComparisonSeries = 4
+
 type cwMetricRangeOption struct {
 	label    string
 	duration time.Duration
@@ -98,6 +100,9 @@ type cloudWatchMetricsModel struct {
 	metricIdx         int
 	selectedMetric    *awsservice.CloudWatchMetric
 	selectedSeries    *awsservice.CloudWatchMetricSeriesData
+	selectedSeriesSet []*awsservice.CloudWatchMetricSeriesData
+	comparisonMetrics []awsservice.CloudWatchMetric
+	selectionNotice   string
 	detailScroll      int
 	presetIdx         int
 	timeRangeIdx      int
@@ -117,6 +122,9 @@ func newCloudWatchMetricsModel() cloudWatchMetricsModel {
 func (cw *cloudWatchMetricsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	cw.selectedMetric = nil
 	cw.selectedSeries = nil
+	cw.selectedSeriesSet = nil
+	cw.comparisonMetrics = nil
+	cw.selectionNotice = ""
 	cw.detailScroll = 0
 	return m.startLoadingWithMessage(
 		"Loading CloudWatch metrics...",
@@ -133,12 +141,25 @@ func (cw *cloudWatchMetricsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Mode
 	case cwMetricsLoadedMsg:
 		cw.metrics = msg.metrics
 		cw.applyMetricFilters(m)
+		cw.comparisonMetrics = nil
+		cw.selectionNotice = ""
 		m.screen = screenCWMetricList
 		return *m, nil, true
 	case cwMetricDataLoadedMsg:
-		metric := msg.metric
-		cw.selectedMetric = &metric
-		cw.selectedSeries = msg.series
+		cw.selectedMetric = nil
+		cw.selectedSeries = nil
+		cw.selectedSeriesSet = msg.series
+		if len(msg.metrics) > 0 {
+			metric := msg.metrics[0]
+			cw.selectedMetric = &metric
+		}
+		if len(msg.series) > 0 {
+			cw.selectedSeries = msg.series[0]
+			if cw.selectedMetric == nil {
+				metric := msg.series[0].Metric
+				cw.selectedMetric = &metric
+			}
+		}
 		cw.detailScroll = 0
 		m.screen = screenCWMetricDetail
 		return *m, nil, true
@@ -202,6 +223,8 @@ func (cw *cloudWatchMetricsModel) updateMetricList(m *Model, msg tea.KeyMsg) (te
 		return m.startLoading(cw.loadMetrics(*m))
 	case "g":
 		cw.presetIdx = (cw.presetIdx + 1) % len(cwMetricPresets)
+		cw.comparisonMetrics = nil
+		cw.selectionNotice = ""
 		cw.applyMetricFilters(m)
 	case "t":
 		cw.timeRangeIdx = (cw.timeRangeIdx + 1) % len(cwMetricRangeOptions)
@@ -209,15 +232,27 @@ func (cw *cloudWatchMetricsModel) updateMetricList(m *Model, msg tea.KeyMsg) (te
 		cw.periodIdx = (cw.periodIdx + 1) % len(cwMetricPeriodOptions)
 	case "s":
 		cw.statIdx = (cw.statIdx + 1) % len(cwMetricStatOptions)
+	case " ":
+		if len(cw.filteredCWMetrics) == 0 || cw.metricIdx >= len(cw.filteredCWMetrics) {
+			return *m, nil
+		}
+		cw.toggleComparisonMetric(cw.filteredCWMetrics[cw.metricIdx])
 	case "enter":
 		if len(cw.filteredCWMetrics) == 0 || cw.metricIdx >= len(cw.filteredCWMetrics) {
 			return *m, nil
 		}
-		selected := cw.filteredCWMetrics[cw.metricIdx]
+		selected := []awsservice.CloudWatchMetric{cw.filteredCWMetrics[cw.metricIdx]}
+		if len(cw.comparisonMetrics) > 0 {
+			selected = append([]awsservice.CloudWatchMetric(nil), cw.comparisonMetrics...)
+		}
+		title := "Loading CloudWatch metric series..."
+		if len(selected) > 1 {
+			title = "Loading CloudWatch metric comparison..."
+		}
 		return m.startLoadingWithMessage(
-			"Loading CloudWatch metric series...",
+			title,
 			[]string{
-				fmt.Sprintf("Metric: %s / %s", selected.Namespace, selected.MetricName),
+				cw.loadingMetricSummary(selected),
 				cw.controlsSummary(),
 			},
 			cw.loadSeries(*m, selected),
@@ -254,43 +289,47 @@ func (cw *cloudWatchMetricsModel) updateMetricDetail(m *Model, msg tea.KeyMsg) (
 			cw.detailScroll = maxOffset
 		}
 	case "r":
-		if cw.selectedMetric == nil {
+		selected := cw.detailMetrics()
+		if len(selected) == 0 {
 			return *m, nil
 		}
 		return m.startLoadingWithMessage(
-			"Refreshing CloudWatch metric series...",
-			[]string{fmt.Sprintf("Metric: %s / %s", cw.selectedMetric.Namespace, cw.selectedMetric.MetricName), cw.controlsSummary()},
-			cw.loadSeries(*m, *cw.selectedMetric),
+			cw.detailLoadingTitle(),
+			[]string{cw.loadingMetricSummary(selected), cw.controlsSummary()},
+			cw.loadSeries(*m, selected),
 		)
 	case "t":
 		cw.timeRangeIdx = (cw.timeRangeIdx + 1) % len(cwMetricRangeOptions)
-		if cw.selectedMetric == nil {
+		selected := cw.detailMetrics()
+		if len(selected) == 0 {
 			return *m, nil
 		}
 		return m.startLoadingWithMessage(
-			"Refreshing CloudWatch metric series...",
-			[]string{fmt.Sprintf("Metric: %s / %s", cw.selectedMetric.Namespace, cw.selectedMetric.MetricName), cw.controlsSummary()},
-			cw.loadSeries(*m, *cw.selectedMetric),
+			cw.detailLoadingTitle(),
+			[]string{cw.loadingMetricSummary(selected), cw.controlsSummary()},
+			cw.loadSeries(*m, selected),
 		)
 	case "p":
 		cw.periodIdx = (cw.periodIdx + 1) % len(cwMetricPeriodOptions)
-		if cw.selectedMetric == nil {
+		selected := cw.detailMetrics()
+		if len(selected) == 0 {
 			return *m, nil
 		}
 		return m.startLoadingWithMessage(
-			"Refreshing CloudWatch metric series...",
-			[]string{fmt.Sprintf("Metric: %s / %s", cw.selectedMetric.Namespace, cw.selectedMetric.MetricName), cw.controlsSummary()},
-			cw.loadSeries(*m, *cw.selectedMetric),
+			cw.detailLoadingTitle(),
+			[]string{cw.loadingMetricSummary(selected), cw.controlsSummary()},
+			cw.loadSeries(*m, selected),
 		)
 	case "s":
 		cw.statIdx = (cw.statIdx + 1) % len(cwMetricStatOptions)
-		if cw.selectedMetric == nil {
+		selected := cw.detailMetrics()
+		if len(selected) == 0 {
 			return *m, nil
 		}
 		return m.startLoadingWithMessage(
-			"Refreshing CloudWatch metric series...",
-			[]string{fmt.Sprintf("Metric: %s / %s", cw.selectedMetric.Namespace, cw.selectedMetric.MetricName), cw.controlsSummary()},
-			cw.loadSeries(*m, *cw.selectedMetric),
+			cw.detailLoadingTitle(),
+			[]string{cw.loadingMetricSummary(selected), cw.controlsSummary()},
+			cw.loadSeries(*m, selected),
 		)
 	}
 	return *m, nil
@@ -306,6 +345,14 @@ func (cw cloudWatchMetricsModel) viewMetricList(m Model) string {
 	b.WriteString(dimStyle.Render(cw.controlsSummary()))
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render(cw.selectedPreset().description))
+	if len(cw.comparisonMetrics) > 0 {
+		b.WriteString("\n")
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Selected for comparison: %d/%d", len(cw.comparisonMetrics), maxCWMetricComparisonSeries)))
+	}
+	if cw.selectionNotice != "" {
+		b.WriteString("\n")
+		b.WriteString(warningStyle.Render(cw.selectionNotice))
+	}
 	b.WriteString("\n\n")
 
 	b.WriteString(m.renderFilterValue(filterCWMetrics))
@@ -338,12 +385,16 @@ func (cw cloudWatchMetricsModel) viewMetricList(m Model) string {
 		for i := start; i < end; i++ {
 			metric := cw.filteredCWMetrics[i]
 			cursor := "  "
+			marker := "[ ] "
+			if cw.isComparisonMetricSelected(metric) {
+				marker = "[x] "
+			}
 			style := normalStyle
 			if i == cw.metricIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterCWMetrics, metric.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + marker + m.renderHighlightedValue(filterCWMetrics, metric.DisplayTitle())))
 			panel.WriteString("\n")
 		}
 
@@ -353,7 +404,7 @@ func (cw cloudWatchMetricsModel) viewMetricList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • g: preset • t: range • p: period • s: stat • r: refresh • enter: chart • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • space: select • enter: chart • /: filter • g/t/p/s: controls • r: refresh • esc: back • H: home"))
 	return b.String()
 }
 
@@ -362,7 +413,11 @@ func (cw cloudWatchMetricsModel) viewMetricDetail(m Model) string {
 	var panel strings.Builder
 
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("CloudWatch Metric Detail"))
+	title := "CloudWatch Metric Detail"
+	if len(cw.selectedSeriesSet) > 1 {
+		title = "CloudWatch Metric Comparison"
+	}
+	b.WriteString(titleStyle.Render(title))
 	b.WriteString("\n\n")
 	b.WriteString(dimStyle.Render(cw.controlsSummary()))
 	b.WriteString("\n")
@@ -413,6 +468,9 @@ func clampCWMetricDetailScroll(offset, total, visible int) int {
 func (cw cloudWatchMetricsModel) detailLines(width int) []string {
 	if cw.selectedMetric == nil {
 		return nil
+	}
+	if len(cw.selectedSeriesSet) > 1 {
+		return cw.comparisonDetailLines(width)
 	}
 
 	series := cw.selectedSeries
@@ -491,6 +549,89 @@ func (cw cloudWatchMetricsModel) detailLines(width int) []string {
 	return lines
 }
 
+func (cw cloudWatchMetricsModel) comparisonDetailLines(width int) []string {
+	seriesSet := cw.selectedSeriesSet
+	if len(seriesSet) == 0 {
+		return nil
+	}
+
+	first := seriesSet[0]
+	lines := []string{
+		renderDetailLine("Namespace", normalStyle.Render(first.Metric.Namespace)),
+		renderDetailLine("Metric", normalStyle.Render(first.Metric.MetricName)),
+		renderDetailLine("Preset", normalStyle.Render(cw.selectedPreset().label)),
+		renderDetailLine("Stat", normalStyle.Render(first.Stat)),
+		renderDetailLine("Range", normalStyle.Render(fmt.Sprintf("%s to %s", first.StartTime.Local().Format("2006-01-02 15:04"), first.EndTime.Local().Format("2006-01-02 15:04")))),
+		renderDetailLine("Period", normalStyle.Render(cw.selectedPeriod().label)),
+		renderDetailLine("Series", normalStyle.Render(fmt.Sprintf("%d", len(seriesSet)))),
+	}
+
+	lines = append(lines, "", titleStyle.Render("Legend"))
+	for i, series := range seriesSet {
+		symbol := cwMetricLegendSymbol(i)
+		label := cloudWatchSeriesDisplayName(series)
+		statsLine := []string{}
+		if latestValue, ok := series.LatestValue(); ok {
+			statsLine = append(statsLine, fmt.Sprintf("latest %s", formatMetricValue(latestValue)))
+		}
+		if avgValue, ok := series.AverageValue(); ok {
+			statsLine = append(statsLine, fmt.Sprintf("avg %s", formatMetricValue(avgValue)))
+		}
+		detail := ""
+		if len(statsLine) > 0 {
+			detail = "  " + strings.Join(statsLine, "  ")
+		}
+		lines = append(lines, fmt.Sprintf("  %s  %s%s", selectedStyle.Render(symbol), normalStyle.Render(label), dimStyle.Render(detail)))
+	}
+
+	lines = append(lines, "", titleStyle.Render("Overlay"))
+	chartWidth := max(width-10, 16)
+	chartLines, minValue, maxValue := renderMetricComparisonOverlay(seriesSet, chartWidth, 8)
+	if len(chartLines) == 0 {
+		lines = append(lines, dimStyle.Render("  No datapoints returned for the selected time window."))
+		lines = append(lines, dimStyle.Render("  Try t to widen the range, p to change the period, or s to switch the statistic."))
+	} else {
+		lines = append(lines, dimStyle.Render(fmt.Sprintf("  max %s", formatMetricValue(maxValue))))
+		for _, line := range chartLines {
+			lines = append(lines, selectedStyle.Render(line))
+		}
+		lines = append(lines, dimStyle.Render(fmt.Sprintf("  min %s", formatMetricValue(minValue))))
+	}
+
+	lines = append(lines, "", titleStyle.Render("Stats"))
+	for i, series := range seriesSet {
+		statsLine := []string{}
+		if minValue, ok := series.MinValue(); ok {
+			statsLine = append(statsLine, fmt.Sprintf("min %s", formatMetricValue(minValue)))
+		}
+		if avgValue, ok := series.AverageValue(); ok {
+			statsLine = append(statsLine, fmt.Sprintf("avg %s", formatMetricValue(avgValue)))
+		}
+		if maxValue, ok := series.MaxValue(); ok {
+			statsLine = append(statsLine, fmt.Sprintf("max %s", formatMetricValue(maxValue)))
+		}
+		if len(statsLine) == 0 {
+			statsLine = append(statsLine, "no datapoints")
+		}
+		lines = append(lines, fmt.Sprintf("  %s  %s", selectedStyle.Render(cwMetricLegendSymbol(i)), dimStyle.Render(strings.Join(statsLine, "  "))))
+	}
+
+	var messages []string
+	for i, series := range seriesSet {
+		for _, message := range series.Messages {
+			messages = append(messages, fmt.Sprintf("%s %s", cwMetricLegendSymbol(i), message))
+		}
+	}
+	if len(messages) > 0 {
+		lines = append(lines, "", titleStyle.Render("Messages"))
+		for _, message := range messages {
+			lines = append(lines, warningStyle.Render("  - "+message))
+		}
+	}
+
+	return lines
+}
+
 func renderMetricSparkline(points []awsservice.CloudWatchMetricDatapoint, width int) string {
 	if len(points) == 0 {
 		return ""
@@ -540,6 +681,81 @@ func renderMetricSparkline(points []awsservice.CloudWatchMetricDatapoint, width 
 	return b.String()
 }
 
+func renderMetricComparisonOverlay(seriesSet []*awsservice.CloudWatchMetricSeriesData, width, height int) ([]string, float64, float64) {
+	if width <= 0 {
+		width = 1
+	}
+	if height <= 0 {
+		height = 1
+	}
+
+	bucketed := make([][]float64, 0, len(seriesSet))
+	var minValue, maxValue float64
+	haveValue := false
+	for _, series := range seriesSet {
+		if series == nil {
+			bucketed = append(bucketed, nil)
+			continue
+		}
+		values := bucketMetricValues(series.Datapoints, width)
+		bucketed = append(bucketed, values)
+		for _, value := range values {
+			if !haveValue {
+				minValue = value
+				maxValue = value
+				haveValue = true
+				continue
+			}
+			if value < minValue {
+				minValue = value
+			}
+			if value > maxValue {
+				maxValue = value
+			}
+		}
+	}
+	if !haveValue {
+		return nil, 0, 0
+	}
+
+	grid := make([][]rune, height)
+	for i := range grid {
+		grid[i] = make([]rune, width)
+		for j := range grid[i] {
+			grid[i][j] = ' '
+		}
+	}
+
+	denominator := maxValue - minValue
+	for seriesIdx, values := range bucketed {
+		symbol := []rune(cwMetricLegendSymbol(seriesIdx))[0]
+		for x, value := range values {
+			position := 0.0
+			if denominator > 0 {
+				position = (value - minValue) / denominator
+			}
+			y := height - 1 - int(math.Round(position*float64(height-1)))
+			if y < 0 {
+				y = 0
+			}
+			if y >= height {
+				y = height - 1
+			}
+			if grid[y][x] != ' ' && grid[y][x] != symbol {
+				grid[y][x] = '*'
+				continue
+			}
+			grid[y][x] = symbol
+		}
+	}
+
+	lines := make([]string, 0, height)
+	for _, row := range grid {
+		lines = append(lines, "  |"+string(row)+"|")
+	}
+	return lines, minValue, maxValue
+}
+
 func bucketMetricValues(points []awsservice.CloudWatchMetricDatapoint, width int) []float64 {
 	if len(points) == 0 {
 		return nil
@@ -586,6 +802,92 @@ func formatMetricValue(value float64) string {
 	}
 }
 
+func (cw *cloudWatchMetricsModel) toggleComparisonMetric(metric awsservice.CloudWatchMetric) {
+	cw.selectionNotice = ""
+	for i, selected := range cw.comparisonMetrics {
+		if selected.IdentityKey() == metric.IdentityKey() {
+			cw.comparisonMetrics = append(cw.comparisonMetrics[:i], cw.comparisonMetrics[i+1:]...)
+			return
+		}
+	}
+	if len(cw.comparisonMetrics) > 0 && !sameCloudWatchMetricComparisonGroup(cw.comparisonMetrics[0], metric) {
+		cw.selectionNotice = "Select metrics with the same namespace and metric name for comparison."
+		return
+	}
+	if len(cw.comparisonMetrics) >= maxCWMetricComparisonSeries {
+		cw.selectionNotice = fmt.Sprintf("Comparison is limited to %d metric series.", maxCWMetricComparisonSeries)
+		return
+	}
+	cw.comparisonMetrics = append(cw.comparisonMetrics, metric)
+}
+
+func (cw cloudWatchMetricsModel) isComparisonMetricSelected(metric awsservice.CloudWatchMetric) bool {
+	for _, selected := range cw.comparisonMetrics {
+		if selected.IdentityKey() == metric.IdentityKey() {
+			return true
+		}
+	}
+	return false
+}
+
+func (cw cloudWatchMetricsModel) detailMetrics() []awsservice.CloudWatchMetric {
+	if len(cw.selectedSeriesSet) > 0 {
+		metrics := make([]awsservice.CloudWatchMetric, 0, len(cw.selectedSeriesSet))
+		for _, series := range cw.selectedSeriesSet {
+			if series != nil {
+				metrics = append(metrics, series.Metric)
+			}
+		}
+		return metrics
+	}
+	if cw.selectedMetric != nil {
+		return []awsservice.CloudWatchMetric{*cw.selectedMetric}
+	}
+	return nil
+}
+
+func (cw cloudWatchMetricsModel) detailLoadingTitle() string {
+	if len(cw.selectedSeriesSet) > 1 {
+		return "Refreshing CloudWatch metric comparison..."
+	}
+	return "Refreshing CloudWatch metric series..."
+}
+
+func (cw cloudWatchMetricsModel) loadingMetricSummary(metrics []awsservice.CloudWatchMetric) string {
+	if len(metrics) == 0 {
+		return "Metric: none"
+	}
+	first := metrics[0]
+	if len(metrics) == 1 {
+		return fmt.Sprintf("Metric: %s / %s", first.Namespace, first.MetricName)
+	}
+	return fmt.Sprintf("Metrics: %s / %s (%d series)", first.Namespace, first.MetricName, len(metrics))
+}
+
+func sameCloudWatchMetricComparisonGroup(left, right awsservice.CloudWatchMetric) bool {
+	return strings.EqualFold(left.Namespace, right.Namespace) && strings.EqualFold(left.MetricName, right.MetricName)
+}
+
+func cwMetricLegendSymbol(index int) string {
+	if index < 0 {
+		return "?"
+	}
+	return string(rune('A' + index))
+}
+
+func cloudWatchSeriesDisplayName(series *awsservice.CloudWatchMetricSeriesData) string {
+	if series == nil {
+		return "unknown"
+	}
+	if series.Label != "" {
+		return series.Label
+	}
+	if dims := series.Metric.DimensionsText(); dims != "" {
+		return dims
+	}
+	return series.Metric.DisplayTitle()
+}
+
 func (cw cloudWatchMetricsModel) loadMetrics(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -602,7 +904,7 @@ func (cw cloudWatchMetricsModel) loadMetrics(m Model) tea.Cmd {
 	}
 }
 
-func (cw cloudWatchMetricsModel) loadSeries(m Model, metric awsservice.CloudWatchMetric) tea.Cmd {
+func (cw cloudWatchMetricsModel) loadSeries(m Model, metrics []awsservice.CloudWatchMetric) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -612,11 +914,11 @@ func (cw cloudWatchMetricsModel) loadSeries(m Model, metric awsservice.CloudWatc
 
 		endTime := time.Now()
 		startTime := endTime.Add(-cw.selectedTimeRange().duration)
-		series, err := repo.GetMetricData(ctx, metric, startTime, endTime, cw.selectedPeriod().duration, cw.selectedStat())
+		series, err := repo.GetMetricDataSeries(ctx, metrics, startTime, endTime, cw.selectedPeriod().duration, cw.selectedStat())
 		if err != nil {
 			return errMsg{err: err}
 		}
-		return cwMetricDataLoadedMsg{metric: metric, series: series}
+		return cwMetricDataLoadedMsg{metrics: metrics, series: series}
 	}
 }
 

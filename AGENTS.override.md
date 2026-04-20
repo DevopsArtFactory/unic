@@ -11,8 +11,8 @@ asks for planning or advisory-only output.
   without an issue reference, call that out before opening a PR.
 - The expected delivery flow is: issue -> implementation -> feature branch ->
   PR that references the issue.
-- Read `PLAN.md` when planning new work so feature scope stays aligned with the
-  active milestone and prior design decisions.
+- Use GitHub issues and pull requests as the source of truth for planned work,
+  implementation status, and prior delivery decisions.
 - Follow recent commit history for commit title style (`feat:`, `fix:`,
   `docs:`, and similar prefixes).
 
@@ -53,7 +53,8 @@ asks for planning or advisory-only output.
   shipped behavior.
 - Keep `Currently Implemented Features`, `TUI Key Bindings`, `Usage`, and
   `Configuration` aligned with the code.
-- When milestone status changes, update `PLAN.md` before the PR is opened.
+- When milestone or issue status changes, update the relevant GitHub issue or
+  pull request before shipping.
 
 ## Repo Skills
 

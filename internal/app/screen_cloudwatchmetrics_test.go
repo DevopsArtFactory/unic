@@ -40,6 +40,37 @@ func TestRenderMetricSparklineConstantSeries(t *testing.T) {
 	}
 }
 
+func TestRenderMetricComparisonOverlayUsesLegendSymbols(t *testing.T) {
+	seriesSet := []*awsservice.CloudWatchMetricSeriesData{
+		{
+			Datapoints: []awsservice.CloudWatchMetricDatapoint{
+				{Timestamp: time.Unix(0, 0), Value: 1},
+				{Timestamp: time.Unix(1, 0), Value: 2},
+				{Timestamp: time.Unix(2, 0), Value: 3},
+			},
+		},
+		{
+			Datapoints: []awsservice.CloudWatchMetricDatapoint{
+				{Timestamp: time.Unix(0, 0), Value: 3},
+				{Timestamp: time.Unix(1, 0), Value: 2},
+				{Timestamp: time.Unix(2, 0), Value: 1},
+			},
+		},
+	}
+
+	lines, minValue, maxValue := renderMetricComparisonOverlay(seriesSet, 3, 3)
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 overlay lines, got %d", len(lines))
+	}
+	chart := strings.Join(lines, "\n")
+	if !strings.Contains(chart, "A") || !strings.Contains(chart, "B") {
+		t.Fatalf("expected overlay to contain legend symbols A and B, got %q", chart)
+	}
+	if minValue != 1 || maxValue != 3 {
+		t.Fatalf("expected min/max 1/3, got %v/%v", minValue, maxValue)
+	}
+}
+
 func TestCloudWatchMetricsHandleMessageLoadsMetrics(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	updated, _, handled := m.cwMetrics.HandleMessage(&m, cwMetricsLoadedMsg{
@@ -58,6 +89,40 @@ func TestCloudWatchMetricsHandleMessageLoadsMetrics(t *testing.T) {
 	}
 	if len(model.cwMetrics.filteredCWMetrics) != 2 {
 		t.Fatalf("expected 2 filtered metrics, got %d", len(model.cwMetrics.filteredCWMetrics))
+	}
+}
+
+func TestCloudWatchMetricListToggleComparisonRequiresRelatedMetrics(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenCWMetricList
+	m.cwMetrics.metrics = []awsservice.CloudWatchMetric{
+		{Namespace: "AWS/EC2", MetricName: "CPUUtilization", Dimensions: []awsservice.CloudWatchMetricDimension{{Name: "InstanceId", Value: "i-1"}}},
+		{Namespace: "AWS/EC2", MetricName: "CPUUtilization", Dimensions: []awsservice.CloudWatchMetricDimension{{Name: "InstanceId", Value: "i-2"}}},
+		{Namespace: "AWS/EC2", MetricName: "NetworkIn", Dimensions: []awsservice.CloudWatchMetricDimension{{Name: "InstanceId", Value: "i-1"}}},
+	}
+	m.cwMetrics.filteredCWMetrics = m.cwMetrics.metrics
+
+	updated, _ := m.cwMetrics.updateMetricList(&m, keyMsg(" "))
+	model := updated.(Model)
+	if len(model.cwMetrics.comparisonMetrics) != 1 {
+		t.Fatalf("expected one selected metric, got %d", len(model.cwMetrics.comparisonMetrics))
+	}
+
+	model.cwMetrics.metricIdx = 1
+	updated, _ = model.cwMetrics.updateMetricList(&model, keyMsg(" "))
+	model = updated.(Model)
+	if len(model.cwMetrics.comparisonMetrics) != 2 {
+		t.Fatalf("expected related metric to be selected, got %d selections", len(model.cwMetrics.comparisonMetrics))
+	}
+
+	model.cwMetrics.metricIdx = 2
+	updated, _ = model.cwMetrics.updateMetricList(&model, keyMsg(" "))
+	model = updated.(Model)
+	if len(model.cwMetrics.comparisonMetrics) != 2 {
+		t.Fatalf("expected unrelated metric to be rejected, got %d selections", len(model.cwMetrics.comparisonMetrics))
+	}
+	if !strings.Contains(model.cwMetrics.selectionNotice, "same namespace and metric name") {
+		t.Fatalf("expected related-metric notice, got %q", model.cwMetrics.selectionNotice)
 	}
 }
 
@@ -150,6 +215,58 @@ func TestCloudWatchMetricDetailViewShowsNoDataMessage(t *testing.T) {
 	}
 	if !strings.Contains(view, "Try t to widen the range, p to change the period, or s to switch the statistic.") {
 		t.Fatalf("expected no-data controls hint, got %q", view)
+	}
+}
+
+func TestCloudWatchMetricDetailViewShowsComparisonOverlay(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 90
+	m.height = 24
+	m.screen = screenCWMetricDetail
+
+	metricOne := awsservice.CloudWatchMetric{
+		Namespace:  "AWS/EC2",
+		MetricName: "CPUUtilization",
+		Dimensions: []awsservice.CloudWatchMetricDimension{{Name: "InstanceId", Value: "i-1"}},
+	}
+	metricTwo := awsservice.CloudWatchMetric{
+		Namespace:  "AWS/EC2",
+		MetricName: "CPUUtilization",
+		Dimensions: []awsservice.CloudWatchMetricDimension{{Name: "InstanceId", Value: "i-2"}},
+	}
+	m.cwMetrics.selectedMetric = &metricOne
+	m.cwMetrics.selectedSeriesSet = []*awsservice.CloudWatchMetricSeriesData{
+		{
+			Metric:    metricOne,
+			Label:     "i-1",
+			Stat:      "Average",
+			StartTime: time.Date(2026, 4, 17, 9, 0, 0, 0, time.UTC),
+			EndTime:   time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC),
+			Period:    time.Minute,
+			Datapoints: []awsservice.CloudWatchMetricDatapoint{
+				{Timestamp: time.Unix(0, 0), Value: 10},
+				{Timestamp: time.Unix(1, 0), Value: 20},
+			},
+		},
+		{
+			Metric:    metricTwo,
+			Label:     "i-2",
+			Stat:      "Average",
+			StartTime: time.Date(2026, 4, 17, 9, 0, 0, 0, time.UTC),
+			EndTime:   time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC),
+			Period:    time.Minute,
+			Datapoints: []awsservice.CloudWatchMetricDatapoint{
+				{Timestamp: time.Unix(0, 0), Value: 20},
+				{Timestamp: time.Unix(1, 0), Value: 10},
+			},
+		},
+	}
+
+	view := m.cwMetrics.viewMetricDetail(m)
+	for _, expected := range []string{"CloudWatch Metric Comparison", "Legend", "Overlay", "A", "B"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("expected comparison view to contain %q, got %q", expected, view)
+		}
 	}
 }
 

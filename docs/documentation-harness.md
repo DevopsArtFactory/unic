@@ -57,10 +57,11 @@ Run this harness whenever a change modifies any of the following:
 - testing expectations
 - documentation responsibilities
 
-### Update `docs/roadmap.md` only when the change affects
+### Update GitHub issues or PRs when the change affects
 
 - near-term maintenance priorities
 - the shape of ongoing product areas
+- implementation status or milestone scope
 
 ## Pull Request Check
 

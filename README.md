@@ -26,8 +26,6 @@ This is the closest structure to a "harness-like" doc hub in this repository: on
 - [Project Overview (KO)](docs/project-overview.ko.md)
 - [Development Guide](docs/development.md)
 - [Branch Naming Harness](docs/branch-naming-harness.md)
-- [Roadmap / Planning Notes](docs/roadmap.md)
-- [Ticket Tracking Note](TICKET.md)
 
 ## Tech Stack
 
@@ -319,7 +317,7 @@ checks:
 | RDS | `s` start, `x` stop, `f` failover, `r` refresh |
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
-| CloudWatch Metrics | preset-driven metric list/detail flow, `/` filter, `g` preset cycle, `t/p/s` range-period-stat controls, `r` refresh, in-terminal single-series charts |
+| CloudWatch Metrics | preset-driven metric list/detail flow, `/` filter, `space` select related series, `g` preset cycle, `t/p/s` range-period-stat controls, `r` refresh, in-terminal single-series and comparison charts |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |

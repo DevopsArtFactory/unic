@@ -334,6 +334,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		shortcuts := listScreenShortcuts("open the selected metric series", "go back to the feature list", true, true)
 		shortcuts = append(shortcuts[:3],
 			append([]helpShortcut{
+				{"space", "Select or unselect a related metric for comparison"},
 				{"g", "Cycle the preset metric group"},
 				{"t", "Cycle the chart time range"},
 				{"p", "Cycle the datapoint period"},
