@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"path/filepath"
 	"testing"
 
 	"unic/internal/config"
@@ -16,7 +17,7 @@ func TestBuildConsoleLoginCmd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := cmd.Args; len(got) != 6 || got[0] != "aws" || got[1] != "login" || got[2] != "--profile" || got[3] != "local-dev" || got[4] != "--region" || got[5] != "ap-northeast-2" {
+	if got := cmd.Args; len(got) != 6 || filepath.Base(got[0]) != "aws" || got[1] != "login" || got[2] != "--profile" || got[3] != "local-dev" || got[4] != "--region" || got[5] != "ap-northeast-2" {
 		t.Fatalf("unexpected args: %#v", got)
 	}
 }
