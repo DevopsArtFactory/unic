@@ -404,8 +404,8 @@ func parseBedrockAgeDays(value string) (int32, error) {
 	if err != nil {
 		return 0, fmt.Errorf("expiration days must be a number")
 	}
-	if days < 1 || days > bedrockMaxCredentialAgeDays {
-		return 0, fmt.Errorf("expiration days must be 1-%d, or blank for no expiration", bedrockMaxCredentialAgeDays)
+	if days < 0 || days > bedrockMaxCredentialAgeDays {
+		return 0, fmt.Errorf("expiration days must be 1-%d, or 0/blank for no expiration", bedrockMaxCredentialAgeDays)
 	}
 	return int32(days), nil
 }
@@ -618,7 +618,7 @@ func (m Model) viewBedrockKeyCreate() string {
 	}
 
 	if m.bedrockCreateField != bedrockCreateFieldUser {
-		b.WriteString(dimStyle.Render("  Blank expiration creates a key with no expiration."))
+		b.WriteString(dimStyle.Render("  Blank or 0 expiration creates a key with no expiration."))
 		b.WriteString("\n")
 	}
 	b.WriteString(dimStyle.Render("  The generated secret is shown only once."))

@@ -138,6 +138,30 @@ func TestCreateBedrockAPIKey_Success(t *testing.T) {
 	}
 }
 
+func TestCreateBedrockAPIKey_ZeroAgeMeansNoExpiration(t *testing.T) {
+	mock := &mockIAMClient{
+		createServiceCredFunc: func(_ context.Context, params *iam.CreateServiceSpecificCredentialInput, _ ...func(*iam.Options)) (*iam.CreateServiceSpecificCredentialOutput, error) {
+			if params.CredentialAgeDays != nil {
+				t.Fatalf("expected zero age days to omit CredentialAgeDays, got %d", awssdk.ToInt32(params.CredentialAgeDays))
+			}
+			return &iam.CreateServiceSpecificCredentialOutput{
+				ServiceSpecificCredential: &iamtypes.ServiceSpecificCredential{
+					ServiceSpecificCredentialId: awssdk.String("ACCA123"),
+					UserName:                    awssdk.String("bedrock-user"),
+					ServiceName:                 awssdk.String(BedrockServiceSpecificCredentialName),
+					ServiceCredentialSecret:     awssdk.String("secret-token"),
+					Status:                      iamtypes.StatusTypeActive,
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{IAMClient: mock}
+	if _, err := repo.CreateBedrockAPIKey(context.Background(), "bedrock-user", 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRotateBedrockAPIKey_Success(t *testing.T) {
 	mock := &mockIAMClient{
 		resetServiceCredFunc: func(_ context.Context, params *iam.ResetServiceSpecificCredentialInput, _ ...func(*iam.Options)) (*iam.ResetServiceSpecificCredentialOutput, error) {

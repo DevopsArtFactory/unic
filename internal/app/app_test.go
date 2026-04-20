@@ -993,6 +993,26 @@ func TestBedrockKeyCreateAdvancesToTypedConfirm(t *testing.T) {
 	}
 }
 
+func TestParseBedrockAgeDaysAllowsNoExpiration(t *testing.T) {
+	for _, input := range []string{"", "0", " 0 "} {
+		got, err := parseBedrockAgeDays(input)
+		if err != nil {
+			t.Fatalf("expected %q to parse as no expiration, got error %v", input, err)
+		}
+		if got != 0 {
+			t.Fatalf("expected %q to parse as 0, got %d", input, got)
+		}
+	}
+}
+
+func TestParseBedrockAgeDaysRejectsOutOfRangeValues(t *testing.T) {
+	for _, input := range []string{"-1", "36601"} {
+		if _, err := parseBedrockAgeDays(input); err == nil {
+			t.Fatalf("expected %q to be rejected", input)
+		}
+	}
+}
+
 func TestBedrockKeyDetailRotateAndDeleteGoToConfirm(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenBedrockKeyDetail
