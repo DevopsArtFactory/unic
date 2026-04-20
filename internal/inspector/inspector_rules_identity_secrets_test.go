@@ -83,6 +83,22 @@ func (m *inspectorIAMMockClient) DeleteAccessKey(context.Context, *iam.DeleteAcc
 	return &iam.DeleteAccessKeyOutput{}, nil
 }
 
+func (m *inspectorIAMMockClient) ListServiceSpecificCredentials(context.Context, *iam.ListServiceSpecificCredentialsInput, ...func(*iam.Options)) (*iam.ListServiceSpecificCredentialsOutput, error) {
+	return &iam.ListServiceSpecificCredentialsOutput{}, nil
+}
+
+func (m *inspectorIAMMockClient) CreateServiceSpecificCredential(context.Context, *iam.CreateServiceSpecificCredentialInput, ...func(*iam.Options)) (*iam.CreateServiceSpecificCredentialOutput, error) {
+	return &iam.CreateServiceSpecificCredentialOutput{}, nil
+}
+
+func (m *inspectorIAMMockClient) ResetServiceSpecificCredential(context.Context, *iam.ResetServiceSpecificCredentialInput, ...func(*iam.Options)) (*iam.ResetServiceSpecificCredentialOutput, error) {
+	return &iam.ResetServiceSpecificCredentialOutput{}, nil
+}
+
+func (m *inspectorIAMMockClient) DeleteServiceSpecificCredential(context.Context, *iam.DeleteServiceSpecificCredentialInput, ...func(*iam.Options)) (*iam.DeleteServiceSpecificCredentialOutput, error) {
+	return &iam.DeleteServiceSpecificCredentialOutput{}, nil
+}
+
 type inspectorSecretsMockClient struct {
 	listSecretsFunc    func(ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error)
 	getSecretValueFunc func(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)

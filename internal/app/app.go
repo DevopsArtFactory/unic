@@ -69,6 +69,11 @@ const (
 	screenLambdaFunctionDetail
 	screenLambdaInvokeInput
 	screenLambdaInvokeResult
+	screenBedrockKeyList
+	screenBedrockKeyDetail
+	screenBedrockKeyCreate
+	screenBedrockKeyConfirm
+	screenBedrockKeyResult
 	screenInspectorHome
 	screenInspectorWorkflowPlaceholder
 	screenInspectorChecklistPicker
@@ -266,6 +271,21 @@ type Model struct {
 	lambdaPayloadSource     lambdaPayloadSource
 	lambdaInvokeStep        int // 0=source select, 1=text input
 
+	// Bedrock API key state
+	bedrockKeys         []awsservice.BedrockAPIKey
+	filteredBedrockKeys []awsservice.BedrockAPIKey
+	bedrockKeyIdx       int
+	selectedBedrockKey  *awsservice.BedrockAPIKey
+	bedrockAction       string // "create", "rotate", "delete"
+	bedrockConfirm      string
+	bedrockCreateField  int
+	bedrockCreateMode   int // 0=current IAM user, 1=another IAM user
+	bedrockCreateInput  string
+	bedrockCreateValues map[string]string
+	bedrockGeneratedKey *awsservice.GeneratedBedrockAPIKey
+	bedrockCopyMsg      string
+	bedrockStatus       string
+
 	// Inspector browser state
 	inspectorWorkflows        []inspector.Workflow
 	inspectorWorkflowIdx      int
@@ -385,7 +405,7 @@ func (m Model) checkForUpdate() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.loadContexts(), m.checkForUpdate())
+	return tea.Batch(m.loadContexts(), m.checkForUpdate(), m.loadCallerIdentity())
 }
 
 func (m Model) loadCallerIdentity() tea.Cmd {
@@ -463,6 +483,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleECSMsg,
 		m.handleS3Msg,
 		m.handleLambdaMsg,
+		m.handleBedrockMsg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
@@ -501,7 +522,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Global home — return to service list from any screen (skip text-input screens)
 		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
 			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-			m.screen != screenLambdaInvokeInput {
+			m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+			m.screen != screenBedrockKeyConfirm {
 			m.deactivateFilter()
 			m.screen = screenServiceList
 			return m, nil
@@ -509,7 +531,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Global context switch — C key opens context picker (skip text-input screens)
 		if msg.String() == "C" && m.screen != screenContextPicker &&
 			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-			m.screen != screenLambdaInvokeInput {
+			m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+			m.screen != screenBedrockKeyConfirm {
 			m.deactivateFilter()
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
@@ -580,6 +603,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateLambdaInvokeInput(msg)
 		case screenLambdaInvokeResult:
 			return m.updateLambdaInvokeResult(msg)
+		case screenBedrockKeyList:
+			return m.updateBedrockKeyList(msg)
+		case screenBedrockKeyDetail:
+			return m.updateBedrockKeyDetail(msg)
+		case screenBedrockKeyCreate:
+			return m.updateBedrockKeyCreate(msg)
+		case screenBedrockKeyConfirm:
+			return m.updateBedrockKeyConfirm(msg)
+		case screenBedrockKeyResult:
+			return m.updateBedrockKeyResult(msg)
 		case screenInspectorHome:
 			return m.updateInspectorHome(msg)
 		case screenInspectorWorkflowPlaceholder:
@@ -757,6 +790,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.startLoading(m.loadECSClusters())
 			case domain.FeatureLambdaBrowser:
 				return m.startLoading(m.loadLambdaFunctions())
+			case domain.FeatureBedrockAPIKeys:
+				return m.startLoading(m.loadBedrockAPIKeys())
 			}
 		}
 	}
@@ -849,6 +884,16 @@ func (m Model) View() string {
 		v = m.viewLambdaInvokeInput()
 	case screenLambdaInvokeResult:
 		v = m.viewLambdaInvokeResult()
+	case screenBedrockKeyList:
+		v = m.viewBedrockKeyList()
+	case screenBedrockKeyDetail:
+		v = m.viewBedrockKeyDetail()
+	case screenBedrockKeyCreate:
+		v = m.viewBedrockKeyCreate()
+	case screenBedrockKeyConfirm:
+		v = m.viewBedrockKeyConfirm()
+	case screenBedrockKeyResult:
+		v = m.viewBedrockKeyResult()
 	case screenInspectorHome:
 		v = m.viewInspectorHome()
 	case screenInspectorWorkflowPlaceholder:

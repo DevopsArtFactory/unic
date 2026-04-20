@@ -102,6 +102,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceBedrock,
+			Features: []Feature{
+				{
+					Kind:        FeatureBedrockAPIKeys,
+					Description: "Manage long-term Bedrock API keys for IAM users",
+				},
+			},
+		},
+		{
 			Name: ServiceIAM,
 			Features: []Feature{
 				{

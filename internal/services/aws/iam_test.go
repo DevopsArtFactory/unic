@@ -26,6 +26,10 @@ type mockIAMClient struct {
 	createAccessKeyFunc      func(ctx context.Context, params *iam.CreateAccessKeyInput, optFns ...func(*iam.Options)) (*iam.CreateAccessKeyOutput, error)
 	updateAccessKeyFunc      func(ctx context.Context, params *iam.UpdateAccessKeyInput, optFns ...func(*iam.Options)) (*iam.UpdateAccessKeyOutput, error)
 	deleteAccessKeyFunc      func(ctx context.Context, params *iam.DeleteAccessKeyInput, optFns ...func(*iam.Options)) (*iam.DeleteAccessKeyOutput, error)
+	listServiceCredsFunc     func(ctx context.Context, params *iam.ListServiceSpecificCredentialsInput, optFns ...func(*iam.Options)) (*iam.ListServiceSpecificCredentialsOutput, error)
+	createServiceCredFunc    func(ctx context.Context, params *iam.CreateServiceSpecificCredentialInput, optFns ...func(*iam.Options)) (*iam.CreateServiceSpecificCredentialOutput, error)
+	resetServiceCredFunc     func(ctx context.Context, params *iam.ResetServiceSpecificCredentialInput, optFns ...func(*iam.Options)) (*iam.ResetServiceSpecificCredentialOutput, error)
+	deleteServiceCredFunc    func(ctx context.Context, params *iam.DeleteServiceSpecificCredentialInput, optFns ...func(*iam.Options)) (*iam.DeleteServiceSpecificCredentialOutput, error)
 }
 
 func (m *mockIAMClient) ListUsers(ctx context.Context, params *iam.ListUsersInput, optFns ...func(*iam.Options)) (*iam.ListUsersOutput, error) {
@@ -114,6 +118,34 @@ func (m *mockIAMClient) DeleteAccessKey(ctx context.Context, params *iam.DeleteA
 		return m.deleteAccessKeyFunc(ctx, params, optFns...)
 	}
 	return &iam.DeleteAccessKeyOutput{}, nil
+}
+
+func (m *mockIAMClient) ListServiceSpecificCredentials(ctx context.Context, params *iam.ListServiceSpecificCredentialsInput, optFns ...func(*iam.Options)) (*iam.ListServiceSpecificCredentialsOutput, error) {
+	if m.listServiceCredsFunc != nil {
+		return m.listServiceCredsFunc(ctx, params, optFns...)
+	}
+	return &iam.ListServiceSpecificCredentialsOutput{}, nil
+}
+
+func (m *mockIAMClient) CreateServiceSpecificCredential(ctx context.Context, params *iam.CreateServiceSpecificCredentialInput, optFns ...func(*iam.Options)) (*iam.CreateServiceSpecificCredentialOutput, error) {
+	if m.createServiceCredFunc != nil {
+		return m.createServiceCredFunc(ctx, params, optFns...)
+	}
+	return &iam.CreateServiceSpecificCredentialOutput{}, nil
+}
+
+func (m *mockIAMClient) ResetServiceSpecificCredential(ctx context.Context, params *iam.ResetServiceSpecificCredentialInput, optFns ...func(*iam.Options)) (*iam.ResetServiceSpecificCredentialOutput, error) {
+	if m.resetServiceCredFunc != nil {
+		return m.resetServiceCredFunc(ctx, params, optFns...)
+	}
+	return &iam.ResetServiceSpecificCredentialOutput{}, nil
+}
+
+func (m *mockIAMClient) DeleteServiceSpecificCredential(ctx context.Context, params *iam.DeleteServiceSpecificCredentialInput, optFns ...func(*iam.Options)) (*iam.DeleteServiceSpecificCredentialOutput, error) {
+	if m.deleteServiceCredFunc != nil {
+		return m.deleteServiceCredFunc(ctx, params, optFns...)
+	}
+	return &iam.DeleteServiceSpecificCredentialOutput{}, nil
 }
 
 // --- IAM user tests ---

@@ -832,6 +832,255 @@ func TestRDSConfirmInputResetOnEntry(t *testing.T) {
 	}
 }
 
+func TestBedrockKeyListCreateLoadsIdentityWhenMissing(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyList
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Fatalf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected identity loading command")
+	}
+}
+
+func TestBedrockKeyCreateDefaultsToCurrentIAMUser(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyList
+	m.callerIdentity = &awsservice.CallerIdentity{Arn: "arn:aws:iam::123456789012:user/team/bedrock-user"}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	model := updated.(Model)
+	if model.screen != screenBedrockKeyCreate {
+		t.Fatalf("expected create screen, got %d", model.screen)
+	}
+	if model.bedrockCreateField != bedrockCreateFieldMode {
+		t.Fatalf("expected mode picker first, got %d", model.bedrockCreateField)
+	}
+	if model.bedrockCreateMode != 0 {
+		t.Fatalf("expected current-user mode by default, got %d", model.bedrockCreateMode)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.bedrockCreateField != bedrockCreateFieldExpiration {
+		t.Fatalf("expected expiration field, got %d", model.bedrockCreateField)
+	}
+	if model.bedrockCreateValues["user"] != "bedrock-user" {
+		t.Fatalf("expected inferred user bedrock-user, got %q", model.bedrockCreateValues["user"])
+	}
+	if model.bedrockCreateValues["user_source"] != "current" {
+		t.Fatalf("expected current user source, got %q", model.bedrockCreateValues["user_source"])
+	}
+}
+
+func TestBedrockCreateIdentityMessageDefaultsToCurrentIAMUser(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+
+	updated, _ := m.Update(bedrockCreateIdentityMsg{
+		identity: &awsservice.CallerIdentity{Arn: "arn:aws:iam::123456789012:user/bedrock-user"},
+	})
+	model := updated.(Model)
+	if model.screen != screenBedrockKeyCreate {
+		t.Fatalf("expected create screen, got %d", model.screen)
+	}
+	if model.bedrockCreateField != bedrockCreateFieldMode {
+		t.Fatalf("expected mode picker, got field %d", model.bedrockCreateField)
+	}
+	if model.bedrockCreateMode != 0 {
+		t.Fatalf("expected current-user mode, got %d", model.bedrockCreateMode)
+	}
+}
+
+func TestBedrockCreateIdentityMessageFallsBackForNonIAMUser(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+
+	updated, _ := m.Update(bedrockCreateIdentityMsg{
+		identity: &awsservice.CallerIdentity{Arn: "arn:aws:sts::123456789012:assumed-role/Admin/session"},
+	})
+	model := updated.(Model)
+	if model.screen != screenBedrockKeyCreate {
+		t.Fatalf("expected create screen, got %d", model.screen)
+	}
+	if model.bedrockCreateField != bedrockCreateFieldUser {
+		t.Fatalf("expected explicit user input, got field %d", model.bedrockCreateField)
+	}
+	if model.bedrockCreateMode != 1 {
+		t.Fatalf("expected another-user mode, got %d", model.bedrockCreateMode)
+	}
+	view := model.viewBedrockKeyCreate()
+	if !strings.Contains(view, "Current AWS identity is not an IAM user") {
+		t.Fatalf("expected non-IAM identity explanation, got %q", view)
+	}
+	if strings.Contains(view, "Expiration Days") {
+		t.Fatalf("expiration field should be hidden until a target IAM user is entered, got %q", view)
+	}
+}
+
+func TestBedrockKeyCreateAnotherUserIsExplicitOption(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyCreate
+	m.callerIdentity = &awsservice.CallerIdentity{Arn: "arn:aws:iam::123456789012:user/current-user"}
+	m.bedrockCreateField = bedrockCreateFieldMode
+	m.bedrockCreateMode = 0
+	m.bedrockCreateValues = map[string]string{}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model := updated.(Model)
+	if model.bedrockCreateMode != 1 {
+		t.Fatalf("expected another-user mode after down, got %d", model.bedrockCreateMode)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.bedrockCreateField != bedrockCreateFieldUser {
+		t.Fatalf("expected explicit user input, got field %d", model.bedrockCreateField)
+	}
+}
+
+func TestBedrockKeyCreateRequiresUser(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyCreate
+	m.bedrockCreateField = bedrockCreateFieldUser
+	m.bedrockCreateInput = ""
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenBedrockKeyCreate {
+		t.Fatalf("expected create screen, got %d", model.screen)
+	}
+	if !strings.Contains(model.bedrockStatus, "IAM user name") {
+		t.Fatalf("expected user validation message, got %q", model.bedrockStatus)
+	}
+}
+
+func TestBedrockKeyCreateAdvancesToTypedConfirm(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyCreate
+	m.bedrockCreateField = bedrockCreateFieldUser
+	m.bedrockCreateInput = "bedrock-user"
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenBedrockKeyCreate || model.bedrockCreateField != bedrockCreateFieldExpiration {
+		t.Fatalf("expected expiration field, got screen=%d field=%d", model.screen, model.bedrockCreateField)
+	}
+	if model.bedrockCreateInput != "30" {
+		t.Fatalf("expected default 30 day expiration, got %q", model.bedrockCreateInput)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenBedrockKeyConfirm {
+		t.Fatalf("expected confirm screen, got %d", model.screen)
+	}
+	if target := model.bedrockConfirmTarget(); target != "bedrock-user" {
+		t.Fatalf("expected confirm target bedrock-user, got %q", target)
+	}
+
+	model.bedrockConfirm = "wrong"
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenBedrockKeyConfirm {
+		t.Fatalf("wrong confirmation should stay on confirm screen, got %d", model.screen)
+	}
+	if cmd != nil {
+		t.Fatal("wrong confirmation should not run a command")
+	}
+}
+
+func TestParseBedrockAgeDaysAllowsNoExpiration(t *testing.T) {
+	for _, input := range []string{"", "0", " 0 "} {
+		got, err := parseBedrockAgeDays(input)
+		if err != nil {
+			t.Fatalf("expected %q to parse as no expiration, got error %v", input, err)
+		}
+		if got != 0 {
+			t.Fatalf("expected %q to parse as 0, got %d", input, got)
+		}
+	}
+}
+
+func TestParseBedrockAgeDaysRejectsOutOfRangeValues(t *testing.T) {
+	for _, input := range []string{"-1", "36601"} {
+		if _, err := parseBedrockAgeDays(input); err == nil {
+			t.Fatalf("expected %q to be rejected", input)
+		}
+	}
+}
+
+func TestBedrockKeyDetailRotateAndDeleteGoToConfirm(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyDetail
+	m.selectedBedrockKey = &awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user", Status: "Active"}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	model := updated.(Model)
+	if model.screen != screenBedrockKeyConfirm {
+		t.Fatalf("expected rotate confirm screen, got %d", model.screen)
+	}
+	if model.bedrockAction != "rotate" {
+		t.Fatalf("expected rotate action, got %q", model.bedrockAction)
+	}
+
+	model.screen = screenBedrockKeyDetail
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	model = updated.(Model)
+	if model.screen != screenBedrockKeyConfirm {
+		t.Fatalf("expected delete confirm screen, got %d", model.screen)
+	}
+	if model.bedrockAction != "delete" {
+		t.Fatalf("expected delete action, got %q", model.bedrockAction)
+	}
+}
+
+func TestBedrockKeyResultEscReloadsList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyResult
+	m.bedrockGeneratedKey = &awsservice.GeneratedBedrockAPIKey{
+		BedrockAPIKey: awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user"},
+		Secret:        "secret-token",
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Fatalf("expected loading screen, got %d", model.screen)
+	}
+	if model.bedrockGeneratedKey != nil {
+		t.Fatal("expected generated key to be cleared")
+	}
+	if cmd == nil {
+		t.Fatal("expected reload command")
+	}
+}
+
+func TestBedrockKeyResultDoesNotRenderSecret(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBedrockKeyResult
+	m.bedrockGeneratedKey = &awsservice.GeneratedBedrockAPIKey{
+		BedrockAPIKey: awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user"},
+		Secret:        "secret-token",
+	}
+
+	view := m.viewBedrockKeyResult()
+	if strings.Contains(view, "secret-token") {
+		t.Fatalf("result view should not render raw secret, got %q", view)
+	}
+	if strings.Contains(view, "AWS_BEARER_TOKEN_BEDROCK=secret-token") {
+		t.Fatalf("result view should not render raw env export, got %q", view)
+	}
+	for _, want := range []string{"copy-only", "[hidden] press c to copy", "[hidden] press e to copy export"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected %q in result view, got %q", want, view)
+		}
+	}
+}
+
 func TestFitToHeight(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 

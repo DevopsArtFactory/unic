@@ -15,6 +15,7 @@ const (
 	ServiceECS            AwsService = "ECS"
 	ServiceS3             AwsService = "S3"
 	ServiceLambda         AwsService = "Lambda"
+	ServiceBedrock        AwsService = "Bedrock"
 )
 
 // FeatureKind represents a specific feature within a service.
@@ -36,6 +37,7 @@ const (
 	FeatureECSExec               FeatureKind = "ECS Browser & Exec"
 	FeatureS3Browser             FeatureKind = "S3 Browser"
 	FeatureLambdaBrowser         FeatureKind = "Lambda Browser"
+	FeatureBedrockAPIKeys        FeatureKind = "Bedrock API Keys"
 )
 
 // Feature describes a selectable feature under an AWS service.

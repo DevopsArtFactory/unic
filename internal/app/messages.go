@@ -189,6 +189,26 @@ type iamKeyDeletedMsg struct {
 	err   error
 }
 
+type bedrockKeysLoadedMsg struct {
+	keys []awsservice.BedrockAPIKey
+}
+
+type bedrockCreateIdentityMsg struct {
+	identity *awsservice.CallerIdentity
+	err      error
+}
+
+type bedrockKeyGeneratedMsg struct {
+	key    *awsservice.GeneratedBedrockAPIKey
+	action string
+	err    error
+}
+
+type bedrockKeyDeletedMsg struct {
+	credentialID string
+	err          error
+}
+
 type ecsClustersLoadedMsg struct {
 	clusters []awsservice.ECSCluster
 }
