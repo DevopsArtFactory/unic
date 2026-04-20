@@ -28,6 +28,8 @@ func PostSwitch(cfg *config.Config) (string, error) {
 		msg, err = postSwitchSSO(cfg)
 	case config.AuthTypeCredential:
 		msg, err = postSwitchCredential(cfg)
+	case config.AuthTypeConsoleLogin:
+		msg, err = postSwitchConsoleLogin(cfg)
 	case config.AuthTypeAssumeRole:
 		msg, err = postSwitchAssumeRole(cfg)
 	default:
@@ -73,6 +75,16 @@ func postSwitchCredential(cfg *config.Config) (string, error) {
 	}
 
 	return fmt.Sprintf("Using credentials profile %q from ~/.aws/credentials (region: %s)", cfg.Profile, cfg.Region), nil
+}
+
+func postSwitchConsoleLogin(cfg *config.Config) (string, error) {
+	if err := awsservice.ValidateConsoleLoginContext(cfg); err != nil {
+		return "", err
+	}
+	if err := awsservice.RunConsoleLogin(cfg); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Console login complete for profile %q (region: %s)", cfg.Profile, cfg.Region), nil
 }
 
 func postSwitchAssumeRole(cfg *config.Config) (string, error) {

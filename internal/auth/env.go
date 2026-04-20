@@ -53,7 +53,12 @@ func BuildEnvExports(ctx context.Context, cfg *config.Config) (string, error) {
 		values["AWS_DEFAULT_REGION"] = cfg.Region
 		values["AWS_PROFILE"] = ""
 
-	case config.AuthTypeCredential, config.AuthTypeDefault:
+	case config.AuthTypeCredential, config.AuthTypeConsoleLogin, config.AuthTypeDefault:
+		if cfg.AuthType == config.AuthTypeConsoleLogin {
+			if err := awsservice.ValidateConsoleLoginContext(cfg); err != nil {
+				return "", err
+			}
+		}
 		profile := cfg.Profile
 		if profile == "" {
 			profile = "default"

@@ -41,6 +41,7 @@ cmd/unic/main.go
 - `unic context setup`
   - 많은 context/account/role 목록에서 live incremental filtering 지원
   - `unic context order`를 통한 interactive context ordering 지원
+  - `console_login` context에서 `aws login` 실행 가능
 - `unic context unset`
 
 ### `internal/config/`
@@ -58,8 +59,10 @@ cmd/unic/main.go
 쉘 export와 interactive setup 흐름을 담당한다.
 
 - `credential`, `assume_role`, concrete `sso` context용 export 문자열 생성
+- `console_login` context에서 `aws login` 이후 profile 기반 export 생성
 - 쉘 export와 cleanup command에 `UNIC_CONTEXT` marker 포함
 - SSO base context setup 실행
+- standalone `console_login` context에서 `aws login` 실행
 - CLI와 TUI에서 함께 쓰는 SSO account / role resolution helper 제공
 - 사용 가능한 SSO account / role 조회
 - clipboard에 붙여넣기 쉬운 export 문자열 반환
@@ -155,6 +158,13 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - STS `AssumeRole` 호출
 - `unic env`는 임시 세션 자격증명을 export
 - SDK client는 assume-role 결과 자격증명으로 초기화
+
+### `console_login`
+
+- shared AWS profile과 AWS CLI `aws login`을 함께 사용
+- `unic context setup`이 `aws login --profile <profile> --region <region>`을 실행
+- login 이후에도 profile 기반이므로 `unic env`는 `AWS_PROFILE`과 region 변수를 export
+- 현재는 standalone context로만 지원하며 `role_arn` chaining은 지원하지 않음
 
 ### `sso`
 

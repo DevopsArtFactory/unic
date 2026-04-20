@@ -269,7 +269,12 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 			return nil, err
 		}
 
-	case config.AuthTypeCredential:
+	case config.AuthTypeCredential, config.AuthTypeConsoleLogin:
+		if cfg.AuthType == config.AuthTypeConsoleLogin {
+			if err := ValidateConsoleLoginContext(cfg); err != nil {
+				return nil, err
+			}
+		}
 		awsCfg, err = LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load AWS config: %w", err)

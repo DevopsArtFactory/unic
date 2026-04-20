@@ -24,10 +24,12 @@ func TestSetupContextUpsertsConcreteSSOContext(t *testing.T) {
 	origAccounts := listSSOAccountsFn
 	origRoles := listSSOAccountRolesFn
 	origBuild := buildEnvExportsFn
+	origConsoleLogin := runConsoleLoginFn
 	defer func() {
 		listSSOAccountsFn = origAccounts
 		listSSOAccountRolesFn = origRoles
 		buildEnvExportsFn = origBuild
+		runConsoleLoginFn = origConsoleLogin
 	}()
 
 	listSSOAccountsFn = func(ctx context.Context, cfg *config.Config) ([]awsservice.SSOAccount, error) {
@@ -39,6 +41,7 @@ func TestSetupContextUpsertsConcreteSSOContext(t *testing.T) {
 	buildEnvExportsFn = func(ctx context.Context, cfg *config.Config) (string, error) {
 		return "export AWS_REGION='ap-northeast-2'", nil
 	}
+	runConsoleLoginFn = func(cfg *config.Config) error { return nil }
 
 	dir := t.TempDir()
 	path := writeConfig(t, dir, `
@@ -74,6 +77,50 @@ contexts:
 	}
 	if len(infos) != 2 {
 		t.Fatalf("expected 2 contexts after upsert, got %d", len(infos))
+	}
+}
+
+func TestSetupContextRunsConsoleLoginForConsoleLoginContext(t *testing.T) {
+	origBuild := buildEnvExportsFn
+	origConsoleLogin := runConsoleLoginFn
+	defer func() {
+		buildEnvExportsFn = origBuild
+		runConsoleLoginFn = origConsoleLogin
+	}()
+
+	var ran bool
+	buildEnvExportsFn = func(ctx context.Context, cfg *config.Config) (string, error) {
+		return "export AWS_PROFILE='local-dev'", nil
+	}
+	runConsoleLoginFn = func(cfg *config.Config) error {
+		ran = true
+		if cfg.Profile != "local-dev" {
+			t.Fatalf("expected local-dev profile, got %q", cfg.Profile)
+		}
+		return nil
+	}
+
+	dir := t.TempDir()
+	path := writeConfig(t, dir, `
+defaults:
+  region: ap-northeast-2
+contexts:
+  - name: local-dev
+    auth_type: console_login
+    profile: local-dev
+    region: ap-northeast-2
+`)
+
+	var stderr strings.Builder
+	exports, err := SetupContext(context.Background(), path, strings.NewReader("1\n"), &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ran {
+		t.Fatal("expected console login to run")
+	}
+	if !strings.Contains(exports, "export AWS_PROFILE='local-dev'") {
+		t.Fatalf("expected exports, got %q", exports)
 	}
 }
 
