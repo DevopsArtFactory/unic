@@ -30,6 +30,7 @@ const (
 	filterSubnets
 	filterInspectorChecklistFiles
 	filterLambdaFunctions
+	filterBedrockKeys
 )
 
 // Filterable is implemented by any type that supports text-based filtering.
@@ -205,6 +206,9 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterLambdaFunctions:
 		m.filteredLambdaFunctions = applyFilter(m.lambdaFunctions, m.filterValue(target))
 		m.lambdaFunctionIdx = 0
+	case filterBedrockKeys:
+		m.filteredBedrockKeys = applyFilter(m.bedrockKeys, m.filterValue(target))
+		m.bedrockKeyIdx = 0
 	}
 }
 

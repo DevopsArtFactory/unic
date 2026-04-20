@@ -160,6 +160,25 @@ func TestCatalogContainsS3BrowserFeature(t *testing.T) {
 	t.Error("S3 service not found in catalog")
 }
 
+func TestCatalogContainsBedrockAPIKeysFeature(t *testing.T) {
+	services := Catalog()
+
+	for _, svc := range services {
+		if svc.Name != ServiceBedrock {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureBedrockAPIKeys {
+				return
+			}
+		}
+		t.Error("Bedrock service should have Bedrock API Keys feature")
+		return
+	}
+
+	t.Error("Bedrock service not found in catalog")
+}
+
 func TestCatalogDoesNotContainInspectorPseudoService(t *testing.T) {
 	services := Catalog()
 

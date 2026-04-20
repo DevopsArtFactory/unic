@@ -68,12 +68,14 @@ func (m Model) globalHelpShortcuts() []helpShortcut {
 	var shortcuts []helpShortcut
 	if m.screen != screenServiceList && m.screen != screenContextPicker &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-		m.screen != screenLambdaInvokeInput {
+		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"H", "Jump to the service list"})
 	}
 	if m.screen != screenContextPicker &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-		m.screen != screenLambdaInvokeInput {
+		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"C", "Open the context picker"})
 	}
 	return shortcuts
@@ -446,6 +448,50 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"l", "View CloudWatch Logs for this function"},
 			{"q / esc", "Go back to the function list"},
 		}
+	case screenBedrockKeyList:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between Bedrock API keys"},
+			{"/", "Start filtering API keys"},
+			{"c", "Generate a new long-term Bedrock API key"},
+			{"enter", "Open the selected API key detail"},
+			{"q / esc", "Go back to the feature list"},
+		}
+	case screenBedrockKeyDetail:
+		shortcuts := []helpShortcut{
+			{"d", "Delete the selected API key"},
+			{"q / esc", "Go back to the API key list"},
+		}
+		if m.selectedBedrockKey != nil && m.selectedBedrockKey.Status == "Active" {
+			shortcuts = append([]helpShortcut{{"r", "Rotate the selected API key secret"}}, shortcuts...)
+		}
+		return shortcuts
+	case screenBedrockKeyCreate:
+		if m.bedrockCreateField == bedrockCreateFieldMode {
+			return []helpShortcut{
+				{"↑/↓, j/k", "Choose current IAM user or another IAM user"},
+				{"enter", "Confirm the selected target mode"},
+				{"esc", "Cancel and return to the API key list"},
+			}
+		}
+		return []helpShortcut{
+			{"type", "Edit the current field"},
+			{"backspace", "Delete the previous character"},
+			{"enter", "Advance to confirmation"},
+			{"esc", "Cancel and return to the API key list"},
+		}
+	case screenBedrockKeyConfirm:
+		return []helpShortcut{
+			{"type", "Enter the required identifier to confirm"},
+			{"backspace", "Delete the previous character"},
+			{"enter", "Run the action when the typed identifier matches"},
+			{"esc", "Cancel and return"},
+		}
+	case screenBedrockKeyResult:
+		return []helpShortcut{
+			{"c", "Copy the generated API key"},
+			{"e", "Copy shell export output"},
+			{"q / esc", "Return to the API key list"},
+		}
 	case screenInspectorHome:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between inspector workflows"},
@@ -719,6 +765,16 @@ func (m Model) helpScreenTitle() string {
 		return "Lambda Invoke"
 	case screenLambdaInvokeResult:
 		return "Lambda Invoke Result"
+	case screenBedrockKeyList:
+		return "Bedrock API Keys"
+	case screenBedrockKeyDetail:
+		return "Bedrock API Key Detail"
+	case screenBedrockKeyCreate:
+		return "Generate Bedrock API Key"
+	case screenBedrockKeyConfirm:
+		return "Confirm Bedrock API Key"
+	case screenBedrockKeyResult:
+		return "Bedrock API Key Result"
 	case screenInspectorHome:
 		return "Inspector Mode"
 	case screenInspectorWorkflowPlaceholder:
