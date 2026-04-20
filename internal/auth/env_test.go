@@ -36,6 +36,33 @@ func TestBuildEnvExportsCredentialContext(t *testing.T) {
 	}
 }
 
+func TestBuildEnvExportsConsoleLoginContext(t *testing.T) {
+	cfg := &config.Config{
+		ContextName: "local-dev",
+		AuthType:    config.AuthTypeConsoleLogin,
+		Profile:     "local-dev",
+		Region:      "ap-northeast-2",
+	}
+
+	exports, err := BuildEnvExports(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, expected := range []string{
+		"export AWS_PROFILE='local-dev'",
+		"export AWS_REGION='ap-northeast-2'",
+		"export AWS_DEFAULT_REGION='ap-northeast-2'",
+		"unset AWS_ACCESS_KEY_ID",
+		"unset AWS_SECRET_ACCESS_KEY",
+		"unset AWS_SESSION_TOKEN",
+	} {
+		if !strings.Contains(exports, expected) {
+			t.Fatalf("expected exports to contain %q, got:\n%s", expected, exports)
+		}
+	}
+}
+
 func TestBuildEnvExportsAssumeRoleContext(t *testing.T) {
 	orig := assumeRoleFn
 	t.Cleanup(func() { assumeRoleFn = orig })

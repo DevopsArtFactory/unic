@@ -36,10 +36,11 @@ type fileDefaults struct {
 type AuthType string
 
 const (
-	AuthTypeDefault    AuthType = ""
-	AuthTypeSSO        AuthType = "sso"
-	AuthTypeCredential AuthType = "credential"
-	AuthTypeAssumeRole AuthType = "assume_role"
+	AuthTypeDefault      AuthType = ""
+	AuthTypeSSO          AuthType = "sso"
+	AuthTypeCredential   AuthType = "credential"
+	AuthTypeConsoleLogin AuthType = "console_login"
+	AuthTypeAssumeRole   AuthType = "assume_role"
 )
 
 // ContextEntry represents a single context definition in config.yaml.
@@ -79,6 +80,8 @@ func normalizeAuthType(value string) AuthType {
 		return AuthTypeSSO
 	case "credential", "credentials":
 		return AuthTypeCredential
+	case "console_login", "console-login":
+		return AuthTypeConsoleLogin
 	case "assume_role", "assume-role":
 		return AuthTypeAssumeRole
 	default:

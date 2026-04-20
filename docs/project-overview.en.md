@@ -43,6 +43,7 @@ The app supports:
 - legacy flat config
 - context-based config with `current`
 - `credential` auth
+- `console_login` auth for AWS CLI `aws login`-backed local development profiles
 - `assume_role` auth
 - `sso` auth, including base contexts resolved by `unic context setup`
 

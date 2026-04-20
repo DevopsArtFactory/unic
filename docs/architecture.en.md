@@ -41,6 +41,7 @@ Owns non-TUI commands:
 - `unic context setup`
   - live incremental filtering for large context/account/role lists
   - interactive context ordering via `unic context order`
+  - can trigger `aws login` for `console_login` contexts
 - `unic context unset`
 
 ### `internal/config/`
@@ -58,8 +59,10 @@ Owns `~/.config/unic/config.yaml` handling:
 Owns shell export and interactive setup workflows:
 
 - build shell exports for `credential`, `assume_role`, and concrete `sso` contexts
+- build profile-based exports for `console_login` contexts after `aws login`
 - include a `UNIC_CONTEXT` marker in shell exports and cleanup commands
 - run interactive setup for SSO base contexts
+- run `aws login` for standalone `console_login` contexts
 - share SSO account / role resolution helpers across CLI and TUI flows
 - discover available SSO accounts and roles
 - return clipboard-friendly export strings
@@ -141,13 +144,20 @@ Supporting files include `styles.go`, `filter.go`, and `messages.go`.
 
 ## Authentication Model
 
-UNIC supports three main auth modes.
+UNIC supports four main auth modes.
 
 ### `credential`
 
 - uses shared AWS profile credentials
 - `unic env` exports `AWS_PROFILE` and region variables
 - TUI uses AWS SDK shared config loading
+
+### `console_login`
+
+- uses a shared AWS profile plus AWS CLI `aws login`
+- `unic context setup` runs `aws login --profile <profile> --region <region>`
+- remains profile-backed after login, so `unic env` exports `AWS_PROFILE` and region variables
+- currently supported only as a standalone context and does not chain with `role_arn`
 
 ### `assume_role`
 

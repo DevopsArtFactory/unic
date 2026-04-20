@@ -160,6 +160,11 @@ contexts:
     role_arn: arn:aws:iam::123456789012:role/Admin
     external_id: optional-external-id
 
+  - name: local-dev
+    profile: local-dev
+    region: ap-northeast-2
+    auth_type: console_login
+
   - name: staging
     profile: staging
     region: eu-west-1
@@ -171,6 +176,7 @@ contexts:
 | Auth Type | Meaning | Required Fields |
 |---|---|---|
 | `credential` | Use shared AWS profile credentials | `profile` |
+| `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
 | `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
 | `sso` | Use AWS IAM Identity Center / SSO | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
 

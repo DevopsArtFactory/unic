@@ -43,6 +43,7 @@ Inspector mode는 이제 built-in security scan과 함께 RDS, security group, s
 - legacy flat config
 - `current`를 포함한 context 기반 config
 - `credential` 인증
+- AWS CLI `aws login` 기반 로컬 개발 profile을 위한 `console_login` 인증
 - `assume_role` 인증
 - `unic context setup`으로 concrete context를 만드는 `sso` 인증
 

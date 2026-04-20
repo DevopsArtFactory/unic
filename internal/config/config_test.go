@@ -394,6 +394,28 @@ contexts:
 	}
 }
 
+func TestContextWithConsoleLoginAuthType(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: local-dev
+contexts:
+  - name: local-dev
+    auth_type: console_login
+    profile: local-dev
+    region: ap-northeast-2
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuthType != AuthTypeConsoleLogin {
+		t.Errorf("expected auth_type 'console_login', got '%s'", cfg.AuthType)
+	}
+	if cfg.Profile != "local-dev" {
+		t.Errorf("expected profile 'local-dev', got '%s'", cfg.Profile)
+	}
+}
+
 func TestContextWithCredentialsAliasAuthType(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `

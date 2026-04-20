@@ -15,7 +15,7 @@ type fieldDef struct {
 	required bool
 }
 
-var authTypes = []string{"sso", "credential", "assume_role"}
+var authTypes = []string{"sso", "credential", "console_login", "assume_role"}
 
 var fieldsByAuthType = map[string][]fieldDef{
 	"sso": {
@@ -27,6 +27,12 @@ var fieldsByAuthType = map[string][]fieldDef{
 		{key: "sso_role_name", label: "SSO Role Name", required: true},
 	},
 	"credential": {
+		{key: "name", label: "Name", required: true},
+		{key: "order", label: "Display Order (optional, lower first)", required: false},
+		{key: "region", label: "Region", required: true},
+		{key: "profile", label: "Profile", required: true},
+	},
+	"console_login": {
 		{key: "name", label: "Name", required: true},
 		{key: "order", label: "Display Order (optional, lower first)", required: false},
 		{key: "region", label: "Region", required: true},

@@ -16,6 +16,7 @@ var (
 	listSSOAccountsFn     = awsservice.ListSSOAccounts
 	listSSOAccountRolesFn = awsservice.ListSSOAccountRoles
 	buildEnvExportsFn     = BuildEnvExports
+	runConsoleLoginFn     = awsservice.RunConsoleLogin
 )
 
 // SelectContext interactively selects a context without changing current state.
@@ -60,6 +61,11 @@ func SetupContext(ctx context.Context, configPath string, in io.Reader, errOut i
 	finalCfg, err := config.LoadNamedContext(configPath, finalName)
 	if err != nil {
 		return "", err
+	}
+	if finalCfg.AuthType == config.AuthTypeConsoleLogin {
+		if err := runConsoleLoginFn(finalCfg); err != nil {
+			return "", err
+		}
 	}
 
 	fmt.Fprintf(errOut, "Selected context: %s\n", finalName)

@@ -50,6 +50,7 @@ Prefer tests for:
 - repository methods with mocked AWS clients
 - config and auth helpers
 - TUI transition logic when a feature adds or changes a flow
+- context add/setup flows when auth types or auth-specific branches change
 
 ## Docs Ownership Model
 
