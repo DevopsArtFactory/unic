@@ -23,13 +23,18 @@ type fileConfig struct {
 	DefaultRegion  string `yaml:"default_region"`
 
 	// New contexts-based format
-	Current  string         `yaml:"current"`
-	Defaults fileDefaults   `yaml:"defaults"`
-	Contexts []contextEntry `yaml:"contexts"`
+	Current   string         `yaml:"current"`
+	Defaults  fileDefaults   `yaml:"defaults"`
+	Favorites fileFavorites  `yaml:"favorites,omitempty"`
+	Contexts  []contextEntry `yaml:"contexts"`
 }
 
 type fileDefaults struct {
 	Region string `yaml:"region"`
+}
+
+type fileFavorites struct {
+	Services []string `yaml:"services,omitempty"`
 }
 
 // AuthType represents the authentication method for a context.
@@ -61,15 +66,16 @@ type ContextEntry struct {
 type contextEntry = ContextEntry
 
 type Config struct {
-	Profile      string
-	Region       string
-	ContextName  string
-	AuthType     AuthType
-	RoleArn      string
-	ExternalID   string
-	SSOStartURL  string
-	SSOAccountID string
-	SSORoleName  string
+	Profile          string
+	Region           string
+	ContextName      string
+	AuthType         AuthType
+	RoleArn          string
+	ExternalID       string
+	SSOStartURL      string
+	SSOAccountID     string
+	SSORoleName      string
+	FavoriteServices []string
 }
 
 func normalizeAuthType(value string) AuthType {
@@ -177,15 +183,16 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	)
 
 	return &Config{
-		Profile:      profile,
-		Region:       region,
-		ContextName:  contextName,
-		AuthType:     authType,
-		RoleArn:      roleArn,
-		ExternalID:   externalID,
-		SSOStartURL:  ssoStartURL,
-		SSOAccountID: ssoAccountID,
-		SSORoleName:  ssoRoleName,
+		Profile:          profile,
+		Region:           region,
+		ContextName:      contextName,
+		AuthType:         authType,
+		RoleArn:          roleArn,
+		ExternalID:       externalID,
+		SSOStartURL:      ssoStartURL,
+		SSOAccountID:     ssoAccountID,
+		SSORoleName:      ssoRoleName,
+		FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
 	}, nil
 }
 
@@ -220,19 +227,38 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 		}
 
 		return &Config{
-			Profile:      profile,
-			Region:       region,
-			ContextName:  ctx.Name,
-			AuthType:     normalizeAuthType(ctx.AuthType),
-			RoleArn:      ctx.RoleArn,
-			ExternalID:   ctx.ExternalID,
-			SSOStartURL:  ctx.SSOStartURL,
-			SSOAccountID: ctx.SSOAccountID,
-			SSORoleName:  ctx.SSORoleName,
+			Profile:          profile,
+			Region:           region,
+			ContextName:      ctx.Name,
+			AuthType:         normalizeAuthType(ctx.AuthType),
+			RoleArn:          ctx.RoleArn,
+			ExternalID:       ctx.ExternalID,
+			SSOStartURL:      ctx.SSOStartURL,
+			SSOAccountID:     ctx.SSOAccountID,
+			SSORoleName:      ctx.SSORoleName,
+			FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
 		}, nil
 	}
 
 	return nil, fmt.Errorf("context %q not found in config", name)
+}
+
+func normalizeFavoriteServices(services []string) []string {
+	seen := make(map[string]struct{}, len(services))
+	normalized := make([]string, 0, len(services))
+	for _, service := range services {
+		service = strings.TrimSpace(service)
+		if service == "" {
+			continue
+		}
+		if _, ok := seen[service]; ok {
+			continue
+		}
+		seen[service] = struct{}{}
+		normalized = append(normalized, service)
+	}
+	sort.Strings(normalized)
+	return normalized
 }
 
 // Contexts reads the config file and returns all defined contexts.
@@ -549,6 +575,35 @@ func SetContextOrders(configPath string, names []string) error {
 	out, err := yaml.Marshal(&fc)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	return nil
+}
+
+// SetFavoriteServices updates the user's preferred service ordering.
+func SetFavoriteServices(configPath string, services []string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to read config: %w", err)
+		}
+		data = []byte(defaultContent())
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+	fc.Favorites.Services = normalizeFavoriteServices(services)
+
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 	if err := os.WriteFile(configPath, out, 0644); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)

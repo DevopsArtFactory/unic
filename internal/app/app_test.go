@@ -238,18 +238,64 @@ func TestServiceListFiltersByFeatureDescription(t *testing.T) {
 	}
 }
 
-func TestServiceListSortByName(t *testing.T) {
+func TestServiceListDefaultsToAlphabeticalOrder(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.screen = screenServiceList
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
-	model := updated.(Model)
-
-	if model.serviceSort != serviceSortName {
-		t.Fatalf("expected service sort mode name, got %v", model.serviceSort)
-	}
-	if got := model.filteredServices[0].Name; got != domain.ServiceBedrock {
+	if got := m.filteredServices[0].Name; got != domain.ServiceBedrock {
 		t.Fatalf("expected Bedrock first in name sort, got %s", got)
+	}
+}
+
+func TestServiceListFavoritesSortFirst(t *testing.T) {
+	cfg := testConfig()
+	cfg.FavoriteServices = []string{string(domain.ServiceRDS)}
+	m := New(cfg, "", "dev")
+
+	if got := m.filteredServices[0].Name; got != domain.ServiceRDS {
+		t.Fatalf("expected favorite service first, got %s", got)
+	}
+	if !m.isFavoriteService(domain.ServiceRDS) {
+		t.Fatal("expected RDS to be tracked as a favorite")
+	}
+}
+
+func TestServiceListFavoriteTogglePersists(t *testing.T) {
+	originalSetFavoriteServicesFn := configSetFavoriteServicesFn
+	t.Cleanup(func() {
+		configSetFavoriteServicesFn = originalSetFavoriteServicesFn
+	})
+
+	var gotPath string
+	var gotFavorites []string
+	configSetFavoriteServicesFn = func(path string, services []string) error {
+		gotPath = path
+		gotFavorites = append([]string(nil), services...)
+		return nil
+	}
+
+	cfg := testConfig()
+	m := New(cfg, "/tmp/unic-test-config.yaml", "dev")
+	m.screen = screenServiceList
+	for i, svc := range m.filteredServices {
+		if svc.Name == domain.ServiceRDS {
+			m.svcIdx = i
+			break
+		}
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	model := updated.(Model)
+	if gotPath != "/tmp/unic-test-config.yaml" {
+		t.Fatalf("expected favorite persistence path, got %q", gotPath)
+	}
+	if len(gotFavorites) != 1 || gotFavorites[0] != string(domain.ServiceRDS) {
+		t.Fatalf("expected persisted RDS favorite, got %v", gotFavorites)
+	}
+	if model.filteredServices[0].Name != domain.ServiceRDS {
+		t.Fatalf("expected toggled favorite to move first, got %s", model.filteredServices[0].Name)
+	}
+	if len(cfg.FavoriteServices) != 1 || cfg.FavoriteServices[0] != string(domain.ServiceRDS) {
+		t.Fatalf("expected config favorite services to update, got %v", cfg.FavoriteServices)
 	}
 }
 

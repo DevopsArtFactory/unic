@@ -22,6 +22,7 @@ var (
 	pathLineStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("67"))
 	filterStyle             = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 	matchStyle              = lipgloss.NewStyle().Bold(true).Underline(true)
+	favoriteServiceStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
 	statusBarStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("236"))
 	listPanelStyle          = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
 	helpStyle               = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Background(lipgloss.Color("237"))

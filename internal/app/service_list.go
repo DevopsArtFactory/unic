@@ -1,17 +1,15 @@
 package app
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 
+	"unic/internal/config"
 	"unic/internal/domain"
 )
 
-type serviceSortMode int
-
-const (
-	serviceSortCatalog serviceSortMode = iota
-	serviceSortName
-)
+var configSetFavoriteServicesFn = config.SetFavoriteServices
 
 func (m Model) serviceList() []domain.Service {
 	if m.filteredServices != nil {
@@ -31,26 +29,84 @@ func (m Model) selectedService() (domain.Service, bool) {
 func (m *Model) applyServiceListFilter() {
 	filtered := applyFilter(m.services, m.filterValue(filterServices))
 	m.filteredServices = append([]domain.Service(nil), filtered...)
-	if m.serviceSort == serviceSortName {
-		sort.SliceStable(m.filteredServices, func(i, j int) bool {
-			return m.filteredServices[i].Name < m.filteredServices[j].Name
-		})
-	}
+	sort.SliceStable(m.filteredServices, m.lessService)
 	m.svcIdx = clampListIndex(m.svcIdx, len(m.filteredServices))
 }
 
-func (m *Model) toggleServiceSort() {
-	if m.serviceSort == serviceSortName {
-		m.serviceSort = serviceSortCatalog
-	} else {
-		m.serviceSort = serviceSortName
+func (m Model) lessService(i, j int) bool {
+	left := m.filteredServices[i]
+	right := m.filteredServices[j]
+	leftFavorite := m.isFavoriteService(left.Name)
+	rightFavorite := m.isFavoriteService(right.Name)
+	if leftFavorite != rightFavorite {
+		return leftFavorite
 	}
-	m.applyServiceListFilter()
+	return string(left.Name) < string(right.Name)
 }
 
-func (m Model) serviceSortLabel() string {
-	if m.serviceSort == serviceSortName {
-		return "name"
+func favoriteServiceSet(names []string) map[domain.AwsService]struct{} {
+	favorites := make(map[domain.AwsService]struct{}, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		favorites[domain.AwsService(name)] = struct{}{}
 	}
-	return "catalog"
+	return favorites
+}
+
+func (m Model) isFavoriteService(name domain.AwsService) bool {
+	_, ok := m.favoriteServices[name]
+	return ok
+}
+
+func (m *Model) toggleFavoriteService(name domain.AwsService) error {
+	if m.favoriteServices == nil {
+		m.favoriteServices = make(map[domain.AwsService]struct{})
+	}
+	if m.isFavoriteService(name) {
+		delete(m.favoriteServices, name)
+	} else {
+		m.favoriteServices[name] = struct{}{}
+	}
+	favorites := m.favoriteServiceNames()
+	if m.cfg != nil {
+		m.cfg.FavoriteServices = favorites
+	}
+	if strings.TrimSpace(m.configPath) != "" {
+		if err := configSetFavoriteServicesFn(m.configPath, favorites); err != nil {
+			return err
+		}
+	}
+	m.applyServiceListFilter()
+	m.selectServiceByName(name)
+	return nil
+}
+
+func (m Model) favoriteServiceNames() []string {
+	names := make([]string, 0, len(m.favoriteServices))
+	for name := range m.favoriteServices {
+		names = append(names, string(name))
+	}
+	sort.Strings(names)
+	return names
+}
+
+func (m Model) serviceListSummary() string {
+	favoriteCount := len(m.favoriteServices)
+	if favoriteCount == 1 {
+		return "favorites first, A-Z • 1 favorite"
+	}
+	return fmt.Sprintf("favorites first, A-Z • %d favorites", favoriteCount)
+}
+
+func (m *Model) selectServiceByName(name domain.AwsService) {
+	for i, service := range m.filteredServices {
+		if service.Name == name {
+			m.svcIdx = i
+			return
+		}
+	}
+	m.svcIdx = clampListIndex(m.svcIdx, len(m.filteredServices))
 }

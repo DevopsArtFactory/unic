@@ -118,7 +118,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between AWS services"},
 			{"/", "Start filtering services"},
-			{"s", "Toggle service sort order"},
+			{"f", "Favorite or unfavorite the selected service"},
 			{"enter", "Open the selected service"},
 			{"i", "Open Inspector mode"},
 			{"esc", "Open the context picker"},

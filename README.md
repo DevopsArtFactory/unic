@@ -134,6 +134,11 @@ current: dev-sso
 defaults:
   region: ap-northeast-2
 
+favorites:
+  services:
+    - Bedrock
+    - ECS
+
 contexts:
   - name: dev-sso
     order: 10
@@ -305,7 +310,7 @@ checks:
 | `i` | Enter Inspector mode from the service list |
 | `C` | Open context picker |
 | `/` | Toggle filter mode on supported screens |
-| `s` | Toggle name/catalog sorting on the service list |
+| `f` | Favorite/unfavorite the selected service on the service list |
 | `?` | Toggle context-aware shortcut help |
 | `Ctrl+C` | Force quit |
 
@@ -330,7 +335,7 @@ checks:
 | Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
 | Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
-The service list supports `/` filtering across service names, feature names, and feature descriptions, plus `s` to toggle catalog/name sorting. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
+The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
 
 Bedrock API key management uses the active unic AWS context and IAM service-specific credential APIs for `bedrock.amazonaws.com`. The TUI lists long-term Bedrock API key metadata, opens a detail screen for inspection, defaults new key generation to the current IAM user when that user can be inferred from caller identity, and keeps another-user generation as an explicit option. Creation supports an optional expiration period, where blank or `0` means no expiration, rotates secrets with a one-time result screen, and deletes keys only after typed confirmation. Generated and rotated key values are intentionally copy-only and are not printed to the terminal; on the result screen, `c` copies the key and `e` copies `export AWS_BEARER_TOKEN_BEDROCK=...`.
 

@@ -104,7 +104,7 @@ type Model struct {
 	services         []domain.Service
 	filteredServices []domain.Service
 	svcIdx           int
-	serviceSort      serviceSortMode
+	favoriteServices map[domain.AwsService]struct{}
 
 	// Feature selection
 	features []domain.Feature
@@ -352,6 +352,10 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	if len(checklistPath) > 0 {
 		configuredChecklistPath = checklistPath[0]
 	}
+	var favoriteServiceNames []string
+	if cfg != nil {
+		favoriteServiceNames = cfg.FavoriteServices
+	}
 	model := Model{
 		cfg:                    cfg,
 		configPath:             configPath,
@@ -359,7 +363,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		screen:                 screenContextPicker,
 		ctxPrevScreen:          screenServiceList,
 		services:               services,
-		filteredServices:       services,
+		favoriteServices:       favoriteServiceSet(favoriteServiceNames),
 		inspectorChecklistPath: configuredChecklistPath,
 		inspectorWorkflows:     inspector.Workflows(configuredChecklistPath),
 		loadingSpinner:         newLoadingSpinner(),
@@ -370,6 +374,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.bedrock = newBedrockModel()
+	model.applyServiceListFilter()
 	return model
 }
 
@@ -696,8 +701,13 @@ func (m Model) updateServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.svcIdx = nextListIndex(m.svcIdx, len(m.serviceList()))
 	case "/":
 		return m, m.activateFilter(filterServices)
-	case "s":
-		m.toggleServiceSort()
+	case "f":
+		if service, ok := m.selectedService(); ok {
+			if err := m.toggleFavoriteService(service.Name); err != nil {
+				m.errMsg = err.Error()
+				m.screen = screenError
+			}
+		}
 	case "i":
 		m.enterInspectorMode()
 	case "enter":
@@ -961,17 +971,25 @@ func (m Model) viewServiceList() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, m.renderHighlightedValue(filterServices, string(svc.Name)))))
+			favoriteMarker := "  "
+			if m.isFavoriteService(svc.Name) {
+				favoriteMarker = favoriteServiceStyle.Render("* ")
+			}
+			label := m.renderHighlightedValue(filterServices, string(svc.Name))
+			if m.isFavoriteService(svc.Name) {
+				label = favoriteServiceStyle.Render(label)
+			}
+			panel.WriteString(style.Render(cursor) + favoriteMarker + style.Render(label))
 			panel.WriteString("\n")
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d services • sort: %s", len(services), len(m.services), m.serviceSortLabel())))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d services • %s", len(services), len(m.services), m.serviceListSummary())))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • s: sort • enter: select • i: Inspector mode • esc: context • q: quit"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • f: favorite • enter: select • i: Inspector mode • esc: context • q: quit"))
 	return b.String()
 }
 
