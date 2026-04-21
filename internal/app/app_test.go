@@ -856,23 +856,23 @@ func TestBedrockKeyCreateDefaultsToCurrentIAMUser(t *testing.T) {
 	if model.screen != screenBedrockKeyCreate {
 		t.Fatalf("expected create screen, got %d", model.screen)
 	}
-	if model.bedrockCreateField != bedrockCreateFieldMode {
-		t.Fatalf("expected mode picker first, got %d", model.bedrockCreateField)
+	if model.bedrock.createField != bedrockCreateFieldMode {
+		t.Fatalf("expected mode picker first, got %d", model.bedrock.createField)
 	}
-	if model.bedrockCreateMode != 0 {
-		t.Fatalf("expected current-user mode by default, got %d", model.bedrockCreateMode)
+	if model.bedrock.createMode != 0 {
+		t.Fatalf("expected current-user mode by default, got %d", model.bedrock.createMode)
 	}
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if model.bedrockCreateField != bedrockCreateFieldExpiration {
-		t.Fatalf("expected expiration field, got %d", model.bedrockCreateField)
+	if model.bedrock.createField != bedrockCreateFieldExpiration {
+		t.Fatalf("expected expiration field, got %d", model.bedrock.createField)
 	}
-	if model.bedrockCreateValues["user"] != "bedrock-user" {
-		t.Fatalf("expected inferred user bedrock-user, got %q", model.bedrockCreateValues["user"])
+	if model.bedrock.createValues["user"] != "bedrock-user" {
+		t.Fatalf("expected inferred user bedrock-user, got %q", model.bedrock.createValues["user"])
 	}
-	if model.bedrockCreateValues["user_source"] != "current" {
-		t.Fatalf("expected current user source, got %q", model.bedrockCreateValues["user_source"])
+	if model.bedrock.createValues["user_source"] != "current" {
+		t.Fatalf("expected current user source, got %q", model.bedrock.createValues["user_source"])
 	}
 }
 
@@ -887,11 +887,11 @@ func TestBedrockCreateIdentityMessageDefaultsToCurrentIAMUser(t *testing.T) {
 	if model.screen != screenBedrockKeyCreate {
 		t.Fatalf("expected create screen, got %d", model.screen)
 	}
-	if model.bedrockCreateField != bedrockCreateFieldMode {
-		t.Fatalf("expected mode picker, got field %d", model.bedrockCreateField)
+	if model.bedrock.createField != bedrockCreateFieldMode {
+		t.Fatalf("expected mode picker, got field %d", model.bedrock.createField)
 	}
-	if model.bedrockCreateMode != 0 {
-		t.Fatalf("expected current-user mode, got %d", model.bedrockCreateMode)
+	if model.bedrock.createMode != 0 {
+		t.Fatalf("expected current-user mode, got %d", model.bedrock.createMode)
 	}
 }
 
@@ -906,13 +906,13 @@ func TestBedrockCreateIdentityMessageFallsBackForNonIAMUser(t *testing.T) {
 	if model.screen != screenBedrockKeyCreate {
 		t.Fatalf("expected create screen, got %d", model.screen)
 	}
-	if model.bedrockCreateField != bedrockCreateFieldUser {
-		t.Fatalf("expected explicit user input, got field %d", model.bedrockCreateField)
+	if model.bedrock.createField != bedrockCreateFieldUser {
+		t.Fatalf("expected explicit user input, got field %d", model.bedrock.createField)
 	}
-	if model.bedrockCreateMode != 1 {
-		t.Fatalf("expected another-user mode, got %d", model.bedrockCreateMode)
+	if model.bedrock.createMode != 1 {
+		t.Fatalf("expected another-user mode, got %d", model.bedrock.createMode)
 	}
-	view := model.viewBedrockKeyCreate()
+	view := model.bedrock.viewCreate(model)
 	if !strings.Contains(view, "Current AWS identity is not an IAM user") {
 		t.Fatalf("expected non-IAM identity explanation, got %q", view)
 	}
@@ -925,52 +925,52 @@ func TestBedrockKeyCreateAnotherUserIsExplicitOption(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenBedrockKeyCreate
 	m.callerIdentity = &awsservice.CallerIdentity{Arn: "arn:aws:iam::123456789012:user/current-user"}
-	m.bedrockCreateField = bedrockCreateFieldMode
-	m.bedrockCreateMode = 0
-	m.bedrockCreateValues = map[string]string{}
+	m.bedrock.createField = bedrockCreateFieldMode
+	m.bedrock.createMode = 0
+	m.bedrock.createValues = map[string]string{}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	model := updated.(Model)
-	if model.bedrockCreateMode != 1 {
-		t.Fatalf("expected another-user mode after down, got %d", model.bedrockCreateMode)
+	if model.bedrock.createMode != 1 {
+		t.Fatalf("expected another-user mode after down, got %d", model.bedrock.createMode)
 	}
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
-	if model.bedrockCreateField != bedrockCreateFieldUser {
-		t.Fatalf("expected explicit user input, got field %d", model.bedrockCreateField)
+	if model.bedrock.createField != bedrockCreateFieldUser {
+		t.Fatalf("expected explicit user input, got field %d", model.bedrock.createField)
 	}
 }
 
 func TestBedrockKeyCreateRequiresUser(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenBedrockKeyCreate
-	m.bedrockCreateField = bedrockCreateFieldUser
-	m.bedrockCreateInput = ""
+	m.bedrock.createField = bedrockCreateFieldUser
+	m.bedrock.createInput = ""
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 	if model.screen != screenBedrockKeyCreate {
 		t.Fatalf("expected create screen, got %d", model.screen)
 	}
-	if !strings.Contains(model.bedrockStatus, "IAM user name") {
-		t.Fatalf("expected user validation message, got %q", model.bedrockStatus)
+	if !strings.Contains(model.bedrock.status, "IAM user name") {
+		t.Fatalf("expected user validation message, got %q", model.bedrock.status)
 	}
 }
 
 func TestBedrockKeyCreateAdvancesToTypedConfirm(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenBedrockKeyCreate
-	m.bedrockCreateField = bedrockCreateFieldUser
-	m.bedrockCreateInput = "bedrock-user"
+	m.bedrock.createField = bedrockCreateFieldUser
+	m.bedrock.createInput = "bedrock-user"
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
-	if model.screen != screenBedrockKeyCreate || model.bedrockCreateField != bedrockCreateFieldExpiration {
-		t.Fatalf("expected expiration field, got screen=%d field=%d", model.screen, model.bedrockCreateField)
+	if model.screen != screenBedrockKeyCreate || model.bedrock.createField != bedrockCreateFieldExpiration {
+		t.Fatalf("expected expiration field, got screen=%d field=%d", model.screen, model.bedrock.createField)
 	}
-	if model.bedrockCreateInput != "30" {
-		t.Fatalf("expected default 30 day expiration, got %q", model.bedrockCreateInput)
+	if model.bedrock.createInput != "30" {
+		t.Fatalf("expected default 30 day expiration, got %q", model.bedrock.createInput)
 	}
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -978,11 +978,11 @@ func TestBedrockKeyCreateAdvancesToTypedConfirm(t *testing.T) {
 	if model.screen != screenBedrockKeyConfirm {
 		t.Fatalf("expected confirm screen, got %d", model.screen)
 	}
-	if target := model.bedrockConfirmTarget(); target != "bedrock-user" {
+	if target := model.bedrock.confirmTarget(); target != "bedrock-user" {
 		t.Fatalf("expected confirm target bedrock-user, got %q", target)
 	}
 
-	model.bedrockConfirm = "wrong"
+	model.bedrock.confirm = "wrong"
 	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	if model.screen != screenBedrockKeyConfirm {
@@ -1016,15 +1016,15 @@ func TestParseBedrockAgeDaysRejectsOutOfRangeValues(t *testing.T) {
 func TestBedrockKeyDetailRotateAndDeleteGoToConfirm(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenBedrockKeyDetail
-	m.selectedBedrockKey = &awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user", Status: "Active"}
+	m.bedrock.selectedKey = &awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user", Status: "Active"}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	model := updated.(Model)
 	if model.screen != screenBedrockKeyConfirm {
 		t.Fatalf("expected rotate confirm screen, got %d", model.screen)
 	}
-	if model.bedrockAction != "rotate" {
-		t.Fatalf("expected rotate action, got %q", model.bedrockAction)
+	if model.bedrock.action != "rotate" {
+		t.Fatalf("expected rotate action, got %q", model.bedrock.action)
 	}
 
 	model.screen = screenBedrockKeyDetail
@@ -1033,15 +1033,15 @@ func TestBedrockKeyDetailRotateAndDeleteGoToConfirm(t *testing.T) {
 	if model.screen != screenBedrockKeyConfirm {
 		t.Fatalf("expected delete confirm screen, got %d", model.screen)
 	}
-	if model.bedrockAction != "delete" {
-		t.Fatalf("expected delete action, got %q", model.bedrockAction)
+	if model.bedrock.action != "delete" {
+		t.Fatalf("expected delete action, got %q", model.bedrock.action)
 	}
 }
 
 func TestBedrockKeyResultEscReloadsList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenBedrockKeyResult
-	m.bedrockGeneratedKey = &awsservice.GeneratedBedrockAPIKey{
+	m.bedrock.generatedKey = &awsservice.GeneratedBedrockAPIKey{
 		BedrockAPIKey: awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user"},
 		Secret:        "secret-token",
 	}
@@ -1051,7 +1051,7 @@ func TestBedrockKeyResultEscReloadsList(t *testing.T) {
 	if model.screen != screenLoading {
 		t.Fatalf("expected loading screen, got %d", model.screen)
 	}
-	if model.bedrockGeneratedKey != nil {
+	if model.bedrock.generatedKey != nil {
 		t.Fatal("expected generated key to be cleared")
 	}
 	if cmd == nil {
@@ -1062,12 +1062,12 @@ func TestBedrockKeyResultEscReloadsList(t *testing.T) {
 func TestBedrockKeyResultDoesNotRenderSecret(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenBedrockKeyResult
-	m.bedrockGeneratedKey = &awsservice.GeneratedBedrockAPIKey{
+	m.bedrock.generatedKey = &awsservice.GeneratedBedrockAPIKey{
 		BedrockAPIKey: awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user"},
 		Secret:        "secret-token",
 	}
 
-	view := m.viewBedrockKeyResult()
+	view := m.bedrock.viewResult(m)
 	if strings.Contains(view, "secret-token") {
 		t.Fatalf("result view should not render raw secret, got %q", view)
 	}

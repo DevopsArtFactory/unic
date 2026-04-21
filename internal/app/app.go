@@ -247,6 +247,7 @@ type Model struct {
 	// Feature submodels
 	cwMetrics cloudWatchMetricsModel
 	cwLogs    cloudWatchLogsModel
+	bedrock   bedrockModel
 
 	// S3 browser state
 	s3Buckets         []awsservice.S3Bucket
@@ -270,21 +271,6 @@ type Model struct {
 	lambdaInvokeResult      *awsservice.LambdaInvokeResult
 	lambdaPayloadSource     lambdaPayloadSource
 	lambdaInvokeStep        int // 0=source select, 1=text input
-
-	// Bedrock API key state
-	bedrockKeys         []awsservice.BedrockAPIKey
-	filteredBedrockKeys []awsservice.BedrockAPIKey
-	bedrockKeyIdx       int
-	selectedBedrockKey  *awsservice.BedrockAPIKey
-	bedrockAction       string // "create", "rotate", "delete"
-	bedrockConfirm      string
-	bedrockCreateField  int
-	bedrockCreateMode   int // 0=current IAM user, 1=another IAM user
-	bedrockCreateInput  string
-	bedrockCreateValues map[string]string
-	bedrockGeneratedKey *awsservice.GeneratedBedrockAPIKey
-	bedrockCopyMsg      string
-	bedrockStatus       string
 
 	// Inspector browser state
 	inspectorWorkflows        []inspector.Workflow
@@ -380,6 +366,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	}
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwLogs = newCloudWatchLogsModel()
+	model.bedrock = newBedrockModel()
 	return model
 }
 
@@ -483,7 +470,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleECSMsg,
 		m.handleS3Msg,
 		m.handleLambdaMsg,
-		m.handleBedrockMsg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
@@ -603,16 +589,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateLambdaInvokeInput(msg)
 		case screenLambdaInvokeResult:
 			return m.updateLambdaInvokeResult(msg)
-		case screenBedrockKeyList:
-			return m.updateBedrockKeyList(msg)
-		case screenBedrockKeyDetail:
-			return m.updateBedrockKeyDetail(msg)
-		case screenBedrockKeyCreate:
-			return m.updateBedrockKeyCreate(msg)
-		case screenBedrockKeyConfirm:
-			return m.updateBedrockKeyConfirm(msg)
-		case screenBedrockKeyResult:
-			return m.updateBedrockKeyResult(msg)
 		case screenInspectorHome:
 			return m.updateInspectorHome(msg)
 		case screenInspectorWorkflowPlaceholder:
@@ -791,7 +767,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureLambdaBrowser:
 				return m.startLoading(m.loadLambdaFunctions())
 			case domain.FeatureBedrockAPIKeys:
-				return m.startLoading(m.loadBedrockAPIKeys())
+				return m.bedrock.Start(&m)
 			}
 		}
 	}
@@ -884,16 +860,6 @@ func (m Model) View() string {
 		v = m.viewLambdaInvokeInput()
 	case screenLambdaInvokeResult:
 		v = m.viewLambdaInvokeResult()
-	case screenBedrockKeyList:
-		v = m.viewBedrockKeyList()
-	case screenBedrockKeyDetail:
-		v = m.viewBedrockKeyDetail()
-	case screenBedrockKeyCreate:
-		v = m.viewBedrockKeyCreate()
-	case screenBedrockKeyConfirm:
-		v = m.viewBedrockKeyConfirm()
-	case screenBedrockKeyResult:
-		v = m.viewBedrockKeyResult()
 	case screenInspectorHome:
 		v = m.viewInspectorHome()
 	case screenInspectorWorkflowPlaceholder:
