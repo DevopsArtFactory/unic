@@ -183,7 +183,15 @@ func (m Model) switchContext(name string) tea.Cmd {
 
 		// SSO needs interactive terminal — hand off via tea.ExecProcess
 		if cfg.AuthType == config.AuthTypeSSO {
-			cmd, cleanup, err := awsservice.BuildSSOLoginCmd(cfg)
+			check, err := contextCheckSSOSessionFn(cfg)
+			if err != nil {
+				return errMsg{err: err}
+			}
+			if !check.LoginRequired {
+				return contextFinalizeSwitchFn(m)()
+			}
+
+			cmd, cleanup, err := contextBuildSSOLoginCmdFn(cfg)
 			if err != nil {
 				return errMsg{err: err}
 			}

@@ -40,6 +40,9 @@ var (
 	contextListSSORolesFn        = auth.ListSSOContextRoles
 	contextResolveSSOSelectionFn = auth.ResolveSSOContextSelection
 	contextDetectEnvFn           = auth.DetectEnvContext
+	contextCheckSSOSessionFn     = awsservice.CheckSSOSession
+	contextBuildSSOLoginCmdFn    = awsservice.BuildSSOLoginCmd
+	contextFinalizeSwitchFn      = func(m Model) tea.Cmd { return m.doFinalizeContextSwitch() }
 )
 
 func (m Model) selectedContextInfo() (config.ContextInfo, bool) {
