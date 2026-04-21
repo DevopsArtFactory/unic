@@ -127,6 +127,12 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "/":
 		return m, m.activateFilter(filterContexts)
+	case "up", "k":
+		m.ctxIdx = previousListIndex(m.ctxIdx, len(m.filteredCtxList))
+		m.contextTable.SetCursor(m.ctxIdx)
+	case "down", "j":
+		m.ctxIdx = nextListIndex(m.ctxIdx, len(m.filteredCtxList))
+		m.contextTable.SetCursor(m.ctxIdx)
 	case "enter":
 		cursor := m.contextTable.Cursor()
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {

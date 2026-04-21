@@ -234,13 +234,9 @@ func (bm *bedrockModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd
 		bm.selectedKey = nil
 		m.resetFilter(filterBedrockKeys)
 	case "up", "k":
-		if bm.keyIdx > 0 {
-			bm.keyIdx--
-		}
+		bm.keyIdx = previousListIndex(bm.keyIdx, len(bm.filteredKeys))
 	case "down", "j":
-		if bm.keyIdx < len(bm.filteredKeys)-1 {
-			bm.keyIdx++
-		}
+		bm.keyIdx = nextListIndex(bm.keyIdx, len(bm.filteredKeys))
 	case "/":
 		return *m, m.activateFilter(filterBedrockKeys)
 	case "c":
@@ -302,12 +298,12 @@ func (bm *bedrockModel) updateCreate(m *Model, msg tea.KeyMsg) (tea.Model, tea.C
 		m.screen = screenBedrockKeyList
 		bm.status = ""
 	case "up", "k":
-		if bm.createField == bedrockCreateFieldMode && bm.createMode > 0 {
-			bm.createMode--
+		if bm.createField == bedrockCreateFieldMode {
+			bm.createMode = previousListIndex(bm.createMode, 2)
 		}
 	case "down", "j":
-		if bm.createField == bedrockCreateFieldMode && bm.createMode < 1 {
-			bm.createMode++
+		if bm.createField == bedrockCreateFieldMode {
+			bm.createMode = nextListIndex(bm.createMode, 2)
 		}
 	case "enter":
 		if bm.createValues == nil {

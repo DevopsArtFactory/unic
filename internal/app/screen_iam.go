@@ -344,13 +344,9 @@ func (m Model) updateIAMUserList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filteredIAMUsers = nil
 		m.iamUserIdx = 0
 	case "up", "k":
-		if m.iamUserIdx > 0 {
-			m.iamUserIdx--
-		}
+		m.iamUserIdx = previousListIndex(m.iamUserIdx, len(m.filteredIAMUsers))
 	case "down", "j":
-		if m.iamUserIdx < len(m.filteredIAMUsers)-1 {
-			m.iamUserIdx++
-		}
+		m.iamUserIdx = nextListIndex(m.iamUserIdx, len(m.filteredIAMUsers))
 	case "/":
 		filterCmd := m.activateFilter(filterIAMUsers)
 		if m.iamUserHasMore && !m.iamUserLoadingMore {
@@ -404,13 +400,9 @@ func (m Model) updateIAMKeyList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.iamKeyIdx = 0
 	case "up", "k":
-		if m.iamKeyIdx > 0 {
-			m.iamKeyIdx--
-		}
+		m.iamKeyIdx = previousListIndex(m.iamKeyIdx, len(m.iamKeys))
 	case "down", "j":
-		if m.iamKeyIdx < len(m.iamKeys)-1 {
-			m.iamKeyIdx++
-		}
+		m.iamKeyIdx = nextListIndex(m.iamKeyIdx, len(m.iamKeys))
 	case "enter":
 		if len(m.iamKeys) > 0 && m.iamKeyIdx < len(m.iamKeys) {
 			selected := m.iamKeys[m.iamKeyIdx]

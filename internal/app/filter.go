@@ -9,6 +9,7 @@ type filterTarget int
 
 const (
 	filterNone filterTarget = iota
+	filterServices
 	filterInstances
 	filterSubnetIPs
 	filterRDS
@@ -156,6 +157,8 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	}
 
 	switch target {
+	case filterServices:
+		m.applyServiceListFilter()
 	case filterInstances:
 		m.filtered = applyFilter(m.instances, m.filterValue(target))
 		m.instIdx = 0

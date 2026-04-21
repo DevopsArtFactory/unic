@@ -60,13 +60,9 @@ func (m Model) updateContextAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "esc":
 			return m, m.loadContexts()
 		case "up", "k":
-			if m.addAuthIdx > 0 {
-				m.addAuthIdx--
-			}
+			m.addAuthIdx = previousListIndex(m.addAuthIdx, len(authTypes))
 		case "down", "j":
-			if m.addAuthIdx < len(authTypes)-1 {
-				m.addAuthIdx++
-			}
+			m.addAuthIdx = nextListIndex(m.addAuthIdx, len(authTypes))
 		case "enter":
 			selected := authTypes[m.addAuthIdx]
 			m.addValues["auth_type"] = selected

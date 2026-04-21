@@ -84,6 +84,30 @@ default_profile: prod
 	}
 }
 
+func TestLoadReadsFavoriteServices(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+favorites:
+  services:
+    - RDS
+    - Bedrock
+    - RDS
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Bedrock", "RDS"}
+	if len(cfg.FavoriteServices) != len(want) {
+		t.Fatalf("expected favorite services %v, got %v", want, cfg.FavoriteServices)
+	}
+	for i := range want {
+		if cfg.FavoriteServices[i] != want[i] {
+			t.Fatalf("expected favorite services %v, got %v", want, cfg.FavoriteServices)
+		}
+	}
+}
+
 func TestCLIProfileWithConfigRegion(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `
@@ -99,6 +123,35 @@ default_region: ap-southeast-1
 	}
 	if cfg.Region != "ap-southeast-1" {
 		t.Errorf("expected region 'ap-southeast-1', got '%s'", cfg.Region)
+	}
+}
+
+func TestSetFavoriteServicesWritesConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+default_region: ap-northeast-2
+favorites:
+  services:
+    - EC2
+`)
+	if err := SetFavoriteServices(path, []string{"RDS", "Bedrock", "RDS"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Bedrock", "RDS"}
+	if len(cfg.FavoriteServices) != len(want) {
+		t.Fatalf("expected favorite services %v, got %v", want, cfg.FavoriteServices)
+	}
+	for i := range want {
+		if cfg.FavoriteServices[i] != want[i] {
+			t.Fatalf("expected favorite services %v, got %v", want, cfg.FavoriteServices)
+		}
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected existing region to be preserved, got %q", cfg.Region)
 	}
 }
 

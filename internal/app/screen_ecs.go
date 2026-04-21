@@ -86,13 +86,9 @@ func (m Model) updateECSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.screen = screenFeatureList
 	case "up", "k":
-		if m.ecsClusterIdx > 0 {
-			m.ecsClusterIdx--
-		}
+		m.ecsClusterIdx = previousListIndex(m.ecsClusterIdx, len(m.filteredECSClusters))
 	case "down", "j":
-		if m.ecsClusterIdx < len(m.filteredECSClusters)-1 {
-			m.ecsClusterIdx++
-		}
+		m.ecsClusterIdx = nextListIndex(m.ecsClusterIdx, len(m.filteredECSClusters))
 	case "/":
 		return m, m.activateFilter(filterECSClusters)
 	case "r":
@@ -163,13 +159,9 @@ func (m Model) updateECSServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.screen = screenECSClusterList
 	case "up", "k":
-		if m.ecsServiceIdx > 0 {
-			m.ecsServiceIdx--
-		}
+		m.ecsServiceIdx = previousListIndex(m.ecsServiceIdx, len(m.filteredECSServices))
 	case "down", "j":
-		if m.ecsServiceIdx < len(m.filteredECSServices)-1 {
-			m.ecsServiceIdx++
-		}
+		m.ecsServiceIdx = nextListIndex(m.ecsServiceIdx, len(m.filteredECSServices))
 	case "/":
 		return m, m.activateFilter(filterECSServices)
 	case "r":
@@ -379,13 +371,9 @@ func (m Model) updateECSTaskList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.screen = screenECSServiceDetail
 	case "up", "k":
-		if m.ecsTaskIdx > 0 {
-			m.ecsTaskIdx--
-		}
+		m.ecsTaskIdx = previousListIndex(m.ecsTaskIdx, len(m.ecsTasks))
 	case "down", "j":
-		if m.ecsTaskIdx < len(m.ecsTasks)-1 {
-			m.ecsTaskIdx++
-		}
+		m.ecsTaskIdx = nextListIndex(m.ecsTaskIdx, len(m.ecsTasks))
 	case "r":
 		return m.startLoading(m.loadECSTasks())
 	case "enter":
@@ -449,13 +437,9 @@ func (m Model) updateECSContainerList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.screen = screenECSTaskList
 	case "up", "k":
-		if m.ecsContainerIdx > 0 {
-			m.ecsContainerIdx--
-		}
+		m.ecsContainerIdx = previousListIndex(m.ecsContainerIdx, len(m.ecsContainers))
 	case "down", "j":
-		if m.ecsContainerIdx < len(m.ecsContainers)-1 {
-			m.ecsContainerIdx++
-		}
+		m.ecsContainerIdx = nextListIndex(m.ecsContainerIdx, len(m.ecsContainers))
 	case "enter":
 		if len(m.ecsContainers) > 0 && m.ecsContainerIdx < len(m.ecsContainers) {
 			container := m.ecsContainers[m.ecsContainerIdx]

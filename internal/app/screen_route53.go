@@ -79,13 +79,9 @@ func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterRoute53Zones)
 	case "up", "k":
-		if m.route53ZoneIdx > 0 {
-			m.route53ZoneIdx--
-		}
+		m.route53ZoneIdx = previousListIndex(m.route53ZoneIdx, len(m.filteredRoute53Zones))
 	case "down", "j":
-		if m.route53ZoneIdx < len(m.filteredRoute53Zones)-1 {
-			m.route53ZoneIdx++
-		}
+		m.route53ZoneIdx = nextListIndex(m.route53ZoneIdx, len(m.filteredRoute53Zones))
 	case "/":
 		return m, m.activateFilter(filterRoute53Zones)
 	case "enter":
@@ -110,13 +106,9 @@ func (m Model) updateRoute53RecordList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenRoute53ZoneList
 		m.resetFilter(filterRoute53Records)
 	case "up", "k":
-		if m.route53RecordIdx > 0 {
-			m.route53RecordIdx--
-		}
+		m.route53RecordIdx = previousListIndex(m.route53RecordIdx, len(m.filteredRoute53Records))
 	case "down", "j":
-		if m.route53RecordIdx < len(m.filteredRoute53Records)-1 {
-			m.route53RecordIdx++
-		}
+		m.route53RecordIdx = nextListIndex(m.route53RecordIdx, len(m.filteredRoute53Records))
 	case "/":
 		return m, m.activateFilter(filterRoute53Records)
 	case "c":
@@ -450,13 +442,9 @@ func (m Model) updateRoute53TypeSelect(key string) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.screen = screenRoute53RecordList
 	case "up", "k":
-		if m.route53EditSelectIdx > 0 {
-			m.route53EditSelectIdx--
-		}
+		m.route53EditSelectIdx = previousListIndex(m.route53EditSelectIdx, len(route53TypeOptions))
 	case "down", "j":
-		if m.route53EditSelectIdx < len(route53TypeOptions)-1 {
-			m.route53EditSelectIdx++
-		}
+		m.route53EditSelectIdx = nextListIndex(m.route53EditSelectIdx, len(route53TypeOptions))
 	case "enter":
 		m.route53EditValues["type"] = route53TypeOptions[m.route53EditSelectIdx]
 		m.route53EditField++

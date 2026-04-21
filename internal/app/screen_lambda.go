@@ -52,13 +52,9 @@ func (m Model) updateLambdaFunctionList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.screen = screenFeatureList
 	case "up", "k":
-		if m.lambdaFunctionIdx > 0 {
-			m.lambdaFunctionIdx--
-		}
+		m.lambdaFunctionIdx = previousListIndex(m.lambdaFunctionIdx, len(m.filteredLambdaFunctions))
 	case "down", "j":
-		if m.lambdaFunctionIdx < len(m.filteredLambdaFunctions)-1 {
-			m.lambdaFunctionIdx++
-		}
+		m.lambdaFunctionIdx = nextListIndex(m.lambdaFunctionIdx, len(m.filteredLambdaFunctions))
 	case "/":
 		return m, m.activateFilter(filterLambdaFunctions)
 	case "r":
@@ -204,9 +200,9 @@ func (m Model) updateLambdaInvokeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.screen = screenLambdaFunctionList
 		case "up", "k":
-			m.lambdaPayloadSource = lambdaPayloadManual
+			m.lambdaPayloadSource = lambdaPayloadSource(previousListIndex(int(m.lambdaPayloadSource), 2))
 		case "down", "j":
-			m.lambdaPayloadSource = lambdaPayloadFile
+			m.lambdaPayloadSource = lambdaPayloadSource(nextListIndex(int(m.lambdaPayloadSource), 2))
 		case "enter":
 			m.lambdaInvokeStep = 1
 			m.lambdaInvokePayload = ""

@@ -193,13 +193,9 @@ func (m Model) updateContextSSOAccountList(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "esc":
 		m.screen = screenContextPicker
 	case "up", "k":
-		if m.contextSSOAccountIdx > 0 {
-			m.contextSSOAccountIdx--
-		}
+		m.contextSSOAccountIdx = previousListIndex(m.contextSSOAccountIdx, len(m.contextSSOAccounts))
 	case "down", "j":
-		if m.contextSSOAccountIdx < len(m.contextSSOAccounts)-1 {
-			m.contextSSOAccountIdx++
-		}
+		m.contextSSOAccountIdx = nextListIndex(m.contextSSOAccountIdx, len(m.contextSSOAccounts))
 	case "enter":
 		if len(m.contextSSOAccounts) == 0 {
 			return m, nil
@@ -221,13 +217,9 @@ func (m Model) updateContextSSORoleList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.screen = screenContextSSOAccountList
 	case "up", "k":
-		if m.contextSSORoleIdx > 0 {
-			m.contextSSORoleIdx--
-		}
+		m.contextSSORoleIdx = previousListIndex(m.contextSSORoleIdx, len(m.contextSSORoles))
 	case "down", "j":
-		if m.contextSSORoleIdx < len(m.contextSSORoles)-1 {
-			m.contextSSORoleIdx++
-		}
+		m.contextSSORoleIdx = nextListIndex(m.contextSSORoleIdx, len(m.contextSSORoles))
 	case "enter":
 		if len(m.contextSSORoles) == 0 {
 			return m, nil

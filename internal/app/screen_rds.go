@@ -71,13 +71,9 @@ func (m Model) updateRDSList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterRDS)
 	case "up", "k":
-		if m.rdsIdx > 0 {
-			m.rdsIdx--
-		}
+		m.rdsIdx = previousListIndex(m.rdsIdx, len(m.filteredRDS))
 	case "down", "j":
-		if m.rdsIdx < len(m.filteredRDS)-1 {
-			m.rdsIdx++
-		}
+		m.rdsIdx = nextListIndex(m.rdsIdx, len(m.filteredRDS))
 	case "/":
 		return m, m.activateFilter(filterRDS)
 	case "enter":

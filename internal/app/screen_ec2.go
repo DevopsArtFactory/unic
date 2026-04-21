@@ -90,13 +90,9 @@ func (m Model) updateInstanceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterInstances)
 	case "up", "k":
-		if m.instIdx > 0 {
-			m.instIdx--
-		}
+		m.instIdx = previousListIndex(m.instIdx, len(m.filtered))
 	case "down", "j":
-		if m.instIdx < len(m.filtered)-1 {
-			m.instIdx++
-		}
+		m.instIdx = nextListIndex(m.instIdx, len(m.filtered))
 	case "/":
 		return m, m.activateFilter(filterInstances)
 	case "r":

@@ -1,5 +1,5 @@
 APP_NAME := unic
-VERSION  := 0.0.4
+VERSION  := 0.1.3
 DIST_DIR := dist
 CMD_PATH := ./cmd/unic
 
