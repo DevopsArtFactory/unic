@@ -60,13 +60,9 @@ func (m Model) updateReachabilityRegionList(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case "q", "esc":
 		m.screen = screenFeatureList
 	case "up", "k":
-		if m.reachabilityRegionIdx > 0 {
-			m.reachabilityRegionIdx--
-		}
+		m.reachabilityRegionIdx = previousListIndex(m.reachabilityRegionIdx, len(m.filteredReachabilityRegions))
 	case "down", "j":
-		if m.reachabilityRegionIdx < len(m.filteredReachabilityRegions)-1 {
-			m.reachabilityRegionIdx++
-		}
+		m.reachabilityRegionIdx = nextListIndex(m.reachabilityRegionIdx, len(m.filteredReachabilityRegions))
 	case "/":
 		m.reachabilityRegionFiltering = true
 	case "enter":
@@ -184,13 +180,9 @@ func (m Model) updateReachabilitySourceList(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			m.reachabilityIdx = 0
 		}
 	case "up", "k":
-		if m.reachabilityIdx > 0 {
-			m.reachabilityIdx--
-		}
+		m.reachabilityIdx = previousListIndex(m.reachabilityIdx, len(m.filteredReachabilityTargets))
 	case "down", "j":
-		if m.reachabilityIdx < len(m.filteredReachabilityTargets)-1 {
-			m.reachabilityIdx++
-		}
+		m.reachabilityIdx = nextListIndex(m.reachabilityIdx, len(m.filteredReachabilityTargets))
 	case "/":
 		m.reachabilityFilterActive = true
 	case "r":
@@ -257,13 +249,9 @@ func (m Model) updateReachabilityDestinationList(msg tea.KeyMsg) (tea.Model, tea
 			m.reachabilityIdx = 0
 		}
 	case "up", "k":
-		if m.reachabilityIdx > 0 {
-			m.reachabilityIdx--
-		}
+		m.reachabilityIdx = previousListIndex(m.reachabilityIdx, len(m.filteredReachabilityTargets))
 	case "down", "j":
-		if m.reachabilityIdx < len(m.filteredReachabilityTargets)-1 {
-			m.reachabilityIdx++
-		}
+		m.reachabilityIdx = nextListIndex(m.reachabilityIdx, len(m.filteredReachabilityTargets))
 	case "/":
 		m.reachabilityFilterActive = true
 	case "r":
@@ -298,17 +286,17 @@ func (m Model) updateReachabilityConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.screen = screenReachabilityDestinationList
 	case "up", "k":
-		if m.reachabilityConfigField > 0 {
-			m.reachabilityConfigField--
+		maxField := 1
+		if m.reachabilityDestination != nil && m.reachabilityDestination.ManualIP {
+			maxField = 2
 		}
+		m.reachabilityConfigField = previousListIndex(m.reachabilityConfigField, maxField+1)
 	case "down", "j", "tab":
 		maxField := 1
 		if m.reachabilityDestination != nil && m.reachabilityDestination.ManualIP {
 			maxField = 2
 		}
-		if m.reachabilityConfigField < maxField {
-			m.reachabilityConfigField++
-		}
+		m.reachabilityConfigField = nextListIndex(m.reachabilityConfigField, maxField+1)
 	case "left", "h":
 		if m.reachabilityConfigField == 0 && m.reachabilityProtocolIdx > 0 {
 			m.reachabilityProtocolIdx--

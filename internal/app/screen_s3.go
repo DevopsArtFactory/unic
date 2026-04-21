@@ -124,13 +124,9 @@ func (m Model) updateS3BucketList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterS3Buckets)
 	case "up", "k":
-		if m.s3BucketIdx > 0 {
-			m.s3BucketIdx--
-		}
+		m.s3BucketIdx = previousListIndex(m.s3BucketIdx, len(m.filteredS3Buckets))
 	case "down", "j":
-		if m.s3BucketIdx < len(m.filteredS3Buckets)-1 {
-			m.s3BucketIdx++
-		}
+		m.s3BucketIdx = nextListIndex(m.s3BucketIdx, len(m.filteredS3Buckets))
 	case "/":
 		return m, m.activateFilter(filterS3Buckets)
 	case "enter":
@@ -168,13 +164,9 @@ func (m Model) updateS3ObjectList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		nextPrefix := awsservice.ParentS3Prefix(m.s3CurrentPrefix)
 		return m.startLoading(m.loadS3Objects(m.selectedS3Bucket.Name, nextPrefix))
 	case "up", "k":
-		if m.s3ObjectIdx > 0 {
-			m.s3ObjectIdx--
-		}
+		m.s3ObjectIdx = previousListIndex(m.s3ObjectIdx, len(m.filteredS3Objects))
 	case "down", "j":
-		if m.s3ObjectIdx < len(m.filteredS3Objects)-1 {
-			m.s3ObjectIdx++
-		}
+		m.s3ObjectIdx = nextListIndex(m.s3ObjectIdx, len(m.filteredS3Objects))
 	case "/":
 		return m, m.activateFilter(filterS3Objects)
 	case "enter":

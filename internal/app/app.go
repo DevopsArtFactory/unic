@@ -101,8 +101,10 @@ type Model struct {
 	exitTitle   string
 
 	// Service selection
-	services []domain.Service
-	svcIdx   int
+	services         []domain.Service
+	filteredServices []domain.Service
+	svcIdx           int
+	serviceSort      serviceSortMode
 
 	// Feature selection
 	features []domain.Feature
@@ -357,6 +359,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		screen:                 screenContextPicker,
 		ctxPrevScreen:          screenServiceList,
 		services:               services,
+		filteredServices:       services,
 		inspectorChecklistPath: configuredChecklistPath,
 		inspectorWorkflows:     inspector.Workflows(configuredChecklistPath),
 		loadingSpinner:         newLoadingSpinner(),
@@ -673,26 +676,33 @@ func (m Model) handleSecretMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) updateServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	key := msg.String()
+
+	if cmd, handled := m.updateSharedFilter(msg, filterServices); handled {
+		return m, cmd
+	}
+
+	switch key {
 	case "q":
 		m.quitting = true
 		return m, tea.Quit
 	case "esc":
+		m.resetFilter(filterServices)
 		m.ctxPrevScreen = screenServiceList
 		return m, m.loadContexts()
 	case "up", "k":
-		if m.svcIdx > 0 {
-			m.svcIdx--
-		}
+		m.svcIdx = previousListIndex(m.svcIdx, len(m.serviceList()))
 	case "down", "j":
-		if m.svcIdx < len(m.services)-1 {
-			m.svcIdx++
-		}
+		m.svcIdx = nextListIndex(m.svcIdx, len(m.serviceList()))
+	case "/":
+		return m, m.activateFilter(filterServices)
+	case "s":
+		m.toggleServiceSort()
 	case "i":
 		m.enterInspectorMode()
 	case "enter":
-		if m.svcIdx < len(m.services) {
-			m.features = m.services[m.svcIdx].Features
+		if service, ok := m.selectedService(); ok {
+			m.features = service.Features
 			m.featIdx = 0
 			m.screen = screenFeatureList
 		}
@@ -705,13 +715,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.screen = screenServiceList
 	case "up", "k":
-		if m.featIdx > 0 {
-			m.featIdx--
-		}
+		m.featIdx = previousListIndex(m.featIdx, len(m.features))
 	case "down", "j":
-		if m.featIdx < len(m.features)-1 {
-			m.featIdx++
-		}
+		m.featIdx = nextListIndex(m.featIdx, len(m.features))
 	case "enter":
 		if m.featIdx < len(m.features) {
 			feat := m.features[m.featIdx]
@@ -928,33 +934,44 @@ func (m Model) View() string {
 func (m Model) viewServiceList() string {
 	var b strings.Builder
 	var panel strings.Builder
+	services := m.serviceList()
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Select AWS Service"))
+	b.WriteString("\n")
+	b.WriteString(m.renderFilterValue(filterServices))
 	b.WriteString("\n\n")
 
-	// overhead: status bar (2) + title (1) + blank (1) + list panel (2) + blank (1) + help bar (1) = 8
-	visibleLines := max(m.height-8, 3)
+	// overhead: status bar (2) + title (1) + filter (1) + blank (1) + list panel (2) + blank (1) + help bar (1) = 9
+	visibleLines := max(m.height-9, 3)
 	start := 0
 	if m.svcIdx >= visibleLines {
 		start = m.svcIdx - visibleLines + 1
 	}
-	end := min(start+visibleLines, len(m.services))
+	end := min(start+visibleLines, len(services))
 
-	for i := start; i < end; i++ {
-		svc := m.services[i]
-		cursor := "  "
-		style := normalStyle
-		if i == m.svcIdx {
-			cursor = "> "
-			style = selectedStyle
-		}
-		panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, svc.Name)))
+	if len(services) == 0 {
+		panel.WriteString(dimStyle.Render("  No matching services"))
 		panel.WriteString("\n")
+	} else {
+		for i := start; i < end; i++ {
+			svc := services[i]
+			cursor := "  "
+			style := normalStyle
+			if i == m.svcIdx {
+				cursor = "> "
+				style = selectedStyle
+			}
+			panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, m.renderHighlightedValue(filterServices, string(svc.Name)))))
+			panel.WriteString("\n")
+		}
+
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d services • sort: %s", len(services), len(m.services), m.serviceSortLabel())))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • i: Inspector mode • esc: context • q: quit"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • s: sort • enter: select • i: Inspector mode • esc: context • q: quit"))
 	return b.String()
 }
 
@@ -962,7 +979,11 @@ func (m Model) viewFeatureList() string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
-	svcName := m.services[m.svcIdx].Name
+	svc, ok := m.selectedService()
+	if !ok {
+		return m.viewServiceList()
+	}
+	svcName := svc.Name
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s > Select Feature", svcName)))
 	b.WriteString("\n\n")
 
@@ -1073,13 +1094,9 @@ func (m Model) updateSecretList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterSecrets)
 	case "up", "k":
-		if m.secretIdx > 0 {
-			m.secretIdx--
-		}
+		m.secretIdx = previousListIndex(m.secretIdx, len(m.filteredSecrets))
 	case "down", "j":
-		if m.secretIdx < len(m.filteredSecrets)-1 {
-			m.secretIdx++
-		}
+		m.secretIdx = nextListIndex(m.secretIdx, len(m.filteredSecrets))
 	case "/":
 		return m, m.activateFilter(filterSecrets)
 	case "enter":

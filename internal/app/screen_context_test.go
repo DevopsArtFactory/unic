@@ -86,6 +86,35 @@ func TestContextPickerNavigationUsesTableModel(t *testing.T) {
 	}
 }
 
+func TestContextPickerNavigationWraps(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+	model.ctxIdx = 0
+	model.contextTable.SetCursor(0)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model = updated.(Model)
+	if model.ctxIdx != 2 {
+		t.Fatalf("expected up from first context to wrap to last, got %d", model.ctxIdx)
+	}
+	if model.contextTable.Cursor() != 2 {
+		t.Fatalf("expected table cursor to wrap to last, got %d", model.contextTable.Cursor())
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model = updated.(Model)
+	if model.ctxIdx != 0 {
+		t.Fatalf("expected down from last context to wrap to first, got %d", model.ctxIdx)
+	}
+	if model.contextTable.Cursor() != 0 {
+		t.Fatalf("expected table cursor to wrap to first, got %d", model.contextTable.Cursor())
+	}
+}
+
 func TestContextPickerFilterUpdatesTableRows(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 80

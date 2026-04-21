@@ -1,5 +1,7 @@
 package domain
 
+import "strings"
+
 // AwsService represents an AWS service category.
 type AwsService string
 
@@ -50,4 +52,13 @@ type Feature struct {
 type Service struct {
 	Name     AwsService
 	Features []Feature
+}
+
+// FilterText returns a lowercase string for matching service names and features.
+func (s Service) FilterText() string {
+	parts := []string{string(s.Name)}
+	for _, feature := range s.Features {
+		parts = append(parts, string(feature.Kind), feature.Description)
+	}
+	return strings.ToLower(strings.Join(parts, " "))
 }

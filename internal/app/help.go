@@ -117,6 +117,8 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 	case screenServiceList:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between AWS services"},
+			{"/", "Start filtering services"},
+			{"s", "Toggle service sort order"},
 			{"enter", "Open the selected service"},
 			{"i", "Open Inspector mode"},
 			{"esc", "Open the context picker"},
@@ -667,8 +669,8 @@ func (m Model) helpScreenTitle() string {
 	case screenServiceList:
 		return "Service List"
 	case screenFeatureList:
-		if len(m.services) > 0 && m.svcIdx < len(m.services) {
-			return fmt.Sprintf("%s Feature List", m.services[m.svcIdx].Name)
+		if service, ok := m.selectedService(); ok {
+			return fmt.Sprintf("%s Feature List", service.Name)
 		}
 		return "Feature List"
 	case screenInstanceList:

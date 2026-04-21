@@ -21,13 +21,9 @@ func (m Model) updateVPCList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.vpcIdx = 0
 		m.resetFilter(filterVPCs)
 	case "up", "k":
-		if m.vpcIdx > 0 {
-			m.vpcIdx--
-		}
+		m.vpcIdx = previousListIndex(m.vpcIdx, len(m.filteredVPCs))
 	case "down", "j":
-		if m.vpcIdx < len(m.filteredVPCs)-1 {
-			m.vpcIdx++
-		}
+		m.vpcIdx = nextListIndex(m.vpcIdx, len(m.filteredVPCs))
 	case "/":
 		return m, m.activateFilter(filterVPCs)
 	case "enter":
@@ -51,13 +47,9 @@ func (m Model) updateSubnetList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.subnetIdx = 0
 		m.resetFilter(filterSubnets)
 	case "up", "k":
-		if m.subnetIdx > 0 {
-			m.subnetIdx--
-		}
+		m.subnetIdx = previousListIndex(m.subnetIdx, len(m.filteredSubnets))
 	case "down", "j":
-		if m.subnetIdx < len(m.filteredSubnets)-1 {
-			m.subnetIdx++
-		}
+		m.subnetIdx = nextListIndex(m.subnetIdx, len(m.filteredSubnets))
 	case "/":
 		return m, m.activateFilter(filterSubnets)
 	case "enter":

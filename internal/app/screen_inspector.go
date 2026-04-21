@@ -227,13 +227,9 @@ func (m Model) updateInspectorHome(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.screen = screenServiceList
 	case "up", "k":
-		if m.inspectorWorkflowIdx > 0 {
-			m.inspectorWorkflowIdx--
-		}
+		m.inspectorWorkflowIdx = previousListIndex(m.inspectorWorkflowIdx, len(m.inspectorWorkflows))
 	case "down", "j":
-		if m.inspectorWorkflowIdx < len(m.inspectorWorkflows)-1 {
-			m.inspectorWorkflowIdx++
-		}
+		m.inspectorWorkflowIdx = nextListIndex(m.inspectorWorkflowIdx, len(m.inspectorWorkflows))
 	case "r":
 		if m.currentInspectorWorkflow().Available {
 			return m.startInspectorWorkflow(m.currentInspectorWorkflow().Kind)
@@ -298,13 +294,9 @@ func (m Model) updateInspectorResults(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.selectedInspectorFinding = nil
 		m.screen = screenInspectorHome
 	case "up", "k":
-		if m.inspectorIdx > 0 {
-			m.inspectorIdx--
-		}
+		m.inspectorIdx = previousListIndex(m.inspectorIdx, len(m.inspectorFindings))
 	case "down", "j":
-		if m.inspectorIdx < len(m.inspectorFindings)-1 {
-			m.inspectorIdx++
-		}
+		m.inspectorIdx = nextListIndex(m.inspectorIdx, len(m.inspectorFindings))
 	case "enter":
 		if len(m.inspectorFindings) > 0 && m.inspectorIdx < len(m.inspectorFindings) {
 			selected := m.inspectorFindings[m.inspectorIdx]
@@ -341,12 +333,12 @@ func (m Model) updateInspectorChecklistResults(msg tea.KeyMsg) (tea.Model, tea.C
 	case "l":
 		return m.openChecklistPicker()
 	case "up", "k":
-		if m.inspectorChecklistIdx > 0 {
-			m.inspectorChecklistIdx--
+		if m.inspectorChecklistReport != nil {
+			m.inspectorChecklistIdx = previousListIndex(m.inspectorChecklistIdx, len(m.inspectorChecklistReport.Results))
 		}
 	case "down", "j":
-		if m.inspectorChecklistReport != nil && m.inspectorChecklistIdx < len(m.inspectorChecklistReport.Results)-1 {
-			m.inspectorChecklistIdx++
+		if m.inspectorChecklistReport != nil {
+			m.inspectorChecklistIdx = nextListIndex(m.inspectorChecklistIdx, len(m.inspectorChecklistReport.Results))
 		}
 	case "enter":
 		if m.inspectorChecklistReport != nil && len(m.inspectorChecklistReport.Results) > 0 && m.inspectorChecklistIdx < len(m.inspectorChecklistReport.Results) {
@@ -381,13 +373,9 @@ func (m Model) updateInspectorChecklistPicker(msg tea.KeyMsg) (tea.Model, tea.Cm
 	case "q", "esc":
 		m.screen = screenInspectorHome
 	case "up", "k":
-		if m.inspectorChecklistFileIdx > 0 {
-			m.inspectorChecklistFileIdx--
-		}
+		m.inspectorChecklistFileIdx = previousListIndex(m.inspectorChecklistFileIdx, len(m.filteredChecklistFiles))
 	case "down", "j":
-		if m.inspectorChecklistFileIdx < len(m.filteredChecklistFiles)-1 {
-			m.inspectorChecklistFileIdx++
-		}
+		m.inspectorChecklistFileIdx = nextListIndex(m.inspectorChecklistFileIdx, len(m.filteredChecklistFiles))
 	case "/":
 		return m, m.activateFilter(filterInspectorChecklistFiles)
 	case "enter":

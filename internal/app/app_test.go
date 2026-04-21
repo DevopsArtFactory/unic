@@ -150,14 +150,106 @@ func TestLoadingSpinnerTickUpdatesOnlyOnLoadingScreen(t *testing.T) {
 	}
 }
 
+func TestListIndexHelpersWrapAndClamp(t *testing.T) {
+	if got := previousListIndex(0, 3); got != 2 {
+		t.Fatalf("expected previous from first to wrap to 2, got %d", got)
+	}
+	if got := nextListIndex(2, 3); got != 0 {
+		t.Fatalf("expected next from last to wrap to 0, got %d", got)
+	}
+	if got := previousListIndex(4, 0); got != 0 {
+		t.Fatalf("expected empty previous list to stay 0, got %d", got)
+	}
+	if got := clampListIndex(9, 3); got != 2 {
+		t.Fatalf("expected clamp to last index 2, got %d", got)
+	}
+}
+
 func TestServiceListNavigation(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenServiceList
-	// Press down — should move to index 1 (now 2 services: EC2, VPC)
+
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
 	if model.svcIdx != 1 {
 		t.Errorf("expected svcIdx 1 after pressing j, got %d", model.svcIdx)
+	}
+}
+
+func TestServiceListNavigationWraps(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenServiceList
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model := updated.(Model)
+	if got, want := model.svcIdx, len(model.serviceList())-1; got != want {
+		t.Fatalf("expected up from first service to wrap to %d, got %d", want, got)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model = updated.(Model)
+	if model.svcIdx != 0 {
+		t.Fatalf("expected down from last service to wrap to 0, got %d", model.svcIdx)
+	}
+}
+
+func TestFeatureListNavigationWraps(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFeatureList
+	m.features = []domain.Feature{
+		{Kind: domain.FeatureSSMSession},
+		{Kind: domain.FeatureSecurityGroupBrowser},
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model := updated.(Model)
+	if model.featIdx != 1 {
+		t.Fatalf("expected up from first feature to wrap to last, got %d", model.featIdx)
+	}
+}
+
+func TestServiceListFiltersByFeatureDescription(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenServiceList
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model := updated.(Model)
+	for _, ch := range []rune("long-term") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if got := len(model.filteredServices); got != 1 {
+		t.Fatalf("expected 1 service matching feature description, got %d", got)
+	}
+	if got := model.filteredServices[0].Name; got != domain.ServiceBedrock {
+		t.Fatalf("expected Bedrock to match feature description, got %s", got)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.screen != screenFeatureList {
+		t.Fatalf("expected filtered service enter to open feature list, got %v", model.screen)
+	}
+	if got := model.features[0].Kind; got != domain.FeatureBedrockAPIKeys {
+		t.Fatalf("expected Bedrock feature after filtered enter, got %s", got)
+	}
+}
+
+func TestServiceListSortByName(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenServiceList
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	model := updated.(Model)
+
+	if model.serviceSort != serviceSortName {
+		t.Fatalf("expected service sort mode name, got %v", model.serviceSort)
+	}
+	if got := model.filteredServices[0].Name; got != domain.ServiceBedrock {
+		t.Fatalf("expected Bedrock first in name sort, got %s", got)
 	}
 }
 
@@ -168,6 +260,27 @@ func TestServiceListEnterGoesToFeatures(t *testing.T) {
 	model := updated.(Model)
 	if model.screen != screenFeatureList {
 		t.Errorf("expected feature list screen, got %d", model.screen)
+	}
+}
+
+func TestRDSListNavigationWraps(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenRDSList
+	m.filteredRDS = []awsservice.RDSInstance{
+		{DBInstanceID: "db-a"},
+		{DBInstanceID: "db-b"},
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model := updated.(Model)
+	if model.rdsIdx != 1 {
+		t.Fatalf("expected up from first RDS instance to wrap to last, got %d", model.rdsIdx)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model = updated.(Model)
+	if model.rdsIdx != 0 {
+		t.Fatalf("expected down from last RDS instance to wrap to first, got %d", model.rdsIdx)
 	}
 }
 

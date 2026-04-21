@@ -257,13 +257,9 @@ func (cw *cloudWatchLogsModel) updateGroupList(m *Model, msg tea.KeyMsg) (tea.Mo
 		m.screen = screenFeatureList
 		m.resetFilter(filterCWLogGroups)
 	case "up", "k":
-		if cw.groupIdx > 0 {
-			cw.groupIdx--
-		}
+		cw.groupIdx = previousListIndex(cw.groupIdx, len(cw.filteredGroups))
 	case "down", "j":
-		if cw.groupIdx < len(cw.filteredGroups)-1 {
-			cw.groupIdx++
-		}
+		cw.groupIdx = nextListIndex(cw.groupIdx, len(cw.filteredGroups))
 	case "/":
 		return *m, m.activateFilter(filterCWLogGroups)
 	case "n":
@@ -371,13 +367,9 @@ func (cw *cloudWatchLogsModel) updateStreamList(m *Model, msg tea.KeyMsg) (tea.M
 		}
 		m.resetFilter(filterCWLogStreams)
 	case "up", "k":
-		if cw.streamIdx > 0 {
-			cw.streamIdx--
-		}
+		cw.streamIdx = previousListIndex(cw.streamIdx, len(cw.filteredStreams))
 	case "down", "j":
-		if cw.streamIdx < len(cw.filteredStreams)-1 {
-			cw.streamIdx++
-		}
+		cw.streamIdx = nextListIndex(cw.streamIdx, len(cw.filteredStreams))
 	case "/":
 		return *m, m.activateFilter(filterCWLogStreams)
 	case "n":

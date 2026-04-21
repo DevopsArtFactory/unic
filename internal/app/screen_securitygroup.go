@@ -174,13 +174,9 @@ func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterSecurityGroups)
 	case "up", "k":
-		if m.sgIdx > 0 {
-			m.sgIdx--
-		}
+		m.sgIdx = previousListIndex(m.sgIdx, len(m.filteredSecurityGroups))
 	case "down", "j":
-		if m.sgIdx < len(m.filteredSecurityGroups)-1 {
-			m.sgIdx++
-		}
+		m.sgIdx = nextListIndex(m.sgIdx, len(m.filteredSecurityGroups))
 	case "/":
 		return m, m.activateFilter(filterSecurityGroups)
 	case "r":
@@ -265,14 +261,9 @@ func (m Model) updateSecurityGroupDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.sgRuleIdx = 0
 	case "up", "k":
-		if m.sgRuleIdx > 0 {
-			m.sgRuleIdx--
-		}
+		m.sgRuleIdx = previousListIndex(m.sgRuleIdx, len(m.activeRules()))
 	case "down", "j":
-		rules := m.activeRules()
-		if m.sgRuleIdx < len(rules)-1 {
-			m.sgRuleIdx++
-		}
+		m.sgRuleIdx = nextListIndex(m.sgRuleIdx, len(m.activeRules()))
 	case "a":
 		m.sgAddField = 0
 		m.sgAddValues = map[string]string{}
@@ -414,13 +405,9 @@ func (m Model) updateSGAddSelect(key string, options []string) (tea.Model, tea.C
 	case "esc":
 		m.screen = screenSecurityGroupDetail
 	case "up", "k":
-		if m.sgAddSelectIdx > 0 {
-			m.sgAddSelectIdx--
-		}
+		m.sgAddSelectIdx = previousListIndex(m.sgAddSelectIdx, len(options))
 	case "down", "j":
-		if m.sgAddSelectIdx < len(options)-1 {
-			m.sgAddSelectIdx++
-		}
+		m.sgAddSelectIdx = nextListIndex(m.sgAddSelectIdx, len(options))
 	case "enter":
 		fieldKey := strings.ToLower(sgAddFieldLabels[m.sgAddField])
 		if m.sgAddField == 0 {

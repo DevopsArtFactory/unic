@@ -210,13 +210,9 @@ func (cw *cloudWatchMetricsModel) updateMetricList(m *Model, msg tea.KeyMsg) (te
 		m.screen = screenFeatureList
 		m.resetFilter(filterCWMetrics)
 	case "up", "k":
-		if cw.metricIdx > 0 {
-			cw.metricIdx--
-		}
+		cw.metricIdx = previousListIndex(cw.metricIdx, len(cw.filteredCWMetrics))
 	case "down", "j":
-		if cw.metricIdx < len(cw.filteredCWMetrics)-1 {
-			cw.metricIdx++
-		}
+		cw.metricIdx = nextListIndex(cw.metricIdx, len(cw.filteredCWMetrics))
 	case "/":
 		return *m, m.activateFilter(filterCWMetrics)
 	case "r":
