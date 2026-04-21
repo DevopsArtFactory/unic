@@ -15,6 +15,8 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
+var ensureSSOLoginFn = awsservice.EnsureSSOLogin
+
 // PostSwitch performs the auth action after switching to a context.
 // Returns a human-readable status message.
 func PostSwitch(cfg *config.Config) (string, error) {
@@ -50,11 +52,15 @@ func PostSwitch(cfg *config.Config) (string, error) {
 }
 
 func postSwitchSSO(cfg *config.Config) (string, error) {
-	uniclog.Debug("auth", "starting SSO login", "sso_start_url", cfg.SSOStartURL)
-	if err := awsservice.RunSSOLogin(cfg); err != nil {
+	uniclog.Debug("auth", "ensuring SSO login", "sso_start_url", cfg.SSOStartURL)
+	result, err := ensureSSOLoginFn(cfg)
+	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("SSO login complete for %s (account: %s, role: %s)", cfg.SSOStartURL, cfg.SSOAccountID, cfg.SSORoleName), nil
+	if result.Refreshed {
+		return fmt.Sprintf("SSO login refreshed for %s (account: %s, role: %s)", result.StartURL, cfg.SSOAccountID, cfg.SSORoleName), nil
+	}
+	return fmt.Sprintf("SSO session active for %s (cached; account: %s, role: %s)", result.StartURL, cfg.SSOAccountID, cfg.SSORoleName), nil
 }
 
 func postSwitchCredential(cfg *config.Config) (string, error) {

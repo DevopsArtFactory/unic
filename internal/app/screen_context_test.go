@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -377,6 +378,118 @@ contexts:
 	}
 	if cfg.ContextName != "prod" {
 		t.Fatalf("expected current context to remain prod, got %q", cfg.ContextName)
+	}
+}
+
+func TestSwitchContextSSOReusesCachedSessionWithoutLoginCommand(t *testing.T) {
+	path := writeContextConfig(t, `
+current: dev-sso
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev-sso
+    auth_type: sso
+    sso_start_url: https://example.awsapps.com/start
+    sso_account_id: "123456789012"
+    sso_role_name: AdministratorAccess
+    region: us-east-1
+`)
+
+	origCheck := contextCheckSSOSessionFn
+	origBuildLogin := contextBuildSSOLoginCmdFn
+	origFinalize := contextFinalizeSwitchFn
+	defer func() {
+		contextCheckSSOSessionFn = origCheck
+		contextBuildSSOLoginCmdFn = origBuildLogin
+		contextFinalizeSwitchFn = origFinalize
+	}()
+
+	checkCalled := false
+	buildCalled := false
+	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
+		checkCalled = true
+		return awsservice.SSOSessionCheck{StartURL: cfg.SSOStartURL}, nil
+	}
+	contextBuildSSOLoginCmdFn = func(*config.Config) (*exec.Cmd, func(), error) {
+		buildCalled = true
+		return exec.Command("true"), func() {}, nil
+	}
+	contextFinalizeSwitchFn = func(m Model) tea.Cmd {
+		return func() tea.Msg {
+			return contextSwitchedMsg{
+				cfg: &config.Config{
+					ContextName: "dev-sso",
+					AuthType:    config.AuthTypeSSO,
+					Region:      "us-east-1",
+				},
+			}
+		}
+	}
+
+	m := New(testConfig(), path, "dev")
+	msg := m.switchContext("dev-sso")()
+	if _, ok := msg.(contextSwitchedMsg); !ok {
+		t.Fatalf("expected cached SSO context to finalize immediately, got %T", msg)
+	}
+	if !checkCalled {
+		t.Fatal("expected SSO session cache check")
+	}
+	if buildCalled {
+		t.Fatal("expected valid cached SSO session to skip login command")
+	}
+}
+
+func TestSwitchContextSSORunsLoginWhenCacheMissing(t *testing.T) {
+	path := writeContextConfig(t, `
+current: dev-sso
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev-sso
+    auth_type: sso
+    sso_start_url: https://example.awsapps.com/start
+    sso_account_id: "123456789012"
+    sso_role_name: AdministratorAccess
+    region: us-east-1
+`)
+
+	origCheck := contextCheckSSOSessionFn
+	origBuildLogin := contextBuildSSOLoginCmdFn
+	origFinalize := contextFinalizeSwitchFn
+	defer func() {
+		contextCheckSSOSessionFn = origCheck
+		contextBuildSSOLoginCmdFn = origBuildLogin
+		contextFinalizeSwitchFn = origFinalize
+	}()
+
+	buildCalled := false
+	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
+		return awsservice.SSOSessionCheck{
+			StartURL:      cfg.SSOStartURL,
+			LoginRequired: true,
+		}, nil
+	}
+	contextBuildSSOLoginCmdFn = func(*config.Config) (*exec.Cmd, func(), error) {
+		buildCalled = true
+		return exec.Command("true"), func() {}, nil
+	}
+	contextFinalizeSwitchFn = func(Model) tea.Cmd {
+		return func() tea.Msg {
+			t.Fatal("SSO context should not finalize before login completes")
+			return nil
+		}
+	}
+
+	m := New(testConfig(), path, "dev")
+	msg := m.switchContext("dev-sso")()
+	if _, ok := msg.(contextSwitchedMsg); ok {
+		t.Fatal("SSO context should not finalize before login command runs")
+	}
+	if _, ok := msg.(ssoLoginDoneMsg); ok {
+		t.Fatal("SSO login command should be handed to Bubble Tea before completion")
+	}
+	if !buildCalled {
+		t.Fatal("expected login command to be built when cache is missing")
 	}
 }
 

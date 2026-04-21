@@ -176,7 +176,7 @@ contexts:
 | `credential` | Use shared AWS profile credentials | `profile` |
 | `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
 | `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
-| `sso` | Use AWS IAM Identity Center / SSO | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
+| `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
 
 Optional context fields:
 

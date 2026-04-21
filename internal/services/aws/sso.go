@@ -44,6 +44,8 @@ var newSSOClient = func(cfg aws.Config) SSOClientAPI {
 	return sso.NewFromConfig(cfg)
 }
 
+var runSSOLoginFn = RunSSOLogin
+
 // ssoTokenCache represents the cached SSO token file structure.
 type ssoTokenCache struct {
 	AccessToken string `json:"accessToken"`
@@ -52,22 +54,23 @@ type ssoTokenCache struct {
 	StartURL    string `json:"startUrl"`
 }
 
+// SSOSessionCheck describes whether a cached AWS CLI SSO session can be reused.
+type SSOSessionCheck struct {
+	StartURL      string
+	LoginRequired bool
+}
+
+// SSOLoginResult describes whether EnsureSSOLogin reused cache or refreshed login.
+type SSOLoginResult struct {
+	StartURL  string
+	Refreshed bool
+}
+
 // resolveSSOCredentials handles SSO authentication and returns an aws.Config with SSO credentials.
 func resolveSSOCredentials(ctx context.Context, cfg *config.Config) (aws.Config, error) {
-	startURL, err := resolveSSOStartURL(cfg)
+	token, err := ensureSSOToken(cfg)
 	if err != nil {
 		return aws.Config{}, err
-	}
-	token, err := loadSSOToken(startURL)
-	if err != nil || isTokenExpired(token) {
-		// Token missing or expired — run aws sso login
-		if err := RunSSOLogin(cfg); err != nil {
-			return aws.Config{}, fmt.Errorf("SSO login failed: %w", err)
-		}
-		token, err = loadSSOToken(startURL)
-		if err != nil {
-			return aws.Config{}, fmt.Errorf("failed to read SSO token after login: %w", err)
-		}
 	}
 
 	// Use the SSO token to get role credentials
@@ -101,6 +104,18 @@ func ResolveSSOCredentials(ctx context.Context, cfg *config.Config) (aws.Config,
 	return resolveSSOCredentials(ctx, cfg)
 }
 
+// CheckSSOSession reports whether the AWS CLI SSO token cache can be reused.
+func CheckSSOSession(cfg *config.Config) (SSOSessionCheck, error) {
+	_, check, err := checkSSOToken(cfg)
+	return check, err
+}
+
+// EnsureSSOLogin reuses a valid cached AWS CLI SSO token or runs login if needed.
+func EnsureSSOLogin(cfg *config.Config) (SSOLoginResult, error) {
+	_, result, err := ensureSSOTokenWithResult(cfg)
+	return result, err
+}
+
 // loadSSOToken reads the cached SSO token for the given start URL.
 func loadSSOToken(startURL string) (*ssoTokenCache, error) {
 	cacheDir, err := ssoTokenCacheDir()
@@ -126,23 +141,48 @@ func loadSSOToken(startURL string) (*ssoTokenCache, error) {
 	return &token, nil
 }
 
-func ensureSSOToken(cfg *config.Config) (*ssoTokenCache, error) {
+func checkSSOToken(cfg *config.Config) (*ssoTokenCache, SSOSessionCheck, error) {
 	startURL, err := resolveSSOStartURL(cfg)
 	if err != nil {
-		return nil, err
+		return nil, SSOSessionCheck{}, err
 	}
+	check := SSOSessionCheck{StartURL: startURL}
 	token, err := loadSSOToken(startURL)
 	if err == nil && !isTokenExpired(token) {
-		return token, nil
+		return token, check, nil
 	}
-	if err := RunSSOLogin(cfg); err != nil {
-		return nil, fmt.Errorf("SSO login failed: %w", err)
-	}
-	token, err = loadSSOToken(startURL)
+
+	check.LoginRequired = true
+	return nil, check, nil
+}
+
+func ensureSSOToken(cfg *config.Config) (*ssoTokenCache, error) {
+	token, _, err := ensureSSOTokenWithResult(cfg)
+	return token, err
+}
+
+func ensureSSOTokenWithResult(cfg *config.Config) (*ssoTokenCache, SSOLoginResult, error) {
+	token, check, err := checkSSOToken(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read SSO token after login: %w", err)
+		return nil, SSOLoginResult{}, err
 	}
-	return token, nil
+	result := SSOLoginResult{StartURL: check.StartURL}
+	if !check.LoginRequired {
+		return token, result, nil
+	}
+
+	if err := runSSOLoginFn(cfg); err != nil {
+		return nil, SSOLoginResult{}, fmt.Errorf("SSO login failed: %w", err)
+	}
+	token, err = loadSSOToken(check.StartURL)
+	if err != nil {
+		return nil, SSOLoginResult{}, fmt.Errorf("failed to read SSO token after login: %w", err)
+	}
+	if isTokenExpired(token) {
+		return nil, SSOLoginResult{}, fmt.Errorf("SSO token is still expired after login")
+	}
+	result.Refreshed = true
+	return token, result, nil
 }
 
 // ListSSOAccounts lists accessible AWS accounts for the configured SSO start URL.
