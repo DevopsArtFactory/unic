@@ -11,6 +11,10 @@ func Catalog() []Service {
 					Description: "Start an SSM session to an EC2 instance",
 				},
 				{
+					Kind:        FeatureEC2InstanceBrowser,
+					Description: "Browse EC2 instances and inspect instance metadata",
+				},
+				{
 					Kind:        FeatureSecurityGroupBrowser,
 					Description: "Browse security groups and view inbound/outbound rules",
 				},

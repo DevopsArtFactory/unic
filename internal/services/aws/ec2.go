@@ -50,25 +50,37 @@ func (r *AwsRepository) ListRunningInstances(ctx context.Context) ([]EC2Instance
 
 		for _, reservation := range page.Reservations {
 			for _, inst := range reservation.Instances {
-				instances = append(instances, EC2Instance{
-					InstanceID: derefString(inst.InstanceId),
-					Name:       extractNameTag(inst.Tags),
-					PrivateIP:  derefString(inst.PrivateIpAddress),
-					State:      string(inst.State.Name),
-				})
+				instances = append(instances, ec2InstanceFromSDK(inst))
 			}
 		}
 	}
 
-	sort.Slice(instances, func(i, j int) bool {
-		left := normalizedSortKey(instances[i].Name, instances[i].InstanceID)
-		right := normalizedSortKey(instances[j].Name, instances[j].InstanceID)
-		if left == right {
-			return instances[i].InstanceID < instances[j].InstanceID
-		}
-		return left < right
-	})
+	sortEC2Instances(instances)
 
+	return instances, nil
+}
+
+// ListEC2Instances returns EC2 instances in the current account/region across states.
+func (r *AwsRepository) ListEC2Instances(ctx context.Context) ([]EC2Instance, error) {
+	uniclog.Debug("aws", "ListEC2Instances called")
+
+	var instances []EC2Instance
+	paginator := ec2.NewDescribeInstancesPaginator(r.EC2Client, &ec2.DescribeInstancesInput{})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, reservation := range page.Reservations {
+			for _, inst := range reservation.Instances {
+				instances = append(instances, ec2InstanceFromSDK(inst))
+			}
+		}
+	}
+
+	sortEC2Instances(instances)
 	return instances, nil
 }
 
@@ -109,6 +121,64 @@ func extractNameTag(tags []types.Tag) string {
 		}
 	}
 	return "Unknown"
+}
+
+func ec2InstanceFromSDK(inst types.Instance) EC2Instance {
+	instance := EC2Instance{
+		InstanceID:      derefString(inst.InstanceId),
+		Name:            extractNameTag(inst.Tags),
+		PrivateIP:       derefString(inst.PrivateIpAddress),
+		PublicIP:        derefString(inst.PublicIpAddress),
+		VPCID:           derefString(inst.VpcId),
+		SubnetID:        derefString(inst.SubnetId),
+		InstanceType:    string(inst.InstanceType),
+		State:           ec2InstanceStateName(inst.State),
+		PlatformDetails: derefString(inst.PlatformDetails),
+		Tags:            tagsToMap(inst.Tags),
+	}
+	if inst.Placement != nil {
+		instance.AvailabilityZone = derefString(inst.Placement.AvailabilityZone)
+	}
+	if inst.LaunchTime != nil {
+		instance.LaunchTime = *inst.LaunchTime
+	}
+	if inst.IamInstanceProfile != nil {
+		instance.IAMProfile = derefString(inst.IamInstanceProfile.Arn)
+	}
+	return instance
+}
+
+func ec2InstanceStateName(state *types.InstanceState) string {
+	if state == nil {
+		return ""
+	}
+	return string(state.Name)
+}
+
+func tagsToMap(tags []types.Tag) map[string]string {
+	if len(tags) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(tags))
+	for _, tag := range tags {
+		key := derefString(tag.Key)
+		if key == "" {
+			continue
+		}
+		out[key] = derefString(tag.Value)
+	}
+	return out
+}
+
+func sortEC2Instances(instances []EC2Instance) {
+	sort.Slice(instances, func(i, j int) bool {
+		left := normalizedSortKey(instances[i].Name, instances[i].InstanceID)
+		right := normalizedSortKey(instances[j].Name, instances[j].InstanceID)
+		if left == right {
+			return instances[i].InstanceID < instances[j].InstanceID
+		}
+		return left < right
+	})
 }
 
 func derefString(s *string) string {

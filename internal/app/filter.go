@@ -11,6 +11,7 @@ const (
 	filterNone filterTarget = iota
 	filterServices
 	filterInstances
+	filterEC2BrowserInstances
 	filterSubnetIPs
 	filterRDS
 	filterRoute53Zones

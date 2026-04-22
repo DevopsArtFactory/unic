@@ -330,6 +330,148 @@ func TestRDSListNavigationWraps(t *testing.T) {
 	}
 }
 
+// --- EC2 instance browser tests ---
+
+func TestFeatureListEC2InstanceBrowserGoesToLoading(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFeatureList
+	m.features = []domain.Feature{
+		{Kind: domain.FeatureEC2InstanceBrowser, Description: "Browse EC2 instances"},
+	}
+	m.featIdx = 0
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Error("expected a command to load EC2 instances")
+	}
+}
+
+func TestEC2BrowserInstancesLoadedMsg(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+
+	instances := []awsservice.EC2Instance{
+		{InstanceID: "i-1", Name: "app-a", State: "running", InstanceType: "t3.micro"},
+	}
+	updated, _ := m.Update(ec2BrowserInstancesLoadedMsg{instances: instances})
+	model := updated.(Model)
+	if model.screen != screenEC2InstanceBrowserList {
+		t.Errorf("expected EC2 browser list screen, got %d", model.screen)
+	}
+	if len(model.ec2Browser.instances) != 1 {
+		t.Errorf("expected 1 instance, got %d", len(model.ec2Browser.instances))
+	}
+}
+
+func TestEC2BrowserListNavigationWraps(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenEC2InstanceBrowserList
+	m.ec2Browser.filtered = []awsservice.EC2Instance{
+		{InstanceID: "i-a"},
+		{InstanceID: "i-b"},
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model := updated.(Model)
+	if model.ec2Browser.idx != 1 {
+		t.Fatalf("expected up from first EC2 instance to wrap to last, got %d", model.ec2Browser.idx)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model = updated.(Model)
+	if model.ec2Browser.idx != 0 {
+		t.Fatalf("expected down from last EC2 instance to wrap to first, got %d", model.ec2Browser.idx)
+	}
+}
+
+func TestEC2BrowserListFilter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenEC2InstanceBrowserList
+	m.ec2Browser.instances = []awsservice.EC2Instance{
+		{InstanceID: "i-prod", Name: "prod-web", State: "running", InstanceType: "t3.micro"},
+		{InstanceID: "i-dev", Name: "dev-web", State: "stopped", InstanceType: "t3.small"},
+	}
+	m.ec2Browser.filtered = m.ec2Browser.instances
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model := updated.(Model)
+	for _, ch := range []rune("prod") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+
+	if len(model.ec2Browser.filtered) != 1 {
+		t.Errorf("expected 1 filtered instance, got %d", len(model.ec2Browser.filtered))
+	}
+	if model.ec2Browser.filtered[0].InstanceID != "i-prod" {
+		t.Errorf("expected i-prod, got %q", model.ec2Browser.filtered[0].InstanceID)
+	}
+}
+
+func TestEC2BrowserListEnterGoesToDetail(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenEC2InstanceBrowserList
+	m.ec2Browser.instances = []awsservice.EC2Instance{
+		{InstanceID: "i-1", Name: "app-a"},
+	}
+	m.ec2Browser.filtered = m.ec2Browser.instances
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenEC2InstanceBrowserDetail {
+		t.Errorf("expected EC2 browser detail screen, got %d", model.screen)
+	}
+	if model.ec2Browser.selected == nil {
+		t.Error("ec2Browser.selected should not be nil")
+	}
+}
+
+func TestEC2BrowserDetailViewShowsMetadata(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenEC2InstanceBrowserDetail
+	m.ec2Browser.selected = &awsservice.EC2Instance{
+		InstanceID:       "i-123",
+		Name:             "prod-web",
+		State:            "running",
+		InstanceType:     "m6i.large",
+		AvailabilityZone: "us-east-1a",
+		VPCID:            "vpc-123",
+		SubnetID:         "subnet-123",
+		PrivateIP:        "10.0.0.10",
+		PublicIP:         "203.0.113.10",
+		LaunchTime:       time.Date(2026, 4, 22, 12, 30, 0, 0, time.UTC),
+		PlatformDetails:  "Linux/UNIX",
+		IAMProfile:       "arn:aws:iam::123456789012:instance-profile/app",
+		Tags:             map[string]string{"Environment": "prod"},
+	}
+
+	view := m.View()
+	for _, want := range []string{
+		"EC2 Instance Detail",
+		"i-123",
+		"prod-web",
+		"running",
+		"m6i.large",
+		"us-east-1a",
+		"vpc-123",
+		"subnet-123",
+		"10.0.0.10",
+		"203.0.113.10",
+		"Linux/UNIX",
+		"instance-profile/app",
+		"Environment",
+		"prod",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected EC2 detail view to contain %q, got %q", want, view)
+		}
+	}
+}
+
 func TestReachabilityFeatureOpensRegionSelection(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenFeatureList

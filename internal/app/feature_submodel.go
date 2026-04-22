@@ -10,5 +10,5 @@ type featureSubmodel interface {
 }
 
 func (m *Model) featureSubmodels() []featureSubmodel {
-	return []featureSubmodel{&m.cwMetrics, &m.cwLogs, &m.rds, &m.bedrock}
+	return []featureSubmodel{&m.ec2Browser, &m.cwMetrics, &m.cwLogs, &m.rds, &m.bedrock}
 }
