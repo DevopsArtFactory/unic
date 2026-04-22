@@ -94,6 +94,12 @@ eval "$(unic env prod-admin)"
 # Interactively choose/setup a context and copy exports to clipboard
 unic context setup
 
+# Print an ECR login command for the current context
+unic ecr login
+
+# Copy a Podman ECR login command to the clipboard
+unic ecr login --runtime podman --copy
+
 # Set a display order for a context
 unic context order prod-admin 10
 
@@ -106,6 +112,7 @@ unic context unset
 
 `unic context setup` writes its prompts to `stderr` and copies the generated shell commands to the clipboard.
 `unic env` prints shell commands to `stdout` so it can be used with `eval`.
+`unic ecr login` prints a machine-usable container registry login command to `stdout` and can optionally copy it to the clipboard with `--copy`.
 Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the TUI can show which shell context is currently active.
 Contexts can be prioritized in the setup picker with an `order` field in config.
 In the CLI `unic context setup` flow, the picker now filters contexts, SSO accounts, and SSO roles as you type, with arrow-key navigation and Enter to confirm.
@@ -216,6 +223,7 @@ Context ordering:
 | Secrets Manager | Secrets Browser |
 | CloudWatch | Metrics Viewer |
 | CloudWatch Logs | Logs Browser |
+| ECR | ECR Login Helper |
 | ECS | ECS Browser & Exec |
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
@@ -327,6 +335,7 @@ checks:
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
 | CloudWatch Metrics | preset-driven metric list/detail flow, `/` filter, `space` select related series, `g` preset cycle, `t/p/s` range-period-stat controls, `r` refresh, in-terminal single-series and comparison charts |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
+| ECR Login | CLI helper: `unic ecr login [--runtime docker|podman] [--copy]` |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
