@@ -118,7 +118,6 @@ func (em ec2InstanceBrowserModel) loadInstances(m Model) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		m.awsRepo = repo
 
 		instances, err := repo.ListEC2Instances(ctx)
 		if err != nil {
