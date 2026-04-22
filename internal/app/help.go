@@ -196,25 +196,25 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"r", "Refresh the selected instance status"},
 			{"q / esc", "Go back to the instance list"},
 		}
-		if m.selectedRDS != nil && m.selectedRDS.CanStart() {
+		if m.rds.selected != nil && m.rds.selected.CanStart() {
 			shortcuts = append([]helpShortcut{{"s", "Start the selected instance or cluster"}}, shortcuts...)
 		}
-		if m.selectedRDS != nil && m.selectedRDS.CanStop() {
+		if m.rds.selected != nil && m.rds.selected.CanStop() {
 			shortcuts = append([]helpShortcut{{"x", "Stop the selected instance or cluster"}}, shortcuts...)
 		}
-		if m.selectedRDS != nil && m.selectedRDS.CanFailover() {
+		if m.rds.selected != nil && m.rds.selected.CanFailover() {
 			shortcuts = append([]helpShortcut{{"f", "Trigger failover for the selected instance or cluster"}}, shortcuts...)
 		}
 		return shortcuts
 	case screenRDSConfirm:
-		if m.rdsAction == "start" {
+		if m.rds.action == "start" {
 			return []helpShortcut{
 				{"y / enter", "Confirm the start action"},
 				{"n / esc", "Cancel and return to the detail screen"},
 			}
 		}
 		target := "instance identifier"
-		if m.selectedRDS != nil && m.selectedRDS.IsClusterMember() {
+		if m.rds.selected != nil && m.rds.selected.IsClusterMember() {
 			target = "cluster identifier"
 		}
 		return []helpShortcut{

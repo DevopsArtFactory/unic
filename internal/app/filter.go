@@ -164,9 +164,6 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 		m.instIdx = 0
 	case filterSubnetIPs:
 		m.applyIPFilter()
-	case filterRDS:
-		m.filteredRDS = applyFilter(m.rdsInstances, m.filterValue(target))
-		m.rdsIdx = 0
 	case filterRoute53Zones:
 		m.filteredRoute53Zones = applyFilter(m.route53Zones, m.filterValue(target))
 		m.route53ZoneIdx = 0

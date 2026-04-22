@@ -312,21 +312,21 @@ func TestServiceListEnterGoesToFeatures(t *testing.T) {
 func TestRDSListNavigationWraps(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
-	m.filteredRDS = []awsservice.RDSInstance{
+	m.rds.filtered = []awsservice.RDSInstance{
 		{DBInstanceID: "db-a"},
 		{DBInstanceID: "db-b"},
 	}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 	model := updated.(Model)
-	if model.rdsIdx != 1 {
-		t.Fatalf("expected up from first RDS instance to wrap to last, got %d", model.rdsIdx)
+	if model.rds.idx != 1 {
+		t.Fatalf("expected up from first RDS instance to wrap to last, got %d", model.rds.idx)
 	}
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model = updated.(Model)
-	if model.rdsIdx != 0 {
-		t.Fatalf("expected down from last RDS instance to wrap to first, got %d", model.rdsIdx)
+	if model.rds.idx != 0 {
+		t.Fatalf("expected down from last RDS instance to wrap to first, got %d", model.rds.idx)
 	}
 }
 
@@ -437,7 +437,7 @@ func TestHelpBlocksNavigationWhileOpen(t *testing.T) {
 func TestHelpViewShowsContextAwareRDSActions(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{
+	m.rds.selected = &awsservice.RDSInstance{
 		DBInstanceID:  "db-1",
 		Status:        "available",
 		MultiAZ:       true,
@@ -485,50 +485,50 @@ func TestHelpViewShowsFilterModeShortcuts(t *testing.T) {
 func TestRDSListNavigation(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
-	m.rdsInstances = []awsservice.RDSInstance{
+	m.rds.instances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
 		{DBInstanceID: "db-2", Engine: "postgres", Status: "stopped", InstanceClass: "db.t3.small"},
 	}
-	m.filteredRDS = m.rdsInstances
+	m.rds.filtered = m.rds.instances
 
 	// Press down
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
-	if model.rdsIdx != 1 {
-		t.Errorf("expected rdsIdx 1 after pressing j, got %d", model.rdsIdx)
+	if model.rds.idx != 1 {
+		t.Errorf("expected rds.idx 1 after pressing j, got %d", model.rds.idx)
 	}
 
 	// Press up
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 	model = updated.(Model)
-	if model.rdsIdx != 0 {
-		t.Errorf("expected rdsIdx 0 after pressing k, got %d", model.rdsIdx)
+	if model.rds.idx != 0 {
+		t.Errorf("expected rds.idx 0 after pressing k, got %d", model.rds.idx)
 	}
 }
 
 func TestRDSListEnterGoesToDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
-	m.rdsInstances = []awsservice.RDSInstance{
+	m.rds.instances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
 	}
-	m.filteredRDS = m.rdsInstances
+	m.rds.filtered = m.rds.instances
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 	if model.screen != screenRDSDetail {
 		t.Errorf("expected RDS detail screen, got %d", model.screen)
 	}
-	if model.selectedRDS == nil {
-		t.Error("selectedRDS should not be nil")
+	if model.rds.selected == nil {
+		t.Error("rds.selected should not be nil")
 	}
 }
 
 func TestRDSListEscGoesBack(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
-	m.rdsInstances = []awsservice.RDSInstance{}
-	m.filteredRDS = m.rdsInstances
+	m.rds.instances = []awsservice.RDSInstance{}
+	m.rds.filtered = m.rds.instances
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
@@ -540,7 +540,7 @@ func TestRDSListEscGoesBack(t *testing.T) {
 func TestRDSDetailEscGoesBack(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available"}
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available"}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
@@ -552,52 +552,52 @@ func TestRDSDetailEscGoesBack(t *testing.T) {
 func TestRDSDetailStopGoesToConfirm(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: ""}
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: ""}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	model := updated.(Model)
 	if model.screen != screenRDSConfirm {
 		t.Errorf("expected confirm screen, got %d", model.screen)
 	}
-	if model.rdsAction != "stop" {
-		t.Errorf("expected action 'stop', got %q", model.rdsAction)
+	if model.rds.action != "stop" {
+		t.Errorf("expected action 'stop', got %q", model.rds.action)
 	}
 }
 
 func TestRDSDetailStartGoesToConfirm(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "stopped"}
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "stopped"}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	model := updated.(Model)
 	if model.screen != screenRDSConfirm {
 		t.Errorf("expected confirm screen, got %d", model.screen)
 	}
-	if model.rdsAction != "start" {
-		t.Errorf("expected action 'start', got %q", model.rdsAction)
+	if model.rds.action != "start" {
+		t.Errorf("expected action 'start', got %q", model.rds.action)
 	}
 }
 
 func TestRDSDetailFailoverGoesToConfirm(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", MultiAZ: true}
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", MultiAZ: true}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
 	model := updated.(Model)
 	if model.screen != screenRDSConfirm {
 		t.Errorf("expected confirm screen, got %d", model.screen)
 	}
-	if model.rdsAction != "failover" {
-		t.Errorf("expected action 'failover', got %q", model.rdsAction)
+	if model.rds.action != "failover" {
+		t.Errorf("expected action 'failover', got %q", model.rds.action)
 	}
 }
 
 func TestRDSDetailStopClusterMember(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: "my-cluster"}
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: "my-cluster"}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	model := updated.(Model)
@@ -605,8 +605,8 @@ func TestRDSDetailStopClusterMember(t *testing.T) {
 	if model.screen != screenRDSConfirm {
 		t.Errorf("expected confirm screen for cluster stop, got %d", model.screen)
 	}
-	if model.rdsAction != "stop" {
-		t.Errorf("expected action 'stop', got %q", model.rdsAction)
+	if model.rds.action != "stop" {
+		t.Errorf("expected action 'stop', got %q", model.rds.action)
 	}
 }
 
@@ -614,8 +614,8 @@ func TestRDSConfirmNoGoesBack(t *testing.T) {
 	// For start action, 'n' cancels back to detail
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
-	m.rdsAction = "start"
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1"}
+	m.rds.action = "start"
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	model := updated.(Model)
@@ -627,8 +627,8 @@ func TestRDSConfirmNoGoesBack(t *testing.T) {
 func TestRDSConfirmEscGoesBack(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
-	m.rdsAction = "stop"
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1"}
+	m.rds.action = "stop"
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
@@ -640,11 +640,11 @@ func TestRDSConfirmEscGoesBack(t *testing.T) {
 func TestRDSListFilter(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
-	m.rdsInstances = []awsservice.RDSInstance{
+	m.rds.instances = []awsservice.RDSInstance{
 		{DBInstanceID: "prod-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
 		{DBInstanceID: "dev-db", Engine: "postgres", Status: "stopped", InstanceClass: "db.t3.small"},
 	}
-	m.filteredRDS = m.rdsInstances
+	m.rds.filtered = m.rds.instances
 
 	// Activate filter
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
@@ -659,23 +659,23 @@ func TestRDSListFilter(t *testing.T) {
 		model = updated.(Model)
 	}
 
-	if len(model.filteredRDS) != 1 {
-		t.Errorf("expected 1 filtered instance, got %d", len(model.filteredRDS))
+	if len(model.rds.filtered) != 1 {
+		t.Errorf("expected 1 filtered instance, got %d", len(model.rds.filtered))
 	}
-	if model.filteredRDS[0].DBInstanceID != "prod-db" {
-		t.Errorf("expected 'prod-db', got %q", model.filteredRDS[0].DBInstanceID)
+	if model.rds.filtered[0].DBInstanceID != "prod-db" {
+		t.Errorf("expected 'prod-db', got %q", model.rds.filtered[0].DBInstanceID)
 	}
 }
 
 func TestRDSListFilterAllowsNavigationWhileFocused(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
-	m.rdsInstances = []awsservice.RDSInstance{
+	m.rds.instances = []awsservice.RDSInstance{
 		{DBInstanceID: "prod-api-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
 		{DBInstanceID: "prod-worker-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
 		{DBInstanceID: "dev-db", Engine: "postgres", Status: "stopped", InstanceClass: "db.t3.small"},
 	}
-	m.filteredRDS = m.rdsInstances
+	m.rds.filtered = m.rds.instances
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	model := updated.(Model)
@@ -688,11 +688,11 @@ func TestRDSListFilterAllowsNavigationWhileFocused(t *testing.T) {
 	if !model.isFiltering(filterRDS) {
 		t.Fatal("expected RDS filter to stay active after typing")
 	}
-	if got := len(model.filteredRDS); got != 2 {
+	if got := len(model.rds.filtered); got != 2 {
 		t.Fatalf("expected 2 filtered instances, got %d", got)
 	}
-	if model.rdsIdx != 0 {
-		t.Fatalf("expected selection to reset to the first filtered row, got %d", model.rdsIdx)
+	if model.rds.idx != 0 {
+		t.Fatalf("expected selection to reset to the first filtered row, got %d", model.rds.idx)
 	}
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
@@ -701,10 +701,10 @@ func TestRDSListFilterAllowsNavigationWhileFocused(t *testing.T) {
 	if !model.isFiltering(filterRDS) {
 		t.Fatal("expected RDS filter to remain active while navigating")
 	}
-	if model.rdsIdx != 1 {
-		t.Fatalf("expected down arrow to move selection to index 1, got %d", model.rdsIdx)
+	if model.rds.idx != 1 {
+		t.Fatalf("expected down arrow to move selection to index 1, got %d", model.rds.idx)
 	}
-	if got := model.filteredRDS[model.rdsIdx].DBInstanceID; got != "prod-worker-db" {
+	if got := model.rds.filtered[model.rds.idx].DBInstanceID; got != "prod-worker-db" {
 		t.Fatalf("expected selection to move to prod-worker-db, got %q", got)
 	}
 }
@@ -712,11 +712,11 @@ func TestRDSListFilterAllowsNavigationWhileFocused(t *testing.T) {
 func TestRDSListFilterStillAcceptsJKCharacters(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
-	m.rdsInstances = []awsservice.RDSInstance{
+	m.rds.instances = []awsservice.RDSInstance{
 		{DBInstanceID: "proj-jk-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
 		{DBInstanceID: "prod-db", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro"},
 	}
-	m.filteredRDS = m.rdsInstances
+	m.rds.filtered = m.rds.instances
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	model := updated.(Model)
@@ -729,10 +729,10 @@ func TestRDSListFilterStillAcceptsJKCharacters(t *testing.T) {
 	if got := model.filterValue(filterRDS); got != "jk" {
 		t.Fatalf("expected filter query to accept j/k characters, got %q", got)
 	}
-	if got := len(model.filteredRDS); got != 1 {
+	if got := len(model.rds.filtered); got != 1 {
 		t.Fatalf("expected 1 filtered instance after typing jk, got %d", got)
 	}
-	if got := model.filteredRDS[0].DBInstanceID; got != "proj-jk-db" {
+	if got := model.rds.filtered[0].DBInstanceID; got != "proj-jk-db" {
 		t.Fatalf("expected proj-jk-db to match typed jk filter, got %q", got)
 	}
 }
@@ -740,14 +740,14 @@ func TestRDSListFilterStillAcceptsJKCharacters(t *testing.T) {
 func TestRDSActionDoneMsg_Success(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1"}
 
 	updated, cmd := m.Update(rdsActionDoneMsg{action: "stop", instanceID: "db-1", err: nil})
 	model := updated.(Model)
 	if model.screen != screenRDSDetail {
 		t.Errorf("expected detail screen after action done, got %d", model.screen)
 	}
-	if !model.rdsPolling {
+	if !model.rds.polling {
 		t.Error("polling should be active after successful action")
 	}
 	if cmd == nil {
@@ -767,8 +767,8 @@ func TestRDSInstancesLoadedMsg(t *testing.T) {
 	if model.screen != screenRDSList {
 		t.Errorf("expected RDS list screen, got %d", model.screen)
 	}
-	if len(model.rdsInstances) != 1 {
-		t.Errorf("expected 1 instance, got %d", len(model.rdsInstances))
+	if len(model.rds.instances) != 1 {
+		t.Errorf("expected 1 instance, got %d", len(model.rds.instances))
 	}
 }
 
@@ -793,10 +793,10 @@ func TestFeatureListRDSBrowserGoesToLoading(t *testing.T) {
 func TestRDSViewNotEmpty(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList
-	m.rdsInstances = []awsservice.RDSInstance{
+	m.rds.instances = []awsservice.RDSInstance{
 		{DBInstanceID: "db-1", Engine: "mysql", Status: "available", InstanceClass: "db.t3.micro", EngineVersion: "8.0"},
 	}
-	m.filteredRDS = m.rdsInstances
+	m.rds.filtered = m.rds.instances
 	m.height = 30
 
 	v := m.View()
@@ -808,7 +808,7 @@ func TestRDSViewNotEmpty(t *testing.T) {
 func TestRDSDetailViewNotEmpty(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{
+	m.rds.selected = &awsservice.RDSInstance{
 		DBInstanceID: "db-1", Engine: "mysql", EngineVersion: "8.0",
 		Status: "available", InstanceClass: "db.t3.micro", MultiAZ: true, StorageGB: 20,
 		Endpoint: "db-1.abc.us-east-1.rds.amazonaws.com:3306",
@@ -823,8 +823,8 @@ func TestRDSDetailViewNotEmpty(t *testing.T) {
 func TestRDSConfirmViewNotEmpty(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
-	m.rdsAction = "stop"
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1"}
+	m.rds.action = "stop"
 
 	v := m.View()
 	if v == "" {
@@ -836,9 +836,9 @@ func TestRDSConfirmStopRequiresTypedInput(t *testing.T) {
 	// Test with standalone instance (confirm target = instance ID)
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", ClusterID: ""}
-	m.rdsAction = "stop"
-	m.rdsConfirmInput = ""
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1", ClusterID: ""}
+	m.rds.action = "stop"
+	m.rds.confirmInput = ""
 
 	// Enter without typing anything — should stay on confirm screen
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -851,7 +851,7 @@ func TestRDSConfirmStopRequiresTypedInput(t *testing.T) {
 	}
 
 	// Type wrong text + enter — should stay on confirm screen
-	model.rdsConfirmInput = "wrong-name"
+	model.rds.confirmInput = "wrong-name"
 	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	if model.screen != screenRDSConfirm {
@@ -862,7 +862,7 @@ func TestRDSConfirmStopRequiresTypedInput(t *testing.T) {
 	}
 
 	// Type correct instance ID + enter — should execute
-	model.rdsConfirmInput = "db-1"
+	model.rds.confirmInput = "db-1"
 	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	if model.screen != screenRDSDetail {
@@ -877,12 +877,12 @@ func TestRDSConfirmStopClusterRequiresClusterID(t *testing.T) {
 	// Test with Aurora cluster member (confirm target = cluster ID)
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "inst-1", ClusterID: "my-cluster", Status: "available"}
-	m.rdsAction = "stop"
-	m.rdsConfirmInput = ""
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "inst-1", ClusterID: "my-cluster", Status: "available"}
+	m.rds.action = "stop"
+	m.rds.confirmInput = ""
 
 	// Type instance ID (wrong target) — should stay
-	m.rdsConfirmInput = "inst-1"
+	m.rds.confirmInput = "inst-1"
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 	if model.screen != screenRDSConfirm {
@@ -893,7 +893,7 @@ func TestRDSConfirmStopClusterRequiresClusterID(t *testing.T) {
 	}
 
 	// Type cluster ID (correct target) — should execute
-	model.rdsConfirmInput = "my-cluster"
+	model.rds.confirmInput = "my-cluster"
 	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	if model.screen != screenRDSDetail {
@@ -907,9 +907,9 @@ func TestRDSConfirmStopClusterRequiresClusterID(t *testing.T) {
 func TestRDSConfirmFailoverRequiresTypedInput(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "prod-db", MultiAZ: true}
-	m.rdsAction = "failover"
-	m.rdsConfirmInput = ""
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "prod-db", MultiAZ: true}
+	m.rds.action = "failover"
+	m.rds.confirmInput = ""
 
 	// Enter without typing — should stay
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -922,7 +922,7 @@ func TestRDSConfirmFailoverRequiresTypedInput(t *testing.T) {
 	}
 
 	// Type correct instance ID + enter — should execute
-	model.rdsConfirmInput = "prod-db"
+	model.rds.confirmInput = "prod-db"
 	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
 	if model.screen != screenRDSDetail {
@@ -936,8 +936,8 @@ func TestRDSConfirmFailoverRequiresTypedInput(t *testing.T) {
 func TestRDSConfirmStartUsesSimpleYN(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "stopped"}
-	m.rdsAction = "start"
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "stopped"}
+	m.rds.action = "start"
 
 	// Pressing 'y' should execute immediately (no typing required)
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
@@ -953,32 +953,32 @@ func TestRDSConfirmStartUsesSimpleYN(t *testing.T) {
 func TestRDSConfirmInputBackspace(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSConfirm
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1"}
-	m.rdsAction = "stop"
-	m.rdsConfirmInput = ""
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1"}
+	m.rds.action = "stop"
+	m.rds.confirmInput = ""
 
 	// Type "abc"
 	for _, ch := range "abc" {
 		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
 		m = updated.(Model)
 	}
-	if m.rdsConfirmInput != "abc" {
-		t.Errorf("expected 'abc', got %q", m.rdsConfirmInput)
+	if m.rds.confirmInput != "abc" {
+		t.Errorf("expected 'abc', got %q", m.rds.confirmInput)
 	}
 
 	// Backspace
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
 	m = updated.(Model)
-	if m.rdsConfirmInput != "ab" {
-		t.Errorf("expected 'ab' after backspace, got %q", m.rdsConfirmInput)
+	if m.rds.confirmInput != "ab" {
+		t.Errorf("expected 'ab' after backspace, got %q", m.rds.confirmInput)
 	}
 }
 
 func TestRDSConfirmInputResetOnEntry(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
-	m.selectedRDS = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: ""}
-	m.rdsConfirmInput = "leftover"
+	m.rds.selected = &awsservice.RDSInstance{DBInstanceID: "db-1", Status: "available", ClusterID: ""}
+	m.rds.confirmInput = "leftover"
 
 	// Press 'x' to go to confirm screen
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
@@ -986,8 +986,8 @@ func TestRDSConfirmInputResetOnEntry(t *testing.T) {
 	if model.screen != screenRDSConfirm {
 		t.Errorf("expected confirm screen, got %d", model.screen)
 	}
-	if model.rdsConfirmInput != "" {
-		t.Errorf("expected empty confirm input on entry, got %q", model.rdsConfirmInput)
+	if model.rds.confirmInput != "" {
+		t.Errorf("expected empty confirm input on entry, got %q", model.rds.confirmInput)
 	}
 }
 
@@ -1273,7 +1273,7 @@ func TestViewFitsTerminalHeight(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSDetail
 	m.height = 10
-	m.selectedRDS = &awsservice.RDSInstance{
+	m.rds.selected = &awsservice.RDSInstance{
 		DBInstanceID: "db-1", Engine: "mysql", EngineVersion: "8.0",
 		Status: "available", InstanceClass: "db.t3.micro", MultiAZ: true, StorageGB: 20,
 		Endpoint: "db-1.abc.us-east-1.rds.amazonaws.com:3306",
