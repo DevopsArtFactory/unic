@@ -14,7 +14,9 @@ func Copy(text string) error {
 	case "darwin":
 		cmd = exec.Command("pbcopy")
 	case "linux":
-		if _, err := exec.LookPath("xclip"); err == nil {
+		if _, err := exec.LookPath("wl-copy"); err == nil {
+			cmd = exec.Command("wl-copy")
+		} else if _, err := exec.LookPath("xclip"); err == nil {
 			cmd = exec.Command("xclip", "-selection", "clipboard")
 		} else {
 			cmd = exec.Command("xsel", "--clipboard", "--input")
