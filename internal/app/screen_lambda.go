@@ -23,68 +23,129 @@ const (
 	lambdaPayloadFile
 )
 
-// handleLambdaMsg routes Lambda messages to the correct screen.
-func (m Model) handleLambdaMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+type lambdaModel struct {
+	functions     []awsservice.LambdaFunction
+	filtered      []awsservice.LambdaFunction
+	functionIdx   int
+	selected      *awsservice.LambdaFunction
+	invokePayload string
+	invokeResult  *awsservice.LambdaInvokeResult
+	payloadSource lambdaPayloadSource
+	invokeStep    int // 0=source select, 1=text input
+}
+
+func newLambdaModel() lambdaModel {
+	return lambdaModel{payloadSource: lambdaPayloadManual}
+}
+
+func (lm *lambdaModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(lm.loadFunctions(*m))
+}
+
+func (lm *lambdaModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case lambdaFunctionsLoadedMsg:
-		m.lambdaFunctions = msg.functions
-		m.filteredLambdaFunctions = msg.functions
-		m.lambdaFunctionIdx = 0
+		lm.functions = msg.functions
+		lm.filtered = msg.functions
+		lm.functionIdx = 0
 		m.resetFilter(filterLambdaFunctions)
 		m.screen = screenLambdaFunctionList
-		return m, nil, true
+		return *m, nil, true
 	case lambdaInvokeResultMsg:
-		m.lambdaInvokeResult = msg.result
+		lm.invokeResult = msg.result
 		m.screen = screenLambdaInvokeResult
-		return m, nil, true
+		return *m, nil, true
 	}
-	return m, nil, false
+	return *m, nil, false
+}
+
+func (lm *lambdaModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenLambdaFunctionList:
+		newM, cmd := lm.updateFunctionList(m, msg)
+		return newM, cmd, true
+	case screenLambdaFunctionDetail:
+		newM, cmd := lm.updateFunctionDetail(m, msg)
+		return newM, cmd, true
+	case screenLambdaInvokeInput:
+		newM, cmd := lm.updateInvokeInput(m, msg)
+		return newM, cmd, true
+	case screenLambdaInvokeResult:
+		newM, cmd := lm.updateInvokeResult(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (lm lambdaModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenLambdaFunctionList:
+		return lm.viewFunctionList(m), true
+	case screenLambdaFunctionDetail:
+		return lm.viewFunctionDetail(m), true
+	case screenLambdaInvokeInput:
+		return lm.viewInvokeInput(m), true
+	case screenLambdaInvokeResult:
+		return lm.viewInvokeResult(m), true
+	default:
+		return "", false
+	}
+}
+
+func (lm *lambdaModel) ApplyFilter(m *Model, target filterTarget) bool {
+	if target != filterLambdaFunctions {
+		return false
+	}
+	lm.filtered = applyFilter(lm.functions, m.filterValue(target))
+	lm.functionIdx = 0
+	return true
 }
 
 // --- Function List ---
 
-func (m Model) updateLambdaFunctionList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (lm *lambdaModel) updateFunctionList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if cmd, handled := m.updateSharedFilter(msg, filterLambdaFunctions); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenFeatureList
 	case "up", "k":
-		m.lambdaFunctionIdx = previousListIndex(m.lambdaFunctionIdx, len(m.filteredLambdaFunctions))
+		lm.functionIdx = previousListIndex(lm.functionIdx, len(lm.filtered))
 	case "down", "j":
-		m.lambdaFunctionIdx = nextListIndex(m.lambdaFunctionIdx, len(m.filteredLambdaFunctions))
+		lm.functionIdx = nextListIndex(lm.functionIdx, len(lm.filtered))
 	case "/":
-		return m, m.activateFilter(filterLambdaFunctions)
+		return *m, m.activateFilter(filterLambdaFunctions)
 	case "r":
-		return m.startLoading(m.loadLambdaFunctions())
+		return m.startLoading(lm.loadFunctions(*m))
 	case "d":
-		if len(m.filteredLambdaFunctions) > 0 && m.lambdaFunctionIdx < len(m.filteredLambdaFunctions) {
-			fn := m.filteredLambdaFunctions[m.lambdaFunctionIdx]
-			m.selectedLambdaFunction = &fn
+		if len(lm.filtered) > 0 && lm.functionIdx < len(lm.filtered) {
+			fn := lm.filtered[lm.functionIdx]
+			lm.selected = &fn
 			m.screen = screenLambdaFunctionDetail
 		}
 	case "l":
-		if len(m.filteredLambdaFunctions) > 0 && m.lambdaFunctionIdx < len(m.filteredLambdaFunctions) {
-			fn := m.filteredLambdaFunctions[m.lambdaFunctionIdx]
-			m.selectedLambdaFunction = &fn
-			return m.cwLogs.StartFromLambda(&m, fn.Name)
+		if len(lm.filtered) > 0 && lm.functionIdx < len(lm.filtered) {
+			fn := lm.filtered[lm.functionIdx]
+			lm.selected = &fn
+			return m.cwLogs.StartFromLambda(m, fn.Name)
 		}
 	case "enter":
-		if len(m.filteredLambdaFunctions) > 0 && m.lambdaFunctionIdx < len(m.filteredLambdaFunctions) {
-			fn := m.filteredLambdaFunctions[m.lambdaFunctionIdx]
-			m.selectedLambdaFunction = &fn
-			m.lambdaInvokePayload = ""
-			m.lambdaPayloadSource = lambdaPayloadManual
-			m.lambdaInvokeStep = 0
+		if len(lm.filtered) > 0 && lm.functionIdx < len(lm.filtered) {
+			fn := lm.filtered[lm.functionIdx]
+			lm.selected = &fn
+			lm.invokePayload = ""
+			lm.payloadSource = lambdaPayloadManual
+			lm.invokeStep = 0
 			m.screen = screenLambdaInvokeInput
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewLambdaFunctionList() string {
+func (lm lambdaModel) viewFunctionList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -93,22 +154,22 @@ func (m Model) viewLambdaFunctionList() string {
 	b.WriteString(m.renderFilterValue(filterLambdaFunctions))
 	b.WriteString("\n\n")
 
-	if len(m.filteredLambdaFunctions) == 0 {
+	if len(lm.filtered) == 0 {
 		panel.WriteString(dimStyle.Render("  No functions found"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.lambdaFunctionIdx >= visibleLines {
-			start = m.lambdaFunctionIdx - visibleLines + 1
+		if lm.functionIdx >= visibleLines {
+			start = lm.functionIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredLambdaFunctions))
+		end := min(start+visibleLines, len(lm.filtered))
 
 		for i := start; i < end; i++ {
-			fn := m.filteredLambdaFunctions[i]
+			fn := lm.filtered[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.lambdaFunctionIdx {
+			if i == lm.functionIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -116,7 +177,7 @@ func (m Model) viewLambdaFunctionList() string {
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d functions", len(m.filteredLambdaFunctions), len(m.lambdaFunctions))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d functions", len(lm.filtered), len(lm.functions))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -127,28 +188,28 @@ func (m Model) viewLambdaFunctionList() string {
 
 // --- Function Detail ---
 
-func (m Model) updateLambdaFunctionDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (lm *lambdaModel) updateFunctionDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenLambdaFunctionList
 	case "i":
-		m.lambdaInvokePayload = ""
-		m.lambdaPayloadSource = lambdaPayloadManual
-		m.lambdaInvokeStep = 0
+		lm.invokePayload = ""
+		lm.payloadSource = lambdaPayloadManual
+		lm.invokeStep = 0
 		m.screen = screenLambdaInvokeInput
 	case "l":
-		if m.selectedLambdaFunction != nil {
-			return m.cwLogs.StartFromLambda(&m, m.selectedLambdaFunction.Name)
+		if lm.selected != nil {
+			return m.cwLogs.StartFromLambda(m, lm.selected.Name)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewLambdaFunctionDetail() string {
+func (lm lambdaModel) viewFunctionDetail(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 
-	fn := m.selectedLambdaFunction
+	fn := lm.selected
 	if fn == nil {
 		return b.String()
 	}
@@ -191,57 +252,57 @@ func (m Model) viewLambdaFunctionDetail() string {
 // Step 0: select payload source (manual / file)
 // Step 1: type payload or file path, then invoke
 
-func (m Model) updateLambdaInvokeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (lm *lambdaModel) updateInvokeInput(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	// Step 0: source selection
-	if m.lambdaInvokeStep == 0 {
+	if lm.invokeStep == 0 {
 		switch key {
 		case "esc":
 			m.screen = screenLambdaFunctionList
 		case "up", "k":
-			m.lambdaPayloadSource = lambdaPayloadSource(previousListIndex(int(m.lambdaPayloadSource), 2))
+			lm.payloadSource = lambdaPayloadSource(previousListIndex(int(lm.payloadSource), 2))
 		case "down", "j":
-			m.lambdaPayloadSource = lambdaPayloadSource(nextListIndex(int(m.lambdaPayloadSource), 2))
+			lm.payloadSource = lambdaPayloadSource(nextListIndex(int(lm.payloadSource), 2))
 		case "enter":
-			m.lambdaInvokeStep = 1
-			m.lambdaInvokePayload = ""
+			lm.invokeStep = 1
+			lm.invokePayload = ""
 		}
-		return m, nil
+		return *m, nil
 	}
 
 	// Step 1: text input
 	switch key {
 	case "esc":
-		m.lambdaInvokeStep = 0
+		lm.invokeStep = 0
 	case "enter":
-		if m.selectedLambdaFunction != nil {
-			return m.startLoading(m.invokeLambdaFunction())
+		if lm.selected != nil {
+			return m.startLoading(lm.invokeFunction(*m))
 		}
 	case "backspace":
-		if len(m.lambdaInvokePayload) > 0 {
-			m.lambdaInvokePayload = m.lambdaInvokePayload[:len(m.lambdaInvokePayload)-1]
+		if len(lm.invokePayload) > 0 {
+			lm.invokePayload = lm.invokePayload[:len(lm.invokePayload)-1]
 		}
 	default:
 		if len(key) == 1 || key == " " {
-			m.lambdaInvokePayload += key
+			lm.invokePayload += key
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewLambdaInvokeInput() string {
+func (lm lambdaModel) viewInvokeInput(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 
 	fnName := ""
-	if m.selectedLambdaFunction != nil {
-		fnName = m.selectedLambdaFunction.Name
+	if lm.selected != nil {
+		fnName = lm.selected.Name
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Invoke — %s", fnName)))
 	b.WriteString("\n\n")
 
-	if m.lambdaInvokeStep == 0 {
+	if lm.invokeStep == 0 {
 		b.WriteString(normalStyle.Render("  Select payload source:"))
 		b.WriteString("\n\n")
 		sources := []struct {
@@ -254,7 +315,7 @@ func (m Model) viewLambdaInvokeInput() string {
 		for _, s := range sources {
 			cursor := "  "
 			style := normalStyle
-			if m.lambdaPayloadSource == s.src {
+			if lm.payloadSource == s.src {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -266,13 +327,13 @@ func (m Model) viewLambdaInvokeInput() string {
 	} else {
 		label := "Payload (JSON):"
 		hint := "(empty — press enter to invoke with no payload)"
-		if m.lambdaPayloadSource == lambdaPayloadFile {
+		if lm.payloadSource == lambdaPayloadFile {
 			label = "File path:"
 			hint = "(enter path to a local JSON file)"
 		}
 		b.WriteString(normalStyle.Render("  " + label))
 		b.WriteString("\n")
-		payload := m.lambdaInvokePayload
+		payload := lm.invokePayload
 		if payload == "" {
 			payload = dimStyle.Render(hint)
 		}
@@ -286,35 +347,35 @@ func (m Model) viewLambdaInvokeInput() string {
 
 // --- Invoke Result ---
 
-func (m Model) updateLambdaInvokeResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (lm *lambdaModel) updateInvokeResult(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenLambdaFunctionList
 	case "i":
-		m.lambdaInvokePayload = ""
-		m.lambdaPayloadSource = lambdaPayloadManual
-		m.lambdaInvokeStep = 0
+		lm.invokePayload = ""
+		lm.payloadSource = lambdaPayloadManual
+		lm.invokeStep = 0
 		m.screen = screenLambdaInvokeInput
 	case "l":
-		if m.selectedLambdaFunction != nil {
-			return m.cwLogs.StartFromLambda(&m, m.selectedLambdaFunction.Name)
+		if lm.selected != nil {
+			return m.cwLogs.StartFromLambda(m, lm.selected.Name)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewLambdaInvokeResult() string {
+func (lm lambdaModel) viewInvokeResult(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 
 	fnName := ""
-	if m.selectedLambdaFunction != nil {
-		fnName = m.selectedLambdaFunction.Name
+	if lm.selected != nil {
+		fnName = lm.selected.Name
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Invoke Result — %s", fnName)))
 	b.WriteString("\n\n")
 
-	r := m.lambdaInvokeResult
+	r := lm.invokeResult
 	if r == nil {
 		return b.String()
 	}
@@ -354,7 +415,7 @@ func (m Model) viewLambdaInvokeResult() string {
 
 // --- Load Commands ---
 
-func (m Model) loadLambdaFunctions() tea.Cmd {
+func (lm lambdaModel) loadFunctions(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), lambdaAPITimeout)
 		defer cancel()
@@ -373,15 +434,15 @@ func (m Model) loadLambdaFunctions() tea.Cmd {
 	}
 }
 
-func (m Model) invokeLambdaFunction() tea.Cmd {
-	if m.selectedLambdaFunction == nil {
+func (lm lambdaModel) invokeFunction(m Model) tea.Cmd {
+	if lm.selected == nil {
 		return func() tea.Msg {
 			return errMsg{err: fmt.Errorf("no function selected")}
 		}
 	}
-	payloadSource := m.lambdaPayloadSource
-	payloadInput := m.lambdaInvokePayload
-	fnName := m.selectedLambdaFunction.Name
+	payloadSource := lm.payloadSource
+	payloadInput := lm.invokePayload
+	fnName := lm.selected.Name
 
 	return func() tea.Msg {
 		payload := payloadInput

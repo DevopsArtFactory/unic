@@ -173,9 +173,6 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 		m.route53RecordIdx = 0
 	case filterIAMUsers:
 		m.refreshIAMUserFilter()
-	case filterSecrets:
-		m.filteredSecrets = applyFilter(m.secrets, m.filterValue(target))
-		m.secretIdx = 0
 	case filterSecurityGroups:
 		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.filterValue(target))
 		m.sgIdx = 0
@@ -185,12 +182,6 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterECSServices:
 		m.filteredECSServices = applyFilter(m.ecsServices, m.filterValue(target))
 		m.ecsServiceIdx = 0
-	case filterS3Buckets:
-		m.filteredS3Buckets = applyFilter(m.s3Buckets, m.filterValue(target))
-		m.s3BucketIdx = 0
-	case filterS3Objects:
-		m.filteredS3Objects = applyFilter(m.s3Objects, m.filterValue(target))
-		m.s3ObjectIdx = 0
 	case filterContexts:
 		m.filteredCtxList = applyFilter(m.ctxList, m.filterValue(target))
 		m.ctxIdx = 0
@@ -204,9 +195,6 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterInspectorChecklistFiles:
 		m.filteredChecklistFiles = applyFilter(m.inspectorChecklistFiles, m.filterValue(target))
 		m.inspectorChecklistFileIdx = 0
-	case filterLambdaFunctions:
-		m.filteredLambdaFunctions = applyFilter(m.lambdaFunctions, m.filterValue(target))
-		m.lambdaFunctionIdx = 0
 	}
 }
 

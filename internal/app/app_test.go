@@ -2296,8 +2296,8 @@ func TestInspectorChecklistResultsEnterShowsDetail(t *testing.T) {
 func TestS3ObjectListEscAtRootReturnsToBucketList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenS3ObjectList
-	m.selectedS3Bucket = &awsservice.S3Bucket{Name: "my-bucket"}
-	m.s3CurrentPrefix = ""
+	m.s3.selectedBucket = &awsservice.S3Bucket{Name: "my-bucket"}
+	m.s3.currentPrefix = ""
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
@@ -2309,10 +2309,10 @@ func TestS3ObjectListEscAtRootReturnsToBucketList(t *testing.T) {
 func TestS3ObjectListShowsBreadcrumb(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenS3ObjectList
-	m.selectedS3Bucket = &awsservice.S3Bucket{Name: "my-bucket"}
-	m.s3CurrentPrefix = "logs/app/"
+	m.s3.selectedBucket = &awsservice.S3Bucket{Name: "my-bucket"}
+	m.s3.currentPrefix = "logs/app/"
 
-	view := m.viewS3ObjectList()
+	view := m.s3.viewObjectList(m)
 	if !strings.Contains(view, "Path: /logs/app") {
 		t.Fatalf("expected breadcrumb in S3 object list, got %q", view)
 	}
