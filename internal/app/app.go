@@ -155,15 +155,6 @@ type Model struct {
 	reachabilityConfigField     int
 	reachabilityResult          *awsservice.ReachabilityAnalysisResult
 	reachabilityScrollOffset    int
-	// RDS browser state
-	rdsInstances    []awsservice.RDSInstance
-	filteredRDS     []awsservice.RDSInstance
-	rdsIdx          int
-	selectedRDS     *awsservice.RDSInstance
-	rdsAction       string // "start", "stop", "failover"
-	rdsConfirmInput string // typed input for destructive action confirmation
-	rdsPolling      bool
-
 	// Route53 browser state
 	route53Zones           []awsservice.HostedZone
 	filteredRoute53Zones   []awsservice.HostedZone
@@ -249,6 +240,7 @@ type Model struct {
 	// Feature submodels
 	cwMetrics cloudWatchMetricsModel
 	cwLogs    cloudWatchLogsModel
+	rds       rdsModel
 	bedrock   bedrockModel
 
 	// S3 browser state
@@ -373,6 +365,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	}
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwLogs = newCloudWatchLogsModel()
+	model.rds = newRDSModel()
 	model.bedrock = newBedrockModel()
 	model.applyServiceListFilter()
 	return model
@@ -471,7 +464,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	for _, h := range []func(tea.Msg) (tea.Model, tea.Cmd, bool){
 		m.handleEC2VPCMsg,
 		m.handleRoute53Msg,
-		m.handleRDSMsg,
 		m.handleSecurityGroupMsg,
 		m.handleIAMMsg,
 		m.handleSecretMsg,
@@ -561,12 +553,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateReachabilityConfig(msg)
 		case screenReachabilityResult:
 			return m.updateReachabilityResult(msg)
-		case screenRDSList:
-			return m.updateRDSList(msg)
-		case screenRDSDetail:
-			return m.updateRDSDetail(msg)
-		case screenRDSConfirm:
-			return m.updateRDSConfirm(msg)
 		case screenRoute53ZoneList:
 			return m.updateRoute53ZoneList(msg)
 		case screenRoute53RecordList:
@@ -757,7 +743,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.screen = screenReachabilityRegionList
 				return m, nil
 			case domain.FeatureRDSBrowser:
-				return m.startLoading(m.loadRDSInstances())
+				return m.rds.Start(&m)
 			case domain.FeatureRoute53Browser:
 				return m.startLoading(m.loadRoute53Zones())
 			case domain.FeatureSecretsBrowser:
@@ -840,12 +826,6 @@ func (m Model) View() string {
 		v = m.viewReachabilityConfig()
 	case screenReachabilityResult:
 		v = m.viewReachabilityResult()
-	case screenRDSList:
-		v = m.viewRDSList()
-	case screenRDSDetail:
-		v = m.viewRDSDetail()
-	case screenRDSConfirm:
-		v = m.viewRDSConfirm()
 	case screenRoute53ZoneList:
 		v = m.viewRoute53ZoneList()
 	case screenRoute53RecordList:

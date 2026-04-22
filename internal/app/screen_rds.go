@@ -11,59 +11,115 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
-func (m Model) handleRDSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+type rdsModel struct {
+	instances    []awsservice.RDSInstance
+	filtered     []awsservice.RDSInstance
+	idx          int
+	selected     *awsservice.RDSInstance
+	action       string // "start", "stop", "failover"
+	confirmInput string // typed input for destructive action confirmation
+	polling      bool
+}
+
+func newRDSModel() rdsModel {
+	return rdsModel{}
+}
+
+func (rm *rdsModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(rm.loadInstances(*m))
+}
+
+func (rm *rdsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case rdsInstancesLoadedMsg:
-		m.rdsInstances = msg.instances
-		m.filteredRDS = msg.instances
-		m.rdsIdx = 0
+		rm.instances = msg.instances
+		rm.filtered = applyFilter(rm.instances, m.filterValue(filterRDS))
+		rm.idx = 0
 		m.screen = screenRDSList
-		return m, nil, true
+		return *m, nil, true
 
 	case rdsActionDoneMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			m.screen = screenError
-			return m, nil, true
+			return *m, nil, true
 		}
-		m.rdsPolling = true
+		rm.polling = true
 		m.screen = screenRDSDetail
-		return m, m.tickRDSPoll(msg.instanceID), true
+		return *m, rm.tickPoll(msg.instanceID), true
 
 	case rdsStatusRefreshedMsg:
 		if msg.err != nil {
-			m.rdsPolling = false
-			return m, nil, true
+			rm.polling = false
+			return *m, nil, true
 		}
-		m.selectedRDS = msg.instance
-		for i, inst := range m.rdsInstances {
+		rm.selected = msg.instance
+		for i, inst := range rm.instances {
 			if inst.DBInstanceID == msg.instance.DBInstanceID {
-				m.rdsInstances[i] = *msg.instance
+				rm.instances[i] = *msg.instance
 				break
 			}
 		}
-		m.filteredRDS = applyFilter(m.rdsInstances, m.filterValue(filterRDS))
-		m.rdsIdx = 0
+		rm.filtered = applyFilter(rm.instances, m.filterValue(filterRDS))
+		rm.idx = 0
 		if awsservice.IsTransitionalStatus(msg.instance.Status) {
-			return m, m.tickRDSPoll(msg.instance.DBInstanceID), true
+			return *m, rm.tickPoll(msg.instance.DBInstanceID), true
 		}
-		m.rdsPolling = false
-		return m, nil, true
+		rm.polling = false
+		return *m, nil, true
 
 	case rdsTickMsg:
-		if m.rdsPolling {
-			return m, m.pollRDSStatus(msg.instanceID), true
+		if rm.polling {
+			return *m, rm.pollStatus(*m, msg.instanceID), true
 		}
-		return m, nil, true
+		return *m, nil, true
 	}
-	return m, nil, false
+	return *m, nil, false
 }
 
-func (m Model) updateRDSList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *rdsModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenRDSList:
+		newM, cmd := rm.updateList(m, msg)
+		return newM, cmd, true
+	case screenRDSDetail:
+		newM, cmd := rm.updateDetail(m, msg)
+		return newM, cmd, true
+	case screenRDSConfirm:
+		newM, cmd := rm.updateConfirm(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (rm rdsModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenRDSList:
+		return rm.viewList(m), true
+	case screenRDSDetail:
+		return rm.viewDetail(m), true
+	case screenRDSConfirm:
+		return rm.viewConfirm(m), true
+	default:
+		return "", false
+	}
+}
+
+func (rm *rdsModel) ApplyFilter(m *Model, target filterTarget) bool {
+	if target != filterRDS {
+		return false
+	}
+	rm.filtered = applyFilter(rm.instances, m.filterValue(target))
+	rm.idx = 0
+	return true
+}
+
+func (rm *rdsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterRDS); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -71,98 +127,98 @@ func (m Model) updateRDSList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterRDS)
 	case "up", "k":
-		m.rdsIdx = previousListIndex(m.rdsIdx, len(m.filteredRDS))
+		rm.idx = previousListIndex(rm.idx, len(rm.filtered))
 	case "down", "j":
-		m.rdsIdx = nextListIndex(m.rdsIdx, len(m.filteredRDS))
+		rm.idx = nextListIndex(rm.idx, len(rm.filtered))
 	case "/":
-		return m, m.activateFilter(filterRDS)
+		return *m, m.activateFilter(filterRDS)
 	case "enter":
-		if len(m.filteredRDS) > 0 && m.rdsIdx < len(m.filteredRDS) {
-			selected := m.filteredRDS[m.rdsIdx]
-			m.selectedRDS = &selected
+		if len(rm.filtered) > 0 && rm.idx < len(rm.filtered) {
+			selected := rm.filtered[rm.idx]
+			rm.selected = &selected
 			m.screen = screenRDSDetail
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateRDSDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *rdsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
-		m.rdsPolling = false
+		rm.polling = false
 		m.screen = screenRDSList
 	case "s":
-		if m.selectedRDS != nil && m.selectedRDS.CanStart() {
-			m.rdsAction = "start"
-			m.rdsConfirmInput = ""
+		if rm.selected != nil && rm.selected.CanStart() {
+			rm.action = "start"
+			rm.confirmInput = ""
 			m.screen = screenRDSConfirm
 		}
 	case "x":
-		if m.selectedRDS != nil && m.selectedRDS.CanStop() {
-			m.rdsAction = "stop"
-			m.rdsConfirmInput = ""
+		if rm.selected != nil && rm.selected.CanStop() {
+			rm.action = "stop"
+			rm.confirmInput = ""
 			m.screen = screenRDSConfirm
 		}
 	case "f":
-		if m.selectedRDS != nil && m.selectedRDS.CanFailover() {
-			m.rdsAction = "failover"
-			m.rdsConfirmInput = ""
+		if rm.selected != nil && rm.selected.CanFailover() {
+			rm.action = "failover"
+			rm.confirmInput = ""
 			m.screen = screenRDSConfirm
 		}
 	case "r":
-		if m.selectedRDS != nil {
-			return m, m.pollRDSStatus(m.selectedRDS.DBInstanceID)
+		if rm.selected != nil {
+			return *m, rm.pollStatus(*m, rm.selected.DBInstanceID)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateRDSConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *rdsModel) updateConfirm(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Start action uses simple y/n confirmation
-	if m.rdsAction == "start" {
+	if rm.action == "start" {
 		switch msg.String() {
 		case "y", "enter":
-			if m.selectedRDS != nil {
+			if rm.selected != nil {
 				m.screen = screenRDSDetail
-				return m, m.executeRDSAction(m.rdsAction, m.selectedRDS.DBInstanceID)
+				return *m, rm.executeAction(*m, rm.action, rm.selected.DBInstanceID)
 			}
 		case "n", "esc":
 			m.screen = screenRDSDetail
 		}
-		return m, nil
+		return *m, nil
 	}
 
 	// Stop/failover require typing the identifier to confirm
 	// For Aurora cluster members, confirm with cluster ID; for standalone, instance ID
 	confirmTarget := ""
-	if m.selectedRDS != nil {
-		if m.selectedRDS.IsClusterMember() {
-			confirmTarget = m.selectedRDS.ClusterID
+	if rm.selected != nil {
+		if rm.selected.IsClusterMember() {
+			confirmTarget = rm.selected.ClusterID
 		} else {
-			confirmTarget = m.selectedRDS.DBInstanceID
+			confirmTarget = rm.selected.DBInstanceID
 		}
 	}
 	switch msg.String() {
 	case "esc":
 		m.screen = screenRDSDetail
 	case "enter":
-		if m.selectedRDS != nil && m.rdsConfirmInput == confirmTarget {
+		if rm.selected != nil && rm.confirmInput == confirmTarget {
 			m.screen = screenRDSDetail
-			return m, m.executeRDSAction(m.rdsAction, m.selectedRDS.DBInstanceID)
+			return *m, rm.executeAction(*m, rm.action, rm.selected.DBInstanceID)
 		}
 	case "backspace":
-		if len(m.rdsConfirmInput) > 0 {
-			m.rdsConfirmInput = m.rdsConfirmInput[:len(m.rdsConfirmInput)-1]
+		if len(rm.confirmInput) > 0 {
+			rm.confirmInput = rm.confirmInput[:len(rm.confirmInput)-1]
 		}
 	default:
 		if runes := msg.Runes; len(runes) > 0 {
-			m.rdsConfirmInput += string(runes)
+			rm.confirmInput += string(runes)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) loadRDSInstances() tea.Cmd {
+func (rm rdsModel) loadInstances(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -182,10 +238,10 @@ func (m Model) loadRDSInstances() tea.Cmd {
 	}
 }
 
-func (m Model) executeRDSAction(action, dbInstanceID string) tea.Cmd {
+func (rm rdsModel) executeAction(m Model, action, dbInstanceID string) tea.Cmd {
 	clusterID := ""
-	if m.selectedRDS != nil {
-		clusterID = m.selectedRDS.ClusterID
+	if rm.selected != nil {
+		clusterID = rm.selected.ClusterID
 	}
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -224,7 +280,7 @@ func (m Model) executeRDSAction(action, dbInstanceID string) tea.Cmd {
 	}
 }
 
-func (m Model) pollRDSStatus(dbInstanceID string) tea.Cmd {
+func (rm rdsModel) pollStatus(m Model, dbInstanceID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -241,13 +297,13 @@ func (m Model) pollRDSStatus(dbInstanceID string) tea.Cmd {
 	}
 }
 
-func (m Model) tickRDSPoll(dbInstanceID string) tea.Cmd {
+func (rm rdsModel) tickPoll(dbInstanceID string) tea.Cmd {
 	return tea.Tick(5*time.Second, func(_ time.Time) tea.Msg {
 		return rdsTickMsg{instanceID: dbInstanceID}
 	})
 }
 
-func (m Model) viewRDSList() string {
+func (rm rdsModel) viewList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -257,22 +313,22 @@ func (m Model) viewRDSList() string {
 	b.WriteString(m.renderFilterValue(filterRDS))
 	b.WriteString("\n\n")
 
-	if len(m.filteredRDS) == 0 {
+	if len(rm.filtered) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching instances"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.rdsIdx >= visibleLines {
-			start = m.rdsIdx - visibleLines + 1
+		if rm.idx >= visibleLines {
+			start = rm.idx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredRDS))
+		end := min(start+visibleLines, len(rm.filtered))
 
 		for i := start; i < end; i++ {
-			inst := m.filteredRDS[i]
+			inst := rm.filtered[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.rdsIdx {
+			if i == rm.idx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -281,7 +337,7 @@ func (m Model) viewRDSList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d instances", len(m.filteredRDS), len(m.rdsInstances))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d instances", len(rm.filtered), len(rm.instances))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -290,11 +346,11 @@ func (m Model) viewRDSList() string {
 	return b.String()
 }
 
-func (m Model) viewRDSDetail() string {
-	if m.selectedRDS == nil {
+func (rm rdsModel) viewDetail(m Model) string {
+	if rm.selected == nil {
 		return ""
 	}
-	r := m.selectedRDS
+	r := rm.selected
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("RDS Instance Detail"))
@@ -315,7 +371,7 @@ func (m Model) viewRDSDetail() string {
 		statusStr = errorStyle.Render(r.Status)
 	}
 	pollingIndicator := ""
-	if m.rdsPolling {
+	if rm.polling {
 		pollingIndicator = filterStyle.Render(" (polling...)")
 	}
 	b.WriteString(renderDetailLine("Status", statusStr+pollingIndicator))
@@ -378,11 +434,11 @@ func (m Model) viewRDSDetail() string {
 	return b.String()
 }
 
-func (m Model) viewRDSConfirm() string {
-	if m.selectedRDS == nil {
+func (rm rdsModel) viewConfirm(m Model) string {
+	if rm.selected == nil {
 		return ""
 	}
-	r := m.selectedRDS
+	r := rm.selected
 
 	// For Aurora cluster members, show cluster-level info
 	targetLabel := "instance"
@@ -397,20 +453,20 @@ func (m Model) viewRDSConfirm() string {
 	b.WriteString(errorStyle.Render("Confirm Action"))
 	b.WriteString("\n\n")
 
-	if m.rdsAction == "start" {
+	if rm.action == "start" {
 		b.WriteString(normalStyle.Render(fmt.Sprintf("  Are you sure you want to start %s %s?",
 			targetLabel, targetID)))
 		b.WriteString("\n\n")
 		b.WriteString(normalStyle.Render("  [y] Yes  [n] No"))
 		b.WriteString("\n")
 	} else {
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  You are about to %s %s:", m.rdsAction, targetLabel)))
+		b.WriteString(normalStyle.Render(fmt.Sprintf("  You are about to %s %s:", rm.action, targetLabel)))
 		b.WriteString("\n")
 		b.WriteString(selectedStyle.Render(fmt.Sprintf("  %s", targetID)))
 		b.WriteString("\n\n")
 		b.WriteString(normalStyle.Render(fmt.Sprintf("  Type the %s identifier to confirm:", targetLabel)))
 		b.WriteString("\n")
-		b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.rdsConfirmInput)))
+		b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", rm.confirmInput)))
 		b.WriteString("\n\n")
 		b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 		b.WriteString("\n")
