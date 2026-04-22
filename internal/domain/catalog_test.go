@@ -36,6 +36,24 @@ func TestEC2HasSSMSessionFeature(t *testing.T) {
 	t.Error("EC2 service not found in catalog")
 }
 
+func TestEC2HasInstanceBrowserFeature(t *testing.T) {
+	services := Catalog()
+
+	for _, svc := range services {
+		if svc.Name == ServiceEC2 {
+			for _, feat := range svc.Features {
+				if feat.Kind == FeatureEC2InstanceBrowser {
+					return
+				}
+			}
+			t.Error("EC2 service should have EC2 Instance Browser feature")
+			return
+		}
+	}
+
+	t.Error("EC2 service not found in catalog")
+}
+
 func TestCatalogNotEmpty(t *testing.T) {
 	services := Catalog()
 	if len(services) == 0 {

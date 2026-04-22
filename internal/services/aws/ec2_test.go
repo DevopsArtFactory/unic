@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -19,20 +20,45 @@ func TestFilterText(t *testing.T) {
 	}
 
 	got := inst.FilterText()
-	if got != "webserver i-1234567890abcdef0 10.0.1.50" {
-		t.Errorf("unexpected FilterText: %q", got)
+	for _, keyword := range []string{"webserver", "i-1234567890abcdef0", "10.0.1.50"} {
+		if !containsStr(got, keyword) {
+			t.Errorf("FilterText %q should contain %q", got, keyword)
+		}
 	}
 }
 
 func TestFilterTextContainsAllFields(t *testing.T) {
 	inst := EC2Instance{
-		InstanceID: "i-abc",
-		Name:       "MyApp",
-		PrivateIP:  "172.16.0.1",
+		InstanceID:       "i-abc",
+		Name:             "MyApp",
+		State:            "running",
+		InstanceType:     "t3.micro",
+		AvailabilityZone: "us-east-1a",
+		VPCID:            "vpc-123",
+		SubnetID:         "subnet-123",
+		PrivateIP:        "172.16.0.1",
+		PublicIP:         "203.0.113.10",
+		PlatformDetails:  "Linux/UNIX",
+		IAMProfile:       "arn:aws:iam::123456789012:instance-profile/app",
+		Tags:             map[string]string{"Environment": "prod"},
 	}
 
 	ft := inst.FilterText()
-	for _, keyword := range []string{"myapp", "i-abc", "172.16.0.1"} {
+	for _, keyword := range []string{
+		"myapp",
+		"i-abc",
+		"running",
+		"t3.micro",
+		"us-east-1a",
+		"vpc-123",
+		"subnet-123",
+		"172.16.0.1",
+		"203.0.113.10",
+		"linux/unix",
+		"instance-profile/app",
+		"environment",
+		"prod",
+	} {
 		if !containsStr(ft, keyword) {
 			t.Errorf("FilterText %q should contain %q", ft, keyword)
 		}
@@ -41,12 +67,14 @@ func TestFilterTextContainsAllFields(t *testing.T) {
 
 func TestDisplayTitle(t *testing.T) {
 	inst := EC2Instance{
-		InstanceID: "i-abc",
-		Name:       "MyApp",
-		PrivateIP:  "10.0.0.1",
+		InstanceID:   "i-abc",
+		Name:         "MyApp",
+		State:        "running",
+		InstanceType: "t3.micro",
+		PrivateIP:    "10.0.0.1",
 	}
 
-	expected := "MyApp (i-abc) - 10.0.0.1"
+	expected := "MyApp (i-abc) t3.micro [running] - 10.0.0.1"
 	if got := inst.DisplayTitle(); got != expected {
 		t.Errorf("expected %q, got %q", expected, got)
 	}
@@ -153,6 +181,98 @@ func TestListRunningInstances_SortedByName(t *testing.T) {
 	}
 	if instances[0].Name != "alpha-web" || instances[1].Name != "zeta-web" {
 		t.Fatalf("expected alphabetical EC2 order, got %+v", instances)
+	}
+}
+
+func TestListEC2Instances_MapsInventoryFields(t *testing.T) {
+	launch := time.Date(2026, 4, 22, 12, 30, 0, 0, time.UTC)
+	ec2Mock := &mockEC2Client{
+		describeInstancesFunc: func(_ context.Context, params *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
+			if len(params.Filters) != 0 {
+				t.Fatalf("expected no filters for inventory browser, got %+v", params.Filters)
+			}
+			if len(params.InstanceIds) != 0 {
+				t.Fatalf("expected no instance IDs for inventory browser, got %+v", params.InstanceIds)
+			}
+			return &ec2.DescribeInstancesOutput{
+				Reservations: []types.Reservation{
+					{
+						Instances: []types.Instance{
+							{
+								InstanceId:       aws.String("i-2"),
+								InstanceType:     types.InstanceTypeM6iLarge,
+								PrivateIpAddress: aws.String("10.0.0.2"),
+								PublicIpAddress:  aws.String("203.0.113.2"),
+								State:            &types.InstanceState{Name: types.InstanceStateNameStopped},
+								Placement:        &types.Placement{AvailabilityZone: aws.String("us-east-1b")},
+								VpcId:            aws.String("vpc-2"),
+								SubnetId:         aws.String("subnet-2"),
+								LaunchTime:       &launch,
+								PlatformDetails:  aws.String("Linux/UNIX"),
+								IamInstanceProfile: &types.IamInstanceProfile{
+									Arn: aws.String("arn:aws:iam::123456789012:instance-profile/app"),
+								},
+								Tags: []types.Tag{
+									{Key: aws.String("Name"), Value: aws.String("zeta-web")},
+									{Key: aws.String("Environment"), Value: aws.String("prod")},
+								},
+							},
+							{
+								InstanceId:       aws.String("i-1"),
+								InstanceType:     types.InstanceTypeT3Micro,
+								PrivateIpAddress: aws.String("10.0.0.1"),
+								State:            &types.InstanceState{Name: types.InstanceStateNameRunning},
+								Tags:             []types.Tag{{Key: aws.String("Name"), Value: aws.String("alpha-web")}},
+							},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{EC2Client: ec2Mock}
+	instances, err := repo.ListEC2Instances(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(instances) != 2 {
+		t.Fatalf("expected 2 instances, got %d", len(instances))
+	}
+	if instances[0].InstanceID != "i-1" {
+		t.Fatalf("expected alpha-web to sort first, got %+v", instances)
+	}
+
+	inst := instances[1]
+	if inst.Name != "zeta-web" {
+		t.Fatalf("expected Name zeta-web, got %q", inst.Name)
+	}
+	if inst.State != "stopped" {
+		t.Fatalf("expected stopped state, got %q", inst.State)
+	}
+	if inst.InstanceType != "m6i.large" {
+		t.Fatalf("expected m6i.large instance type, got %q", inst.InstanceType)
+	}
+	if inst.AvailabilityZone != "us-east-1b" {
+		t.Fatalf("expected AZ us-east-1b, got %q", inst.AvailabilityZone)
+	}
+	if inst.VPCID != "vpc-2" || inst.SubnetID != "subnet-2" {
+		t.Fatalf("expected VPC/subnet IDs, got %q/%q", inst.VPCID, inst.SubnetID)
+	}
+	if inst.PrivateIP != "10.0.0.2" || inst.PublicIP != "203.0.113.2" {
+		t.Fatalf("expected private/public IPs, got %q/%q", inst.PrivateIP, inst.PublicIP)
+	}
+	if !inst.LaunchTime.Equal(launch) {
+		t.Fatalf("expected launch time %v, got %v", launch, inst.LaunchTime)
+	}
+	if inst.PlatformDetails != "Linux/UNIX" {
+		t.Fatalf("expected platform details, got %q", inst.PlatformDetails)
+	}
+	if inst.IAMProfile != "arn:aws:iam::123456789012:instance-profile/app" {
+		t.Fatalf("expected IAM profile ARN, got %q", inst.IAMProfile)
+	}
+	if inst.Tags["Environment"] != "prod" {
+		t.Fatalf("expected Environment tag prod, got %+v", inst.Tags)
 	}
 }
 

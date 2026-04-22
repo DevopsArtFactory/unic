@@ -23,6 +23,8 @@ const (
 	screenServiceList screen = iota
 	screenFeatureList
 	screenInstanceList
+	screenEC2InstanceBrowserList
+	screenEC2InstanceBrowserDetail
 	screenVPCList
 	screenSubnetList
 	screenSubnetDetail
@@ -238,10 +240,11 @@ type Model struct {
 	ecsContainerIdx int
 
 	// Feature submodels
-	cwMetrics cloudWatchMetricsModel
-	cwLogs    cloudWatchLogsModel
-	rds       rdsModel
-	bedrock   bedrockModel
+	ec2Browser ec2InstanceBrowserModel
+	cwMetrics  cloudWatchMetricsModel
+	cwLogs     cloudWatchLogsModel
+	rds        rdsModel
+	bedrock    bedrockModel
 
 	// S3 browser state
 	s3Buckets         []awsservice.S3Bucket
@@ -363,6 +366,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		filters:                make(map[filterTarget]string),
 		contextTable:           newContextTable(),
 	}
+	model.ec2Browser = newEC2InstanceBrowserModel()
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
@@ -720,6 +724,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			switch feat.Kind {
 			case domain.FeatureSSMSession:
 				return m.startLoading(m.loadInstances())
+			case domain.FeatureEC2InstanceBrowser:
+				return m.ec2Browser.Start(&m)
 			case domain.FeatureVPCBrowser:
 				return m.startLoading(m.loadVPCs())
 			case domain.FeatureReachabilityAnalyzer:

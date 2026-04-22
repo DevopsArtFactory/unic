@@ -11,6 +11,10 @@ type instancesLoadedMsg struct {
 	instances []awsservice.EC2Instance
 }
 
+type ec2BrowserInstancesLoadedMsg struct {
+	instances []awsservice.EC2Instance
+}
+
 type vpcsLoadedMsg struct {
 	vpcs []awsservice.VPC
 }

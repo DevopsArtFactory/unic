@@ -132,6 +132,12 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		}
 	case screenInstanceList:
 		return listScreenShortcuts("connect to the selected instance", "go back to the feature list", true, true)
+	case screenEC2InstanceBrowserList:
+		return listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
+	case screenEC2InstanceBrowserDetail:
+		return []helpShortcut{
+			{"q / esc", "Go back to the instance list"},
+		}
 	case screenVPCList:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between VPCs"},
@@ -674,7 +680,11 @@ func (m Model) helpScreenTitle() string {
 		}
 		return "Feature List"
 	case screenInstanceList:
-		return "EC2 Instances"
+		return "EC2 SSM Instances"
+	case screenEC2InstanceBrowserList:
+		return "EC2 Instance Browser"
+	case screenEC2InstanceBrowserDetail:
+		return "EC2 Instance Detail"
 	case screenVPCList:
 		return "VPC List"
 	case screenSubnetList:
