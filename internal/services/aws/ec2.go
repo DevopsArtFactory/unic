@@ -132,11 +132,9 @@ func ec2InstanceFromSDK(inst types.Instance) EC2Instance {
 		VPCID:           derefString(inst.VpcId),
 		SubnetID:        derefString(inst.SubnetId),
 		InstanceType:    string(inst.InstanceType),
+		State:           ec2InstanceStateName(inst.State),
 		PlatformDetails: derefString(inst.PlatformDetails),
 		Tags:            tagsToMap(inst.Tags),
-	}
-	if inst.State != nil {
-		instance.State = string(inst.State.Name)
 	}
 	if inst.Placement != nil {
 		instance.AvailabilityZone = derefString(inst.Placement.AvailabilityZone)
@@ -148,6 +146,13 @@ func ec2InstanceFromSDK(inst types.Instance) EC2Instance {
 		instance.IAMProfile = derefString(inst.IamInstanceProfile.Arn)
 	}
 	return instance
+}
+
+func ec2InstanceStateName(state *types.InstanceState) string {
+	if state == nil {
+		return ""
+	}
+	return string(state.Name)
 }
 
 func tagsToMap(tags []types.Tag) map[string]string {

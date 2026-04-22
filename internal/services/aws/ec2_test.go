@@ -276,6 +276,19 @@ func TestListEC2Instances_MapsInventoryFields(t *testing.T) {
 	}
 }
 
+func TestEC2InstanceFromSDKHandlesNilState(t *testing.T) {
+	inst := ec2InstanceFromSDK(types.Instance{
+		InstanceId: aws.String("i-no-state"),
+	})
+
+	if inst.InstanceID != "i-no-state" {
+		t.Fatalf("expected instance ID to be mapped, got %q", inst.InstanceID)
+	}
+	if inst.State != "" {
+		t.Fatalf("expected empty state for nil SDK state, got %q", inst.State)
+	}
+}
+
 func containsStr(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstr(s, substr))
 }
