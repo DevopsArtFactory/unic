@@ -44,6 +44,31 @@ commit, and PR flow.
 - Otherwise structure the PR body with: Summary, Related Issues, Validation,
   and Checklist.
 
+6. Wait for automated review.
+- After the PR is open, wait for required checks and Amazon Q Developer review
+  to finish before reporting the PR as ready.
+- Read the latest Amazon Q top-level review/comments for the current head with
+  `gh pr view <number> --json reviews,comments,statusCheckRollup,headRefOid`.
+- Also read thread-aware inline review state before deciding the PR is clean.
+  Use the GitHub connector `list_pull_request_review_threads` when available,
+  or `gh api graphql` to fetch `reviewThreads { isResolved isOutdated path line
+  comments { author { login } body createdAt } }`.
+- Treat any unresolved, non-outdated Amazon Q inline thread as actionable unless
+  it is clearly informational. Do not rely only on top-level review summaries;
+  they can miss inline findings.
+- Ignore outdated Amazon Q threads only after confirming the current head no
+  longer contains the flagged code.
+- If Amazon Q reports actionable issues in either top-level reviews or current
+  inline threads, patch them locally, rerun `make test` and `make build`, commit
+  the fix, push, and comment `/q review` on the PR.
+- Repeat the wait/read-threads/read-summary/patch/review loop until the latest
+  Amazon Q review for the current head has no blocking or actionable issues and
+  there are no unresolved, non-outdated actionable Amazon Q threads.
+- If Amazon Q is unavailable, still report the PR URL and the completed local
+  validation, but explicitly note that automated review could not be confirmed.
+- Do not resolve or dismiss review threads unless the user explicitly asks.
+
 ## Output
 
-Return the branch name, commit message, and PR URL.
+Return the branch name, commit message, PR URL, local validation, and latest
+Amazon Q result.
