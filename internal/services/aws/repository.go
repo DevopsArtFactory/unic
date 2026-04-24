@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/configservice"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/guardduty"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -66,6 +67,9 @@ var _ ConfigServiceClientAPI = (*configservice.Client)(nil)
 
 // Verify *ecs.Client satisfies ECSClientAPI at compile time.
 var _ ECSClientAPI = (*ecs.Client)(nil)
+
+// Verify *eks.Client satisfies EKSClientAPI at compile time.
+var _ EKSClientAPI = (*eks.Client)(nil)
 
 // Verify *elasticache.Client satisfies ElastiCacheClientAPI at compile time.
 var _ ElastiCacheClientAPI = (*elasticache.Client)(nil)
@@ -178,6 +182,14 @@ type ECSClientAPI interface {
 	DescribeTasks(ctx context.Context, params *ecs.DescribeTasksInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error)
 }
 
+// EKSClientAPI is the interface for EKS operations used by AwsRepository.
+type EKSClientAPI interface {
+	ListClusters(ctx context.Context, params *eks.ListClustersInput, optFns ...func(*eks.Options)) (*eks.ListClustersOutput, error)
+	DescribeCluster(ctx context.Context, params *eks.DescribeClusterInput, optFns ...func(*eks.Options)) (*eks.DescribeClusterOutput, error)
+	ListNodegroups(ctx context.Context, params *eks.ListNodegroupsInput, optFns ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error)
+	DescribeNodegroup(ctx context.Context, params *eks.DescribeNodegroupInput, optFns ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error)
+}
+
 // S3ClientAPI is the interface for S3 operations used by AwsRepository.
 type S3ClientAPI interface {
 	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
@@ -251,6 +263,7 @@ type AwsRepository struct {
 	GuardDutyClient      GuardDutyClientAPI
 	ConfigServiceClient  ConfigServiceClientAPI
 	ECSClient            ECSClientAPI
+	EKSClient            EKSClientAPI
 	ElastiCacheClient    ElastiCacheClientAPI
 	S3Client             S3ClientAPI
 	LambdaClient         LambdaClientAPI
@@ -322,6 +335,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		GuardDutyClient:      guardduty.NewFromConfig(awsCfg),
 		ConfigServiceClient:  configservice.NewFromConfig(awsCfg),
 		ECSClient:            ecs.NewFromConfig(awsCfg),
+		EKSClient:            eks.NewFromConfig(awsCfg),
 		ElastiCacheClient:    elasticache.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),
 		LambdaClient:         lambda.NewFromConfig(awsCfg),

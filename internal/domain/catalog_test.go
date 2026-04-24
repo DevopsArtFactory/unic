@@ -197,6 +197,25 @@ func TestCatalogContainsBedrockAPIKeysFeature(t *testing.T) {
 	t.Error("Bedrock service not found in catalog")
 }
 
+func TestCatalogContainsEKSBrowserFeature(t *testing.T) {
+	services := Catalog()
+
+	for _, svc := range services {
+		if svc.Name != ServiceEKS {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureEKSBrowser {
+				return
+			}
+		}
+		t.Error("EKS service should have EKS Cluster Browser feature")
+		return
+	}
+
+	t.Error("EKS service not found in catalog")
+}
+
 func TestCatalogDoesNotContainInspectorPseudoService(t *testing.T) {
 	services := Catalog()
 

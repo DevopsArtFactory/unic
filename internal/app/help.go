@@ -405,6 +405,17 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"enter", "Start an ECS exec session for the selected container"},
 			{"q / esc", "Go back to the task list"},
 		}
+	case screenEKSClusterList:
+		return listScreenShortcuts("open managed node groups for the selected cluster", "go back to the feature list", true, true)
+	case screenEKSNodeGroupList:
+		return listScreenShortcuts("open the selected node group", "go back to the cluster list", true, true)
+	case screenEKSNodeGroupDetail:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Scroll the node group detail"},
+			{"pgup / pgdn", "Scroll by one page"},
+			{"esc", "Go back to the node group list"},
+			{"q", "Go back to the feature list"},
+		}
 	case screenS3BucketList:
 		return listScreenShortcuts("browse the selected bucket", "go back to the feature list", true, false)
 	case screenS3ObjectList:
@@ -763,6 +774,12 @@ func (m Model) helpScreenTitle() string {
 		return "ECS Tasks"
 	case screenECSContainerList:
 		return "ECS Containers"
+	case screenEKSClusterList:
+		return "EKS Clusters"
+	case screenEKSNodeGroupList:
+		return "EKS Node Groups"
+	case screenEKSNodeGroupDetail:
+		return "EKS Node Group Detail"
 	case screenS3BucketList:
 		return "S3 Buckets"
 	case screenS3ObjectList:

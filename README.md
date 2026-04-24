@@ -11,7 +11,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Drill down into resources with filters, detail views, and action screens
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
-- Perform operational workflows such as EC2 inventory inspection, SSM sessions, RDS control, Route53 record changes, ECS rollout inspection/exec, IAM access key rotation, and Bedrock API key management
+- Perform operational workflows such as EC2 inventory inspection, SSM sessions, RDS control, Route53 record changes, ECS rollout inspection/exec, EKS cluster and node group review, IAM access key rotation, and Bedrock API key management
 - Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
 ## Documentation Map
@@ -226,6 +226,7 @@ Context ordering:
 | CloudWatch Logs | Logs Browser |
 | ECR | ECR Login Helper |
 | ECS | ECS Browser & Exec |
+| EKS | Cluster & Node Group Browser |
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
 | Bedrock | API Key Manager |
@@ -340,13 +341,14 @@ checks:
 | ECR Login | CLI helper: `unic ecr login [--runtime docker|podman] [--copy]` |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
+| EKS Browser | cluster/node group lists support `/` filter and `r` refresh, cluster view shows version/status/endpoint visibility/ARN summary, node group detail shows desired/min/max scaling plus health issues |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
 | Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, `u` clear shell context and quit with a final confirmation message |
 | Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
-The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
+The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
 
 The EC2 Instance Browser lists EC2 instances across available states for the active context and region, separate from the SSM session picker that only lists connectable running instances. The detail screen shows core metadata including instance ID, name tag, state, instance type, AZ, VPC, subnet, private and public IPs, launch time, platform details, IAM profile, and tags.
 

@@ -64,6 +64,9 @@ const (
 	screenECSServiceDetail
 	screenECSTaskList
 	screenECSContainerList
+	screenEKSClusterList
+	screenEKSNodeGroupList
+	screenEKSNodeGroupDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -232,6 +235,18 @@ type Model struct {
 
 	ecsContainers   []awsservice.ECSContainer
 	ecsContainerIdx int
+
+	// EKS browser state
+	eksClusters         []awsservice.EKSCluster
+	filteredEKSClusters []awsservice.EKSCluster
+	eksClusterIdx       int
+	selectedEKSCluster  *awsservice.EKSCluster
+
+	eksNodeGroups         []awsservice.EKSNodeGroup
+	filteredEKSNodeGroups []awsservice.EKSNodeGroup
+	eksNodeGroupIdx       int
+	selectedEKSNodeGroup  *awsservice.EKSNodeGroup
+	eksNodeGroupScroll    int
 
 	// Feature submodels
 	ec2Browser ec2InstanceBrowserModel
@@ -448,6 +463,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleSecurityGroupMsg,
 		m.handleIAMMsg,
 		m.handleECSMsg,
+		m.handleEKSMsg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
@@ -587,6 +603,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateECSTaskList(msg)
 		case screenECSContainerList:
 			return m.updateECSContainerList(msg)
+		case screenEKSClusterList:
+			return m.updateEKSClusterList(msg)
+		case screenEKSNodeGroupList:
+			return m.updateEKSNodeGroupList(msg)
+		case screenEKSNodeGroupDetail:
+			return m.updateEKSNodeGroupDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -711,6 +733,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.startLoading(m.loadIAMKeys())
 			case domain.FeatureECSExec:
 				return m.startLoading(m.loadECSClusters())
+			case domain.FeatureEKSBrowser:
+				return m.startLoading(m.loadEKSClusters())
 			case domain.FeatureLambdaBrowser:
 				return m.lambda.Start(&m)
 			case domain.FeatureBedrockAPIKeys:
@@ -829,6 +853,12 @@ func (m Model) View() string {
 		v = m.viewECSTaskList()
 	case screenECSContainerList:
 		v = m.viewECSContainerList()
+	case screenEKSClusterList:
+		v = m.viewEKSClusterList()
+	case screenEKSNodeGroupList:
+		v = m.viewEKSNodeGroupList()
+	case screenEKSNodeGroupDetail:
+		v = m.viewEKSNodeGroupDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:
