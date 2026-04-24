@@ -19,90 +19,177 @@ import (
 const iamUserPageSize = 25
 const iamUserFilterPageSize = 100
 
-func (m Model) handleIAMMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+type iamModel struct {
+	users            []awsservice.IAMUser
+	filteredUsers    []awsservice.IAMUser
+	userIdx          int
+	userLoadingMore  bool
+	userHasMore      bool
+	userNextMarker   string
+	selectedUser     *awsservice.IAMUserDetail
+	keys             []awsservice.AccessKey
+	keyIdx           int
+	selectedKey      *awsservice.AccessKey
+	rotationEnabled  bool
+	rotateConfirm    string // typed input for rotate confirmation
+	rotationOldKeyID string
+	newKey           *awsservice.NewAccessKey
+	copyMsg          string // feedback message for clipboard copy
+	rotationStatus   string
+	newKeyVerified   bool
+	oldKeyDeleted    bool
+	oldKeyInactive   bool
+}
+
+func newIAMModel() iamModel {
+	return iamModel{}
+}
+
+func (im *iamModel) StartUsers(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(im.loadUsers(*m))
+}
+
+func (im *iamModel) StartKeys(m *Model, rotationEnabled bool) (tea.Model, tea.Cmd) {
+	im.rotationEnabled = rotationEnabled
+	return m.startLoading(im.loadKeys(*m))
+}
+
+func (im *iamModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case iamUsersLoadedMsg:
 		if msg.append {
-			m.iamUsers = append(m.iamUsers, msg.users...)
+			im.users = append(im.users, msg.users...)
 		} else {
-			m.iamUsers = msg.users
-			m.iamUserIdx = 0
+			im.users = msg.users
+			im.userIdx = 0
 		}
-		sort.Slice(m.iamUsers, func(i, j int) bool {
-			return strings.ToLower(m.iamUsers[i].UserName) < strings.ToLower(m.iamUsers[j].UserName)
+		sort.Slice(im.users, func(i, j int) bool {
+			return strings.ToLower(im.users[i].UserName) < strings.ToLower(im.users[j].UserName)
 		})
-		m.iamUserLoadingMore = false
-		m.iamUserHasMore = msg.hasMore
-		m.iamUserNextMarker = msg.nextMarker
-		m.refreshIAMUserFilter()
+		im.userLoadingMore = false
+		im.userHasMore = msg.hasMore
+		im.userNextMarker = msg.nextMarker
+		im.refreshUserFilter(m)
 		m.screen = screenIAMUserList
-		return m, nil, true
+		return *m, nil, true
 
 	case iamUserDetailLoadedMsg:
-		m.selectedIAMUser = msg.user
+		im.selectedUser = msg.user
 		m.screen = screenIAMUserDetail
-		return m, nil, true
+		return *m, nil, true
 
 	case iamKeysLoadedMsg:
-		m.iamKeys = msg.keys
-		m.iamKeyIdx = 0
+		im.keys = msg.keys
+		im.keyIdx = 0
 		m.screen = screenIAMKeyList
-		return m, nil, true
+		return *m, nil, true
 
 	case iamKeyCreatedMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			m.screen = screenError
-			return m, nil, true
+			return *m, nil, true
 		}
-		m.iamNewKey = msg.newKey
-		m.iamCopyMsg = ""
-		m.iamRotationStatus = ""
-		m.iamNewKeyVerified = false
-		m.iamOldKeyInactive = false
-		m.iamOldKeyDeleted = false
+		im.newKey = msg.newKey
+		im.copyMsg = ""
+		im.rotationStatus = ""
+		im.newKeyVerified = false
+		im.oldKeyInactive = false
+		im.oldKeyDeleted = false
 		m.screen = screenIAMKeyRotateResult
-		return m, nil, true
+		return *m, nil, true
 
 	case iamKeyVerifiedMsg:
 		if msg.err != nil {
-			m.iamRotationStatus = fmt.Sprintf("Verification failed: %s", msg.err)
-			return m, nil, true
+			im.rotationStatus = fmt.Sprintf("Verification failed: %s", msg.err)
+			return *m, nil, true
 		}
-		m.iamNewKeyVerified = true
+		im.newKeyVerified = true
 		if msg.identity != nil {
-			m.iamRotationStatus = fmt.Sprintf("Verified new key as %s", msg.identity.Arn)
+			im.rotationStatus = fmt.Sprintf("Verified new key as %s", msg.identity.Arn)
 		} else {
-			m.iamRotationStatus = "Verified new key"
+			im.rotationStatus = "Verified new key"
 		}
-		return m, nil, true
+		return *m, nil, true
 
 	case iamKeyDeactivatedMsg:
 		if msg.err != nil {
-			m.iamRotationStatus = msg.err.Error()
-			return m, nil, true
+			im.rotationStatus = msg.err.Error()
+			return *m, nil, true
 		}
-		m.iamOldKeyInactive = true
-		m.iamRotationStatus = fmt.Sprintf("Old key %s marked Inactive", msg.keyID)
-		return m, nil, true
+		im.oldKeyInactive = true
+		im.rotationStatus = fmt.Sprintf("Old key %s marked Inactive", msg.keyID)
+		return *m, nil, true
 
 	case iamKeyDeletedMsg:
 		if msg.err != nil {
-			m.iamRotationStatus = msg.err.Error()
-			return m, nil, true
+			im.rotationStatus = msg.err.Error()
+			return *m, nil, true
 		}
-		m.iamOldKeyDeleted = true
-		m.iamRotationStatus = fmt.Sprintf("Old key %s deleted", msg.keyID)
-		return m, nil, true
+		im.oldKeyDeleted = true
+		im.rotationStatus = fmt.Sprintf("Old key %s deleted", msg.keyID)
+		return *m, nil, true
 	}
-	return m, nil, false
+	return *m, nil, false
 }
 
-func (m Model) loadIAMUsers() tea.Cmd {
-	return m.loadIAMUsersPage("", false)
+func (im *iamModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenIAMUserList:
+		newM, cmd := im.updateUserList(m, msg)
+		return newM, cmd, true
+	case screenIAMUserDetail:
+		newM, cmd := im.updateUserDetail(m, msg)
+		return newM, cmd, true
+	case screenIAMKeyList:
+		newM, cmd := im.updateKeyList(m, msg)
+		return newM, cmd, true
+	case screenIAMKeyDetail:
+		newM, cmd := im.updateKeyDetail(m, msg)
+		return newM, cmd, true
+	case screenIAMKeyRotateConfirm:
+		newM, cmd := im.updateKeyRotateConfirm(m, msg)
+		return newM, cmd, true
+	case screenIAMKeyRotateResult:
+		newM, cmd := im.updateKeyRotateResult(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
 }
 
-func (m Model) loadIAMUsersPage(marker string, appendPage bool) tea.Cmd {
+func (im iamModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenIAMUserList:
+		return im.viewUserList(m), true
+	case screenIAMUserDetail:
+		return im.viewUserDetail(m), true
+	case screenIAMKeyList:
+		return im.viewKeyList(m), true
+	case screenIAMKeyDetail:
+		return im.viewKeyDetail(m), true
+	case screenIAMKeyRotateConfirm:
+		return im.viewKeyRotateConfirm(m), true
+	case screenIAMKeyRotateResult:
+		return im.viewKeyRotateResult(m), true
+	default:
+		return "", false
+	}
+}
+
+func (im *iamModel) ApplyFilter(m *Model, target filterTarget) bool {
+	if target != filterIAMUsers {
+		return false
+	}
+	im.refreshUserFilter(m)
+	return true
+}
+
+func (im iamModel) loadUsers(m Model) tea.Cmd {
+	return im.loadUsersPage(m, "", false)
+}
+
+func (im iamModel) loadUsersPage(m Model, marker string, appendPage bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -131,7 +218,7 @@ func (m Model) loadIAMUsersPage(marker string, appendPage bool) tea.Cmd {
 	}
 }
 
-func (m Model) loadAllIAMUserSummaries(marker string) tea.Cmd {
+func (im iamModel) loadAllUserSummaries(m Model, marker string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -168,7 +255,7 @@ func (m Model) loadAllIAMUserSummaries(marker string) tea.Cmd {
 	}
 }
 
-func (m Model) loadIAMUserDetail(userName string) tea.Cmd {
+func (im iamModel) loadUserDetail(m Model, userName string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -188,7 +275,7 @@ func (m Model) loadIAMUserDetail(userName string) tea.Cmd {
 	}
 }
 
-func (m Model) loadIAMKeys() tea.Cmd {
+func (im iamModel) loadKeys(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -208,7 +295,7 @@ func (m Model) loadIAMKeys() tea.Cmd {
 	}
 }
 
-func (m Model) createIAMKey() tea.Cmd {
+func (im iamModel) createKey(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -225,13 +312,13 @@ func (m Model) createIAMKey() tea.Cmd {
 	}
 }
 
-func (m Model) verifyIAMKey() tea.Cmd {
+func (im iamModel) verifyKey(m Model) tea.Cmd {
 	return func() tea.Msg {
-		if m.iamNewKey == nil {
+		if im.newKey == nil {
 			return iamKeyVerifiedMsg{err: fmt.Errorf("no new key available to verify")}
 		}
 
-		if err := auth.UpdateSharedCredentialsProfile(m.cfg.Profile, m.iamNewKey.AccessKeyID, m.iamNewKey.SecretAccessKey); err != nil {
+		if err := auth.UpdateSharedCredentialsProfile(m.cfg.Profile, im.newKey.AccessKeyID, im.newKey.SecretAccessKey); err != nil {
 			return iamKeyVerifiedMsg{err: err}
 		}
 
@@ -245,12 +332,12 @@ func (m Model) verifyIAMKey() tea.Cmd {
 			}
 		}
 
-		identity, err := repo.VerifyAccessKey(ctx, m.iamNewKey)
+		identity, err := repo.VerifyAccessKey(ctx, im.newKey)
 		return iamKeyVerifiedMsg{identity: identity, err: err}
 	}
 }
 
-func (m Model) deactivateIAMKey(oldKeyID string) tea.Cmd {
+func (im iamModel) deactivateKey(m Model, oldKeyID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -267,7 +354,7 @@ func (m Model) deactivateIAMKey(oldKeyID string) tea.Cmd {
 	}
 }
 
-func (m Model) deleteIAMKey(keyID string) tea.Cmd {
+func (im iamModel) deleteKey(m Model, keyID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -284,7 +371,7 @@ func (m Model) deleteIAMKey(keyID string) tea.Cmd {
 	}
 }
 
-func (m Model) requiresIAMCredentialApplyBeforeDeactivate() bool {
+func (im iamModel) requiresCredentialApplyBeforeDeactivate(m Model) bool {
 	if m.cfg == nil {
 		return false
 	}
@@ -302,19 +389,19 @@ func (m Model) requiresIAMCredentialApplyBeforeDeactivate() bool {
 		m.cfg.SSORoleName == ""
 }
 
-func (m Model) canDeactivateIAMOldKey() bool {
-	if m.iamNewKey == nil || m.iamRotationOldKeyID == "" || m.iamOldKeyInactive {
+func (im iamModel) canDeactivateOldKey(m Model) bool {
+	if im.newKey == nil || im.rotationOldKeyID == "" || im.oldKeyInactive {
 		return false
 	}
-	if !m.requiresIAMCredentialApplyBeforeDeactivate() {
+	if !im.requiresCredentialApplyBeforeDeactivate(m) {
 		return true
 	}
-	return m.iamNewKeyVerified
+	return im.newKeyVerified
 }
 
-func (m Model) iamApplyActionLine() string {
-	if m.requiresIAMCredentialApplyBeforeDeactivate() {
-		if m.iamNewKeyVerified {
+func (im iamModel) applyActionLine(m Model) string {
+	if im.requiresCredentialApplyBeforeDeactivate(m) {
+		if im.newKeyVerified {
 			return selectedStyle.Render("  [a] Applied to ~/.aws/credentials and verified")
 		}
 		return normalStyle.Render("  [a] Apply to ~/.aws/credentials and verify")
@@ -326,181 +413,181 @@ func (m Model) iamApplyActionLine() string {
 	return dimStyle.Render(fmt.Sprintf("  [a] Apply to ~/.aws/credentials and verify (disabled for auth:%s)", authType))
 }
 
-func (m Model) updateIAMUserList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *iamModel) updateUserList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterIAMUsers); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.selectedIAMUser = nil
+		im.selectedUser = nil
 		m.resetFilter(filterIAMUsers)
-		m.iamUserLoadingMore = false
-		m.iamUserHasMore = false
-		m.iamUserNextMarker = ""
-		m.filteredIAMUsers = nil
-		m.iamUserIdx = 0
+		im.userLoadingMore = false
+		im.userHasMore = false
+		im.userNextMarker = ""
+		im.filteredUsers = nil
+		im.userIdx = 0
 	case "up", "k":
-		m.iamUserIdx = previousListIndex(m.iamUserIdx, len(m.filteredIAMUsers))
+		im.userIdx = previousListIndex(im.userIdx, len(im.filteredUsers))
 	case "down", "j":
-		m.iamUserIdx = nextListIndex(m.iamUserIdx, len(m.filteredIAMUsers))
+		im.userIdx = nextListIndex(im.userIdx, len(im.filteredUsers))
 	case "/":
 		filterCmd := m.activateFilter(filterIAMUsers)
-		if m.iamUserHasMore && !m.iamUserLoadingMore {
-			m.iamUserLoadingMore = true
-			return m, tea.Batch(filterCmd, m.loadAllIAMUserSummaries(m.iamUserNextMarker))
+		if im.userHasMore && !im.userLoadingMore {
+			im.userLoadingMore = true
+			return *m, tea.Batch(filterCmd, im.loadAllUserSummaries(*m, im.userNextMarker))
 		}
-		return m, filterCmd
+		return *m, filterCmd
 	case "enter":
-		if len(m.filteredIAMUsers) > 0 && m.iamUserIdx < len(m.filteredIAMUsers) {
-			selected := m.filteredIAMUsers[m.iamUserIdx]
-			return m.startLoading(m.loadIAMUserDetail(selected.UserName))
+		if len(im.filteredUsers) > 0 && im.userIdx < len(im.filteredUsers) {
+			selected := im.filteredUsers[im.userIdx]
+			return m.startLoading(im.loadUserDetail(*m, selected.UserName))
 		}
 	case "n":
-		if m.iamUserHasMore && !m.iamUserLoadingMore {
-			m.iamUserLoadingMore = true
-			return m, m.loadIAMUsersPage(m.iamUserNextMarker, true)
+		if im.userHasMore && !im.userLoadingMore {
+			im.userLoadingMore = true
+			return *m, im.loadUsersPage(*m, im.userNextMarker, true)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m *Model) refreshIAMUserFilter() {
+func (im *iamModel) refreshUserFilter(m *Model) {
 	query := m.filterValue(filterIAMUsers)
 	if query == "" {
-		m.filteredIAMUsers = m.iamUsers
+		im.filteredUsers = im.users
 	} else {
-		m.filteredIAMUsers = applyFilter(m.iamUsers, query)
+		im.filteredUsers = applyFilter(im.users, query)
 	}
 
-	if len(m.filteredIAMUsers) == 0 {
-		m.iamUserIdx = 0
+	if len(im.filteredUsers) == 0 {
+		im.userIdx = 0
 		return
 	}
-	if m.iamUserIdx >= len(m.filteredIAMUsers) {
-		m.iamUserIdx = len(m.filteredIAMUsers) - 1
+	if im.userIdx >= len(im.filteredUsers) {
+		im.userIdx = len(im.filteredUsers) - 1
 	}
 }
 
-func (m Model) updateIAMUserDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *iamModel) updateUserDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
-		m.selectedIAMUser = nil
+		im.selectedUser = nil
 		m.screen = screenIAMUserList
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateIAMKeyList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *iamModel) updateKeyList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.iamKeyIdx = 0
+		im.keyIdx = 0
 	case "up", "k":
-		m.iamKeyIdx = previousListIndex(m.iamKeyIdx, len(m.iamKeys))
+		im.keyIdx = previousListIndex(im.keyIdx, len(im.keys))
 	case "down", "j":
-		m.iamKeyIdx = nextListIndex(m.iamKeyIdx, len(m.iamKeys))
+		im.keyIdx = nextListIndex(im.keyIdx, len(im.keys))
 	case "enter":
-		if len(m.iamKeys) > 0 && m.iamKeyIdx < len(m.iamKeys) {
-			selected := m.iamKeys[m.iamKeyIdx]
-			m.selectedIAMKey = &selected
+		if len(im.keys) > 0 && im.keyIdx < len(im.keys) {
+			selected := im.keys[im.keyIdx]
+			im.selectedKey = &selected
 			m.screen = screenIAMKeyDetail
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateIAMKeyDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *iamModel) updateKeyDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenIAMKeyList
 	case "r":
-		if m.iamRotationEnabled && m.selectedIAMKey != nil && m.selectedIAMKey.Status == "Active" {
-			m.iamRotateConfirm = ""
-			m.iamRotationOldKeyID = m.selectedIAMKey.AccessKeyID
-			m.iamNewKey = nil
-			m.iamCopyMsg = ""
-			m.iamRotationStatus = ""
-			m.iamNewKeyVerified = false
-			m.iamOldKeyInactive = false
-			m.iamOldKeyDeleted = false
+		if im.rotationEnabled && im.selectedKey != nil && im.selectedKey.Status == "Active" {
+			im.rotateConfirm = ""
+			im.rotationOldKeyID = im.selectedKey.AccessKeyID
+			im.newKey = nil
+			im.copyMsg = ""
+			im.rotationStatus = ""
+			im.newKeyVerified = false
+			im.oldKeyInactive = false
+			im.oldKeyDeleted = false
 			m.screen = screenIAMKeyRotateConfirm
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateIAMKeyRotateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *iamModel) updateKeyRotateConfirm(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	confirmTarget := ""
-	if m.selectedIAMKey != nil {
-		confirmTarget = m.selectedIAMKey.AccessKeyID
+	if im.selectedKey != nil {
+		confirmTarget = im.selectedKey.AccessKeyID
 	}
 
 	switch msg.String() {
 	case "esc":
 		m.screen = screenIAMKeyDetail
 	case "enter":
-		if m.selectedIAMKey != nil && m.iamRotateConfirm == confirmTarget {
-			return m.startLoading(m.createIAMKey())
+		if im.selectedKey != nil && im.rotateConfirm == confirmTarget {
+			return m.startLoading(im.createKey(*m))
 		}
 	case "backspace":
-		if len(m.iamRotateConfirm) > 0 {
-			m.iamRotateConfirm = m.iamRotateConfirm[:len(m.iamRotateConfirm)-1]
+		if len(im.rotateConfirm) > 0 {
+			im.rotateConfirm = im.rotateConfirm[:len(im.rotateConfirm)-1]
 		}
 	default:
 		if runes := msg.Runes; len(runes) > 0 {
-			m.iamRotateConfirm += string(runes)
+			im.rotateConfirm += string(runes)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateIAMKeyRotateResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *iamModel) updateKeyRotateResult(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "c":
-		if m.iamNewKey != nil {
+		if im.newKey != nil {
 			exportStr := fmt.Sprintf(
 				"export AWS_ACCESS_KEY_ID=%s\nexport AWS_SECRET_ACCESS_KEY=%s",
-				m.iamNewKey.AccessKeyID, m.iamNewKey.SecretAccessKey,
+				im.newKey.AccessKeyID, im.newKey.SecretAccessKey,
 			)
 			if err := clipboard.Copy(exportStr); err != nil {
-				m.iamCopyMsg = fmt.Sprintf("Clipboard error: %s", err)
+				im.copyMsg = fmt.Sprintf("Clipboard error: %s", err)
 			} else {
-				m.iamCopyMsg = "Copied to clipboard!"
+				im.copyMsg = "Copied to clipboard!"
 			}
 		}
 	case "a":
-		if m.requiresIAMCredentialApplyBeforeDeactivate() && m.iamNewKey != nil && !m.iamNewKeyVerified {
-			m.iamRotationStatus = "Applying new key to ~/.aws/credentials and verifying..."
-			return m, m.verifyIAMKey()
+		if im.requiresCredentialApplyBeforeDeactivate(*m) && im.newKey != nil && !im.newKeyVerified {
+			im.rotationStatus = "Applying new key to ~/.aws/credentials and verifying..."
+			return *m, im.verifyKey(*m)
 		}
 	case "d":
-		if m.canDeactivateIAMOldKey() {
-			return m, m.deactivateIAMKey(m.iamRotationOldKeyID)
+		if im.canDeactivateOldKey(*m) {
+			return *m, im.deactivateKey(*m, im.rotationOldKeyID)
 		}
 	case "x":
-		if m.iamOldKeyInactive && !m.iamOldKeyDeleted && m.iamRotationOldKeyID != "" {
-			return m, m.deleteIAMKey(m.iamRotationOldKeyID)
+		if im.oldKeyInactive && !im.oldKeyDeleted && im.rotationOldKeyID != "" {
+			return *m, im.deleteKey(*m, im.rotationOldKeyID)
 		}
 	case "q", "esc":
-		m.iamRotationOldKeyID = ""
-		m.iamNewKey = nil
-		m.iamCopyMsg = ""
-		m.iamRotationStatus = ""
-		m.iamNewKeyVerified = false
-		m.iamOldKeyInactive = false
-		m.iamOldKeyDeleted = false
-		return m.startLoading(m.loadIAMKeys())
+		im.rotationOldKeyID = ""
+		im.newKey = nil
+		im.copyMsg = ""
+		im.rotationStatus = ""
+		im.newKeyVerified = false
+		im.oldKeyInactive = false
+		im.oldKeyDeleted = false
+		return m.startLoading(im.loadKeys(*m))
 	}
-	return m, nil
+	return *m, nil
 }
 
 // --- View functions ---
 
-func (m Model) viewIAMUserList() string {
+func (im iamModel) viewUserList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -510,12 +597,12 @@ func (m Model) viewIAMUserList() string {
 	b.WriteString(m.renderFilterValue(filterIAMUsers))
 	b.WriteString("\n\n")
 
-	if len(m.filteredIAMUsers) == 0 {
+	if len(im.filteredUsers) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching IAM users"))
 		panel.WriteString("\n")
 	} else {
 		maxName := len("USERNAME")
-		for _, user := range m.filteredIAMUsers {
+		for _, user := range im.filteredUsers {
 			if len(user.UserName) > maxName {
 				maxName = len(user.UserName)
 			}
@@ -535,16 +622,16 @@ func (m Model) viewIAMUserList() string {
 
 		visibleLines := max(m.height-11, 5)
 		start := 0
-		if m.iamUserIdx >= visibleLines {
-			start = m.iamUserIdx - visibleLines + 1
+		if im.userIdx >= visibleLines {
+			start = im.userIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredIAMUsers))
+		end := min(start+visibleLines, len(im.filteredUsers))
 
 		for i := start; i < end; i++ {
-			user := m.filteredIAMUsers[i]
+			user := im.filteredUsers[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.iamUserIdx {
+			if i == im.userIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -558,21 +645,21 @@ func (m Model) viewIAMUserList() string {
 		}
 
 		panel.WriteString("\n")
-		status := fmt.Sprintf("  %d/%d loaded IAM users", len(m.filteredIAMUsers), len(m.iamUsers))
-		if m.iamUserHasMore {
+		status := fmt.Sprintf("  %d/%d loaded IAM users", len(im.filteredUsers), len(im.users))
+		if im.userHasMore {
 			status += " • more available"
 		}
 		panel.WriteString(dimStyle.Render(status))
 	}
 
-	if m.iamUserLoadingMore {
+	if im.userLoadingMore {
 		panel.WriteString("\n")
 		if m.isFiltering(filterIAMUsers) || m.filterValue(filterIAMUsers) != "" {
 			panel.WriteString(filterStyle.Render("  Loading remaining IAM usernames for filter..."))
 		} else {
 			panel.WriteString(filterStyle.Render("  Loading more IAM users..."))
 		}
-	} else if m.iamUserHasMore {
+	} else if im.userHasMore {
 		panel.WriteString("\n")
 		if m.isFiltering(filterIAMUsers) || m.filterValue(filterIAMUsers) != "" {
 			panel.WriteString(dimStyle.Render("  Continue typing to filter loaded usernames"))
@@ -587,12 +674,12 @@ func (m Model) viewIAMUserList() string {
 	return b.String()
 }
 
-func (m Model) viewIAMUserDetail() string {
-	if m.selectedIAMUser == nil {
+func (im iamModel) viewUserDetail(m Model) string {
+	if im.selectedUser == nil {
 		return ""
 	}
 
-	u := m.selectedIAMUser
+	u := im.selectedUser
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("IAM User Detail"))
@@ -641,38 +728,38 @@ func (m Model) viewIAMUserDetail() string {
 	return b.String()
 }
 
-func (m Model) viewIAMKeyList() string {
+func (im iamModel) viewKeyList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	title := "IAM Access Keys"
-	if m.iamRotationEnabled {
+	if im.rotationEnabled {
 		title = "Rotate IAM Access Key"
 	}
 	b.WriteString(titleStyle.Render(title))
 	b.WriteString("\n\n")
 
-	if m.iamRotationEnabled {
+	if im.rotationEnabled {
 		b.WriteString(dimStyle.Render("  User: Current identity"))
 		b.WriteString("\n\n")
 	}
 
-	if len(m.iamKeys) == 0 {
+	if len(im.keys) == 0 {
 		panel.WriteString(dimStyle.Render("  No access keys found"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.iamKeyIdx >= visibleLines {
-			start = m.iamKeyIdx - visibleLines + 1
+		if im.keyIdx >= visibleLines {
+			start = im.keyIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.iamKeys))
+		end := min(start+visibleLines, len(im.keys))
 
 		for i := start; i < end; i++ {
-			key := m.iamKeys[i]
+			key := im.keys[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.iamKeyIdx {
+			if i == im.keyIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -681,7 +768,7 @@ func (m Model) viewIAMKeyList() string {
 				title = errorStyle.Render(title)
 				cursor = errorStyle.Render(cursor)
 			}
-			if i == m.iamKeyIdx && !key.IsAged() {
+			if i == im.keyIdx && !key.IsAged() {
 				title = style.Render(fmt.Sprintf("%s%s", cursor, key.DisplayTitle()))
 			} else if key.IsAged() {
 				title = fmt.Sprintf("%s%s", cursor, title)
@@ -693,7 +780,7 @@ func (m Model) viewIAMKeyList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d keys", len(m.iamKeys))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d keys", len(im.keys))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -702,11 +789,11 @@ func (m Model) viewIAMKeyList() string {
 	return b.String()
 }
 
-func (m Model) viewIAMKeyDetail() string {
-	if m.selectedIAMKey == nil {
+func (im iamModel) viewKeyDetail(m Model) string {
+	if im.selectedKey == nil {
 		return ""
 	}
-	k := m.selectedIAMKey
+	k := im.selectedKey
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Access Key Detail"))
@@ -749,7 +836,7 @@ func (m Model) viewIAMKeyDetail() string {
 	b.WriteString("\n")
 	b.WriteString(titleStyle.Render("Actions"))
 	b.WriteString("\n")
-	if !m.iamRotationEnabled {
+	if !im.rotationEnabled {
 		b.WriteString(dimStyle.Render("  Rotation is available from the RotateAccessKey feature"))
 		b.WriteString("\n")
 	} else if k.Status == "Active" {
@@ -765,11 +852,11 @@ func (m Model) viewIAMKeyDetail() string {
 	return b.String()
 }
 
-func (m Model) viewIAMKeyRotateConfirm() string {
-	if m.selectedIAMKey == nil {
+func (im iamModel) viewKeyRotateConfirm(m Model) string {
+	if im.selectedKey == nil {
 		return ""
 	}
-	k := m.selectedIAMKey
+	k := im.selectedKey
 
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -790,14 +877,14 @@ func (m Model) viewIAMKeyRotateConfirm() string {
 	b.WriteString("\n\n")
 	b.WriteString(normalStyle.Render("  Type the access key ID to confirm:"))
 	b.WriteString("\n")
-	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.iamRotateConfirm)))
+	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", im.rotateConfirm)))
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 	return b.String()
 }
 
-func (m Model) viewIAMKeyRotateResult() string {
-	if m.iamNewKey == nil {
+func (im iamModel) viewKeyRotateResult(m Model) string {
+	if im.newKey == nil {
 		return ""
 	}
 	var b strings.Builder
@@ -808,32 +895,32 @@ func (m Model) viewIAMKeyRotateResult() string {
 	b.WriteString(normalStyle.Render("  New credentials (shown once only):"))
 	b.WriteString("\n\n")
 
-	b.WriteString(renderDetailLine("Access Key ID", normalStyle.Render(m.iamNewKey.AccessKeyID)))
+	b.WriteString(renderDetailLine("Access Key ID", normalStyle.Render(im.newKey.AccessKeyID)))
 	b.WriteString("\n")
-	b.WriteString(renderDetailLine("Secret Access Key", normalStyle.Render(m.iamNewKey.SecretAccessKey)))
+	b.WriteString(renderDetailLine("Secret Access Key", normalStyle.Render(im.newKey.SecretAccessKey)))
 	b.WriteString("\n\n")
 
-	if m.iamRotationOldKeyID != "" {
+	if im.rotationOldKeyID != "" {
 		oldKeyStatus := "Pending"
-		if m.iamOldKeyInactive {
+		if im.oldKeyInactive {
 			oldKeyStatus = "Inactive"
 		}
-		if m.iamOldKeyDeleted {
+		if im.oldKeyDeleted {
 			oldKeyStatus = "Deleted"
 		}
-		b.WriteString(renderDetailLine("Old Key", normalStyle.Render(m.iamRotationOldKeyID)))
+		b.WriteString(renderDetailLine("Old Key", normalStyle.Render(im.rotationOldKeyID)))
 		b.WriteString("\n")
 		b.WriteString(renderDetailLine("Old Key Status", normalStyle.Render(oldKeyStatus)))
 		b.WriteString("\n\n")
 	}
 
-	if m.iamCopyMsg != "" {
-		b.WriteString(selectedStyle.Render(fmt.Sprintf("  %s", m.iamCopyMsg)))
+	if im.copyMsg != "" {
+		b.WriteString(selectedStyle.Render(fmt.Sprintf("  %s", im.copyMsg)))
 		b.WriteString("\n\n")
 	}
 
-	if m.iamRotationStatus != "" {
-		b.WriteString(selectedStyle.Render(fmt.Sprintf("  %s", m.iamRotationStatus)))
+	if im.rotationStatus != "" {
+		b.WriteString(selectedStyle.Render(fmt.Sprintf("  %s", im.rotationStatus)))
 		b.WriteString("\n\n")
 	}
 
@@ -841,21 +928,21 @@ func (m Model) viewIAMKeyRotateResult() string {
 	b.WriteString("\n")
 	b.WriteString(normalStyle.Render("  [c] Copy as export commands"))
 	b.WriteString("\n")
-	b.WriteString(m.iamApplyActionLine())
+	b.WriteString(im.applyActionLine(m))
 	b.WriteString("\n")
-	if m.canDeactivateIAMOldKey() {
+	if im.canDeactivateOldKey(m) {
 		b.WriteString(normalStyle.Render("  [d] Deactivate old key"))
-	} else if m.iamOldKeyInactive {
+	} else if im.oldKeyInactive {
 		b.WriteString(dimStyle.Render("  [d] Old key already inactive"))
-	} else if m.requiresIAMCredentialApplyBeforeDeactivate() {
+	} else if im.requiresCredentialApplyBeforeDeactivate(m) {
 		b.WriteString(dimStyle.Render("  [d] Deactivate old key (available after apply + verify)"))
 	} else {
 		b.WriteString(dimStyle.Render("  [d] Deactivate old key"))
 	}
 	b.WriteString("\n")
-	if m.iamOldKeyInactive && !m.iamOldKeyDeleted {
+	if im.oldKeyInactive && !im.oldKeyDeleted {
 		b.WriteString(normalStyle.Render("  [x] Delete old inactive key"))
-	} else if m.iamOldKeyDeleted {
+	} else if im.oldKeyDeleted {
 		b.WriteString(dimStyle.Render("  [x] Old key already deleted"))
 	} else {
 		b.WriteString(dimStyle.Render("  [x] Delete old key (available after deactivation)"))

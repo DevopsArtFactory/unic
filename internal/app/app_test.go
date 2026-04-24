@@ -1607,10 +1607,10 @@ func TestIAMUserFeatureUsesUserBrowserFlow(t *testing.T) {
 func TestIAMUserListEnterGoesToDetailLoad(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenIAMUserList
-	m.iamUsers = []awsservice.IAMUser{
+	m.iam.users = []awsservice.IAMUser{
 		{UserName: "alice"},
 	}
-	m.filteredIAMUsers = m.iamUsers
+	m.iam.filteredUsers = m.iam.users
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
@@ -1625,14 +1625,14 @@ func TestIAMUserListEnterGoesToDetailLoad(t *testing.T) {
 func TestIAMUserListNextPageStartsIncrementalLoad(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenIAMUserList
-	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
-	m.filteredIAMUsers = m.iamUsers
-	m.iamUserHasMore = true
-	m.iamUserNextMarker = "page-2"
+	m.iam.users = []awsservice.IAMUser{{UserName: "alice"}}
+	m.iam.filteredUsers = m.iam.users
+	m.iam.userHasMore = true
+	m.iam.userNextMarker = "page-2"
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	model := updated.(Model)
-	if !model.iamUserLoadingMore {
+	if !model.iam.userLoadingMore {
 		t.Fatal("expected IAM user incremental loading to start")
 	}
 	if model.screen != screenIAMUserList {
@@ -1646,17 +1646,17 @@ func TestIAMUserListNextPageStartsIncrementalLoad(t *testing.T) {
 func TestIAMUserListFilterStartsBackgroundSummaryLoad(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenIAMUserList
-	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
-	m.filteredIAMUsers = m.iamUsers
-	m.iamUserHasMore = true
-	m.iamUserNextMarker = "page-2"
+	m.iam.users = []awsservice.IAMUser{{UserName: "alice"}}
+	m.iam.filteredUsers = m.iam.users
+	m.iam.userHasMore = true
+	m.iam.userNextMarker = "page-2"
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	model := updated.(Model)
 	if !model.isFiltering(filterIAMUsers) {
 		t.Fatal("expected IAM user filter to activate")
 	}
-	if !model.iamUserLoadingMore {
+	if !model.iam.userLoadingMore {
 		t.Fatal("expected background username loading for filter")
 	}
 	if cmd == nil {
@@ -1667,11 +1667,11 @@ func TestIAMUserListFilterStartsBackgroundSummaryLoad(t *testing.T) {
 func TestHandleIAMUsersLoadedMsgAppendsPage(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenIAMUserList
-	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
-	m.filteredIAMUsers = m.iamUsers
-	m.iamUserLoadingMore = true
+	m.iam.users = []awsservice.IAMUser{{UserName: "alice"}}
+	m.iam.filteredUsers = m.iam.users
+	m.iam.userLoadingMore = true
 
-	updated, _, handled := m.handleIAMMsg(iamUsersLoadedMsg{
+	updated, _, handled := m.iam.HandleMessage(&m, iamUsersLoadedMsg{
 		users:      []awsservice.IAMUser{{UserName: "bob"}},
 		append:     true,
 		hasMore:    true,
@@ -1682,24 +1682,24 @@ func TestHandleIAMUsersLoadedMsgAppendsPage(t *testing.T) {
 	}
 
 	model := updated.(Model)
-	if len(model.iamUsers) != 2 {
-		t.Fatalf("expected 2 IAM users after append, got %d", len(model.iamUsers))
+	if len(model.iam.users) != 2 {
+		t.Fatalf("expected 2 IAM users after append, got %d", len(model.iam.users))
 	}
-	if model.iamUserLoadingMore {
+	if model.iam.userLoadingMore {
 		t.Fatal("expected loading-more flag to be cleared")
 	}
-	if !model.iamUserHasMore {
+	if !model.iam.userHasMore {
 		t.Fatal("expected hasMore to remain true")
 	}
-	if model.iamUserNextMarker != "page-3" {
-		t.Fatalf("expected next marker page-3, got %q", model.iamUserNextMarker)
+	if model.iam.userNextMarker != "page-3" {
+		t.Fatalf("expected next marker page-3, got %q", model.iam.userNextMarker)
 	}
 }
 
 func TestIAMUserDetailShowsGroupsPoliciesAndKeys(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenIAMUserDetail
-	m.selectedIAMUser = &awsservice.IAMUserDetail{
+	m.iam.selectedUser = &awsservice.IAMUserDetail{
 		IAMUser: awsservice.IAMUser{
 			UserName:         "alice",
 			UserID:           "AIDA1234",
@@ -1722,7 +1722,7 @@ func TestIAMUserDetailShowsGroupsPoliciesAndKeys(t *testing.T) {
 		},
 	}
 
-	view := m.viewIAMUserDetail()
+	view := m.iam.viewUserDetail(m)
 	if !strings.Contains(view, "admins") {
 		t.Fatalf("expected groups in detail view, got %q", view)
 	}
@@ -1737,11 +1737,11 @@ func TestIAMUserDetailShowsGroupsPoliciesAndKeys(t *testing.T) {
 func TestIAMUserListShowsLoadMoreHint(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenIAMUserList
-	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
-	m.filteredIAMUsers = m.iamUsers
-	m.iamUserHasMore = true
+	m.iam.users = []awsservice.IAMUser{{UserName: "alice"}}
+	m.iam.filteredUsers = m.iam.users
+	m.iam.userHasMore = true
 
-	view := m.viewIAMUserList()
+	view := m.iam.viewUserList(m)
 	if !strings.Contains(view, "Press n to load the next page") {
 		t.Fatalf("expected load-more hint in IAM user list view, got %q", view)
 	}
@@ -1750,12 +1750,12 @@ func TestIAMUserListShowsLoadMoreHint(t *testing.T) {
 func TestIAMUserListShowsFilterBackgroundLoadHint(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenIAMUserList
-	m.iamUsers = []awsservice.IAMUser{{UserName: "alice"}}
-	m.filteredIAMUsers = m.iamUsers
+	m.iam.users = []awsservice.IAMUser{{UserName: "alice"}}
+	m.iam.filteredUsers = m.iam.users
 	m.storeFilterValue(filterIAMUsers, "ali")
-	m.iamUserLoadingMore = true
+	m.iam.userLoadingMore = true
 
-	view := m.viewIAMUserList()
+	view := m.iam.viewUserList(m)
 	if !strings.Contains(view, "Loading remaining IAM usernames for filter") {
 		t.Fatalf("expected filter background load hint, got %q", view)
 	}
@@ -1763,13 +1763,13 @@ func TestIAMUserListShowsFilterBackgroundLoadHint(t *testing.T) {
 
 func TestIAMKeyDetailHidesRotateActionInListMode(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.iamRotationEnabled = false
-	m.selectedIAMKey = &awsservice.AccessKey{
+	m.iam.rotationEnabled = false
+	m.iam.selectedKey = &awsservice.AccessKey{
 		AccessKeyID: "AKIATEST",
 		Status:      "Active",
 	}
 
-	view := m.viewIAMKeyDetail()
+	view := m.iam.viewKeyDetail(m)
 	if !strings.Contains(view, "RotateAccessKey feature") {
 		t.Fatalf("expected list mode detail view to hide direct rotate action, got %q", view)
 	}
@@ -1777,13 +1777,13 @@ func TestIAMKeyDetailHidesRotateActionInListMode(t *testing.T) {
 
 func TestIAMKeyDetailShowsRotateActionInRotateMode(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.iamRotationEnabled = true
-	m.selectedIAMKey = &awsservice.AccessKey{
+	m.iam.rotationEnabled = true
+	m.iam.selectedKey = &awsservice.AccessKey{
 		AccessKeyID: "AKIATEST",
 		Status:      "Active",
 	}
 
-	view := m.viewIAMKeyDetail()
+	view := m.iam.viewKeyDetail(m)
 	if !strings.Contains(view, "[r] Rotate key") {
 		t.Fatalf("expected rotate mode detail view to show rotate action, got %q", view)
 	}
@@ -1792,17 +1792,17 @@ func TestIAMKeyDetailShowsRotateActionInRotateMode(t *testing.T) {
 func TestIAMRotationResultRequiresApplyBeforeDeactivateForCredentialCurrentIdentity(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeCredential
-	m.iamNewKey = &awsservice.NewAccessKey{
+	m.iam.newKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
 		SecretAccessKey: "secret",
 	}
-	m.iamRotationOldKeyID = "AKIAOLDKEY"
+	m.iam.rotationOldKeyID = "AKIAOLDKEY"
 
-	if m.canDeactivateIAMOldKey() {
+	if m.iam.canDeactivateOldKey(m) {
 		t.Fatal("expected deactivate to be blocked before apply/verify")
 	}
 
-	view := m.viewIAMKeyRotateResult()
+	view := m.iam.viewKeyRotateResult(m)
 	if !strings.Contains(view, "Apply to ~/.aws/credentials and verify") {
 		t.Fatalf("expected apply action in result view, got %q", view)
 	}
@@ -1814,14 +1814,14 @@ func TestIAMRotationResultRequiresApplyBeforeDeactivateForCredentialCurrentIdent
 func TestIAMRotationResultAllowsDeactivateAfterVerify(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeCredential
-	m.iamNewKey = &awsservice.NewAccessKey{
+	m.iam.newKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
 		SecretAccessKey: "secret",
 	}
-	m.iamRotationOldKeyID = "AKIAOLDKEY"
-	m.iamNewKeyVerified = true
+	m.iam.rotationOldKeyID = "AKIAOLDKEY"
+	m.iam.newKeyVerified = true
 
-	if !m.canDeactivateIAMOldKey() {
+	if !m.iam.canDeactivateOldKey(m) {
 		t.Fatal("expected deactivate to be allowed after verification")
 	}
 }
@@ -1829,13 +1829,13 @@ func TestIAMRotationResultAllowsDeactivateAfterVerify(t *testing.T) {
 func TestIAMRotationResultRequiresNoApplyForSSOContext(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeSSO
-	m.iamNewKey = &awsservice.NewAccessKey{
+	m.iam.newKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
 		SecretAccessKey: "secret",
 	}
-	m.iamRotationOldKeyID = "AKIAOLDKEY"
+	m.iam.rotationOldKeyID = "AKIAOLDKEY"
 
-	if !m.canDeactivateIAMOldKey() {
+	if !m.iam.canDeactivateOldKey(m) {
 		t.Fatal("expected non-credential flow to allow immediate deactivate")
 	}
 }
@@ -1848,17 +1848,17 @@ func TestIAMRotationResultShowsApplyForLegacyCredentialContext(t *testing.T) {
 	m.cfg.SSOStartURL = ""
 	m.cfg.SSOAccountID = ""
 	m.cfg.SSORoleName = ""
-	m.iamNewKey = &awsservice.NewAccessKey{
+	m.iam.newKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
 		SecretAccessKey: "secret",
 	}
-	m.iamRotationOldKeyID = "AKIAOLDKEY"
+	m.iam.rotationOldKeyID = "AKIAOLDKEY"
 
-	if !m.requiresIAMCredentialApplyBeforeDeactivate() {
+	if !m.iam.requiresCredentialApplyBeforeDeactivate(m) {
 		t.Fatal("expected legacy profile-based context to require apply/verify")
 	}
 
-	view := m.viewIAMKeyRotateResult()
+	view := m.iam.viewKeyRotateResult(m)
 	if !strings.Contains(view, "[a] Apply to ~/.aws/credentials and verify") {
 		t.Fatalf("expected apply action for legacy credential context, got %q", view)
 	}
@@ -1872,17 +1872,17 @@ func TestIAMRotationResultShowsApplyForImplicitDefaultProfile(t *testing.T) {
 	m.cfg.SSOStartURL = ""
 	m.cfg.SSOAccountID = ""
 	m.cfg.SSORoleName = ""
-	m.iamNewKey = &awsservice.NewAccessKey{
+	m.iam.newKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
 		SecretAccessKey: "secret",
 	}
-	m.iamRotationOldKeyID = "AKIAOLDKEY"
+	m.iam.rotationOldKeyID = "AKIAOLDKEY"
 
-	if !m.requiresIAMCredentialApplyBeforeDeactivate() {
+	if !m.iam.requiresCredentialApplyBeforeDeactivate(m) {
 		t.Fatal("expected implicit default profile to require apply/verify")
 	}
 
-	view := m.viewIAMKeyRotateResult()
+	view := m.iam.viewKeyRotateResult(m)
 	if !strings.Contains(view, "[a] Apply to ~/.aws/credentials and verify") {
 		t.Fatalf("expected apply action for implicit default profile, got %q", view)
 	}
@@ -1891,13 +1891,13 @@ func TestIAMRotationResultShowsApplyForImplicitDefaultProfile(t *testing.T) {
 func TestIAMRotationResultShowsDisabledApplyReasonForSSO(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cfg.AuthType = config.AuthTypeSSO
-	m.iamNewKey = &awsservice.NewAccessKey{
+	m.iam.newKey = &awsservice.NewAccessKey{
 		AccessKeyID:     "AKIANEWKEY",
 		SecretAccessKey: "secret",
 	}
-	m.iamRotationOldKeyID = "AKIAOLDKEY"
+	m.iam.rotationOldKeyID = "AKIAOLDKEY"
 
-	view := m.viewIAMKeyRotateResult()
+	view := m.iam.viewKeyRotateResult(m)
 	if !strings.Contains(view, "disabled for auth:sso") {
 		t.Fatalf("expected disabled reason for sso flow, got %q", view)
 	}
@@ -1917,7 +1917,7 @@ func TestRotateAccessKeyFeatureUsesCurrentIdentityFlow(t *testing.T) {
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
-	if !model.iamRotationEnabled {
+	if !model.iam.rotationEnabled {
 		t.Fatal("expected IAM rotation mode to be enabled")
 	}
 	if model.screen != screenLoading {
@@ -2347,7 +2347,7 @@ func TestCWLogTailAppendClampsScrollOffsetForShortEventList(t *testing.T) {
 		{Timestamp: time.Unix(1, 0), Message: "two"},
 	}
 
-	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+	updated, _, handled := m.cwLogs.HandleMessage(&m, cwLogEventsLoadedMsg{
 		append: true,
 		events: []awsservice.LogEvent{
 			{Timestamp: time.Unix(2, 0), Message: "three"},
@@ -2368,7 +2368,7 @@ func TestCWLogTailTickSchedulesPollAndNextTick(t *testing.T) {
 	m.cwLogs.tailing = true
 	m.cwLogs.selectedGroup = &awsservice.LogGroup{Name: "/aws/lambda/test"}
 
-	updated, cmd, handled := m.handleCloudWatchLogsMsg(cwLogTailTickMsg{})
+	updated, cmd, handled := m.cwLogs.HandleMessage(&m, cwLogTailTickMsg{})
 	if !handled {
 		t.Fatal("expected CloudWatch logs tail tick to be handled")
 	}
@@ -2401,7 +2401,7 @@ func TestCWLogTailAppendDeduplicatesExistingEventIDs(t *testing.T) {
 		{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"},
 	}
 
-	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+	updated, _, handled := m.cwLogs.HandleMessage(&m, cwLogEventsLoadedMsg{
 		append: true,
 		events: []awsservice.LogEvent{
 			{EventID: "evt-2", Timestamp: time.Unix(1, 0), Message: "two"},
@@ -2430,7 +2430,7 @@ func TestCWLogTailAppendDeduplicatesEventsWithoutEventIDs(t *testing.T) {
 		{Timestamp: time.Unix(1, 0), Message: "duplicate"},
 	}
 
-	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+	updated, _, handled := m.cwLogs.HandleMessage(&m, cwLogEventsLoadedMsg{
 		append: true,
 		events: []awsservice.LogEvent{
 			{Timestamp: time.Unix(1, 0), Message: "duplicate"},
@@ -2455,7 +2455,7 @@ func TestCWLogLoadMoreDoesNotOverwriteTailToken(t *testing.T) {
 	m.cwLogs.tailToken = stringPtr("tail-token")
 	m.cwLogs.nextToken = stringPtr("page-token")
 
-	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+	updated, _, handled := m.cwLogs.HandleMessage(&m, cwLogEventsLoadedMsg{
 		append:                true,
 		nextToken:             stringPtr("older-page-token"),
 		updatePaginationToken: true,
@@ -2479,7 +2479,7 @@ func TestCWLogTailAppendDoesNotOverwritePaginationToken(t *testing.T) {
 	m.cwLogs.nextToken = stringPtr("page-token")
 	m.cwLogs.tailToken = stringPtr("tail-token")
 
-	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogEventsLoadedMsg{
+	updated, _, handled := m.cwLogs.HandleMessage(&m, cwLogEventsLoadedMsg{
 		append:          true,
 		nextToken:       stringPtr("new-tail-token"),
 		updateTailToken: true,
@@ -2501,7 +2501,7 @@ func TestCWLogTailAppendDoesNotOverwritePaginationToken(t *testing.T) {
 func TestCWLogGroupsLoadedReplacesInitialPageAndStoresNextToken(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 
-	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogGroupsLoadedMsg{
+	updated, _, handled := m.cwLogs.HandleMessage(&m, cwLogGroupsLoadedMsg{
 		groups: []awsservice.LogGroup{
 			{Name: "/aws/lambda/a"},
 			{Name: "/aws/lambda/b"},
@@ -2525,7 +2525,7 @@ func TestCWLogGroupsLoadedAppendExtendsExistingList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cwLogs.groups = []awsservice.LogGroup{{Name: "/aws/lambda/a"}}
 
-	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogGroupsLoadedMsg{
+	updated, _, handled := m.cwLogs.HandleMessage(&m, cwLogGroupsLoadedMsg{
 		append: true,
 		groups: []awsservice.LogGroup{
 			{Name: "/aws/lambda/b"},
@@ -2549,7 +2549,7 @@ func TestCWLogStreamsLoadedAppendExtendsExistingList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cwLogs.streams = []awsservice.LogStream{{Name: "stream-a"}}
 
-	updated, _, handled := m.handleCloudWatchLogsMsg(cwLogStreamsLoadedMsg{
+	updated, _, handled := m.cwLogs.HandleMessage(&m, cwLogStreamsLoadedMsg{
 		append: true,
 		streams: []awsservice.LogStream{
 			{Name: "stream-b"},

@@ -157,48 +157,6 @@ type Model struct {
 	reachabilityConfigField     int
 	reachabilityResult          *awsservice.ReachabilityAnalysisResult
 	reachabilityScrollOffset    int
-	// Route53 browser state
-	route53Zones           []awsservice.HostedZone
-	filteredRoute53Zones   []awsservice.HostedZone
-	route53ZoneIdx         int
-	selectedRoute53Zone    *awsservice.HostedZone
-	route53Records         []awsservice.DNSRecord
-	filteredRoute53Records []awsservice.DNSRecord
-	route53RecordIdx       int
-	selectedRoute53Record  *awsservice.DNSRecord
-
-	// Route53 mutation state
-	route53Action        string            // "create", "edit", "delete"
-	route53ConfirmInput  string            // type-to-confirm for delete
-	route53EditField     int               // current form field index
-	route53EditValues    map[string]string // accumulated form values
-	route53EditInput     string            // current field text input
-	route53EditSelectIdx int               // index for select-type fields (record type)
-	route53ChangeID      string            // for status polling
-	route53ChangeStatus  string            // "PENDING" / "INSYNC"
-	route53Polling       bool              // polling active
-
-	// IAM credentials state
-	iamUsers            []awsservice.IAMUser
-	filteredIAMUsers    []awsservice.IAMUser
-	iamUserIdx          int
-	iamUserLoadingMore  bool
-	iamUserHasMore      bool
-	iamUserNextMarker   string
-	selectedIAMUser     *awsservice.IAMUserDetail
-	iamKeys             []awsservice.AccessKey
-	iamKeyIdx           int
-	selectedIAMKey      *awsservice.AccessKey
-	iamRotationEnabled  bool
-	iamRotateConfirm    string // typed input for rotate confirmation
-	iamRotationOldKeyID string
-	iamNewKey           *awsservice.NewAccessKey
-	iamCopyMsg          string // feedback message for clipboard copy
-	iamRotationStatus   string
-	iamNewKeyVerified   bool
-	iamOldKeyDeleted    bool
-	iamOldKeyInactive   bool
-
 	// Security Group browser state
 	securityGroups         []awsservice.SecurityGroup
 	filteredSecurityGroups []awsservice.SecurityGroup
@@ -238,6 +196,8 @@ type Model struct {
 	cwMetrics  cloudWatchMetricsModel
 	cwLogs     cloudWatchLogsModel
 	rds        rdsModel
+	route53    route53Model
+	iam        iamModel
 	bedrock    bedrockModel
 	secrets    secretsModel
 	s3         s3Model
@@ -344,6 +304,8 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
+	model.route53 = newRoute53Model()
+	model.iam = newIAMModel()
 	model.bedrock = newBedrockModel()
 	model.secrets = newSecretsModel()
 	model.s3 = newS3Model()
@@ -444,9 +406,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Domain message handlers
 	for _, h := range []func(tea.Msg) (tea.Model, tea.Cmd, bool){
 		m.handleEC2VPCMsg,
-		m.handleRoute53Msg,
 		m.handleSecurityGroupMsg,
-		m.handleIAMMsg,
 		m.handleECSMsg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
@@ -531,18 +491,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateReachabilityConfig(msg)
 		case screenReachabilityResult:
 			return m.updateReachabilityResult(msg)
-		case screenRoute53ZoneList:
-			return m.updateRoute53ZoneList(msg)
-		case screenRoute53RecordList:
-			return m.updateRoute53RecordList(msg)
-		case screenRoute53RecordDetail:
-			return m.updateRoute53RecordDetail(msg)
-		case screenRoute53RecordCreate:
-			return m.updateRoute53RecordCreate(msg)
-		case screenRoute53RecordEdit:
-			return m.updateRoute53RecordEdit(msg)
-		case screenRoute53RecordDeleteConfirm:
-			return m.updateRoute53RecordDeleteConfirm(msg)
 		case screenInspectorHome:
 			return m.updateInspectorHome(msg)
 		case screenInspectorWorkflowPlaceholder:
@@ -565,18 +513,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecurityGroupAddRule(msg)
 		case screenSecurityGroupDeleteConfirm:
 			return m.updateSecurityGroupDeleteConfirm(msg)
-		case screenIAMUserList:
-			return m.updateIAMUserList(msg)
-		case screenIAMUserDetail:
-			return m.updateIAMUserDetail(msg)
-		case screenIAMKeyList:
-			return m.updateIAMKeyList(msg)
-		case screenIAMKeyDetail:
-			return m.updateIAMKeyDetail(msg)
-		case screenIAMKeyRotateConfirm:
-			return m.updateIAMKeyRotateConfirm(msg)
-		case screenIAMKeyRotateResult:
-			return m.updateIAMKeyRotateResult(msg)
 		case screenECSClusterList:
 			return m.updateECSClusterList(msg)
 		case screenECSServiceList:
@@ -690,7 +626,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureRDSBrowser:
 				return m.rds.Start(&m)
 			case domain.FeatureRoute53Browser:
-				return m.startLoading(m.loadRoute53Zones())
+				return m.route53.Start(&m)
 			case domain.FeatureSecretsBrowser:
 				return m.secrets.Start(&m)
 			case domain.FeatureCloudWatchMetrics:
@@ -702,13 +638,11 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureSecurityGroupBrowser:
 				return m.startLoading(m.loadSecurityGroups())
 			case domain.FeatureIAMUsersBrowser:
-				return m.startLoading(m.loadIAMUsers())
+				return m.iam.StartUsers(&m)
 			case domain.FeatureListAccessKeys:
-				m.iamRotationEnabled = false
-				return m.startLoading(m.loadIAMKeys())
+				return m.iam.StartKeys(&m, false)
 			case domain.FeatureRotateAccessKey:
-				m.iamRotationEnabled = true
-				return m.startLoading(m.loadIAMKeys())
+				return m.iam.StartKeys(&m, true)
 			case domain.FeatureECSExec:
 				return m.startLoading(m.loadECSClusters())
 			case domain.FeatureLambdaBrowser:
@@ -771,18 +705,6 @@ func (m Model) View() string {
 		v = m.viewReachabilityConfig()
 	case screenReachabilityResult:
 		v = m.viewReachabilityResult()
-	case screenRoute53ZoneList:
-		v = m.viewRoute53ZoneList()
-	case screenRoute53RecordList:
-		v = m.viewRoute53RecordList()
-	case screenRoute53RecordDetail:
-		v = m.viewRoute53RecordDetail()
-	case screenRoute53RecordCreate:
-		v = m.viewRoute53RecordCreate()
-	case screenRoute53RecordEdit:
-		v = m.viewRoute53RecordEdit()
-	case screenRoute53RecordDeleteConfirm:
-		v = m.viewRoute53RecordDeleteConfirm()
 	case screenInspectorHome:
 		v = m.viewInspectorHome()
 	case screenInspectorWorkflowPlaceholder:
@@ -807,18 +729,6 @@ func (m Model) View() string {
 		v = m.viewSecurityGroupAddRule()
 	case screenSecurityGroupDeleteConfirm:
 		v = m.viewSecurityGroupDeleteConfirm()
-	case screenIAMUserList:
-		v = m.viewIAMUserList()
-	case screenIAMUserDetail:
-		v = m.viewIAMUserDetail()
-	case screenIAMKeyList:
-		v = m.viewIAMKeyList()
-	case screenIAMKeyDetail:
-		v = m.viewIAMKeyDetail()
-	case screenIAMKeyRotateConfirm:
-		v = m.viewIAMKeyRotateConfirm()
-	case screenIAMKeyRotateResult:
-		v = m.viewIAMKeyRotateResult()
 	case screenECSClusterList:
 		v = m.viewECSClusterList()
 	case screenECSServiceList:

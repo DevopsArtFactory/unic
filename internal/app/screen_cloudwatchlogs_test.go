@@ -20,7 +20,7 @@ func TestCWLogViewerLinesWrapLongMessages(t *testing.T) {
 		},
 	}
 
-	lines := m.cwLogViewerLines()
+	lines := m.cwLogs.viewerLines(m)
 	if len(lines) < 2 {
 		t.Fatalf("expected wrapped lines, got %d: %#v", len(lines), lines)
 	}
@@ -39,7 +39,7 @@ func TestCWLogViewerLinesHorizontalOffsetWhenWrapDisabled(t *testing.T) {
 		},
 	}
 
-	lines := m.cwLogViewerLines()
+	lines := m.cwLogs.viewerLines(m)
 	if len(lines) != 1 {
 		t.Fatalf("expected a single rendered line, got %d", len(lines))
 	}
