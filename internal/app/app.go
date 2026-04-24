@@ -199,12 +199,6 @@ type Model struct {
 	iamOldKeyDeleted    bool
 	iamOldKeyInactive   bool
 
-	// Secrets Manager browser state
-	secrets         []awsservice.Secret
-	filteredSecrets []awsservice.Secret
-	secretIdx       int
-	selectedSecret  *awsservice.SecretDetail
-
 	// Security Group browser state
 	securityGroups         []awsservice.SecurityGroup
 	filteredSecurityGroups []awsservice.SecurityGroup
@@ -245,29 +239,9 @@ type Model struct {
 	cwLogs     cloudWatchLogsModel
 	rds        rdsModel
 	bedrock    bedrockModel
-
-	// S3 browser state
-	s3Buckets         []awsservice.S3Bucket
-	filteredS3Buckets []awsservice.S3Bucket
-	s3BucketIdx       int
-	selectedS3Bucket  *awsservice.S3Bucket
-	s3Objects         []awsservice.S3Object
-	filteredS3Objects []awsservice.S3Object
-	s3ObjectIdx       int
-	s3CurrentPrefix   string
-	s3PrefixStack     []string
-	selectedS3Object  *awsservice.S3ObjectDetail
-
-	// Lambda browser state
-	lambdaFunctions         []awsservice.LambdaFunction
-	filteredLambdaFunctions []awsservice.LambdaFunction
-	lambdaFunctionIdx       int
-	selectedLambdaFunction  *awsservice.LambdaFunction
-	lambdaInvokePayload     string
-	lambdaInvokeAsync       bool
-	lambdaInvokeResult      *awsservice.LambdaInvokeResult
-	lambdaPayloadSource     lambdaPayloadSource
-	lambdaInvokeStep        int // 0=source select, 1=text input
+	secrets    secretsModel
+	s3         s3Model
+	lambda     lambdaModel
 
 	// Inspector browser state
 	inspectorWorkflows        []inspector.Workflow
@@ -371,6 +345,9 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
 	model.bedrock = newBedrockModel()
+	model.secrets = newSecretsModel()
+	model.s3 = newS3Model()
+	model.lambda = newLambdaModel()
 	model.applyServiceListFilter()
 	return model
 }
@@ -470,10 +447,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleRoute53Msg,
 		m.handleSecurityGroupMsg,
 		m.handleIAMMsg,
-		m.handleSecretMsg,
 		m.handleECSMsg,
-		m.handleS3Msg,
-		m.handleLambdaMsg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
@@ -569,24 +543,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateRoute53RecordEdit(msg)
 		case screenRoute53RecordDeleteConfirm:
 			return m.updateRoute53RecordDeleteConfirm(msg)
-		case screenSecretList:
-			return m.updateSecretList(msg)
-		case screenSecretDetail:
-			return m.updateSecretDetail(msg)
-		case screenS3BucketList:
-			return m.updateS3BucketList(msg)
-		case screenS3ObjectList:
-			return m.updateS3ObjectList(msg)
-		case screenS3ObjectDetail:
-			return m.updateS3ObjectDetail(msg)
-		case screenLambdaFunctionList:
-			return m.updateLambdaFunctionList(msg)
-		case screenLambdaFunctionDetail:
-			return m.updateLambdaFunctionDetail(msg)
-		case screenLambdaInvokeInput:
-			return m.updateLambdaInvokeInput(msg)
-		case screenLambdaInvokeResult:
-			return m.updateLambdaInvokeResult(msg)
 		case screenInspectorHome:
 			return m.updateInspectorHome(msg)
 		case screenInspectorWorkflowPlaceholder:
@@ -651,23 +607,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
-}
-
-// handleSecretMsg handles Secrets Manager messages.
-func (m Model) handleSecretMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
-	switch msg := msg.(type) {
-	case secretsLoadedMsg:
-		m.secrets = msg.secrets
-		m.filteredSecrets = msg.secrets
-		m.secretIdx = 0
-		m.screen = screenSecretList
-		return m, nil, true
-	case secretDetailLoadedMsg:
-		m.selectedSecret = msg.detail
-		m.screen = screenSecretDetail
-		return m, nil, true
-	}
-	return m, nil, false
 }
 
 func (m Model) updateServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -753,13 +692,13 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureRoute53Browser:
 				return m.startLoading(m.loadRoute53Zones())
 			case domain.FeatureSecretsBrowser:
-				return m.startLoading(m.loadSecrets())
+				return m.secrets.Start(&m)
 			case domain.FeatureCloudWatchMetrics:
 				return m.cwMetrics.Start(&m)
 			case domain.FeatureCloudWatchLogsBrowser:
 				return m.cwLogs.Start(&m)
 			case domain.FeatureS3Browser:
-				return m.startLoading(m.loadS3Buckets())
+				return m.s3.Start(&m)
 			case domain.FeatureSecurityGroupBrowser:
 				return m.startLoading(m.loadSecurityGroups())
 			case domain.FeatureIAMUsersBrowser:
@@ -773,7 +712,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureECSExec:
 				return m.startLoading(m.loadECSClusters())
 			case domain.FeatureLambdaBrowser:
-				return m.startLoading(m.loadLambdaFunctions())
+				return m.lambda.Start(&m)
 			case domain.FeatureBedrockAPIKeys:
 				return m.bedrock.Start(&m)
 			}
@@ -844,24 +783,6 @@ func (m Model) View() string {
 		v = m.viewRoute53RecordEdit()
 	case screenRoute53RecordDeleteConfirm:
 		v = m.viewRoute53RecordDeleteConfirm()
-	case screenSecretList:
-		v = m.viewSecretList()
-	case screenSecretDetail:
-		v = m.viewSecretDetail()
-	case screenS3BucketList:
-		v = m.viewS3BucketList()
-	case screenS3ObjectList:
-		v = m.viewS3ObjectList()
-	case screenS3ObjectDetail:
-		v = m.viewS3ObjectDetail()
-	case screenLambdaFunctionList:
-		v = m.viewLambdaFunctionList()
-	case screenLambdaFunctionDetail:
-		v = m.viewLambdaFunctionDetail()
-	case screenLambdaInvokeInput:
-		v = m.viewLambdaInvokeInput()
-	case screenLambdaInvokeResult:
-		v = m.viewLambdaInvokeResult()
 	case screenInspectorHome:
 		v = m.viewInspectorHome()
 	case screenInspectorWorkflowPlaceholder:
@@ -1047,168 +968,5 @@ func (m Model) viewFeatureList() string {
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: select • esc: back"))
-	return b.String()
-}
-func (m Model) loadSecrets() tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
-		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
-		if err != nil {
-			return errMsg{err: err}
-		}
-		secrets, err := repo.ListSecrets(ctx)
-		if err != nil {
-			return errMsg{err: err}
-		}
-		if len(secrets) == 0 {
-			return errMsg{err: fmt.Errorf("no secrets found")}
-		}
-		return secretsLoadedMsg{secrets: secrets}
-	}
-}
-
-func (m Model) loadSecretDetail(name string) tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
-		repo := m.awsRepo
-		if repo == nil {
-			var err error
-			repo, err = awsservice.NewAwsRepository(ctx, m.cfg)
-			if err != nil {
-				return errMsg{err: err}
-			}
-		}
-		detail, err := repo.GetSecretDetail(ctx, name)
-		if err != nil {
-			return errMsg{err: err}
-		}
-		return secretDetailLoadedMsg{detail: detail}
-	}
-}
-
-func (m Model) updateSecretList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
-
-	if cmd, handled := m.updateSharedFilter(msg, filterSecrets); handled {
-		return m, cmd
-	}
-
-	switch key {
-	case "q", "esc":
-		m.screen = screenFeatureList
-		m.resetFilter(filterSecrets)
-	case "up", "k":
-		m.secretIdx = previousListIndex(m.secretIdx, len(m.filteredSecrets))
-	case "down", "j":
-		m.secretIdx = nextListIndex(m.secretIdx, len(m.filteredSecrets))
-	case "/":
-		return m, m.activateFilter(filterSecrets)
-	case "enter":
-		if len(m.filteredSecrets) > 0 && m.secretIdx < len(m.filteredSecrets) {
-			selected := m.filteredSecrets[m.secretIdx]
-			return m.startLoading(m.loadSecretDetail(selected.Name))
-		}
-	}
-	return m, nil
-}
-
-func (m Model) updateSecretDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "esc":
-		m.selectedSecret = nil
-		m.screen = screenSecretList
-	}
-	return m, nil
-}
-
-func (m Model) viewSecretList() string {
-	var b strings.Builder
-	var panel strings.Builder
-	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Secrets Manager"))
-	b.WriteString("\n")
-
-	b.WriteString(m.renderFilterValue(filterSecrets))
-	b.WriteString("\n\n")
-
-	if len(m.filteredSecrets) == 0 {
-		panel.WriteString(dimStyle.Render("  No matching secrets"))
-		panel.WriteString("\n")
-	} else {
-		visibleLines := max(m.height-10, 5)
-		start := 0
-		if m.secretIdx >= visibleLines {
-			start = m.secretIdx - visibleLines + 1
-		}
-		end := min(start+visibleLines, len(m.filteredSecrets))
-
-		for i := start; i < end; i++ {
-			s := m.filteredSecrets[i]
-			cursor := "  "
-			style := normalStyle
-			if i == m.secretIdx {
-				cursor = "> "
-				style = selectedStyle
-			}
-			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSecrets, s.DisplayTitle())))
-			panel.WriteString("\n")
-		}
-
-		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d secrets", len(m.filteredSecrets), len(m.secrets))))
-	}
-
-	b.WriteString(m.renderListPanel(panel.String()))
-	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
-	return b.String()
-}
-
-func (m Model) viewSecretDetail() string {
-	if m.selectedSecret == nil {
-		return ""
-	}
-	d := m.selectedSecret
-	var b strings.Builder
-	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Secret Detail"))
-	b.WriteString("\n\n")
-
-	b.WriteString(renderDetailLine("Name", normalStyle.Render(d.Name)))
-	b.WriteString("\n")
-
-	kmsKey := d.KMSKeyID
-	if kmsKey == "" {
-		kmsKey = dimStyle.Render("(aws/secretsmanager)")
-	}
-	b.WriteString(renderDetailLine("Encryption Key", kmsKey))
-	b.WriteString("\n\n")
-
-	if len(d.Values) > 0 {
-		b.WriteString(titleStyle.Render("Key / Value"))
-		b.WriteString("\n\n")
-
-		keys := make([]string, 0, len(d.Values))
-		for k := range d.Values {
-			keys = append(keys, k)
-		}
-		for i := 1; i < len(keys); i++ {
-			for j := i; j > 0 && keys[j] < keys[j-1]; j-- {
-				keys[j], keys[j-1] = keys[j-1], keys[j]
-			}
-		}
-
-		for _, k := range keys {
-			b.WriteString(fmt.Sprintf("  %s  %s\n", dimStyle.Render(k), normalStyle.Render(d.Values[k])))
-		}
-	} else if d.Raw != "" {
-		b.WriteString(titleStyle.Render("Value"))
-		b.WriteString("\n\n")
-		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s", d.Raw)))
-		b.WriteString("\n")
-	}
-
-	b.WriteString("\n")
-	b.WriteString(m.renderHelpBar("esc: back • H: home"))
 	return b.String()
 }

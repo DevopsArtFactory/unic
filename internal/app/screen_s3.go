@@ -12,32 +12,97 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
-func (m Model) handleS3Msg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+type s3Model struct {
+	buckets         []awsservice.S3Bucket
+	filteredBuckets []awsservice.S3Bucket
+	bucketIdx       int
+	selectedBucket  *awsservice.S3Bucket
+	objects         []awsservice.S3Object
+	filteredObjects []awsservice.S3Object
+	objectIdx       int
+	currentPrefix   string
+	prefixStack     []string
+	selectedObject  *awsservice.S3ObjectDetail
+}
+
+func newS3Model() s3Model {
+	return s3Model{}
+}
+
+func (s3m *s3Model) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(s3m.loadBuckets(*m))
+}
+
+func (s3m *s3Model) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case s3BucketsLoadedMsg:
-		m.s3Buckets = msg.buckets
-		m.filteredS3Buckets = msg.buckets
-		m.s3BucketIdx = 0
+		s3m.buckets = msg.buckets
+		s3m.filteredBuckets = msg.buckets
+		s3m.bucketIdx = 0
 		m.resetFilter(filterS3Buckets)
 		m.screen = screenS3BucketList
-		return m, nil, true
+		return *m, nil, true
 	case s3ObjectsLoadedMsg:
-		if m.selectedS3Bucket == nil || m.selectedS3Bucket.Name != msg.bucket {
-			return m, nil, true
+		if s3m.selectedBucket == nil || s3m.selectedBucket.Name != msg.bucket {
+			return *m, nil, true
 		}
-		m.s3CurrentPrefix = msg.prefix
-		m.s3Objects = flattenS3Objects(msg.objects)
-		m.filteredS3Objects = m.s3Objects
-		m.s3ObjectIdx = 0
+		s3m.currentPrefix = msg.prefix
+		s3m.objects = flattenS3Objects(msg.objects)
+		s3m.filteredObjects = s3m.objects
+		s3m.objectIdx = 0
 		m.resetFilter(filterS3Objects)
 		m.screen = screenS3ObjectList
-		return m, nil, true
+		return *m, nil, true
 	case s3ObjectDetailLoadedMsg:
-		m.selectedS3Object = msg.detail
+		s3m.selectedObject = msg.detail
 		m.screen = screenS3ObjectDetail
-		return m, nil, true
+		return *m, nil, true
 	}
-	return m, nil, false
+	return *m, nil, false
+}
+
+func (s3m *s3Model) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenS3BucketList:
+		newM, cmd := s3m.updateBucketList(m, msg)
+		return newM, cmd, true
+	case screenS3ObjectList:
+		newM, cmd := s3m.updateObjectList(m, msg)
+		return newM, cmd, true
+	case screenS3ObjectDetail:
+		newM, cmd := s3m.updateObjectDetail(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (s3m s3Model) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenS3BucketList:
+		return s3m.viewBucketList(m), true
+	case screenS3ObjectList:
+		return s3m.viewObjectList(m), true
+	case screenS3ObjectDetail:
+		return s3m.viewObjectDetail(m), true
+	default:
+		return "", false
+	}
+}
+
+func (s3m *s3Model) ApplyFilter(m *Model, target filterTarget) bool {
+	switch target {
+	case filterS3Buckets:
+		s3m.filteredBuckets = applyFilter(s3m.buckets, m.filterValue(target))
+		s3m.bucketIdx = 0
+		return true
+	case filterS3Objects:
+		s3m.filteredObjects = applyFilter(s3m.objects, m.filterValue(target))
+		s3m.objectIdx = 0
+		return true
+	default:
+		return false
+	}
 }
 
 func flattenS3Objects(result awsservice.S3ListResult) []awsservice.S3Object {
@@ -47,7 +112,7 @@ func flattenS3Objects(result awsservice.S3ListResult) []awsservice.S3Object {
 	return items
 }
 
-func (m Model) loadS3Buckets() tea.Cmd {
+func (s3m s3Model) loadBuckets(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -68,7 +133,7 @@ func (m Model) loadS3Buckets() tea.Cmd {
 	}
 }
 
-func (m Model) loadS3Objects(bucketName, prefix string) tea.Cmd {
+func (s3m s3Model) loadObjects(m Model, bucketName, prefix string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -92,7 +157,7 @@ func (m Model) loadS3Objects(bucketName, prefix string) tea.Cmd {
 	}
 }
 
-func (m Model) loadS3ObjectDetail(bucketName, key string) tea.Cmd {
+func (s3m s3Model) loadObjectDetail(m Model, bucketName, key string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -112,11 +177,11 @@ func (m Model) loadS3ObjectDetail(bucketName, key string) tea.Cmd {
 	}
 }
 
-func (m Model) updateS3BucketList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (s3m *s3Model) updateBucketList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterS3Buckets); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -124,75 +189,75 @@ func (m Model) updateS3BucketList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterS3Buckets)
 	case "up", "k":
-		m.s3BucketIdx = previousListIndex(m.s3BucketIdx, len(m.filteredS3Buckets))
+		s3m.bucketIdx = previousListIndex(s3m.bucketIdx, len(s3m.filteredBuckets))
 	case "down", "j":
-		m.s3BucketIdx = nextListIndex(m.s3BucketIdx, len(m.filteredS3Buckets))
+		s3m.bucketIdx = nextListIndex(s3m.bucketIdx, len(s3m.filteredBuckets))
 	case "/":
-		return m, m.activateFilter(filterS3Buckets)
+		return *m, m.activateFilter(filterS3Buckets)
 	case "enter":
-		if len(m.filteredS3Buckets) > 0 && m.s3BucketIdx < len(m.filteredS3Buckets) {
-			selected := m.filteredS3Buckets[m.s3BucketIdx]
-			m.selectedS3Bucket = &selected
-			m.s3CurrentPrefix = ""
-			m.s3PrefixStack = nil
-			return m.startLoading(m.loadS3Objects(selected.Name, ""))
+		if len(s3m.filteredBuckets) > 0 && s3m.bucketIdx < len(s3m.filteredBuckets) {
+			selected := s3m.filteredBuckets[s3m.bucketIdx]
+			s3m.selectedBucket = &selected
+			s3m.currentPrefix = ""
+			s3m.prefixStack = nil
+			return m.startLoading(s3m.loadObjects(*m, selected.Name, ""))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateS3ObjectList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (s3m *s3Model) updateObjectList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterS3Objects); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
 	case "q":
 		m.screen = screenFeatureList
 	case "esc":
-		if m.selectedS3Bucket == nil {
+		if s3m.selectedBucket == nil {
 			m.screen = screenS3BucketList
-			return m, nil
+			return *m, nil
 		}
-		if m.s3CurrentPrefix == "" {
+		if s3m.currentPrefix == "" {
 			m.screen = screenS3BucketList
-			m.s3ObjectIdx = 0
-			return m, nil
+			s3m.objectIdx = 0
+			return *m, nil
 		}
-		nextPrefix := awsservice.ParentS3Prefix(m.s3CurrentPrefix)
-		return m.startLoading(m.loadS3Objects(m.selectedS3Bucket.Name, nextPrefix))
+		nextPrefix := awsservice.ParentS3Prefix(s3m.currentPrefix)
+		return m.startLoading(s3m.loadObjects(*m, s3m.selectedBucket.Name, nextPrefix))
 	case "up", "k":
-		m.s3ObjectIdx = previousListIndex(m.s3ObjectIdx, len(m.filteredS3Objects))
+		s3m.objectIdx = previousListIndex(s3m.objectIdx, len(s3m.filteredObjects))
 	case "down", "j":
-		m.s3ObjectIdx = nextListIndex(m.s3ObjectIdx, len(m.filteredS3Objects))
+		s3m.objectIdx = nextListIndex(s3m.objectIdx, len(s3m.filteredObjects))
 	case "/":
-		return m, m.activateFilter(filterS3Objects)
+		return *m, m.activateFilter(filterS3Objects)
 	case "enter":
-		if len(m.filteredS3Objects) == 0 || m.s3ObjectIdx >= len(m.filteredS3Objects) || m.selectedS3Bucket == nil {
-			return m, nil
+		if len(s3m.filteredObjects) == 0 || s3m.objectIdx >= len(s3m.filteredObjects) || s3m.selectedBucket == nil {
+			return *m, nil
 		}
-		selected := m.filteredS3Objects[m.s3ObjectIdx]
+		selected := s3m.filteredObjects[s3m.objectIdx]
 		if selected.IsPrefix {
-			return m.startLoading(m.loadS3Objects(m.selectedS3Bucket.Name, selected.Prefix))
+			return m.startLoading(s3m.loadObjects(*m, s3m.selectedBucket.Name, selected.Prefix))
 		}
-		return m.startLoading(m.loadS3ObjectDetail(m.selectedS3Bucket.Name, selected.Key))
+		return m.startLoading(s3m.loadObjectDetail(*m, s3m.selectedBucket.Name, selected.Key))
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateS3ObjectDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (s3m *s3Model) updateObjectDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		m.screen = screenFeatureList
 	case "esc":
 		m.screen = screenS3ObjectList
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewS3BucketList() string {
+func (s3m s3Model) viewBucketList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -202,12 +267,12 @@ func (m Model) viewS3BucketList() string {
 	b.WriteString(m.renderFilterValue(filterS3Buckets))
 	b.WriteString("\n\n")
 
-	if len(m.filteredS3Buckets) == 0 {
+	if len(s3m.filteredBuckets) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching buckets"))
 		panel.WriteString("\n")
 	} else {
 		maxName := 6
-		for _, bucket := range m.filteredS3Buckets {
+		for _, bucket := range s3m.filteredBuckets {
 			if len(bucket.Name) > maxName {
 				maxName = len(bucket.Name)
 			}
@@ -222,15 +287,15 @@ func (m Model) viewS3BucketList() string {
 
 		visibleLines := max(m.height-11, 5)
 		start := 0
-		if m.s3BucketIdx >= visibleLines {
-			start = m.s3BucketIdx - visibleLines + 1
+		if s3m.bucketIdx >= visibleLines {
+			start = s3m.bucketIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredS3Buckets))
+		end := min(start+visibleLines, len(s3m.filteredBuckets))
 		for i := start; i < end; i++ {
-			bucket := m.filteredS3Buckets[i]
+			bucket := s3m.filteredBuckets[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.s3BucketIdx {
+			if i == s3m.bucketIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -251,7 +316,7 @@ func (m Model) viewS3BucketList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d buckets", len(m.filteredS3Buckets), len(m.s3Buckets))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d buckets", len(s3m.filteredBuckets), len(s3m.buckets))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -260,28 +325,28 @@ func (m Model) viewS3BucketList() string {
 	return b.String()
 }
 
-func (m Model) viewS3ObjectList() string {
+func (s3m s3Model) viewObjectList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	bucketName := ""
-	if m.selectedS3Bucket != nil {
-		bucketName = m.selectedS3Bucket.Name
+	if s3m.selectedBucket != nil {
+		bucketName = s3m.selectedBucket.Name
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("S3 Objects — %s", bucketName)))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(fmt.Sprintf("Path: %s", awsservice.S3Breadcrumb(m.s3CurrentPrefix))))
+	b.WriteString(dimStyle.Render(fmt.Sprintf("Path: %s", awsservice.S3Breadcrumb(s3m.currentPrefix))))
 	b.WriteString("\n")
 
 	b.WriteString(m.renderFilterValue(filterS3Objects))
 	b.WriteString("\n\n")
 
-	if len(m.filteredS3Objects) == 0 {
+	if len(s3m.filteredObjects) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching objects or prefixes"))
 		panel.WriteString("\n")
 	} else {
 		maxName := 6
-		for _, obj := range m.filteredS3Objects {
+		for _, obj := range s3m.filteredObjects {
 			if len(obj.Name) > maxName {
 				maxName = len(obj.Name)
 			}
@@ -297,15 +362,15 @@ func (m Model) viewS3ObjectList() string {
 
 		visibleLines := max(m.height-12, 5)
 		start := 0
-		if m.s3ObjectIdx >= visibleLines {
-			start = m.s3ObjectIdx - visibleLines + 1
+		if s3m.objectIdx >= visibleLines {
+			start = s3m.objectIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredS3Objects))
+		end := min(start+visibleLines, len(s3m.filteredObjects))
 		for i := start; i < end; i++ {
-			obj := m.filteredS3Objects[i]
+			obj := s3m.filteredObjects[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.s3ObjectIdx {
+			if i == s3m.objectIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -339,7 +404,7 @@ func (m Model) viewS3ObjectList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d items", len(m.filteredS3Objects))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d items", len(s3m.filteredObjects))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -348,11 +413,11 @@ func (m Model) viewS3ObjectList() string {
 	return b.String()
 }
 
-func (m Model) viewS3ObjectDetail() string {
-	if m.selectedS3Object == nil {
+func (s3m s3Model) viewObjectDetail(m Model) string {
+	if s3m.selectedObject == nil {
 		return ""
 	}
-	o := m.selectedS3Object
+	o := s3m.selectedObject
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("S3 Object Detail"))

@@ -437,7 +437,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q / esc", "Go back to the function list"},
 		}
 	case screenLambdaInvokeInput:
-		if m.lambdaInvokeStep == 0 {
+		if m.lambda.invokeStep == 0 {
 			return []helpShortcut{
 				{"↑/↓, j/k", "Select payload source"},
 				{"enter", "Confirm the selected source"},
