@@ -322,8 +322,13 @@ func (m Model) loadEKSClusters() tea.Cmd {
 }
 
 func (m Model) loadEKSNodeGroups() tea.Cmd {
-	cfg := m.cfg
-	cluster := m.selectedEKSCluster
+	return func() tea.Msg {
+		cfg := m.cfg
+		cluster := m.selectedEKSCluster
+		if cluster == nil {
+			return errMsg{fmt.Errorf("no EKS cluster selected")}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
 	if cluster == nil {
 		return func() tea.Msg { return errMsg{fmt.Errorf("no EKS cluster selected")} }
 	}
