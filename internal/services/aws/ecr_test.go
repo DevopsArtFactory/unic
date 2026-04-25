@@ -1,9 +1,23 @@
 package aws
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"testing"
+
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 )
+
+type mockECRClient struct {
+	describeRepositoriesFunc func(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error)
+}
+
+func (m *mockECRClient) DescribeRepositories(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
+	return m.describeRepositoriesFunc(ctx, params, optFns...)
+}
 
 func TestBuildPrivateECRRegistryURI(t *testing.T) {
 	got, err := BuildPrivateECRRegistryURI("123456789012", "ap-northeast-2")
@@ -96,5 +110,96 @@ func TestBuildECRLoginCommandRejectsInjectionAttempts(t *testing.T) {
 func TestParseECRRuntimeRejectsUnknown(t *testing.T) {
 	if _, err := ParseECRRuntime("nerdctl"); err == nil {
 		t.Fatal("expected unsupported runtime error")
+	}
+}
+
+func TestListECRRepositoriesSuccess(t *testing.T) {
+	mock := &mockECRClient{
+		describeRepositoriesFunc: func(_ context.Context, _ *ecr.DescribeRepositoriesInput, _ ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
+			return &ecr.DescribeRepositoriesOutput{
+				Repositories: []ecrtypes.Repository{
+					{
+						RepositoryName: awssdk.String("zeta"),
+						RepositoryUri:  awssdk.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/zeta"),
+						RegistryId:     awssdk.String("123456789012"),
+					},
+					{
+						RepositoryName:     awssdk.String("app"),
+						RepositoryUri:      awssdk.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/app"),
+						RepositoryArn:      awssdk.String("arn:aws:ecr:us-east-1:123456789012:repository/app"),
+						RegistryId:         awssdk.String("123456789012"),
+						ImageTagMutability: ecrtypes.ImageTagMutabilityImmutable,
+						ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{
+							ScanOnPush: true,
+						},
+						EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+							EncryptionType: ecrtypes.EncryptionTypeKms,
+							KmsKey:         awssdk.String("arn:aws:kms:us-east-1:123456789012:key/key-id"),
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{ECRClient: mock}
+	repositories, err := repo.ListECRRepositories(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repositories) != 2 {
+		t.Fatalf("expected 2 repositories, got %d", len(repositories))
+	}
+
+	got := repositories[0]
+	if got.Name != "app" {
+		t.Fatalf("expected sorted repository app first, got %q", got.Name)
+	}
+	if got.URI != "123456789012.dkr.ecr.us-east-1.amazonaws.com/app" {
+		t.Errorf("unexpected URI: %q", got.URI)
+	}
+	if !got.ScanOnPush {
+		t.Error("expected scan-on-push to be true")
+	}
+	if got.TagMutability != "IMMUTABLE" {
+		t.Errorf("expected IMMUTABLE mutability, got %q", got.TagMutability)
+	}
+	if got.Encryption != "KMS (key-id)" {
+		t.Errorf("expected shortened KMS encryption summary, got %q", got.Encryption)
+	}
+	if repositories[1].Encryption != "AES256" {
+		t.Errorf("expected default AES256 encryption summary, got %q", repositories[1].Encryption)
+	}
+}
+
+func TestListECRRepositoriesError(t *testing.T) {
+	mock := &mockECRClient{
+		describeRepositoriesFunc: func(_ context.Context, _ *ecr.DescribeRepositoriesInput, _ ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
+			return nil, fmt.Errorf("access denied")
+		},
+	}
+
+	repo := &AwsRepository{ECRClient: mock}
+	_, err := repo.ListECRRepositories(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestECRRepositoryFilterText(t *testing.T) {
+	repo := ECRRepository{
+		Name:          "App",
+		URI:           "123456789012.dkr.ecr.us-east-1.amazonaws.com/app",
+		RegistryID:    "123456789012",
+		ARN:           "arn:aws:ecr:us-east-1:123456789012:repository/app",
+		TagMutability: "IMMUTABLE",
+		Encryption:    "KMS (alias/ecr)",
+	}
+
+	filterText := repo.FilterText()
+	for _, want := range []string{"app", "123456789012", "immutable", "kms"} {
+		if !strings.Contains(filterText, want) {
+			t.Errorf("FilterText %q should contain %q", filterText, want)
+		}
 	}
 }

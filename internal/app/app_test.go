@@ -932,6 +932,41 @@ func TestFeatureListRDSBrowserGoesToLoading(t *testing.T) {
 	}
 }
 
+func TestFeatureListECRRepositoryBrowserGoesToLoading(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFeatureList
+	m.features = []domain.Feature{
+		{Kind: domain.FeatureECRRepositoryBrowser, Description: "Browse ECR repositories"},
+	}
+	m.featIdx = 0
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Error("expected a command to load ECR repositories")
+	}
+}
+
+func TestECRRepositoriesLoadedGoesToRepositoryList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+
+	repositories := []awsservice.ECRRepository{
+		{Name: "app", URI: "123456789012.dkr.ecr.us-east-1.amazonaws.com/app"},
+	}
+	updated, _ := m.Update(ecrRepositoriesLoadedMsg{repositories: repositories})
+	model := updated.(Model)
+	if model.screen != screenECRRepositoryList {
+		t.Errorf("expected ECR repository list screen, got %d", model.screen)
+	}
+	if len(model.ecrRepositories) != 1 {
+		t.Errorf("expected 1 repository, got %d", len(model.ecrRepositories))
+	}
+}
+
 func TestRDSViewNotEmpty(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList

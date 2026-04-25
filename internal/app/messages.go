@@ -249,6 +249,10 @@ type eksAddonsLoadedMsg struct {
 	addons []awsservice.EKSAddon
 }
 
+type ecrRepositoriesLoadedMsg struct {
+	repositories []awsservice.ECRRepository
+}
+
 type inspectorScanLoadedMsg struct {
 	report *inspector.SecurityScanReport
 }

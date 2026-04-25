@@ -425,6 +425,13 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"esc", "Go back to the add-on list"},
 			{"q", "Go back to the feature list"},
 		}
+	case screenECRRepositoryList:
+		return listScreenShortcuts("open the selected repository", "go back to the feature list", true, false)
+	case screenECRRepositoryDetail:
+		return []helpShortcut{
+			{"r", "Refresh repository list"},
+			{"q / esc", "Go back to the repository list"},
+		}
 	case screenS3BucketList:
 		return listScreenShortcuts("browse the selected bucket", "go back to the feature list", true, false)
 	case screenS3ObjectList:
@@ -793,6 +800,10 @@ func (m Model) helpScreenTitle() string {
 		return "EKS Add-ons"
 	case screenEKSAddonDetail:
 		return "EKS Add-on Detail"
+	case screenECRRepositoryList:
+		return "ECR Repositories"
+	case screenECRRepositoryDetail:
+		return "ECR Repository Detail"
 	case screenS3BucketList:
 		return "S3 Buckets"
 	case screenS3ObjectList:
