@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/configservice"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
@@ -67,6 +68,9 @@ var _ ConfigServiceClientAPI = (*configservice.Client)(nil)
 
 // Verify *ecs.Client satisfies ECSClientAPI at compile time.
 var _ ECSClientAPI = (*ecs.Client)(nil)
+
+// Verify *ecr.Client satisfies ECRClientAPI at compile time.
+var _ ECRClientAPI = (*ecr.Client)(nil)
 
 // Verify *eks.Client satisfies EKSClientAPI at compile time.
 var _ EKSClientAPI = (*eks.Client)(nil)
@@ -182,6 +186,11 @@ type ECSClientAPI interface {
 	DescribeTasks(ctx context.Context, params *ecs.DescribeTasksInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error)
 }
 
+// ECRClientAPI is the interface for ECR operations used by AwsRepository.
+type ECRClientAPI interface {
+	DescribeRepositories(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error)
+}
+
 // EKSClientAPI is the interface for EKS operations used by AwsRepository.
 type EKSClientAPI interface {
 	ListClusters(ctx context.Context, params *eks.ListClustersInput, optFns ...func(*eks.Options)) (*eks.ListClustersOutput, error)
@@ -263,6 +272,7 @@ type AwsRepository struct {
 	GuardDutyClient      GuardDutyClientAPI
 	ConfigServiceClient  ConfigServiceClientAPI
 	ECSClient            ECSClientAPI
+	ECRClient            ECRClientAPI
 	EKSClient            EKSClientAPI
 	ElastiCacheClient    ElastiCacheClientAPI
 	S3Client             S3ClientAPI
@@ -335,6 +345,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		GuardDutyClient:      guardduty.NewFromConfig(awsCfg),
 		ConfigServiceClient:  configservice.NewFromConfig(awsCfg),
 		ECSClient:            ecs.NewFromConfig(awsCfg),
+		ECRClient:            ecr.NewFromConfig(awsCfg),
 		EKSClient:            eks.NewFromConfig(awsCfg),
 		ElastiCacheClient:    elasticache.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),

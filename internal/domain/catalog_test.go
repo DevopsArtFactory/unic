@@ -216,6 +216,25 @@ func TestCatalogContainsEKSBrowserFeature(t *testing.T) {
 	t.Error("EKS service not found in catalog")
 }
 
+func TestCatalogContainsECRRepositoryBrowserFeature(t *testing.T) {
+	services := Catalog()
+
+	for _, svc := range services {
+		if svc.Name != ServiceECR {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureECRRepositoryBrowser {
+				return
+			}
+		}
+		t.Error("ECR service should have ECR Repository Browser feature")
+		return
+	}
+
+	t.Error("ECR service not found in catalog")
+}
+
 func TestCatalogDoesNotContainInspectorPseudoService(t *testing.T) {
 	services := Catalog()
 

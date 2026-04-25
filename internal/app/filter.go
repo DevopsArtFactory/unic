@@ -23,6 +23,7 @@ const (
 	filterECSServices
 	filterEKSClusters
 	filterEKSNodeGroups
+	filterECRRepositories
 	filterCWMetrics
 	filterCWLogGroups
 	filterCWLogStreams
@@ -190,6 +191,9 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterEKSNodeGroups:
 		m.filteredEKSNodeGroups = applyFilter(m.eksNodeGroups, m.filterValue(target))
 		m.eksNodeGroupIdx = 0
+	case filterECRRepositories:
+		m.filteredECRRepositories = applyFilter(m.ecrRepositories, m.filterValue(target))
+		m.ecrRepositoryIdx = 0
 	case filterContexts:
 		m.filteredCtxList = applyFilter(m.ctxList, m.filterValue(target))
 		m.ctxIdx = 0
