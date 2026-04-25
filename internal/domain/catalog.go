@@ -88,6 +88,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceEKS,
+			Features: []Feature{
+				{
+					Kind:        FeatureEKSBrowser,
+					Description: "Browse EKS clusters and managed node groups with scaling and health details",
+				},
+			},
+		},
+		{
 			Name: ServiceS3,
 			Features: []Feature{
 				{

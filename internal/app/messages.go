@@ -237,6 +237,14 @@ type ecsExecDoneMsg struct {
 	err error
 }
 
+type eksClustersLoadedMsg struct {
+	clusters []awsservice.EKSCluster
+}
+
+type eksNodeGroupsLoadedMsg struct {
+	nodeGroups []awsservice.EKSNodeGroup
+}
+
 type inspectorScanLoadedMsg struct {
 	report *inspector.SecurityScanReport
 }
