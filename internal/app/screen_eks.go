@@ -304,7 +304,9 @@ func (m Model) currentEKSNodeGroup() *awsservice.EKSNodeGroup {
 }
 
 func (m Model) loadEKSClusters() tea.Cmd {
-	cfg := m.cfg
+	return func() tea.Msg {
+		cfg := m.cfg
+		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
 		defer cancel()
