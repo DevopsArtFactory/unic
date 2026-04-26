@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -13,10 +14,18 @@ import (
 
 type mockECRClient struct {
 	describeRepositoriesFunc func(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error)
+	describeImagesFunc       func(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error)
 }
 
 func (m *mockECRClient) DescribeRepositories(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
 	return m.describeRepositoriesFunc(ctx, params, optFns...)
+}
+
+func (m *mockECRClient) DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
+	if m.describeImagesFunc != nil {
+		return m.describeImagesFunc(ctx, params, optFns...)
+	}
+	return &ecr.DescribeImagesOutput{}, nil
 }
 
 func TestBuildPrivateECRRegistryURI(t *testing.T) {
@@ -201,5 +210,82 @@ func TestECRRepositoryFilterText(t *testing.T) {
 		if !strings.Contains(filterText, want) {
 			t.Errorf("FilterText %q should contain %q", filterText, want)
 		}
+	}
+}
+
+func TestListECRImagesSuccess(t *testing.T) {
+	pushedRecent := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	pushedOld := time.Date(2025, 12, 1, 10, 0, 0, 0, time.UTC)
+	mock := &mockECRClient{
+		describeRepositoriesFunc: func(_ context.Context, _ *ecr.DescribeRepositoriesInput, _ ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
+			return &ecr.DescribeRepositoriesOutput{}, nil
+		},
+		describeImagesFunc: func(_ context.Context, params *ecr.DescribeImagesInput, _ ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
+			if awssdk.ToString(params.RepositoryName) != "app" {
+				t.Fatalf("expected repository app, got %q", awssdk.ToString(params.RepositoryName))
+			}
+			return &ecr.DescribeImagesOutput{
+				ImageDetails: []ecrtypes.ImageDetail{
+					{
+						ImageDigest:      awssdk.String("sha256:old"),
+						ImageTags:        []string{"old"},
+						ImagePushedAt:    awssdk.Time(pushedOld),
+						ImageSizeInBytes: awssdk.Int64(2048),
+					},
+					{
+						ImageDigest:      awssdk.String("sha256:recent"),
+						ImageTags:        []string{"latest", "v1"},
+						ImagePushedAt:    awssdk.Time(pushedRecent),
+						ImageSizeInBytes: awssdk.Int64(1024),
+					},
+					{
+						ImageDigest:      awssdk.String("sha256:untagged"),
+						ImagePushedAt:    awssdk.Time(pushedRecent.Add(-time.Hour)),
+						ImageSizeInBytes: awssdk.Int64(512),
+					},
+				},
+			}, nil
+		},
+	}
+
+	repo := &AwsRepository{ECRClient: mock}
+	images, err := repo.ListECRImages(context.Background(), "app")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(images) != 3 {
+		t.Fatalf("expected 3 images, got %d", len(images))
+	}
+	if images[0].Digest != "sha256:recent" {
+		t.Fatalf("expected most recent image first, got %q", images[0].Digest)
+	}
+	if images[0].TagsText() != "latest, v1" {
+		t.Errorf("unexpected tag text: %q", images[0].TagsText())
+	}
+	if images[1].TagsText() != "(untagged)" {
+		t.Errorf("expected untagged marker, got %q", images[1].TagsText())
+	}
+	if !images[1].IsUntagged() {
+		t.Error("expected untagged image")
+	}
+	if !images[2].IsStale(time.Date(2026, 4, 26, 0, 0, 0, 0, time.UTC)) {
+		t.Error("expected old image to be stale")
+	}
+}
+
+func TestListECRImagesError(t *testing.T) {
+	mock := &mockECRClient{
+		describeRepositoriesFunc: func(_ context.Context, _ *ecr.DescribeRepositoriesInput, _ ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
+			return &ecr.DescribeRepositoriesOutput{}, nil
+		},
+		describeImagesFunc: func(_ context.Context, _ *ecr.DescribeImagesInput, _ ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
+			return nil, fmt.Errorf("access denied")
+		},
+	}
+
+	repo := &AwsRepository{ECRClient: mock}
+	_, err := repo.ListECRImages(context.Background(), "app")
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }

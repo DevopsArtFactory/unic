@@ -253,6 +253,11 @@ type ecrRepositoriesLoadedMsg struct {
 	repositories []awsservice.ECRRepository
 }
 
+type ecrImagesLoadedMsg struct {
+	repository string
+	images     []awsservice.ECRImage
+}
+
 type inspectorScanLoadedMsg struct {
 	report *inspector.SecurityScanReport
 }
