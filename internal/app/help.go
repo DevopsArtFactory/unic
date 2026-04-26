@@ -416,6 +416,15 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"esc", "Go back to the node group list"},
 			{"q", "Go back to the feature list"},
 		}
+	case screenEKSAddonList:
+		return listScreenShortcuts("open the selected add-on", "go back to the cluster list", true, true)
+	case screenEKSAddonDetail:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Scroll the add-on detail"},
+			{"pgup / pgdn", "Scroll by one page"},
+			{"esc", "Go back to the add-on list"},
+			{"q", "Go back to the feature list"},
+		}
 	case screenS3BucketList:
 		return listScreenShortcuts("browse the selected bucket", "go back to the feature list", true, false)
 	case screenS3ObjectList:
@@ -780,6 +789,10 @@ func (m Model) helpScreenTitle() string {
 		return "EKS Node Groups"
 	case screenEKSNodeGroupDetail:
 		return "EKS Node Group Detail"
+	case screenEKSAddonList:
+		return "EKS Add-ons"
+	case screenEKSAddonDetail:
+		return "EKS Add-on Detail"
 	case screenS3BucketList:
 		return "S3 Buckets"
 	case screenS3ObjectList:

@@ -98,6 +98,52 @@ func (r *AwsRepository) ListEKSNodeGroups(ctx context.Context, clusterName strin
 	return nodeGroups, nil
 }
 
+// ListEKSAddons returns all managed add-ons for the given cluster.
+func (r *AwsRepository) ListEKSAddons(ctx context.Context, clusterName string) ([]EKSAddon, error) {
+	uniclog.Debug("aws", "ListEKSAddons called", "cluster", clusterName)
+
+	var names []string
+	var nextToken *string
+	for {
+		out, err := r.EKSClient.ListAddons(ctx, &eks.ListAddonsInput{
+			ClusterName: awssdk.String(clusterName),
+			NextToken:   nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to list EKS add-ons for %s: %w", clusterName, err)
+		}
+		names = append(names, out.Addons...)
+		if out.NextToken == nil {
+			break
+		}
+		nextToken = out.NextToken
+	}
+
+	if len(names) == 0 {
+		return nil, nil
+	}
+
+	addons := make([]EKSAddon, 0, len(names))
+	for _, name := range names {
+		out, err := r.EKSClient.DescribeAddon(ctx, &eks.DescribeAddonInput{
+			ClusterName: awssdk.String(clusterName),
+			AddonName:   awssdk.String(name),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe EKS add-on %s/%s: %w", clusterName, name, err)
+		}
+		if out.Addon == nil {
+			continue
+		}
+		addons = append(addons, mapEKSAddon(out.Addon))
+	}
+
+	sort.SliceStable(addons, func(i, j int) bool {
+		return normalizedSortKey(addons[i].Name, addons[i].ARN) < normalizedSortKey(addons[j].Name, addons[j].ARN)
+	})
+	return addons, nil
+}
+
 func mapEKSCluster(cluster *ekstypes.Cluster) EKSCluster {
 	item := EKSCluster{
 		Name:    awssdk.ToString(cluster.Name),
@@ -132,6 +178,29 @@ func mapEKSNodeGroup(nodeGroup *ekstypes.Nodegroup) EKSNodeGroup {
 	if nodeGroup.Health != nil {
 		for _, issue := range nodeGroup.Health.Issues {
 			item.HealthIssues = append(item.HealthIssues, EKSHealthIssue{
+				Code:        string(issue.Code),
+				Message:     awssdk.ToString(issue.Message),
+				ResourceIDs: append([]string(nil), issue.ResourceIds...),
+			})
+		}
+	}
+	return item
+}
+
+func mapEKSAddon(addon *ekstypes.Addon) EKSAddon {
+	item := EKSAddon{
+		ClusterName:           awssdk.ToString(addon.ClusterName),
+		Name:                  awssdk.ToString(addon.AddonName),
+		ARN:                   awssdk.ToString(addon.AddonArn),
+		Version:               awssdk.ToString(addon.AddonVersion),
+		Status:                string(addon.Status),
+		Owner:                 awssdk.ToString(addon.Owner),
+		Publisher:             awssdk.ToString(addon.Publisher),
+		ServiceAccountRoleARN: awssdk.ToString(addon.ServiceAccountRoleArn),
+	}
+	if addon.Health != nil {
+		for _, issue := range addon.Health.Issues {
+			item.HealthIssues = append(item.HealthIssues, EKSAddonIssue{
 				Code:        string(issue.Code),
 				Message:     awssdk.ToString(issue.Message),
 				ResourceIDs: append([]string(nil), issue.ResourceIds...),

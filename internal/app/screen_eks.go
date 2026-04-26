@@ -24,6 +24,10 @@ func (m Model) handleEKSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.filteredEKSNodeGroups = nil
 		m.selectedEKSNodeGroup = nil
 		m.eksNodeGroupScroll = 0
+		m.eksAddons = nil
+		m.filteredEKSAddons = nil
+		m.selectedEKSAddon = nil
+		m.eksAddonScroll = 0
 		m.resetFilter(filterEKSClusters)
 		m.screen = screenEKSClusterList
 		return m, nil, true
@@ -35,6 +39,15 @@ func (m Model) handleEKSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.eksNodeGroupScroll = 0
 		m.resetFilter(filterEKSNodeGroups)
 		m.screen = screenEKSNodeGroupList
+		return m, nil, true
+	case eksAddonsLoadedMsg:
+		m.eksAddons = msg.addons
+		m.filteredEKSAddons = msg.addons
+		m.eksAddonIdx = 0
+		m.selectedEKSAddon = nil
+		m.eksAddonScroll = 0
+		m.resetFilter(filterEKSAddons)
+		m.screen = screenEKSAddonList
 		return m, nil, true
 	}
 	return m, nil, false
@@ -56,6 +69,12 @@ func (m Model) updateEKSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.activateFilter(filterEKSClusters)
 	case "r":
 		return m.startLoading(m.loadEKSClusters())
+	case "a":
+		if len(m.filteredEKSClusters) > 0 && m.eksClusterIdx < len(m.filteredEKSClusters) {
+			cluster := m.filteredEKSClusters[m.eksClusterIdx]
+			m.selectedEKSCluster = &cluster
+			return m.startLoading(m.loadEKSAddons())
+		}
 	case "enter":
 		if len(m.filteredEKSClusters) > 0 && m.eksClusterIdx < len(m.filteredEKSClusters) {
 			cluster := m.filteredEKSClusters[m.eksClusterIdx]
@@ -114,7 +133,7 @@ func (m Model) viewEKSClusterList() string {
 		b.WriteString(renderDetailLine("ARN", cluster.ARN))
 		b.WriteString("\n\n")
 	}
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: node groups • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: node groups • a: add-ons • r: refresh • esc: back • H: home"))
 	return b.String()
 }
 
@@ -259,6 +278,189 @@ func (m Model) viewEKSNodeGroupDetail() string {
 	return b.String()
 }
 
+func (m Model) updateEKSAddonList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if cmd, handled := m.updateSharedFilter(msg, filterEKSAddons); handled {
+		return m, cmd
+	}
+
+	switch msg.String() {
+	case "q":
+		m.screen = screenFeatureList
+	case "esc":
+		m.screen = screenEKSClusterList
+	case "up", "k":
+		m.eksAddonIdx = previousListIndex(m.eksAddonIdx, len(m.filteredEKSAddons))
+	case "down", "j":
+		m.eksAddonIdx = nextListIndex(m.eksAddonIdx, len(m.filteredEKSAddons))
+	case "/":
+		return m, m.activateFilter(filterEKSAddons)
+	case "r":
+		return m.startLoading(m.loadEKSAddons())
+	case "enter":
+		if len(m.filteredEKSAddons) > 0 && m.eksAddonIdx < len(m.filteredEKSAddons) {
+			addon := m.filteredEKSAddons[m.eksAddonIdx]
+			m.selectedEKSAddon = &addon
+			m.eksAddonScroll = 0
+			m.screen = screenEKSAddonDetail
+		}
+	}
+	return m, nil
+}
+
+func (m Model) viewEKSAddonList() string {
+	var b strings.Builder
+	var panel strings.Builder
+	clusterName := ""
+	if m.selectedEKSCluster != nil {
+		clusterName = m.selectedEKSCluster.Name
+	}
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render(fmt.Sprintf("EKS Add-ons — %s", clusterName)))
+	b.WriteString("\n")
+	b.WriteString(m.renderFilterValue(filterEKSAddons))
+	b.WriteString("\n\n")
+
+	if len(m.filteredEKSAddons) == 0 {
+		panel.WriteString(dimStyle.Render("  No managed add-ons found"))
+		panel.WriteString("\n")
+	} else {
+		visibleLines := max(m.height-17, 5)
+		start := 0
+		if m.eksAddonIdx >= visibleLines {
+			start = m.eksAddonIdx - visibleLines + 1
+		}
+		end := min(start+visibleLines, len(m.filteredEKSAddons))
+		for i := start; i < end; i++ {
+			addon := m.filteredEKSAddons[i]
+			cursor := "  "
+			style := normalStyle
+			if addon.NeedsAttention() {
+				style = warningStyle
+			}
+			if i == m.eksAddonIdx {
+				cursor = "> "
+				style = selectedStyle
+			}
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterEKSAddons, addon.DisplayTitle())))
+			panel.WriteString("\n")
+		}
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d add-ons", len(m.filteredEKSAddons), len(m.eksAddons))))
+	}
+
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	if addon := m.currentEKSAddon(); addon != nil {
+		status := addon.StatusSummary()
+		if addon.NeedsAttention() {
+			status = warningStyle.Render(status)
+		} else {
+			status = successStyle.Render(status)
+		}
+		b.WriteString(titleStyle.Render("Selected Add-on"))
+		b.WriteString("\n")
+		b.WriteString(renderDetailLine("Version", firstNonEmpty(addon.Version, "-")))
+		b.WriteString("\n")
+		b.WriteString(renderDetailLine("Status", firstNonEmpty(addon.Status, "-")))
+		b.WriteString("\n")
+		b.WriteString(renderDetailLine("Health", status))
+		b.WriteString("\n\n")
+	}
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: detail • esc: clusters • q: feature list • H: home"))
+	return b.String()
+}
+
+func (m Model) updateEKSAddonDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	lines := m.eksAddonDetailLines()
+	visibleLines := max(m.height-9, 5)
+	maxOffset := max(len(lines)-visibleLines, 0)
+
+	switch msg.String() {
+	case "q":
+		m.screen = screenFeatureList
+	case "esc":
+		m.screen = screenEKSAddonList
+	case "up", "k":
+		if m.eksAddonScroll > 0 {
+			m.eksAddonScroll--
+		}
+	case "down", "j":
+		if m.eksAddonScroll < maxOffset {
+			m.eksAddonScroll++
+		}
+	case "pgup":
+		m.eksAddonScroll -= visibleLines
+		if m.eksAddonScroll < 0 {
+			m.eksAddonScroll = 0
+		}
+	case "pgdown":
+		m.eksAddonScroll += visibleLines
+		if m.eksAddonScroll > maxOffset {
+			m.eksAddonScroll = maxOffset
+		}
+	}
+	return m, nil
+}
+
+func (m Model) viewEKSAddonDetail() string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	title := "EKS Add-on Detail"
+	if m.selectedEKSAddon != nil {
+		title = fmt.Sprintf("EKS Add-on Detail — %s", m.selectedEKSAddon.Name)
+	}
+	b.WriteString(titleStyle.Render(title))
+	b.WriteString("\n\n")
+
+	lines := m.eksAddonDetailLines()
+	visibleLines := max(m.height-9, 5)
+	start := min(m.eksAddonScroll, max(len(lines)-visibleLines, 0))
+	end := min(start+visibleLines, len(lines))
+
+	var panel strings.Builder
+	for _, line := range lines[start:end] {
+		panel.WriteString(line)
+		panel.WriteString("\n")
+	}
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • esc: back • q: feature list • H: home"))
+	return b.String()
+}
+
+func (m Model) eksAddonDetailLines() []string {
+	if m.selectedEKSAddon == nil {
+		return []string{dimStyle.Render("No add-on selected")}
+	}
+	addon := m.selectedEKSAddon
+	status := addon.StatusSummary()
+	if addon.NeedsAttention() {
+		status = warningStyle.Render(status)
+	} else {
+		status = successStyle.Render(status)
+	}
+	lines := []string{
+		renderDetailLine("Cluster", addon.ClusterName),
+		renderDetailLine("Status", firstNonEmpty(addon.Status, "-")),
+		renderDetailLine("Version", firstNonEmpty(addon.Version, "-")),
+		renderDetailLine("Health", status),
+		renderDetailLine("Owner", firstNonEmpty(addon.Owner, "-")),
+		renderDetailLine("Publisher", firstNonEmpty(addon.Publisher, "-")),
+		renderDetailLine("Role ARN", firstNonEmpty(addon.ServiceAccountRoleARN, "-")),
+		renderDetailLine("ARN", firstNonEmpty(addon.ARN, "-")),
+		"",
+		titleStyle.Render("Health Issues"),
+	}
+	if len(addon.HealthIssues) == 0 {
+		lines = append(lines, "  "+successStyle.Render("No active health issues"))
+		return lines
+	}
+	for _, issue := range addon.HealthIssues {
+		lines = append(lines, "  "+warningStyle.Render(issue.Summary()))
+	}
+	return lines
+}
+
 func (m Model) eksNodeGroupDetailLines() []string {
 	if m.selectedEKSNodeGroup == nil {
 		return []string{dimStyle.Render("No node group selected")}
@@ -303,6 +505,14 @@ func (m Model) currentEKSNodeGroup() *awsservice.EKSNodeGroup {
 	return &nodeGroup
 }
 
+func (m Model) currentEKSAddon() *awsservice.EKSAddon {
+	if len(m.filteredEKSAddons) == 0 || m.eksAddonIdx < 0 || m.eksAddonIdx >= len(m.filteredEKSAddons) {
+		return nil
+	}
+	addon := m.filteredEKSAddons[m.eksAddonIdx]
+	return &addon
+}
+
 func (m Model) loadEKSClusters() tea.Cmd {
 	return func() tea.Msg {
 		cfg := m.cfg
@@ -340,6 +550,28 @@ func (m Model) loadEKSNodeGroups() tea.Cmd {
 			return errMsg{err}
 		}
 		return eksNodeGroupsLoadedMsg{nodeGroups: nodeGroups}
+	}
+}
+
+func (m Model) loadEKSAddons() tea.Cmd {
+	return func() tea.Msg {
+		cfg := m.cfg
+		cluster := m.selectedEKSCluster
+		if cluster == nil {
+			return errMsg{fmt.Errorf("no EKS cluster selected")}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
+		defer cancel()
+
+		repo, err := awsservice.NewAwsRepository(ctx, cfg)
+		if err != nil {
+			return errMsg{err}
+		}
+		addons, err := repo.ListEKSAddons(ctx, cluster.Name)
+		if err != nil {
+			return errMsg{err}
+		}
+		return eksAddonsLoadedMsg{addons: addons}
 	}
 }
 

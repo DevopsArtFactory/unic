@@ -67,6 +67,8 @@ const (
 	screenEKSClusterList
 	screenEKSNodeGroupList
 	screenEKSNodeGroupDetail
+	screenEKSAddonList
+	screenEKSAddonDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -247,6 +249,12 @@ type Model struct {
 	eksNodeGroupIdx       int
 	selectedEKSNodeGroup  *awsservice.EKSNodeGroup
 	eksNodeGroupScroll    int
+
+	eksAddons         []awsservice.EKSAddon
+	filteredEKSAddons []awsservice.EKSAddon
+	eksAddonIdx       int
+	selectedEKSAddon  *awsservice.EKSAddon
+	eksAddonScroll    int
 
 	// Feature submodels
 	ec2Browser ec2InstanceBrowserModel
@@ -609,6 +617,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateEKSNodeGroupList(msg)
 		case screenEKSNodeGroupDetail:
 			return m.updateEKSNodeGroupDetail(msg)
+		case screenEKSAddonList:
+			return m.updateEKSAddonList(msg)
+		case screenEKSAddonDetail:
+			return m.updateEKSAddonDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -859,6 +871,10 @@ func (m Model) View() string {
 		v = m.viewEKSNodeGroupList()
 	case screenEKSNodeGroupDetail:
 		v = m.viewEKSNodeGroupDetail()
+	case screenEKSAddonList:
+		v = m.viewEKSAddonList()
+	case screenEKSAddonDetail:
+		v = m.viewEKSAddonDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:
