@@ -189,6 +189,7 @@ type ECSClientAPI interface {
 // ECRClientAPI is the interface for ECR operations used by AwsRepository.
 type ECRClientAPI interface {
 	DescribeRepositories(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error)
+	DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error)
 }
 
 // EKSClientAPI is the interface for EKS operations used by AwsRepository.

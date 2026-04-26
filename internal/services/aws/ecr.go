@@ -173,6 +173,51 @@ func mapECRRepository(repo ecrtypes.Repository) ECRRepository {
 	}
 }
 
+// ListECRImages returns all images in an ECR repository.
+func (r *AwsRepository) ListECRImages(ctx context.Context, repositoryName string) ([]ECRImage, error) {
+	uniclog.Debug("aws", "ListECRImages called", "repository", repositoryName)
+
+	paginator := ecr.NewDescribeImagesPaginator(r.ECRClient, &ecr.DescribeImagesInput{
+		RepositoryName: awssdk.String(repositoryName),
+	})
+	images := []ECRImage{}
+	for paginator.HasMorePages() {
+		output, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe ECR images for %s: %w", repositoryName, err)
+		}
+		for _, image := range output.ImageDetails {
+			images = append(images, mapECRImage(repositoryName, image))
+		}
+	}
+
+	sort.Slice(images, func(i, j int) bool {
+		left := images[i].PushedAt
+		right := images[j].PushedAt
+		if left.Equal(right) {
+			return images[i].Digest < images[j].Digest
+		}
+		if left.IsZero() {
+			return false
+		}
+		if right.IsZero() {
+			return true
+		}
+		return left.After(right)
+	})
+	return images, nil
+}
+
+func mapECRImage(repositoryName string, image ecrtypes.ImageDetail) ECRImage {
+	return ECRImage{
+		RepositoryName: repositoryName,
+		Digest:         awssdk.ToString(image.ImageDigest),
+		Tags:           image.ImageTags,
+		PushedAt:       awssdk.ToTime(image.ImagePushedAt),
+		SizeBytes:      awssdk.ToInt64(image.ImageSizeInBytes),
+	}
+}
+
 func formatECREncryption(config *ecrtypes.EncryptionConfiguration) string {
 	if config == nil {
 		return "AES256"

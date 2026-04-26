@@ -69,6 +69,8 @@ const (
 	screenEKSNodeGroupDetail
 	screenECRRepositoryList
 	screenECRRepositoryDetail
+	screenECRImageList
+	screenECRImageDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -255,6 +257,11 @@ type Model struct {
 	filteredECRRepositories []awsservice.ECRRepository
 	ecrRepositoryIdx        int
 	selectedECRRepository   *awsservice.ECRRepository
+	ecrImages               []awsservice.ECRImage
+	filteredECRImages       []awsservice.ECRImage
+	ecrImageIdx             int
+	selectedECRImage        *awsservice.ECRImage
+	ecrCopyMsg              string
 
 	// Feature submodels
 	ec2Browser ec2InstanceBrowserModel
@@ -622,6 +629,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateECRRepositoryList(msg)
 		case screenECRRepositoryDetail:
 			return m.updateECRRepositoryDetail(msg)
+		case screenECRImageList:
+			return m.updateECRImageList(msg)
+		case screenECRImageDetail:
+			return m.updateECRImageDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -878,6 +889,10 @@ func (m Model) View() string {
 		v = m.viewECRRepositoryList()
 	case screenECRRepositoryDetail:
 		v = m.viewECRRepositoryDetail()
+	case screenECRImageList:
+		v = m.viewECRImageList()
+	case screenECRImageDetail:
+		v = m.viewECRImageDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:

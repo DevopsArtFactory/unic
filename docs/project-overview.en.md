@@ -19,11 +19,12 @@ Implemented service areas currently include:
 - CloudWatch Metrics
 - CloudWatch Logs
 - ECS
+- ECR
 - S3
 - Lambda
 - Inspector mode
 
-The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens. CloudWatch Metrics now includes resource-centric preset groups plus time-range, period, and statistic controls for faster terminal triage.
+The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens. CloudWatch Metrics now includes resource-centric preset groups plus time-range, period, and statistic controls for faster terminal triage. ECR includes repository and image/tag browsing with cleanup-oriented untagged and stale image signals.
 Inspector mode now includes built-in security scans plus checklist-driven readiness checks for RDS, security groups, secrets, Route53, VPCs/subnets, CloudWatch Logs, and baseline posture wrappers.
 
 ## Primary User Flows

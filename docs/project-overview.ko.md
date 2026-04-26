@@ -19,11 +19,12 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 - CloudWatch Metrics
 - CloudWatch Logs
 - ECS
+- ECR
 - S3
 - Lambda
 - Inspector mode
 
-애플리케이션은 이미 상호작용형 변경 작업 플로우, polling 기반 상태 확인, context helper, 서비스별 drill-down 화면을 포함한다. CloudWatch Metrics는 이제 resource-centric preset 그룹과 time-range / period / statistic control을 제공해 터미널에서 더 빠르게 triage할 수 있다.
+애플리케이션은 이미 상호작용형 변경 작업 플로우, polling 기반 상태 확인, context helper, 서비스별 drill-down 화면을 포함한다. CloudWatch Metrics는 이제 resource-centric preset 그룹과 time-range / period / statistic control을 제공해 터미널에서 더 빠르게 triage할 수 있다. ECR은 repository와 image/tag 탐색을 제공하고, untagged image와 오래된 image를 cleanup 후보로 드러낸다.
 Inspector mode는 이제 built-in security scan과 함께 RDS, security group, secret, Route53, VPC/subnet, CloudWatch Logs, baseline posture wrapper를 다루는 checklist 기반 readiness check도 포함한다.
 
 ## 주요 사용자 흐름
