@@ -40,3 +40,16 @@ Examples:
 - `feature/58-s3-browser`
 - `bugfix/76-s3-region-error-handling`
 - `docs/79-documentation-harness`
+
+## Worktree Isolation Rule
+
+All repository work must start from `main` in a fresh git worktree.
+
+- Before editing files, fetch or otherwise verify the intended `main` base.
+- Create a new worktree and branch from `main` or `origin/main`.
+- Do not implement new work directly in the primary checkout or on an existing
+  feature branch.
+- Keep one worktree per task, issue, or PR-sized change.
+- If follow-up work appears to depend on another unmerged branch, still create a
+  fresh worktree from `main` first, then explicitly document and apply the
+  dependency only when it is unavoidable.
