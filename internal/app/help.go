@@ -239,10 +239,10 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"c", "Create a new DNS record"},
 			{"q / esc", "Go back to the record list"},
 		}
-		if m.selectedRoute53Record != nil {
-			canEdit := m.selectedRoute53Record.AliasTarget == "" &&
-				(m.selectedRoute53Record.Type == "A" || m.selectedRoute53Record.Type == "CNAME")
-			canDelete := m.selectedRoute53Record.Type != "NS" && m.selectedRoute53Record.Type != "SOA"
+		if m.route53.selectedRecord != nil {
+			canEdit := m.route53.selectedRecord.AliasTarget == "" &&
+				(m.route53.selectedRecord.Type == "A" || m.route53.selectedRecord.Type == "CNAME")
+			canDelete := m.route53.selectedRecord.Type != "NS" && m.route53.selectedRecord.Type != "SOA"
 			if canEdit {
 				shortcuts = append([]helpShortcut{{"e", "Edit the selected DNS record"}}, shortcuts...)
 			}
@@ -252,7 +252,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		}
 		return shortcuts
 	case screenRoute53RecordCreate:
-		return route53FormShortcuts(m.route53EditField == 1)
+		return route53FormShortcuts(m.route53.editField == 1)
 	case screenRoute53RecordEdit:
 		return []helpShortcut{
 			{"type", "Edit the current record field"},
@@ -321,7 +321,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		shortcuts := []helpShortcut{
 			{"q / esc", "Go back to the access key list"},
 		}
-		if m.iamRotationEnabled && m.selectedIAMKey != nil && m.selectedIAMKey.Status == "Active" {
+		if m.iam.rotationEnabled && m.iam.selectedKey != nil && m.iam.selectedKey.Status == "Active" {
 			shortcuts = append([]helpShortcut{{"r", "Start rotating the selected access key"}}, shortcuts...)
 		}
 		return shortcuts

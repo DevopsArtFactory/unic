@@ -862,11 +862,3 @@ func (cw cloudWatchLogsModel) tickTail() tea.Cmd {
 		return cwLogTailTickMsg{}
 	})
 }
-
-func (m Model) handleCloudWatchLogsMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
-	return m.cwLogs.HandleMessage(&m, msg)
-}
-
-func (m Model) cwLogViewerLines() []string {
-	return m.cwLogs.viewerLines(m)
-}

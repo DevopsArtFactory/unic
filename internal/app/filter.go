@@ -167,14 +167,6 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 		m.instIdx = 0
 	case filterSubnetIPs:
 		m.applyIPFilter()
-	case filterRoute53Zones:
-		m.filteredRoute53Zones = applyFilter(m.route53Zones, m.filterValue(target))
-		m.route53ZoneIdx = 0
-	case filterRoute53Records:
-		m.filteredRoute53Records = applyFilter(m.route53Records, m.filterValue(target))
-		m.route53RecordIdx = 0
-	case filterIAMUsers:
-		m.refreshIAMUserFilter()
 	case filterSecurityGroups:
 		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.filterValue(target))
 		m.sgIdx = 0

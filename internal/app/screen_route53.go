@@ -12,66 +12,153 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
-func (m Model) handleRoute53Msg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+type route53Model struct {
+	zones           []awsservice.HostedZone
+	filteredZones   []awsservice.HostedZone
+	zoneIdx         int
+	selectedZone    *awsservice.HostedZone
+	records         []awsservice.DNSRecord
+	filteredRecords []awsservice.DNSRecord
+	recordIdx       int
+	selectedRecord  *awsservice.DNSRecord
+	action          string            // "create", "edit", "delete"
+	confirmInput    string            // type-to-confirm for delete
+	editField       int               // current form field index
+	editValues      map[string]string // accumulated form values
+	editInput       string            // current field text input
+	editSelectIdx   int               // index for select-type fields (record type)
+	changeID        string            // for status polling
+	changeStatus    string            // "PENDING" / "INSYNC"
+	polling         bool              // polling active
+}
+
+func newRoute53Model() route53Model {
+	return route53Model{}
+}
+
+func (rm *route53Model) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(rm.loadZones(*m))
+}
+
+func (rm *route53Model) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case route53ZonesLoadedMsg:
-		m.route53Zones = msg.zones
-		m.filteredRoute53Zones = msg.zones
-		m.route53ZoneIdx = 0
+		rm.zones = msg.zones
+		rm.filteredZones = applyFilter(rm.zones, m.filterValue(filterRoute53Zones))
+		rm.zoneIdx = 0
 		m.screen = screenRoute53ZoneList
-		return m, nil, true
+		return *m, nil, true
 
 	case route53RecordsLoadedMsg:
-		m.route53Records = msg.records
-		m.filteredRoute53Records = msg.records
-		m.route53RecordIdx = 0
+		rm.records = msg.records
+		rm.filteredRecords = applyFilter(rm.records, m.filterValue(filterRoute53Records))
+		rm.recordIdx = 0
 		m.screen = screenRoute53RecordList
-		return m, nil, true
+		return *m, nil, true
 
 	case route53ActionDoneMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			m.screen = screenError
-			return m, nil, true
+			return *m, nil, true
 		}
-		m.route53ChangeID = msg.changeID
-		m.route53ChangeStatus = "PENDING"
-		m.route53Polling = true
-		if m.selectedRoute53Zone != nil {
-			return m, tea.Batch(
-				m.loadRoute53Records(m.selectedRoute53Zone.ID),
-				m.pollRoute53ChangeStatus(),
+		rm.changeID = msg.changeID
+		rm.changeStatus = "PENDING"
+		rm.polling = true
+		if rm.selectedZone != nil {
+			return *m, tea.Batch(
+				rm.loadRecords(*m, rm.selectedZone.ID),
+				rm.pollChangeStatus(*m),
 			), true
 		}
 		m.screen = screenRoute53RecordList
-		return m, nil, true
+		return *m, nil, true
 
 	case route53ChangeStatusMsg:
 		if msg.err != nil {
-			m.route53Polling = false
-			return m, nil, true
+			rm.polling = false
+			return *m, nil, true
 		}
-		m.route53ChangeStatus = msg.status
+		rm.changeStatus = msg.status
 		if msg.status == "INSYNC" {
-			m.route53Polling = false
-			return m, nil, true
+			rm.polling = false
+			return *m, nil, true
 		}
-		return m, m.tickRoute53Poll(), true
+		return *m, rm.tickPoll(), true
 
 	case route53PollTickMsg:
-		if m.route53Polling {
-			return m, m.pollRoute53ChangeStatus(), true
+		if rm.polling {
+			return *m, rm.pollChangeStatus(*m), true
 		}
-		return m, nil, true
+		return *m, nil, true
 	}
-	return m, nil, false
+	return *m, nil, false
 }
 
-func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *route53Model) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenRoute53ZoneList:
+		newM, cmd := rm.updateZoneList(m, msg)
+		return newM, cmd, true
+	case screenRoute53RecordList:
+		newM, cmd := rm.updateRecordList(m, msg)
+		return newM, cmd, true
+	case screenRoute53RecordDetail:
+		newM, cmd := rm.updateRecordDetail(m, msg)
+		return newM, cmd, true
+	case screenRoute53RecordCreate:
+		newM, cmd := rm.updateRecordCreate(m, msg)
+		return newM, cmd, true
+	case screenRoute53RecordEdit:
+		newM, cmd := rm.updateRecordEdit(m, msg)
+		return newM, cmd, true
+	case screenRoute53RecordDeleteConfirm:
+		newM, cmd := rm.updateRecordDeleteConfirm(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (rm route53Model) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenRoute53ZoneList:
+		return rm.viewZoneList(m), true
+	case screenRoute53RecordList:
+		return rm.viewRecordList(m), true
+	case screenRoute53RecordDetail:
+		return rm.viewRecordDetail(m), true
+	case screenRoute53RecordCreate:
+		return rm.viewRecordCreate(m), true
+	case screenRoute53RecordEdit:
+		return rm.viewRecordEdit(m), true
+	case screenRoute53RecordDeleteConfirm:
+		return rm.viewRecordDeleteConfirm(m), true
+	default:
+		return "", false
+	}
+}
+
+func (rm *route53Model) ApplyFilter(m *Model, target filterTarget) bool {
+	switch target {
+	case filterRoute53Zones:
+		rm.filteredZones = applyFilter(rm.zones, m.filterValue(target))
+		rm.zoneIdx = 0
+		return true
+	case filterRoute53Records:
+		rm.filteredRecords = applyFilter(rm.records, m.filterValue(target))
+		rm.recordIdx = 0
+		return true
+	default:
+		return false
+	}
+}
+
+func (rm *route53Model) updateZoneList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterRoute53Zones); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -79,26 +166,26 @@ func (m Model) updateRoute53ZoneList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterRoute53Zones)
 	case "up", "k":
-		m.route53ZoneIdx = previousListIndex(m.route53ZoneIdx, len(m.filteredRoute53Zones))
+		rm.zoneIdx = previousListIndex(rm.zoneIdx, len(rm.filteredZones))
 	case "down", "j":
-		m.route53ZoneIdx = nextListIndex(m.route53ZoneIdx, len(m.filteredRoute53Zones))
+		rm.zoneIdx = nextListIndex(rm.zoneIdx, len(rm.filteredZones))
 	case "/":
-		return m, m.activateFilter(filterRoute53Zones)
+		return *m, m.activateFilter(filterRoute53Zones)
 	case "enter":
-		if len(m.filteredRoute53Zones) > 0 && m.route53ZoneIdx < len(m.filteredRoute53Zones) {
-			selected := m.filteredRoute53Zones[m.route53ZoneIdx]
-			m.selectedRoute53Zone = &selected
-			return m.startLoading(m.loadRoute53Records(selected.ID))
+		if len(rm.filteredZones) > 0 && rm.zoneIdx < len(rm.filteredZones) {
+			selected := rm.filteredZones[rm.zoneIdx]
+			rm.selectedZone = &selected
+			return m.startLoading(rm.loadRecords(*m, selected.ID))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateRoute53RecordList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *route53Model) updateRecordList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterRoute53Records); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -106,65 +193,65 @@ func (m Model) updateRoute53RecordList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenRoute53ZoneList
 		m.resetFilter(filterRoute53Records)
 	case "up", "k":
-		m.route53RecordIdx = previousListIndex(m.route53RecordIdx, len(m.filteredRoute53Records))
+		rm.recordIdx = previousListIndex(rm.recordIdx, len(rm.filteredRecords))
 	case "down", "j":
-		m.route53RecordIdx = nextListIndex(m.route53RecordIdx, len(m.filteredRoute53Records))
+		rm.recordIdx = nextListIndex(rm.recordIdx, len(rm.filteredRecords))
 	case "/":
-		return m, m.activateFilter(filterRoute53Records)
+		return *m, m.activateFilter(filterRoute53Records)
 	case "c":
-		m.route53Action = "create"
-		m.route53EditField = 0
-		m.route53EditValues = map[string]string{}
-		m.route53EditInput = ""
-		m.route53EditSelectIdx = 0
+		rm.action = "create"
+		rm.editField = 0
+		rm.editValues = map[string]string{}
+		rm.editInput = ""
+		rm.editSelectIdx = 0
 		m.screen = screenRoute53RecordCreate
 	case "enter":
-		if len(m.filteredRoute53Records) > 0 && m.route53RecordIdx < len(m.filteredRoute53Records) {
-			selected := m.filteredRoute53Records[m.route53RecordIdx]
-			m.selectedRoute53Record = &selected
+		if len(rm.filteredRecords) > 0 && rm.recordIdx < len(rm.filteredRecords) {
+			selected := rm.filteredRecords[rm.recordIdx]
+			rm.selectedRecord = &selected
 			m.screen = screenRoute53RecordDetail
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateRoute53RecordDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *route53Model) updateRecordDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenRoute53RecordList
 	case "e":
 		// Edit only for A/CNAME non-alias records
-		if m.selectedRoute53Record != nil && m.selectedRoute53Record.AliasTarget == "" &&
-			(m.selectedRoute53Record.Type == "A" || m.selectedRoute53Record.Type == "CNAME") {
-			m.route53Action = "edit"
-			m.route53EditField = 0
-			m.route53EditValues = map[string]string{
-				"value": strings.Join(m.selectedRoute53Record.Values, ","),
-				"ttl":   fmt.Sprintf("%d", m.selectedRoute53Record.TTL),
+		if rm.selectedRecord != nil && rm.selectedRecord.AliasTarget == "" &&
+			(rm.selectedRecord.Type == "A" || rm.selectedRecord.Type == "CNAME") {
+			rm.action = "edit"
+			rm.editField = 0
+			rm.editValues = map[string]string{
+				"value": strings.Join(rm.selectedRecord.Values, ","),
+				"ttl":   fmt.Sprintf("%d", rm.selectedRecord.TTL),
 			}
-			m.route53EditInput = strings.Join(m.selectedRoute53Record.Values, ",")
+			rm.editInput = strings.Join(rm.selectedRecord.Values, ",")
 			m.screen = screenRoute53RecordEdit
 		}
 	case "d":
 		// Delete allowed for non-NS/SOA records
-		if m.selectedRoute53Record != nil &&
-			m.selectedRoute53Record.Type != "NS" && m.selectedRoute53Record.Type != "SOA" {
-			m.route53Action = "delete"
-			m.route53ConfirmInput = ""
+		if rm.selectedRecord != nil &&
+			rm.selectedRecord.Type != "NS" && rm.selectedRecord.Type != "SOA" {
+			rm.action = "delete"
+			rm.confirmInput = ""
 			m.screen = screenRoute53RecordDeleteConfirm
 		}
 	case "c":
-		m.route53Action = "create"
-		m.route53EditField = 0
-		m.route53EditValues = map[string]string{}
-		m.route53EditInput = ""
-		m.route53EditSelectIdx = 0
+		rm.action = "create"
+		rm.editField = 0
+		rm.editValues = map[string]string{}
+		rm.editInput = ""
+		rm.editSelectIdx = 0
 		m.screen = screenRoute53RecordCreate
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) loadRoute53Zones() tea.Cmd {
+func (rm route53Model) loadZones(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -184,7 +271,7 @@ func (m Model) loadRoute53Zones() tea.Cmd {
 	}
 }
 
-func (m Model) loadRoute53Records(zoneID string) tea.Cmd {
+func (rm route53Model) loadRecords(m Model, zoneID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -207,7 +294,7 @@ func (m Model) loadRoute53Records(zoneID string) tea.Cmd {
 	}
 }
 
-func (m Model) viewRoute53ZoneList() string {
+func (rm route53Model) viewZoneList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -217,13 +304,13 @@ func (m Model) viewRoute53ZoneList() string {
 	b.WriteString(m.renderFilterValue(filterRoute53Zones))
 	b.WriteString("\n\n")
 
-	if len(m.filteredRoute53Zones) == 0 {
+	if len(rm.filteredZones) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching hosted zones"))
 		panel.WriteString("\n")
 	} else {
 		// Measure max widths for column alignment
 		maxName, maxID := 4, 2 // "NAME", "ID"
-		for _, zone := range m.filteredRoute53Zones {
+		for _, zone := range rm.filteredZones {
 			if len(zone.Name) > maxName {
 				maxName = len(zone.Name)
 			}
@@ -241,16 +328,16 @@ func (m Model) viewRoute53ZoneList() string {
 
 		visibleLines := max(m.height-11, 5)
 		start := 0
-		if m.route53ZoneIdx >= visibleLines {
-			start = m.route53ZoneIdx - visibleLines + 1
+		if rm.zoneIdx >= visibleLines {
+			start = rm.zoneIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredRoute53Zones))
+		end := min(start+visibleLines, len(rm.filteredZones))
 
 		for i := start; i < end; i++ {
-			zone := m.filteredRoute53Zones[i]
+			zone := rm.filteredZones[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.route53ZoneIdx {
+			if i == rm.zoneIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -268,7 +355,7 @@ func (m Model) viewRoute53ZoneList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d zones", len(m.filteredRoute53Zones), len(m.route53Zones))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d zones", len(rm.filteredZones), len(rm.zones))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -277,13 +364,13 @@ func (m Model) viewRoute53ZoneList() string {
 	return b.String()
 }
 
-func (m Model) viewRoute53RecordList() string {
+func (rm route53Model) viewRecordList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	zoneName := ""
-	if m.selectedRoute53Zone != nil {
-		zoneName = m.selectedRoute53Zone.Name
+	if rm.selectedZone != nil {
+		zoneName = rm.selectedZone.Name
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("DNS Records — %s", zoneName)))
 	b.WriteString("\n")
@@ -291,13 +378,13 @@ func (m Model) viewRoute53RecordList() string {
 	b.WriteString(m.renderFilterValue(filterRoute53Records))
 	b.WriteString("\n\n")
 
-	if len(m.filteredRoute53Records) == 0 {
+	if len(rm.filteredRecords) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching records"))
 		panel.WriteString("\n")
 	} else {
 		// Measure max widths for column alignment
 		maxName, maxType := 4, 4 // "NAME", "TYPE"
-		for _, rec := range m.filteredRoute53Records {
+		for _, rec := range rm.filteredRecords {
 			if len(rec.Name) > maxName {
 				maxName = len(rec.Name)
 			}
@@ -314,16 +401,16 @@ func (m Model) viewRoute53RecordList() string {
 
 		visibleLines := max(m.height-11, 5)
 		start := 0
-		if m.route53RecordIdx >= visibleLines {
-			start = m.route53RecordIdx - visibleLines + 1
+		if rm.recordIdx >= visibleLines {
+			start = rm.recordIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredRoute53Records))
+		end := min(start+visibleLines, len(rm.filteredRecords))
 
 		for i := start; i < end; i++ {
-			rec := m.filteredRoute53Records[i]
+			rec := rm.filteredRecords[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.route53RecordIdx {
+			if i == rm.recordIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -346,15 +433,15 @@ func (m Model) viewRoute53RecordList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d records", len(m.filteredRoute53Records), len(m.route53Records))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d records", len(rm.filteredRecords), len(rm.records))))
 	}
 
 	// Show change status if polling
-	if m.route53Polling {
+	if rm.polling {
 		panel.WriteString("\n")
-		panel.WriteString(filterStyle.Render(fmt.Sprintf("  Change: %s...", m.route53ChangeStatus)))
+		panel.WriteString(filterStyle.Render(fmt.Sprintf("  Change: %s...", rm.changeStatus)))
 		panel.WriteString("\n")
-	} else if m.route53ChangeStatus == "INSYNC" {
+	} else if rm.changeStatus == "INSYNC" {
 		panel.WriteString("\n")
 		panel.WriteString(dimStyle.Render("  Change: INSYNC"))
 		panel.WriteString("\n")
@@ -366,11 +453,11 @@ func (m Model) viewRoute53RecordList() string {
 	return b.String()
 }
 
-func (m Model) viewRoute53RecordDetail() string {
-	if m.selectedRoute53Record == nil {
+func (rm route53Model) viewRecordDetail(m Model) string {
+	if rm.selectedRecord == nil {
 		return ""
 	}
-	r := m.selectedRoute53Record
+	r := rm.selectedRecord
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("DNS Record Detail"))
@@ -400,10 +487,10 @@ func (m Model) viewRoute53RecordDetail() string {
 
 	b.WriteString("\n")
 	hints := "esc: back • H: home"
-	if m.selectedRoute53Record != nil {
-		canEdit := m.selectedRoute53Record.AliasTarget == "" &&
-			(m.selectedRoute53Record.Type == "A" || m.selectedRoute53Record.Type == "CNAME")
-		canDelete := m.selectedRoute53Record.Type != "NS" && m.selectedRoute53Record.Type != "SOA"
+	if rm.selectedRecord != nil {
+		canEdit := rm.selectedRecord.AliasTarget == "" &&
+			(rm.selectedRecord.Type == "A" || rm.selectedRecord.Type == "CNAME")
+		canDelete := rm.selectedRecord.Type != "NS" && rm.selectedRecord.Type != "SOA"
 		if canEdit {
 			hints = "e: edit • " + hints
 		}
@@ -421,134 +508,134 @@ func (m Model) viewRoute53RecordDetail() string {
 var route53CreateFieldLabels = []string{"Name", "Type", "Value", "TTL"}
 var route53TypeOptions = []string{"A", "CNAME"}
 
-func (m Model) updateRoute53RecordCreate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *route53Model) updateRecordCreate(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	switch m.route53EditField {
+	switch rm.editField {
 	case 0: // Name (text input)
-		return m.updateRoute53TextInput(key, screenRoute53RecordList)
+		return rm.updateTextInput(m, key, screenRoute53RecordList)
 	case 1: // Type (select)
-		return m.updateRoute53TypeSelect(key)
+		return rm.updateTypeSelect(m, key)
 	case 2: // Value (text input)
-		return m.updateRoute53TextInput(key, screenRoute53RecordList)
+		return rm.updateTextInput(m, key, screenRoute53RecordList)
 	case 3: // TTL (text input, last field → execute)
-		return m.updateRoute53CreateTTL(key)
+		return rm.updateCreateTTL(m, key)
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateRoute53TypeSelect(key string) (tea.Model, tea.Cmd) {
+func (rm *route53Model) updateTypeSelect(m *Model, key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "esc":
 		m.screen = screenRoute53RecordList
 	case "up", "k":
-		m.route53EditSelectIdx = previousListIndex(m.route53EditSelectIdx, len(route53TypeOptions))
+		rm.editSelectIdx = previousListIndex(rm.editSelectIdx, len(route53TypeOptions))
 	case "down", "j":
-		m.route53EditSelectIdx = nextListIndex(m.route53EditSelectIdx, len(route53TypeOptions))
+		rm.editSelectIdx = nextListIndex(rm.editSelectIdx, len(route53TypeOptions))
 	case "enter":
-		m.route53EditValues["type"] = route53TypeOptions[m.route53EditSelectIdx]
-		m.route53EditField++
-		m.route53EditInput = ""
+		rm.editValues["type"] = route53TypeOptions[rm.editSelectIdx]
+		rm.editField++
+		rm.editInput = ""
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateRoute53TextInput(key string, cancelScreen screen) (tea.Model, tea.Cmd) {
+func (rm *route53Model) updateTextInput(m *Model, key string, cancelScreen screen) (tea.Model, tea.Cmd) {
 	switch key {
 	case "esc":
 		m.screen = cancelScreen
 	case "enter":
-		if m.route53EditInput == "" {
-			return m, nil // required field
+		if rm.editInput == "" {
+			return *m, nil // required field
 		}
-		switch m.route53EditField {
+		switch rm.editField {
 		case 0:
-			m.route53EditValues["name"] = m.route53EditInput
+			rm.editValues["name"] = rm.editInput
 		case 2:
-			m.route53EditValues["value"] = m.route53EditInput
+			rm.editValues["value"] = rm.editInput
 		}
-		m.route53EditField++
-		m.route53EditInput = ""
+		rm.editField++
+		rm.editInput = ""
 		// Pre-fill TTL default
-		if m.route53EditField == 3 {
-			m.route53EditInput = "300"
+		if rm.editField == 3 {
+			rm.editInput = "300"
 		}
 	case "backspace":
-		if len(m.route53EditInput) > 0 {
-			m.route53EditInput = m.route53EditInput[:len(m.route53EditInput)-1]
+		if len(rm.editInput) > 0 {
+			rm.editInput = rm.editInput[:len(rm.editInput)-1]
 		}
 	default:
 		if len(key) == 1 {
-			m.route53EditInput += key
+			rm.editInput += key
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateRoute53CreateTTL(key string) (tea.Model, tea.Cmd) {
+func (rm *route53Model) updateCreateTTL(m *Model, key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "esc":
 		m.screen = screenRoute53RecordList
 	case "enter":
-		if m.route53EditInput == "" {
-			m.route53EditInput = "300"
+		if rm.editInput == "" {
+			rm.editInput = "300"
 		}
-		m.route53EditValues["ttl"] = m.route53EditInput
+		rm.editValues["ttl"] = rm.editInput
 		// Execute create
-		return m.startLoading(m.executeRoute53Create())
+		return m.startLoading(rm.executeCreate(*m))
 	case "backspace":
-		if len(m.route53EditInput) > 0 {
-			m.route53EditInput = m.route53EditInput[:len(m.route53EditInput)-1]
+		if len(rm.editInput) > 0 {
+			rm.editInput = rm.editInput[:len(rm.editInput)-1]
 		}
 	default:
 		if len(key) == 1 && key >= "0" && key <= "9" {
-			m.route53EditInput += key
+			rm.editInput += key
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewRoute53RecordCreate() string {
+func (rm route53Model) viewRecordCreate(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Create DNS Record"))
 	b.WriteString("\n\n")
 
-	if m.selectedRoute53Zone != nil {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  Zone: %s (%s)", m.selectedRoute53Zone.Name, m.selectedRoute53Zone.ID)))
+	if rm.selectedZone != nil {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  Zone: %s (%s)", rm.selectedZone.Name, rm.selectedZone.ID)))
 		b.WriteString("\n\n")
 	}
 
 	// Show completed fields
-	for i := 0; i < m.route53EditField; i++ {
+	for i := 0; i < rm.editField; i++ {
 		label := route53CreateFieldLabels[i]
 		val := ""
 		switch i {
 		case 0:
-			val = m.route53EditValues["name"]
+			val = rm.editValues["name"]
 		case 1:
-			val = m.route53EditValues["type"]
+			val = rm.editValues["type"]
 		case 2:
-			val = m.route53EditValues["value"]
+			val = rm.editValues["value"]
 		case 3:
-			val = m.route53EditValues["ttl"]
+			val = rm.editValues["ttl"]
 		}
 		b.WriteString(dimStyle.Render(fmt.Sprintf("  %s: %s", label, val)))
 		b.WriteString("\n")
 	}
 
 	// Show current field
-	if m.route53EditField < len(route53CreateFieldLabels) {
-		label := route53CreateFieldLabels[m.route53EditField]
+	if rm.editField < len(route53CreateFieldLabels) {
+		label := route53CreateFieldLabels[rm.editField]
 		b.WriteString("\n")
 		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s:", label)))
 		b.WriteString("\n")
 
-		if m.route53EditField == 1 { // Type select
+		if rm.editField == 1 { // Type select
 			for i, opt := range route53TypeOptions {
 				cursor := "  "
 				style := normalStyle
-				if i == m.route53EditSelectIdx {
+				if i == rm.editSelectIdx {
 					cursor = "> "
 					style = selectedStyle
 				}
@@ -556,7 +643,7 @@ func (m Model) viewRoute53RecordCreate() string {
 				b.WriteString("\n")
 			}
 		} else {
-			b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.route53EditInput)))
+			b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", rm.editInput)))
 			b.WriteString("\n")
 		}
 	}
@@ -568,28 +655,28 @@ func (m Model) viewRoute53RecordCreate() string {
 
 // --- Edit record form ---
 
-func (m Model) updateRoute53RecordEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *route53Model) updateRecordEdit(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	switch m.route53EditField {
+	switch rm.editField {
 	case 0: // Value (text input)
 		switch key {
 		case "esc":
 			m.screen = screenRoute53RecordDetail
 		case "enter":
-			if m.route53EditInput == "" {
-				return m, nil
+			if rm.editInput == "" {
+				return *m, nil
 			}
-			m.route53EditValues["value"] = m.route53EditInput
-			m.route53EditField++
-			m.route53EditInput = m.route53EditValues["ttl"]
+			rm.editValues["value"] = rm.editInput
+			rm.editField++
+			rm.editInput = rm.editValues["ttl"]
 		case "backspace":
-			if len(m.route53EditInput) > 0 {
-				m.route53EditInput = m.route53EditInput[:len(m.route53EditInput)-1]
+			if len(rm.editInput) > 0 {
+				rm.editInput = rm.editInput[:len(rm.editInput)-1]
 			}
 		default:
 			if len(key) == 1 {
-				m.route53EditInput += key
+				rm.editInput += key
 			}
 		}
 	case 1: // TTL (text input, last field → execute)
@@ -597,29 +684,29 @@ func (m Model) updateRoute53RecordEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.screen = screenRoute53RecordDetail
 		case "enter":
-			if m.route53EditInput == "" {
-				return m, nil
+			if rm.editInput == "" {
+				return *m, nil
 			}
-			m.route53EditValues["ttl"] = m.route53EditInput
-			return m.startLoading(m.executeRoute53Update())
+			rm.editValues["ttl"] = rm.editInput
+			return m.startLoading(rm.executeUpdate(*m))
 		case "backspace":
-			if len(m.route53EditInput) > 0 {
-				m.route53EditInput = m.route53EditInput[:len(m.route53EditInput)-1]
+			if len(rm.editInput) > 0 {
+				rm.editInput = rm.editInput[:len(rm.editInput)-1]
 			}
 		default:
 			if len(key) == 1 && key >= "0" && key <= "9" {
-				m.route53EditInput += key
+				rm.editInput += key
 			}
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewRoute53RecordEdit() string {
-	if m.selectedRoute53Record == nil {
+func (rm route53Model) viewRecordEdit(m Model) string {
+	if rm.selectedRecord == nil {
 		return ""
 	}
-	r := m.selectedRoute53Record
+	r := rm.selectedRecord
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Edit DNS Record"))
@@ -634,26 +721,26 @@ func (m Model) viewRoute53RecordEdit() string {
 	editFields := []string{"Value", "TTL"}
 
 	// Show completed edit fields
-	for i := 0; i < m.route53EditField; i++ {
+	for i := 0; i < rm.editField; i++ {
 		label := editFields[i]
 		val := ""
 		switch i {
 		case 0:
-			val = m.route53EditValues["value"]
+			val = rm.editValues["value"]
 		case 1:
-			val = m.route53EditValues["ttl"]
+			val = rm.editValues["ttl"]
 		}
 		b.WriteString(dimStyle.Render(fmt.Sprintf("  %s: %s", label, val)))
 		b.WriteString("\n")
 	}
 
 	// Show current edit field
-	if m.route53EditField < len(editFields) {
-		label := editFields[m.route53EditField]
+	if rm.editField < len(editFields) {
+		label := editFields[rm.editField]
 		b.WriteString("\n")
 		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s:", label)))
 		b.WriteString("\n")
-		b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.route53EditInput)))
+		b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", rm.editInput)))
 		b.WriteString("\n")
 	}
 
@@ -664,37 +751,37 @@ func (m Model) viewRoute53RecordEdit() string {
 
 // --- Delete record confirm ---
 
-func (m Model) updateRoute53RecordDeleteConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.selectedRoute53Record == nil {
+func (rm *route53Model) updateRecordDeleteConfirm(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if rm.selectedRecord == nil {
 		m.screen = screenRoute53RecordList
-		return m, nil
+		return *m, nil
 	}
-	confirmTarget := m.selectedRoute53Record.Name
+	confirmTarget := rm.selectedRecord.Name
 
 	switch msg.String() {
 	case "esc":
 		m.screen = screenRoute53RecordDetail
 	case "enter":
-		if m.route53ConfirmInput == confirmTarget {
-			return m.startLoading(m.executeRoute53Delete())
+		if rm.confirmInput == confirmTarget {
+			return m.startLoading(rm.executeDelete(*m))
 		}
 	case "backspace":
-		if len(m.route53ConfirmInput) > 0 {
-			m.route53ConfirmInput = m.route53ConfirmInput[:len(m.route53ConfirmInput)-1]
+		if len(rm.confirmInput) > 0 {
+			rm.confirmInput = rm.confirmInput[:len(rm.confirmInput)-1]
 		}
 	default:
 		if runes := msg.Runes; len(runes) > 0 {
-			m.route53ConfirmInput += string(runes)
+			rm.confirmInput += string(runes)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewRoute53RecordDeleteConfirm() string {
-	if m.selectedRoute53Record == nil {
+func (rm route53Model) viewRecordDeleteConfirm(m Model) string {
+	if rm.selectedRecord == nil {
 		return ""
 	}
-	r := m.selectedRoute53Record
+	r := rm.selectedRecord
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Delete DNS Record"))
@@ -717,7 +804,7 @@ func (m Model) viewRoute53RecordDeleteConfirm() string {
 
 	b.WriteString(normalStyle.Render("  Type the record name to confirm:"))
 	b.WriteString("\n")
-	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.route53ConfirmInput)))
+	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", rm.confirmInput)))
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
 	return b.String()
@@ -725,7 +812,7 @@ func (m Model) viewRoute53RecordDeleteConfirm() string {
 
 // --- Execution commands ---
 
-func (m Model) executeRoute53Create() tea.Cmd {
+func (rm route53Model) executeCreate(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -737,10 +824,10 @@ func (m Model) executeRoute53Create() tea.Cmd {
 			}
 		}
 
-		name := m.route53EditValues["name"]
-		recordType := m.route53EditValues["type"]
-		value := m.route53EditValues["value"]
-		ttlStr := m.route53EditValues["ttl"]
+		name := rm.editValues["name"]
+		recordType := rm.editValues["type"]
+		value := rm.editValues["value"]
+		ttlStr := rm.editValues["ttl"]
 		ttl := parseTTL(ttlStr)
 
 		values := strings.Split(value, ",")
@@ -749,8 +836,8 @@ func (m Model) executeRoute53Create() tea.Cmd {
 		}
 
 		zoneID := ""
-		if m.selectedRoute53Zone != nil {
-			zoneID = m.selectedRoute53Zone.ID
+		if rm.selectedZone != nil {
+			zoneID = rm.selectedZone.ID
 		}
 
 		info, err := repo.CreateRecord(ctx, zoneID, name, recordType, values, ttl)
@@ -765,7 +852,7 @@ func (m Model) executeRoute53Create() tea.Cmd {
 	}
 }
 
-func (m Model) executeRoute53Update() tea.Cmd {
+func (rm route53Model) executeUpdate(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -777,12 +864,12 @@ func (m Model) executeRoute53Update() tea.Cmd {
 			}
 		}
 
-		if m.selectedRoute53Record == nil || m.selectedRoute53Zone == nil {
+		if rm.selectedRecord == nil || rm.selectedZone == nil {
 			return route53ActionDoneMsg{err: fmt.Errorf("no record selected")}
 		}
 
-		value := m.route53EditValues["value"]
-		ttlStr := m.route53EditValues["ttl"]
+		value := rm.editValues["value"]
+		ttlStr := rm.editValues["ttl"]
 		ttl := parseTTL(ttlStr)
 
 		values := strings.Split(value, ",")
@@ -790,7 +877,7 @@ func (m Model) executeRoute53Update() tea.Cmd {
 			values[i] = strings.TrimSpace(values[i])
 		}
 
-		info, err := repo.UpdateRecord(ctx, m.selectedRoute53Zone.ID, *m.selectedRoute53Record, values, ttl)
+		info, err := repo.UpdateRecord(ctx, rm.selectedZone.ID, *rm.selectedRecord, values, ttl)
 		if err != nil {
 			return route53ActionDoneMsg{action: "edit", err: err}
 		}
@@ -802,7 +889,7 @@ func (m Model) executeRoute53Update() tea.Cmd {
 	}
 }
 
-func (m Model) executeRoute53Delete() tea.Cmd {
+func (rm route53Model) executeDelete(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -814,11 +901,11 @@ func (m Model) executeRoute53Delete() tea.Cmd {
 			}
 		}
 
-		if m.selectedRoute53Record == nil || m.selectedRoute53Zone == nil {
+		if rm.selectedRecord == nil || rm.selectedZone == nil {
 			return route53ActionDoneMsg{err: fmt.Errorf("no record selected")}
 		}
 
-		info, err := repo.DeleteRecord(ctx, m.selectedRoute53Zone.ID, *m.selectedRoute53Record)
+		info, err := repo.DeleteRecord(ctx, rm.selectedZone.ID, *rm.selectedRecord)
 		if err != nil {
 			return route53ActionDoneMsg{action: "delete", err: err}
 		}
@@ -832,7 +919,7 @@ func (m Model) executeRoute53Delete() tea.Cmd {
 
 // --- Change status polling ---
 
-func (m Model) pollRoute53ChangeStatus() tea.Cmd {
+func (rm route53Model) pollChangeStatus(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -844,12 +931,12 @@ func (m Model) pollRoute53ChangeStatus() tea.Cmd {
 			}
 		}
 
-		status, err := repo.GetChangeStatus(ctx, m.route53ChangeID)
+		status, err := repo.GetChangeStatus(ctx, rm.changeID)
 		return route53ChangeStatusMsg{status: status, err: err}
 	}
 }
 
-func (m Model) tickRoute53Poll() tea.Cmd {
+func (rm route53Model) tickPoll() tea.Cmd {
 	return tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
 		return route53PollTickMsg{}
 	})
