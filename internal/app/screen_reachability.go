@@ -16,12 +16,145 @@ import (
 
 var reachabilityProtocols = []string{"TCP", "UDP"}
 
-func (m Model) loadReachabilityTargets() tea.Cmd {
+type reachabilityModel struct {
+	regions         []string
+	filteredRegions []string
+	region          string
+	regionIdx       int
+	regionFilter    string
+	regionFiltering bool
+	targets         []awsservice.ReachabilityTarget
+	filteredTargets []awsservice.ReachabilityTarget
+	sourceTypes     []string
+	sourceTypeIdx   int
+	destTypes       []string
+	destTypeIdx     int
+	idx             int
+	filter          string
+	filterActive    bool
+	source          *awsservice.ReachabilityTarget
+	destination     *awsservice.ReachabilityTarget
+	destinationIP   string
+	protocolIdx     int
+	portInput       string
+	configField     int
+	result          *awsservice.ReachabilityAnalysisResult
+	scrollOffset    int
+}
+
+func newReachabilityModel() reachabilityModel {
+	return reachabilityModel{}
+}
+
+func (rm *reachabilityModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	rm.regions = availableReachabilityRegions(m.cfg.Region)
+	rm.filteredRegions = rm.regions
+	rm.region = m.cfg.Region
+	rm.regionIdx = indexOfString(rm.regions, rm.region)
+	if rm.regionIdx < 0 {
+		rm.regionIdx = 0
+	}
+	rm.regionFilter = ""
+	rm.regionFiltering = false
+	rm.targets = nil
+	rm.filteredTargets = nil
+	rm.source = nil
+	rm.destination = nil
+	rm.destinationIP = ""
+	rm.result = nil
+	rm.scrollOffset = 0
+	m.awsRepo = nil
+	m.screen = screenReachabilityRegionList
+	return *m, nil
+}
+
+func (rm *reachabilityModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case reachabilityTargetsLoadedMsg:
+		rm.targets = msg.targets
+		rm.sourceTypes = buildReachabilityTargetTypes(msg.targets, false)
+		rm.sourceTypeIdx = 0
+		rm.destTypes = nil
+		rm.destTypeIdx = 0
+		rm.filteredTargets = applyReachabilityTargetFilter(msg.targets, rm.selectedSourceType(), "")
+		rm.idx = 0
+		rm.filter = ""
+		rm.filterActive = false
+		rm.source = nil
+		rm.destination = nil
+		rm.destinationIP = ""
+		rm.protocolIdx = 0
+		rm.portInput = "443"
+		rm.configField = 0
+		rm.result = nil
+		rm.scrollOffset = 0
+		m.screen = screenReachabilitySourceList
+		return *m, nil, true
+	case reachabilityAnalysisLoadedMsg:
+		rm.result = msg.result
+		rm.scrollOffset = 0
+		m.screen = screenReachabilityResult
+		return *m, nil, true
+	}
+	return *m, nil, false
+}
+
+func (rm *reachabilityModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenReachabilityRegionList:
+		newM, cmd := rm.updateRegionList(m, msg)
+		return newM, cmd, true
+	case screenReachabilitySourceList:
+		newM, cmd := rm.updateSourceList(m, msg)
+		return newM, cmd, true
+	case screenReachabilityDestinationList:
+		newM, cmd := rm.updateDestinationList(m, msg)
+		return newM, cmd, true
+	case screenReachabilityConfig:
+		newM, cmd := rm.updateConfig(m, msg)
+		return newM, cmd, true
+	case screenReachabilityResult:
+		newM, cmd := rm.updateResult(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (rm reachabilityModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenReachabilityRegionList:
+		return rm.viewRegionList(m), true
+	case screenReachabilitySourceList:
+		return rm.viewSourceList(m), true
+	case screenReachabilityDestinationList:
+		return rm.viewDestinationList(m), true
+	case screenReachabilityConfig:
+		return rm.viewConfig(m), true
+	case screenReachabilityResult:
+		return rm.viewResult(m), true
+	default:
+		return "", false
+	}
+}
+
+func (rm *reachabilityModel) ApplyFilter(_ *Model, _ filterTarget) bool {
+	return false
+}
+
+func (rm reachabilityModel) activeRegion(m Model) string {
+	if strings.TrimSpace(rm.region) != "" {
+		return rm.region
+	}
+	return m.cfg.Region
+}
+
+func (rm reachabilityModel) loadReachabilityTargets(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		reachabilityCfg := *m.cfg
-		if strings.TrimSpace(m.reachabilityRegion) != "" {
-			reachabilityCfg.Region = strings.TrimSpace(m.reachabilityRegion)
+		if strings.TrimSpace(rm.region) != "" {
+			reachabilityCfg.Region = strings.TrimSpace(rm.region)
 		}
 		repo, err := awsservice.NewAwsRepository(ctx, &reachabilityCfg)
 		if err != nil {
@@ -41,44 +174,44 @@ func (m Model) loadReachabilityTargets() tea.Cmd {
 	}
 }
 
-func (m Model) updateReachabilityRegionList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *reachabilityModel) updateRegionList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
-	if m.reachabilityRegionFiltering {
-		newFilter, deactivate, changed := handleFilterKey(key, m.reachabilityRegionFilter)
-		m.reachabilityRegionFilter = newFilter
+	if rm.regionFiltering {
+		newFilter, deactivate, changed := handleFilterKey(key, rm.regionFilter)
+		rm.regionFilter = newFilter
 		if deactivate {
-			m.reachabilityRegionFiltering = false
+			rm.regionFiltering = false
 		}
 		if changed {
-			m.filteredReachabilityRegions = applyStringFilter(m.reachabilityRegions, m.reachabilityRegionFilter)
-			m.reachabilityRegionIdx = 0
+			rm.filteredRegions = applyStringFilter(rm.regions, rm.regionFilter)
+			rm.regionIdx = 0
 		}
-		return m, nil
+		return *m, nil
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
 	case "up", "k":
-		m.reachabilityRegionIdx = previousListIndex(m.reachabilityRegionIdx, len(m.filteredReachabilityRegions))
+		rm.regionIdx = previousListIndex(rm.regionIdx, len(rm.filteredRegions))
 	case "down", "j":
-		m.reachabilityRegionIdx = nextListIndex(m.reachabilityRegionIdx, len(m.filteredReachabilityRegions))
+		rm.regionIdx = nextListIndex(rm.regionIdx, len(rm.filteredRegions))
 	case "/":
-		m.reachabilityRegionFiltering = true
+		rm.regionFiltering = true
 	case "enter":
-		if len(m.filteredReachabilityRegions) == 0 {
-			return m, nil
+		if len(rm.filteredRegions) == 0 {
+			return *m, nil
 		}
-		m.reachabilityRegion = m.filteredReachabilityRegions[m.reachabilityRegionIdx]
-		m.reachabilityTargets = nil
-		m.filteredReachabilityTargets = nil
-		m.reachabilitySource = nil
-		m.reachabilityDestination = nil
-		m.reachabilityDestinationIP = ""
-		m.reachabilityResult = nil
-		m.reachabilityScrollOffset = 0
-		m.reachabilityFilter = ""
-		m.reachabilityFilterActive = false
+		rm.region = rm.filteredRegions[rm.regionIdx]
+		rm.targets = nil
+		rm.filteredTargets = nil
+		rm.source = nil
+		rm.destination = nil
+		rm.destinationIP = ""
+		rm.result = nil
+		rm.scrollOffset = 0
+		rm.filter = ""
+		rm.filterActive = false
 		m.awsRepo = nil
 		return m.startLoadingWithMessage(
 			"Loading reachability targets...",
@@ -86,13 +219,13 @@ func (m Model) updateReachabilityRegionList(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 				fmt.Sprintf("Region: %s", m.activeReachabilityRegion()),
 				"Collecting source and destination candidates for Reachability Analyzer.",
 			},
-			m.loadReachabilityTargets(),
+			rm.loadReachabilityTargets(*m),
 		)
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) runReachabilityAnalysis() tea.Cmd {
+func (rm reachabilityModel) runAnalysis(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
@@ -100,8 +233,8 @@ func (m Model) runReachabilityAnalysis() tea.Cmd {
 		if repo == nil {
 			var err error
 			reachabilityCfg := *m.cfg
-			if strings.TrimSpace(m.reachabilityRegion) != "" {
-				reachabilityCfg.Region = strings.TrimSpace(m.reachabilityRegion)
+			if strings.TrimSpace(rm.region) != "" {
+				reachabilityCfg.Region = strings.TrimSpace(rm.region)
 			}
 			repo, err = awsservice.NewAwsRepository(ctx, &reachabilityCfg)
 			if err != nil {
@@ -109,19 +242,19 @@ func (m Model) runReachabilityAnalysis() tea.Cmd {
 			}
 		}
 
-		port, err := strconv.Atoi(strings.TrimSpace(m.reachabilityPortInput))
+		port, err := strconv.Atoi(strings.TrimSpace(rm.portInput))
 		if err != nil || port <= 0 || port > 65535 {
 			return errMsg{err: fmt.Errorf("destination port must be between 1 and 65535")}
 		}
 
-		if m.reachabilitySource == nil {
+		if rm.source == nil {
 			return errMsg{err: fmt.Errorf("source is required")}
 		}
 
 		var destination awsservice.ReachabilityTarget
-		destinationIP := strings.TrimSpace(m.reachabilityDestinationIP)
-		if m.reachabilityDestination != nil && !m.reachabilityDestination.ManualIP {
-			destination = *m.reachabilityDestination
+		destinationIP := strings.TrimSpace(rm.destinationIP)
+		if rm.destination != nil && !rm.destination.ManualIP {
+			destination = *rm.destination
 			destinationIP = ""
 		}
 		if destination.ID == "" && destinationIP == "" {
@@ -136,10 +269,10 @@ func (m Model) runReachabilityAnalysis() tea.Cmd {
 
 		result, err := repo.RunReachabilityAnalysis(
 			ctx,
-			*m.reachabilitySource,
+			*rm.source,
 			destination,
 			destinationIP,
-			reachabilityProtocols[m.reachabilityProtocolIdx],
+			reachabilityProtocols[rm.protocolIdx],
 			int32(port),
 		)
 		if err != nil {
@@ -149,137 +282,137 @@ func (m Model) runReachabilityAnalysis() tea.Cmd {
 	}
 }
 
-func (m Model) updateReachabilitySourceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *reachabilityModel) updateSourceList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
-	if m.reachabilityFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.reachabilityFilter)
-		m.reachabilityFilter = newFilter
+	if rm.filterActive {
+		newFilter, deactivate, changed := handleFilterKey(key, rm.filter)
+		rm.filter = newFilter
 		if deactivate {
-			m.reachabilityFilterActive = false
+			rm.filterActive = false
 		}
 		if changed {
-			m.filteredReachabilityTargets = applyReachabilityTargetFilter(m.reachabilityTargets, m.selectedReachabilitySourceType(), m.reachabilityFilter)
-			m.reachabilityIdx = 0
+			rm.filteredTargets = applyReachabilityTargetFilter(rm.targets, rm.selectedSourceType(), rm.filter)
+			rm.idx = 0
 		}
-		return m, nil
+		return *m, nil
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenReachabilityRegionList
 	case "left", "h":
-		if m.reachabilitySourceTypeIdx > 0 {
-			m.reachabilitySourceTypeIdx--
-			m.filteredReachabilityTargets = applyReachabilityTargetFilter(m.reachabilityTargets, m.selectedReachabilitySourceType(), m.reachabilityFilter)
-			m.reachabilityIdx = 0
+		if rm.sourceTypeIdx > 0 {
+			rm.sourceTypeIdx--
+			rm.filteredTargets = applyReachabilityTargetFilter(rm.targets, rm.selectedSourceType(), rm.filter)
+			rm.idx = 0
 		}
 	case "right", "l", "tab":
-		if m.reachabilitySourceTypeIdx < len(m.reachabilitySourceTypes)-1 {
-			m.reachabilitySourceTypeIdx++
-			m.filteredReachabilityTargets = applyReachabilityTargetFilter(m.reachabilityTargets, m.selectedReachabilitySourceType(), m.reachabilityFilter)
-			m.reachabilityIdx = 0
+		if rm.sourceTypeIdx < len(rm.sourceTypes)-1 {
+			rm.sourceTypeIdx++
+			rm.filteredTargets = applyReachabilityTargetFilter(rm.targets, rm.selectedSourceType(), rm.filter)
+			rm.idx = 0
 		}
 	case "up", "k":
-		m.reachabilityIdx = previousListIndex(m.reachabilityIdx, len(m.filteredReachabilityTargets))
+		rm.idx = previousListIndex(rm.idx, len(rm.filteredTargets))
 	case "down", "j":
-		m.reachabilityIdx = nextListIndex(m.reachabilityIdx, len(m.filteredReachabilityTargets))
+		rm.idx = nextListIndex(rm.idx, len(rm.filteredTargets))
 	case "/":
-		m.reachabilityFilterActive = true
+		rm.filterActive = true
 	case "r":
 		return m.startLoadingWithMessage(
 			"Refreshing reachability targets...",
 			[]string{
 				fmt.Sprintf("Region: %s", m.activeReachabilityRegion()),
 			},
-			m.loadReachabilityTargets(),
+			rm.loadReachabilityTargets(*m),
 		)
 	case "enter":
-		if len(m.filteredReachabilityTargets) == 0 {
-			return m, nil
+		if len(rm.filteredTargets) == 0 {
+			return *m, nil
 		}
-		selected := m.filteredReachabilityTargets[m.reachabilityIdx]
-		m.reachabilitySource = &selected
-		m.reachabilityDestination = nil
-		m.reachabilityDestinationIP = ""
-		m.reachabilityFilter = ""
-		m.reachabilityFilterActive = false
-		m.reachabilityDestTypes = buildReachabilityTargetTypes(m.reachabilityTargets, true)
-		m.reachabilityDestTypeIdx = 0
-		m.filteredReachabilityTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(m.reachabilityTargets), m.selectedReachabilityDestinationType(), "")
-		m.reachabilityIdx = 0
+		selected := rm.filteredTargets[rm.idx]
+		rm.source = &selected
+		rm.destination = nil
+		rm.destinationIP = ""
+		rm.filter = ""
+		rm.filterActive = false
+		rm.destTypes = buildReachabilityTargetTypes(rm.targets, true)
+		rm.destTypeIdx = 0
+		rm.filteredTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(rm.targets), rm.selectedDestinationType(), "")
+		rm.idx = 0
 		m.screen = screenReachabilityDestinationList
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateReachabilityDestinationList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *reachabilityModel) updateDestinationList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
-	if m.reachabilityFilterActive {
-		newFilter, deactivate, changed := handleFilterKey(key, m.reachabilityFilter)
-		m.reachabilityFilter = newFilter
+	if rm.filterActive {
+		newFilter, deactivate, changed := handleFilterKey(key, rm.filter)
+		rm.filter = newFilter
 		if deactivate {
-			m.reachabilityFilterActive = false
+			rm.filterActive = false
 		}
 		if changed {
-			m.filteredReachabilityTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(m.reachabilityTargets), m.selectedReachabilityDestinationType(), m.reachabilityFilter)
-			m.reachabilityIdx = 0
+			rm.filteredTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(rm.targets), rm.selectedDestinationType(), rm.filter)
+			rm.idx = 0
 		}
-		return m, nil
+		return *m, nil
 	}
 
 	switch key {
 	case "q":
 		m.screen = screenFeatureList
 	case "esc":
-		m.filteredReachabilityTargets = applyReachabilityTargetFilter(m.reachabilityTargets, m.selectedReachabilitySourceType(), "")
-		m.reachabilityIdx = 0
-		m.reachabilityFilter = ""
-		m.reachabilityFilterActive = false
+		rm.filteredTargets = applyReachabilityTargetFilter(rm.targets, rm.selectedSourceType(), "")
+		rm.idx = 0
+		rm.filter = ""
+		rm.filterActive = false
 		m.screen = screenReachabilitySourceList
 	case "left", "h":
-		if m.reachabilityDestTypeIdx > 0 {
-			m.reachabilityDestTypeIdx--
-			m.filteredReachabilityTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(m.reachabilityTargets), m.selectedReachabilityDestinationType(), m.reachabilityFilter)
-			m.reachabilityIdx = 0
+		if rm.destTypeIdx > 0 {
+			rm.destTypeIdx--
+			rm.filteredTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(rm.targets), rm.selectedDestinationType(), rm.filter)
+			rm.idx = 0
 		}
 	case "right", "l", "tab":
-		if m.reachabilityDestTypeIdx < len(m.reachabilityDestTypes)-1 {
-			m.reachabilityDestTypeIdx++
-			m.filteredReachabilityTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(m.reachabilityTargets), m.selectedReachabilityDestinationType(), m.reachabilityFilter)
-			m.reachabilityIdx = 0
+		if rm.destTypeIdx < len(rm.destTypes)-1 {
+			rm.destTypeIdx++
+			rm.filteredTargets = applyReachabilityTargetFilter(reachabilityDestinationCandidates(rm.targets), rm.selectedDestinationType(), rm.filter)
+			rm.idx = 0
 		}
 	case "up", "k":
-		m.reachabilityIdx = previousListIndex(m.reachabilityIdx, len(m.filteredReachabilityTargets))
+		rm.idx = previousListIndex(rm.idx, len(rm.filteredTargets))
 	case "down", "j":
-		m.reachabilityIdx = nextListIndex(m.reachabilityIdx, len(m.filteredReachabilityTargets))
+		rm.idx = nextListIndex(rm.idx, len(rm.filteredTargets))
 	case "/":
-		m.reachabilityFilterActive = true
+		rm.filterActive = true
 	case "r":
 		return m.startLoadingWithMessage(
 			"Refreshing reachability targets...",
 			[]string{
 				fmt.Sprintf("Region: %s", m.activeReachabilityRegion()),
 			},
-			m.loadReachabilityTargets(),
+			rm.loadReachabilityTargets(*m),
 		)
 	case "enter":
-		if len(m.filteredReachabilityTargets) == 0 {
-			return m, nil
+		if len(rm.filteredTargets) == 0 {
+			return *m, nil
 		}
-		selected := m.filteredReachabilityTargets[m.reachabilityIdx]
-		m.reachabilityDestination = &selected
+		selected := rm.filteredTargets[rm.idx]
+		rm.destination = &selected
 		if !selected.ManualIP {
-			m.reachabilityDestinationIP = ""
+			rm.destinationIP = ""
 		}
-		m.reachabilityProtocolIdx = 0
-		m.reachabilityPortInput = "443"
-		m.reachabilityConfigField = 0
+		rm.protocolIdx = 0
+		rm.portInput = "443"
+		rm.configField = 0
 		m.screen = screenReachabilityConfig
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateReachabilityConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *reachabilityModel) updateConfig(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		m.screen = screenFeatureList
@@ -287,69 +420,69 @@ func (m Model) updateReachabilityConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenReachabilityDestinationList
 	case "up", "k":
 		maxField := 1
-		if m.reachabilityDestination != nil && m.reachabilityDestination.ManualIP {
+		if rm.destination != nil && rm.destination.ManualIP {
 			maxField = 2
 		}
-		m.reachabilityConfigField = previousListIndex(m.reachabilityConfigField, maxField+1)
+		rm.configField = previousListIndex(rm.configField, maxField+1)
 	case "down", "j", "tab":
 		maxField := 1
-		if m.reachabilityDestination != nil && m.reachabilityDestination.ManualIP {
+		if rm.destination != nil && rm.destination.ManualIP {
 			maxField = 2
 		}
-		m.reachabilityConfigField = nextListIndex(m.reachabilityConfigField, maxField+1)
+		rm.configField = nextListIndex(rm.configField, maxField+1)
 	case "left", "h":
-		if m.reachabilityConfigField == 0 && m.reachabilityProtocolIdx > 0 {
-			m.reachabilityProtocolIdx--
+		if rm.configField == 0 && rm.protocolIdx > 0 {
+			rm.protocolIdx--
 		}
 	case "right", "l":
-		if m.reachabilityConfigField == 0 && m.reachabilityProtocolIdx < len(reachabilityProtocols)-1 {
-			m.reachabilityProtocolIdx++
+		if rm.configField == 0 && rm.protocolIdx < len(reachabilityProtocols)-1 {
+			rm.protocolIdx++
 		}
 	case "backspace":
-		switch m.reachabilityConfigField {
+		switch rm.configField {
 		case 1:
-			if len(m.reachabilityPortInput) > 0 {
-				m.reachabilityPortInput = m.reachabilityPortInput[:len(m.reachabilityPortInput)-1]
+			if len(rm.portInput) > 0 {
+				rm.portInput = rm.portInput[:len(rm.portInput)-1]
 			}
 		case 2:
-			if len(m.reachabilityDestinationIP) > 0 {
-				m.reachabilityDestinationIP = m.reachabilityDestinationIP[:len(m.reachabilityDestinationIP)-1]
+			if len(rm.destinationIP) > 0 {
+				rm.destinationIP = rm.destinationIP[:len(rm.destinationIP)-1]
 			}
 		}
 	case "enter":
-		if m.reachabilityConfigField == 0 {
+		if rm.configField == 0 {
 			maxField := 1
-			if m.reachabilityDestination != nil && m.reachabilityDestination.ManualIP {
+			if rm.destination != nil && rm.destination.ManualIP {
 				maxField = 2
 			}
-			if m.reachabilityConfigField < maxField {
-				m.reachabilityConfigField++
-				return m, nil
+			if rm.configField < maxField {
+				rm.configField++
+				return *m, nil
 			}
 		}
 		return m.startLoadingWithMessage(
 			"Finding Network Path",
-			m.reachabilityLoadingDetails(),
-			m.runReachabilityAnalysis(),
+			rm.loadingDetails(*m),
+			rm.runAnalysis(*m),
 		)
 	default:
 		if len(msg.String()) == 1 {
-			switch m.reachabilityConfigField {
+			switch rm.configField {
 			case 1:
 				if msg.String()[0] >= '0' && msg.String()[0] <= '9' {
-					m.reachabilityPortInput += msg.String()
+					rm.portInput += msg.String()
 				}
 			case 2:
 				if strings.ContainsRune("0123456789.", rune(msg.String()[0])) {
-					m.reachabilityDestinationIP += msg.String()
+					rm.destinationIP += msg.String()
 				}
 			}
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateReachabilityResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (rm *reachabilityModel) updateResult(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		m.screen = screenFeatureList
@@ -358,32 +491,32 @@ func (m Model) updateReachabilityResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		return m.startLoadingWithMessage(
 			"Finding Network Path",
-			m.reachabilityLoadingDetails(),
-			m.runReachabilityAnalysis(),
+			rm.loadingDetails(*m),
+			rm.runAnalysis(*m),
 		)
 	case "up", "k":
-		if m.reachabilityScrollOffset > 0 {
-			m.reachabilityScrollOffset--
+		if rm.scrollOffset > 0 {
+			rm.scrollOffset--
 		}
 	case "down", "j":
-		lines := len(m.reachabilityResultLines())
+		lines := len(rm.resultLines(*m))
 		visible := max(m.height-8, 5)
-		if m.reachabilityScrollOffset < max(lines-visible, 0) {
-			m.reachabilityScrollOffset++
+		if rm.scrollOffset < max(lines-visible, 0) {
+			rm.scrollOffset++
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewReachabilitySourceList() string {
-	return m.viewReachabilityTargetList("Reachability Analyzer > Source", fmt.Sprintf("Region: %s. Supported source types: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, and VPC peering connections.", m.activeReachabilityRegion()), m.filteredReachabilityTargets, m.reachabilitySourceTypes, m.reachabilitySourceTypeIdx, "←/→ or tab: type • ↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home")
+func (rm reachabilityModel) viewSourceList(m Model) string {
+	return rm.viewTargetList(m, "Reachability Analyzer > Source", fmt.Sprintf("Region: %s. Supported source types: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, and VPC peering connections.", m.activeReachabilityRegion()), rm.filteredTargets, rm.sourceTypes, rm.sourceTypeIdx, "←/→ or tab: type • ↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home")
 }
 
-func (m Model) viewReachabilityDestinationList() string {
-	return m.viewReachabilityTargetList("Reachability Analyzer > Destination", fmt.Sprintf("Region: %s. Supported destination types: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, and IP addresses.", m.activeReachabilityRegion()), m.filteredReachabilityTargets, m.reachabilityDestTypes, m.reachabilityDestTypeIdx, "←/→ or tab: type • ↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home")
+func (rm reachabilityModel) viewDestinationList(m Model) string {
+	return rm.viewTargetList(m, "Reachability Analyzer > Destination", fmt.Sprintf("Region: %s. Supported destination types: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, and IP addresses.", m.activeReachabilityRegion()), rm.filteredTargets, rm.destTypes, rm.destTypeIdx, "←/→ or tab: type • ↑/↓: navigate • /: filter • r: refresh • enter: select • esc: back • H: home")
 }
 
-func (m Model) viewReachabilityRegionList() string {
+func (rm reachabilityModel) viewRegionList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -391,28 +524,28 @@ func (m Model) viewReachabilityRegionList() string {
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("Start with the region you want to inspect. The current context region is preselected."))
 	b.WriteString("\n")
-	if m.reachabilityRegionFiltering {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.reachabilityRegionFilter)))
-	} else if m.reachabilityRegionFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.reachabilityRegionFilter)))
+	if rm.regionFiltering {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", rm.regionFilter)))
+	} else if rm.regionFilter != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", rm.regionFilter)))
 	}
 	b.WriteString("\n\n")
 
-	if len(m.filteredReachabilityRegions) == 0 {
+	if len(rm.filteredRegions) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching regions"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-12, 5)
 		start := 0
-		if m.reachabilityRegionIdx >= visibleLines {
-			start = m.reachabilityRegionIdx - visibleLines + 1
+		if rm.regionIdx >= visibleLines {
+			start = rm.regionIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredReachabilityRegions))
+		end := min(start+visibleLines, len(rm.filteredRegions))
 		for i := start; i < end; i++ {
-			region := m.filteredReachabilityRegions[i]
+			region := rm.filteredRegions[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.reachabilityRegionIdx {
+			if i == rm.regionIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -431,7 +564,7 @@ func (m Model) viewReachabilityRegionList() string {
 	return b.String()
 }
 
-func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsservice.ReachabilityTarget, typeOptions []string, typeIdx int, footer string) string {
+func (rm reachabilityModel) viewTargetList(m Model, title, subtitle string, items []awsservice.ReachabilityTarget, typeOptions []string, typeIdx int, footer string) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -440,13 +573,13 @@ func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsser
 	b.WriteString(dimStyle.Render(subtitle))
 	b.WriteString("\n")
 	if len(typeOptions) > 0 {
-		b.WriteString(m.renderReachabilityTypeSelector(typeOptions, typeIdx))
+		b.WriteString(rm.renderTypeSelector(typeOptions, typeIdx))
 		b.WriteString("\n")
 	}
-	if m.reachabilityFilterActive {
-		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", m.reachabilityFilter)))
-	} else if m.reachabilityFilter != "" {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", m.reachabilityFilter)))
+	if rm.filterActive {
+		b.WriteString(filterStyle.Render(fmt.Sprintf("Filter: %s▏", rm.filter)))
+	} else if rm.filter != "" {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Filter: %s", rm.filter)))
 	}
 	b.WriteString("\n\n")
 
@@ -456,8 +589,8 @@ func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsser
 	} else {
 		visibleLines := max(m.height-12, 5)
 		start := 0
-		if m.reachabilityIdx >= visibleLines {
-			start = m.reachabilityIdx - visibleLines + 1
+		if rm.idx >= visibleLines {
+			start = rm.idx - visibleLines + 1
 		}
 		end := min(start+visibleLines, len(items))
 
@@ -465,7 +598,7 @@ func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsser
 			item := items[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.reachabilityIdx {
+			if i == rm.idx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -482,7 +615,7 @@ func (m Model) viewReachabilityTargetList(title, subtitle string, items []awsser
 	return b.String()
 }
 
-func (m Model) viewReachabilityConfig() string {
+func (rm reachabilityModel) viewConfig(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Reachability Analyzer > Analysis Settings"))
@@ -491,12 +624,12 @@ func (m Model) viewReachabilityConfig() string {
 	b.WriteString("\n")
 
 	source := ""
-	if m.reachabilitySource != nil {
-		source = m.reachabilitySource.DisplayTitle()
+	if rm.source != nil {
+		source = rm.source.DisplayTitle()
 	}
 	destination := ""
-	if m.reachabilityDestination != nil {
-		destination = m.reachabilityDestination.DisplayTitle()
+	if rm.destination != nil {
+		destination = rm.destination.DisplayTitle()
 	}
 
 	b.WriteString(normalStyle.Render("  Source      : " + source))
@@ -504,28 +637,28 @@ func (m Model) viewReachabilityConfig() string {
 	b.WriteString(normalStyle.Render("  Destination : " + destination))
 	b.WriteString("\n\n")
 
-	protocol := reachabilityProtocols[m.reachabilityProtocolIdx]
-	if m.reachabilityConfigField == 0 {
+	protocol := reachabilityProtocols[rm.protocolIdx]
+	if rm.configField == 0 {
 		b.WriteString(selectedStyle.Render("  Protocol    : " + protocol))
 	} else {
 		b.WriteString(normalStyle.Render("  Protocol    : " + protocol))
 	}
 	b.WriteString("\n")
 
-	portValue := m.reachabilityPortInput
+	portValue := rm.portInput
 	if portValue == "" {
 		portValue = "443"
 	}
-	if m.reachabilityConfigField == 1 {
+	if rm.configField == 1 {
 		b.WriteString(selectedStyle.Render("  Dest Port   : " + portValue + "▏"))
 	} else {
 		b.WriteString(normalStyle.Render("  Dest Port   : " + portValue))
 	}
 	b.WriteString("\n")
 
-	if m.reachabilityDestination != nil && m.reachabilityDestination.ManualIP {
-		ipValue := m.reachabilityDestinationIP
-		if m.reachabilityConfigField == 2 {
+	if rm.destination != nil && rm.destination.ManualIP {
+		ipValue := rm.destinationIP
+		if rm.configField == 2 {
 			b.WriteString(selectedStyle.Render("  Dest IPv4   : " + ipValue + "▏"))
 		} else {
 			b.WriteString(normalStyle.Render("  Dest IPv4   : " + ipValue))
@@ -540,15 +673,15 @@ func (m Model) viewReachabilityConfig() string {
 	return b.String()
 }
 
-func (m Model) viewReachabilityResult() string {
+func (rm reachabilityModel) viewResult(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Reachability Analyzer > Result"))
 	b.WriteString("\n\n")
 
-	lines := m.reachabilityResultLines()
+	lines := rm.resultLines(m)
 	visibleLines := max(m.height-8, 5)
-	start := min(m.reachabilityScrollOffset, max(len(lines)-visibleLines, 0))
+	start := min(rm.scrollOffset, max(len(lines)-visibleLines, 0))
 	end := min(start+visibleLines, len(lines))
 	for _, line := range lines[start:end] {
 		b.WriteString(line)
@@ -561,12 +694,12 @@ func (m Model) viewReachabilityResult() string {
 	return b.String()
 }
 
-func (m Model) reachabilityResultLines() []string {
-	if m.reachabilityResult == nil {
+func (rm reachabilityModel) resultLines(m Model) []string {
+	if rm.result == nil {
 		return []string{dimStyle.Render("No analysis result")}
 	}
 
-	r := m.reachabilityResult
+	r := rm.result
 	lines := make([]string, 0, 64)
 	status := "Not reachable"
 	statusStyle := errorStyle
@@ -686,21 +819,21 @@ func applyReachabilityTargetFilter(items []awsservice.ReachabilityTarget, target
 	return applyFilter(filtered, query)
 }
 
-func (m Model) selectedReachabilitySourceType() string {
-	if len(m.reachabilitySourceTypes) == 0 {
+func (rm reachabilityModel) selectedSourceType() string {
+	if len(rm.sourceTypes) == 0 {
 		return ""
 	}
-	return m.reachabilitySourceTypes[m.reachabilitySourceTypeIdx]
+	return rm.sourceTypes[rm.sourceTypeIdx]
 }
 
-func (m Model) selectedReachabilityDestinationType() string {
-	if len(m.reachabilityDestTypes) == 0 {
+func (rm reachabilityModel) selectedDestinationType() string {
+	if len(rm.destTypes) == 0 {
 		return ""
 	}
-	return m.reachabilityDestTypes[m.reachabilityDestTypeIdx]
+	return rm.destTypes[rm.destTypeIdx]
 }
 
-func (m Model) renderReachabilityTypeSelector(options []string, selected int) string {
+func (rm reachabilityModel) renderTypeSelector(options []string, selected int) string {
 	var parts []string
 	for i, option := range options {
 		label := "[" + option + "]"
@@ -714,10 +847,7 @@ func (m Model) renderReachabilityTypeSelector(options []string, selected int) st
 }
 
 func (m Model) activeReachabilityRegion() string {
-	if strings.TrimSpace(m.reachabilityRegion) != "" {
-		return m.reachabilityRegion
-	}
-	return m.cfg.Region
+	return m.reachability.activeRegion(m)
 }
 
 func availableReachabilityRegions(current string) []string {
@@ -767,27 +897,27 @@ func indexOfString(items []string, target string) int {
 	return -1
 }
 
-func (m Model) reachabilityLoadingDetails() []string {
+func (rm reachabilityModel) loadingDetails(m Model) []string {
 	source := "source pending"
-	if m.reachabilitySource != nil {
-		source = m.reachabilitySource.DisplayTitle()
+	if rm.source != nil {
+		source = rm.source.DisplayTitle()
 	}
 
 	destination := "destination pending"
-	if strings.TrimSpace(m.reachabilityDestinationIP) != "" {
-		destination = strings.TrimSpace(m.reachabilityDestinationIP)
-	} else if m.reachabilityDestination != nil {
-		destination = m.reachabilityDestination.DisplayTitle()
+	if strings.TrimSpace(rm.destinationIP) != "" {
+		destination = strings.TrimSpace(rm.destinationIP)
+	} else if rm.destination != nil {
+		destination = rm.destination.DisplayTitle()
 	}
 
 	protocol := ""
-	if m.reachabilityProtocolIdx >= 0 && m.reachabilityProtocolIdx < len(reachabilityProtocols) {
-		protocol = reachabilityProtocols[m.reachabilityProtocolIdx]
+	if rm.protocolIdx >= 0 && rm.protocolIdx < len(reachabilityProtocols) {
+		protocol = reachabilityProtocols[rm.protocolIdx]
 	}
 
 	intent := protocol
-	if strings.TrimSpace(m.reachabilityPortInput) != "" {
-		intent = fmt.Sprintf("%s/%s", protocol, strings.TrimSpace(m.reachabilityPortInput))
+	if strings.TrimSpace(rm.portInput) != "" {
+		intent = fmt.Sprintf("%s/%s", protocol, strings.TrimSpace(rm.portInput))
 	}
 
 	source = truncateReachabilityLoadingLabel(source, m.width)

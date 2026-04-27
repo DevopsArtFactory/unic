@@ -96,13 +96,13 @@ func (m Model) helpModeShortcuts() []helpShortcut {
 		}
 		shortcuts = append(shortcuts, helpShortcut{"esc", "Close filter mode"})
 		return shortcuts
-	case m.screen == screenReachabilityRegionList && m.reachabilityRegionFiltering:
+	case m.screen == screenReachabilityRegionList && m.reachability.regionFiltering:
 		return []helpShortcut{
 			{"type", "Update the region filter"},
 			{"backspace", "Delete the previous character"},
 			{"enter / esc", "Close region filter mode"},
 		}
-	case (m.screen == screenReachabilitySourceList || m.screen == screenReachabilityDestinationList) && m.reachabilityFilterActive:
+	case (m.screen == screenReachabilitySourceList || m.screen == screenReachabilityDestinationList) && m.reachability.filterActive:
 		return []helpShortcut{
 			{"type", "Update the target filter"},
 			{"backspace", "Delete the previous character"},
