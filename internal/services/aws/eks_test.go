@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -61,10 +62,11 @@ func TestListEKSClusters(t *testing.T) {
 		describeClusterFunc: func(_ context.Context, params *eks.DescribeClusterInput, _ ...func(*eks.Options)) (*eks.DescribeClusterOutput, error) {
 			name := awssdk.ToString(params.Name)
 			return &eks.DescribeClusterOutput{Cluster: &ekstypes.Cluster{
-				Name:    awssdk.String(name),
-				Arn:     awssdk.String("arn:aws:eks:ap-northeast-2:123456789012:cluster/" + name),
-				Version: awssdk.String("1.32"),
-				Status:  ekstypes.ClusterStatusActive,
+				Name:     awssdk.String(name),
+				Arn:      awssdk.String("arn:aws:eks:ap-northeast-2:123456789012:cluster/" + name),
+				Version:  awssdk.String("1.32"),
+				Status:   ekstypes.ClusterStatusActive,
+				Endpoint: awssdk.String("https://" + name + ".eks.amazonaws.com"),
 				ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
 					EndpointPublicAccess:  true,
 					EndpointPrivateAccess: false,
@@ -86,6 +88,29 @@ func TestListEKSClusters(t *testing.T) {
 	}
 	if got := clusters[0].EndpointVisibility(); got != "pub:yes priv:no" {
 		t.Fatalf("unexpected endpoint visibility: %s", got)
+	}
+	if clusters[0].Endpoint == "" {
+		t.Fatal("expected endpoint to be mapped")
+	}
+}
+
+func TestBuildEKSUpdateKubeconfigCommand(t *testing.T) {
+	got := BuildEKSUpdateKubeconfigCommand("prod-eks", "ap-northeast-2", "prod", "prod-context")
+	want := `aws eks update-kubeconfig --name 'prod-eks' --region 'ap-northeast-2' --profile 'prod' --alias 'prod-context'`
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestBuildEKSUpdateKubeconfigCommandQuotesInput(t *testing.T) {
+	got := BuildEKSUpdateKubeconfigCommand(`prod'; rm -rf /`, `$(touch /tmp/pwn)`, "`id`", "$AWS_PROFILE")
+	if strings.Contains(got, `prod'; rm -rf /`) {
+		t.Fatalf("command should quote shell metacharacters safely: %s", got)
+	}
+	for _, want := range []string{`'prod'"'"'; rm -rf /'`, `'$(touch /tmp/pwn)'`, "'`id`'", "'$AWS_PROFILE'"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected command to contain safely quoted %q, got %s", want, got)
+		}
 	}
 }
 

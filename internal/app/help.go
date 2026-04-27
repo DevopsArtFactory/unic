@@ -411,7 +411,9 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"/", "Filter clusters"},
 			{"r", "Refresh clusters"},
 			{"enter", "Open managed node groups for the selected cluster"},
+			{"a", "Open managed add-ons for the selected cluster"},
 			{"U", "Open current-version upgrade readiness for the selected cluster"},
+			{"u", "Open the kubeconfig access helper for the selected cluster"},
 			{"q / esc", "Go back to the feature list"},
 		}
 	case screenEKSUpgradeReadiness:
@@ -419,6 +421,13 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"↑/↓, j/k", "Scroll the readiness report"},
 			{"pgup / pgdn", "Scroll by one page"},
 			{"r", "Refresh readiness data"},
+			{"esc", "Go back to the cluster list"},
+			{"q", "Go back to the feature list"},
+		}
+	case screenEKSAccessHelper:
+		return []helpShortcut{
+			{"c", "Copy the aws eks update-kubeconfig command"},
+			{"k", "Copy the kubectl smoke-check command"},
 			{"esc", "Go back to the cluster list"},
 			{"q", "Go back to the feature list"},
 		}
@@ -819,6 +828,8 @@ func (m Model) helpScreenTitle() string {
 		return "EKS Clusters"
 	case screenEKSUpgradeReadiness:
 		return "EKS Upgrade Readiness"
+	case screenEKSAccessHelper:
+		return "EKS Access Helper"
 	case screenEKSNodeGroupList:
 		return "EKS Node Groups"
 	case screenEKSNodeGroupDetail:

@@ -228,10 +228,11 @@ func (r *AwsRepository) isEKSAddonVersionCompatible(ctx context.Context, addon E
 
 func mapEKSCluster(cluster *ekstypes.Cluster) EKSCluster {
 	item := EKSCluster{
-		Name:    awssdk.ToString(cluster.Name),
-		ARN:     awssdk.ToString(cluster.Arn),
-		Version: awssdk.ToString(cluster.Version),
-		Status:  string(cluster.Status),
+		Name:     awssdk.ToString(cluster.Name),
+		ARN:      awssdk.ToString(cluster.Arn),
+		Version:  awssdk.ToString(cluster.Version),
+		Status:   string(cluster.Status),
+		Endpoint: awssdk.ToString(cluster.Endpoint),
 	}
 	if cluster.ResourcesVpcConfig != nil {
 		item.EndpointPublicAccess = cluster.ResourcesVpcConfig.EndpointPublicAccess

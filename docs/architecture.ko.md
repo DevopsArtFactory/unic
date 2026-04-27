@@ -194,7 +194,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - CloudWatch metric list/detail
 - CloudWatch Logs group/stream/viewer
 - ECS cluster/service/rollout detail/task/container
-- EKS cluster/node group/add-on status, upgrade readiness
+- EKS cluster/node group/add-on status, upgrade readiness, access helper
 - ECR repository/image/detail
 - S3 bucket/object/detail
 - Inspector mode home, checklist setup, security findings/detail, checklist results/detail

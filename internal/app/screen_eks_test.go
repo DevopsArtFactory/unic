@@ -80,6 +80,31 @@ func TestEKSClusterListALoadsAddons(t *testing.T) {
 	}
 }
 
+func TestEKSClusterListUOpensAccessHelper(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenEKSClusterList
+	m.eksClusters = []awsservice.EKSCluster{{
+		Name:     "prod-eks",
+		ARN:      "arn:aws:eks:ap-northeast-2:123456789012:cluster/prod-eks",
+		Version:  "1.32",
+		Status:   "ACTIVE",
+		Endpoint: "https://prod-eks.eks.amazonaws.com",
+	}}
+	m.filteredEKSClusters = m.eksClusters
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected no async command")
+	}
+	if model.selectedEKSCluster == nil || model.selectedEKSCluster.Name != "prod-eks" {
+		t.Fatalf("unexpected selected cluster: %+v", model.selectedEKSCluster)
+	}
+	if model.screen != screenEKSAccessHelper {
+		t.Fatalf("expected access helper screen, got %v", model.screen)
+	}
+}
+
 func TestEKSClusterListULoadsUpgradeReadiness(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenEKSClusterList
@@ -235,6 +260,39 @@ func TestEKSAddonDetailViewShowsHealthIssues(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected view to contain %q, got %q", want, view)
 		}
+	}
+}
+
+func TestEKSAccessHelperViewShowsCommands(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenEKSAccessHelper
+	m.selectedEKSCluster = &awsservice.EKSCluster{
+		Name:     "prod-eks",
+		ARN:      "arn:aws:eks:ap-northeast-2:123456789012:cluster/prod-eks",
+		Endpoint: "https://prod-eks.eks.amazonaws.com",
+	}
+
+	view := stripANSI(m.viewEKSAccessHelper())
+	for _, want := range []string{
+		"EKS Access Helper — prod-eks",
+		"https://prod-eks.eks.amazonaws.com",
+		`aws eks update-kubeconfig --name 'prod-eks' --region 'us-east-1' --profile 'default' --alias 'prod-eks'`,
+		"kubectl get nodes",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected view to contain %q, got %q", want, view)
+		}
+	}
+}
+
+func TestEKSAccessHelperAliasIncludesContextAndCluster(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "prod"
+	m.selectedEKSCluster = &awsservice.EKSCluster{Name: "blue"}
+
+	got := m.eksUpdateKubeconfigCommand()
+	if !strings.Contains(got, "--alias 'prod-blue'") {
+		t.Fatalf("expected context-cluster alias, got %s", got)
 	}
 }
 
