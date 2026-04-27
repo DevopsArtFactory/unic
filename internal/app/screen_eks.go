@@ -20,6 +20,8 @@ func (m Model) handleEKSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.filteredEKSClusters = msg.clusters
 		m.eksClusterIdx = 0
 		m.selectedEKSCluster = nil
+		m.eksUpgradeReadiness = nil
+		m.eksUpgradeScroll = 0
 		m.eksNodeGroups = nil
 		m.filteredEKSNodeGroups = nil
 		m.selectedEKSNodeGroup = nil
@@ -49,6 +51,11 @@ func (m Model) handleEKSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.resetFilter(filterEKSAddons)
 		m.screen = screenEKSAddonList
 		return m, nil, true
+	case eksUpgradeReadinessLoadedMsg:
+		m.eksUpgradeReadiness = msg.readiness
+		m.eksUpgradeScroll = 0
+		m.screen = screenEKSUpgradeReadiness
+		return m, nil, true
 	}
 	return m, nil, false
 }
@@ -74,6 +81,12 @@ func (m Model) updateEKSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			cluster := m.filteredEKSClusters[m.eksClusterIdx]
 			m.selectedEKSCluster = &cluster
 			return m.startLoading(m.loadEKSAddons())
+		}
+	case "U":
+		if len(m.filteredEKSClusters) > 0 && m.eksClusterIdx < len(m.filteredEKSClusters) {
+			cluster := m.filteredEKSClusters[m.eksClusterIdx]
+			m.selectedEKSCluster = &cluster
+			return m.startLoading(m.loadEKSUpgradeReadiness())
 		}
 	case "enter":
 		if len(m.filteredEKSClusters) > 0 && m.eksClusterIdx < len(m.filteredEKSClusters) {
@@ -133,8 +146,135 @@ func (m Model) viewEKSClusterList() string {
 		b.WriteString(renderDetailLine("ARN", cluster.ARN))
 		b.WriteString("\n\n")
 	}
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: node groups • a: add-ons • r: refresh • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: node groups • a: add-ons • U: readiness • r: refresh • esc: back • H: home"))
 	return b.String()
+}
+
+func (m Model) updateEKSUpgradeReadiness(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	lines := m.eksUpgradeReadinessLines()
+	visibleLines := max(m.height-9, 5)
+	maxOffset := max(len(lines)-visibleLines, 0)
+
+	switch msg.String() {
+	case "q":
+		m.screen = screenFeatureList
+	case "esc":
+		m.screen = screenEKSClusterList
+	case "r":
+		return m.startLoading(m.loadEKSUpgradeReadiness())
+	case "up", "k":
+		if m.eksUpgradeScroll > 0 {
+			m.eksUpgradeScroll--
+		}
+	case "down", "j":
+		if m.eksUpgradeScroll < maxOffset {
+			m.eksUpgradeScroll++
+		}
+	case "pgup":
+		m.eksUpgradeScroll -= visibleLines
+		if m.eksUpgradeScroll < 0 {
+			m.eksUpgradeScroll = 0
+		}
+	case "pgdown":
+		m.eksUpgradeScroll += visibleLines
+		if m.eksUpgradeScroll > maxOffset {
+			m.eksUpgradeScroll = maxOffset
+		}
+	}
+	return m, nil
+}
+
+func (m Model) viewEKSUpgradeReadiness() string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	title := "EKS Upgrade Readiness"
+	if m.eksUpgradeReadiness != nil {
+		title = fmt.Sprintf("EKS Upgrade Readiness — %s", m.eksUpgradeReadiness.ClusterName)
+	}
+	b.WriteString(titleStyle.Render(title))
+	b.WriteString("\n\n")
+
+	lines := m.eksUpgradeReadinessLines()
+	visibleLines := max(m.height-9, 5)
+	start := min(m.eksUpgradeScroll, max(len(lines)-visibleLines, 0))
+	end := min(start+visibleLines, len(lines))
+
+	var panel strings.Builder
+	for _, line := range lines[start:end] {
+		panel.WriteString(line)
+		panel.WriteString("\n")
+	}
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • r: refresh • esc: clusters • q: feature list • H: home"))
+	return b.String()
+}
+
+func (m Model) eksUpgradeReadinessLines() []string {
+	if m.eksUpgradeReadiness == nil {
+		return []string{dimStyle.Render("No readiness data loaded")}
+	}
+	readiness := m.eksUpgradeReadiness
+	summary := readiness.Summary()
+	if readiness.HasBlockers() {
+		summary = warningStyle.Render(summary)
+	} else if summary == "ready" {
+		summary = successStyle.Render(summary)
+	} else {
+		summary = warningStyle.Render(summary)
+	}
+	lines := []string{
+		renderDetailLine("Cluster", readiness.ClusterName),
+		renderDetailLine("Control Plane", firstNonEmpty(readiness.ClusterVersion, "-")),
+		renderDetailLine("Check", "current version alignment"),
+		renderDetailLine("Summary", summary),
+		"",
+		titleStyle.Render("Node Groups"),
+	}
+	if len(readiness.NodeGroups) == 0 {
+		lines = append(lines, "  "+dimStyle.Render("No managed node groups found"))
+	} else {
+		for _, nodeGroup := range readiness.NodeGroups {
+			line := fmt.Sprintf("  %s  version:%s  status:%s", nodeGroup.Name, firstNonEmpty(nodeGroup.Version, "-"), firstNonEmpty(nodeGroup.Status, "-"))
+			if nodeGroup.Version != readiness.ClusterVersion {
+				line = warningStyle.Render(line)
+			}
+			lines = append(lines, line)
+		}
+	}
+	lines = append(lines, "", titleStyle.Render("Add-ons"))
+	if len(readiness.Addons) == 0 {
+		lines = append(lines, "  "+dimStyle.Render("No managed add-ons found"))
+	} else {
+		for _, addon := range readiness.Addons {
+			lines = append(lines, fmt.Sprintf("  %s  version:%s  status:%s", addon.Name, firstNonEmpty(addon.Version, "-"), firstNonEmpty(addon.Status, "-")))
+		}
+	}
+	lines = append(lines, "", titleStyle.Render("Upgrade Insights"))
+	if len(readiness.Insights) == 0 {
+		lines = append(lines, "  "+dimStyle.Render("No EKS upgrade insights returned"))
+	} else {
+		for _, insight := range readiness.Insights {
+			line := fmt.Sprintf("  %s  status:%s  version:%s", firstNonEmpty(insight.Name, insight.ID), firstNonEmpty(insight.Status, "-"), firstNonEmpty(insight.KubernetesVersion, "-"))
+			if !strings.EqualFold(insight.Status, "PASSING") {
+				line = warningStyle.Render(line)
+			}
+			lines = append(lines, line)
+		}
+	}
+	lines = append(lines, "", titleStyle.Render("Findings"))
+	if len(readiness.Findings) == 0 {
+		lines = append(lines, "  "+successStyle.Render("No version alignment blockers found"))
+		return lines
+	}
+	for _, finding := range readiness.Findings {
+		line := fmt.Sprintf("  [%s] %s", strings.ToUpper(finding.Severity), finding.Summary())
+		if strings.EqualFold(finding.Severity, "blocker") || strings.EqualFold(finding.Severity, "warning") {
+			line = warningStyle.Render(line)
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 func (m Model) updateEKSNodeGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -572,6 +712,28 @@ func (m Model) loadEKSAddons() tea.Cmd {
 			return errMsg{err}
 		}
 		return eksAddonsLoadedMsg{addons: addons}
+	}
+}
+
+func (m Model) loadEKSUpgradeReadiness() tea.Cmd {
+	return func() tea.Msg {
+		cfg := m.cfg
+		cluster := m.selectedEKSCluster
+		if cluster == nil {
+			return errMsg{fmt.Errorf("no EKS cluster selected")}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
+		defer cancel()
+
+		repo, err := awsservice.NewAwsRepository(ctx, cfg)
+		if err != nil {
+			return errMsg{err}
+		}
+		readiness, err := repo.ListEKSUpgradeReadiness(ctx, *cluster)
+		if err != nil {
+			return errMsg{err}
+		}
+		return eksUpgradeReadinessLoadedMsg{readiness: readiness}
 	}
 }
 
