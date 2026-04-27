@@ -143,26 +143,6 @@ type Model struct {
 	sgAddInput             string            // current field text input
 	sgAddSelectIdx         int               // index for select-type fields (direction, protocol)
 
-	// ECS browser state
-	ecsClusters         []awsservice.ECSCluster
-	filteredECSClusters []awsservice.ECSCluster
-	ecsClusterIdx       int
-	selectedECSCluster  *awsservice.ECSCluster
-
-	ecsServices         []awsservice.ECSService
-	filteredECSServices []awsservice.ECSService
-	ecsServiceIdx       int
-	selectedECSService  *awsservice.ECSService
-	selectedECSDetail   *awsservice.ECSServiceDetail
-	ecsDetailScroll     int
-
-	ecsTasks        []awsservice.ECSTask
-	ecsTaskIdx      int
-	selectedECSTask *awsservice.ECSTask
-
-	ecsContainers   []awsservice.ECSContainer
-	ecsContainerIdx int
-
 	// EKS browser state
 	eksClusters         []awsservice.EKSCluster
 	filteredEKSClusters []awsservice.EKSCluster
@@ -194,6 +174,7 @@ type Model struct {
 
 	// Feature submodels
 	ec2Browser   ec2InstanceBrowserModel
+	ecs          ecsModel
 	vpc          vpcModel
 	reachability reachabilityModel
 	cwMetrics    cloudWatchMetricsModel
@@ -304,6 +285,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		contextTable:           newContextTable(),
 	}
 	model.ec2Browser = newEC2InstanceBrowserModel()
+	model.ecs = newECSModel()
 	model.vpc = newVPCModel()
 	model.reachability = newReachabilityModel()
 	model.cwMetrics = newCloudWatchMetricsModel()
@@ -412,7 +394,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	for _, h := range []func(tea.Msg) (tea.Model, tea.Cmd, bool){
 		m.handleEC2VPCMsg,
 		m.handleSecurityGroupMsg,
-		m.handleECSMsg,
 		m.handleEKSMsg,
 		m.handleECRMsg,
 		m.handleInspectorMsg,
@@ -504,16 +485,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecurityGroupAddRule(msg)
 		case screenSecurityGroupDeleteConfirm:
 			return m.updateSecurityGroupDeleteConfirm(msg)
-		case screenECSClusterList:
-			return m.updateECSClusterList(msg)
-		case screenECSServiceList:
-			return m.updateECSServiceList(msg)
-		case screenECSServiceDetail:
-			return m.updateECSServiceDetail(msg)
-		case screenECSTaskList:
-			return m.updateECSTaskList(msg)
-		case screenECSContainerList:
-			return m.updateECSContainerList(msg)
 		case screenEKSClusterList:
 			return m.updateEKSClusterList(msg)
 		case screenEKSNodeGroupList:
@@ -635,7 +606,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureRotateAccessKey:
 				return m.iam.StartKeys(&m, true)
 			case domain.FeatureECSExec:
-				return m.startLoading(m.loadECSClusters())
+				return m.ecs.Start(&m)
 			case domain.FeatureECRRepositoryBrowser:
 				return m.startLoading(m.loadECRRepositories())
 			case domain.FeatureEKSBrowser:
@@ -708,16 +679,6 @@ func (m Model) View() string {
 		v = m.viewSecurityGroupAddRule()
 	case screenSecurityGroupDeleteConfirm:
 		v = m.viewSecurityGroupDeleteConfirm()
-	case screenECSClusterList:
-		v = m.viewECSClusterList()
-	case screenECSServiceList:
-		v = m.viewECSServiceList()
-	case screenECSServiceDetail:
-		v = m.viewECSServiceDetail()
-	case screenECSTaskList:
-		v = m.viewECSTaskList()
-	case screenECSContainerList:
-		v = m.viewECSContainerList()
 	case screenEKSClusterList:
 		v = m.viewEKSClusterList()
 	case screenEKSNodeGroupList:

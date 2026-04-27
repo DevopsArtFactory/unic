@@ -13,97 +13,171 @@ import (
 
 const ecsAPITimeout = 30 * time.Second
 
-// handleECSMsg routes ECS messages to the correct screen.
-func (m Model) handleECSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+type ecsModel struct {
+	clusters         []awsservice.ECSCluster
+	filteredClusters []awsservice.ECSCluster
+	clusterIdx       int
+	selectedCluster  *awsservice.ECSCluster
+	services         []awsservice.ECSService
+	filteredServices []awsservice.ECSService
+	serviceIdx       int
+	selectedService  *awsservice.ECSService
+	selectedDetail   *awsservice.ECSServiceDetail
+	detailScroll     int
+	tasks            []awsservice.ECSTask
+	taskIdx          int
+	selectedTask     *awsservice.ECSTask
+	containers       []awsservice.ECSContainer
+	containerIdx     int
+}
+
+func newECSModel() ecsModel {
+	return ecsModel{}
+}
+
+func (em *ecsModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(em.loadClusters(*m))
+}
+
+func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case ecsClustersLoadedMsg:
-		m.ecsClusters = msg.clusters
-		m.filteredECSClusters = msg.clusters
-		m.ecsClusterIdx = 0
-		m.selectedECSService = nil
-		m.selectedECSDetail = nil
-		m.ecsDetailScroll = 0
+		em.clusters = msg.clusters
+		em.filteredClusters = msg.clusters
+		em.clusterIdx = 0
+		em.selectedService = nil
+		em.selectedDetail = nil
+		em.detailScroll = 0
 		m.resetFilter(filterECSClusters)
 		m.screen = screenECSClusterList
-		return m, nil, true
-
+		return *m, nil, true
 	case ecsServicesLoadedMsg:
-		m.ecsServices = msg.services
-		m.filteredECSServices = msg.services
-		m.ecsServiceIdx = 0
-		m.selectedECSService = nil
-		m.selectedECSDetail = nil
-		m.ecsDetailScroll = 0
+		em.services = msg.services
+		em.filteredServices = msg.services
+		em.serviceIdx = 0
+		em.selectedService = nil
+		em.selectedDetail = nil
+		em.detailScroll = 0
 		m.resetFilter(filterECSServices)
 		m.screen = screenECSServiceList
-		return m, nil, true
-
+		return *m, nil, true
 	case ecsServiceDetailLoadedMsg:
-		m.selectedECSDetail = msg.detail
-		m.ecsDetailScroll = 0
+		em.selectedDetail = msg.detail
+		em.detailScroll = 0
 		if msg.detail != nil {
 			summary := msg.detail.Summary()
-			m.selectedECSService = &summary
-			for i, svc := range m.ecsServices {
+			em.selectedService = &summary
+			for i, svc := range em.services {
 				if svc.ARN == summary.ARN {
-					m.ecsServices[i] = summary
+					em.services[i] = summary
 				}
 			}
-			m.filteredECSServices = applyFilter(m.ecsServices, m.filterValue(filterECSServices))
+			em.filteredServices = applyFilter(em.services, m.filterValue(filterECSServices))
 		}
 		m.screen = screenECSServiceDetail
-		return m, nil, true
-
+		return *m, nil, true
 	case ecsTasksLoadedMsg:
-		m.ecsTasks = msg.tasks
-		m.ecsTaskIdx = 0
+		em.tasks = msg.tasks
+		em.taskIdx = 0
 		m.screen = screenECSTaskList
-		return m, nil, true
-
+		return *m, nil, true
 	case ecsContainersLoadedMsg:
-		m.ecsContainers = msg.containers
-		m.ecsContainerIdx = 0
+		em.containers = msg.containers
+		em.containerIdx = 0
 		m.screen = screenECSContainerList
-		return m, nil, true
-
+		return *m, nil, true
 	case ecsExecDoneMsg:
 		m.screen = screenECSContainerList
-		return m, nil, true
+		return *m, nil, true
 	}
-	return m, nil, false
+	return *m, nil, false
+}
+
+func (em *ecsModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenECSClusterList:
+		newM, cmd := em.updateClusterList(m, msg)
+		return newM, cmd, true
+	case screenECSServiceList:
+		newM, cmd := em.updateServiceList(m, msg)
+		return newM, cmd, true
+	case screenECSServiceDetail:
+		newM, cmd := em.updateServiceDetail(m, msg)
+		return newM, cmd, true
+	case screenECSTaskList:
+		newM, cmd := em.updateTaskList(m, msg)
+		return newM, cmd, true
+	case screenECSContainerList:
+		newM, cmd := em.updateContainerList(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (em ecsModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenECSClusterList:
+		return em.viewClusterList(m), true
+	case screenECSServiceList:
+		return em.viewServiceList(m), true
+	case screenECSServiceDetail:
+		return em.viewServiceDetail(m), true
+	case screenECSTaskList:
+		return em.viewTaskList(m), true
+	case screenECSContainerList:
+		return em.viewContainerList(m), true
+	default:
+		return "", false
+	}
+}
+
+func (em *ecsModel) ApplyFilter(m *Model, target filterTarget) bool {
+	switch target {
+	case filterECSClusters:
+		em.filteredClusters = applyFilter(em.clusters, m.filterValue(target))
+		em.clusterIdx = 0
+		return true
+	case filterECSServices:
+		em.filteredServices = applyFilter(em.services, m.filterValue(target))
+		em.serviceIdx = 0
+		return true
+	default:
+		return false
+	}
 }
 
 // --- Cluster List ---
 
-func (m Model) updateECSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (em *ecsModel) updateClusterList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterECSClusters); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenFeatureList
 	case "up", "k":
-		m.ecsClusterIdx = previousListIndex(m.ecsClusterIdx, len(m.filteredECSClusters))
+		em.clusterIdx = previousListIndex(em.clusterIdx, len(em.filteredClusters))
 	case "down", "j":
-		m.ecsClusterIdx = nextListIndex(m.ecsClusterIdx, len(m.filteredECSClusters))
+		em.clusterIdx = nextListIndex(em.clusterIdx, len(em.filteredClusters))
 	case "/":
-		return m, m.activateFilter(filterECSClusters)
+		return *m, m.activateFilter(filterECSClusters)
 	case "r":
-		return m.startLoading(m.loadECSClusters())
+		return m.startLoading(em.loadClusters(*m))
 	case "enter":
-		if len(m.filteredECSClusters) > 0 && m.ecsClusterIdx < len(m.filteredECSClusters) {
-			cluster := m.filteredECSClusters[m.ecsClusterIdx]
-			m.selectedECSCluster = &cluster
-			return m.startLoading(m.loadECSServices())
+		if len(em.filteredClusters) > 0 && em.clusterIdx < len(em.filteredClusters) {
+			cluster := em.filteredClusters[em.clusterIdx]
+			em.selectedCluster = &cluster
+			return m.startLoading(em.loadServices(*m))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewECSClusterList() string {
+func (em ecsModel) viewClusterList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -113,23 +187,23 @@ func (m Model) viewECSClusterList() string {
 	b.WriteString(m.renderFilterValue(filterECSClusters))
 	b.WriteString("\n\n")
 
-	if len(m.filteredECSClusters) == 0 {
+	if len(em.filteredClusters) == 0 {
 		panel.WriteString(dimStyle.Render("  No clusters found"))
 		panel.WriteString("\n")
 	} else {
 		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 10
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.ecsClusterIdx >= visibleLines {
-			start = m.ecsClusterIdx - visibleLines + 1
+		if em.clusterIdx >= visibleLines {
+			start = em.clusterIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredECSClusters))
+		end := min(start+visibleLines, len(em.filteredClusters))
 
 		for i := start; i < end; i++ {
-			c := m.filteredECSClusters[i]
+			c := em.filteredClusters[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.ecsClusterIdx {
+			if i == em.clusterIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -137,7 +211,7 @@ func (m Model) viewECSClusterList() string {
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d clusters", len(m.filteredECSClusters), len(m.ecsClusters))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d clusters", len(em.filteredClusters), len(em.clusters))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -148,41 +222,41 @@ func (m Model) viewECSClusterList() string {
 
 // --- Service List ---
 
-func (m Model) updateECSServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (em *ecsModel) updateServiceList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterECSServices); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenECSClusterList
 	case "up", "k":
-		m.ecsServiceIdx = previousListIndex(m.ecsServiceIdx, len(m.filteredECSServices))
+		em.serviceIdx = previousListIndex(em.serviceIdx, len(em.filteredServices))
 	case "down", "j":
-		m.ecsServiceIdx = nextListIndex(m.ecsServiceIdx, len(m.filteredECSServices))
+		em.serviceIdx = nextListIndex(em.serviceIdx, len(em.filteredServices))
 	case "/":
-		return m, m.activateFilter(filterECSServices)
+		return *m, m.activateFilter(filterECSServices)
 	case "r":
-		return m.startLoading(m.loadECSServices())
+		return m.startLoading(em.loadServices(*m))
 	case "enter":
-		if len(m.filteredECSServices) > 0 && m.ecsServiceIdx < len(m.filteredECSServices) {
-			svc := m.filteredECSServices[m.ecsServiceIdx]
-			m.selectedECSService = &svc
-			return m.startLoading(m.loadECSServiceDetail())
+		if len(em.filteredServices) > 0 && em.serviceIdx < len(em.filteredServices) {
+			svc := em.filteredServices[em.serviceIdx]
+			em.selectedService = &svc
+			return m.startLoading(em.loadServiceDetail(*m))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewECSServiceList() string {
+func (em ecsModel) viewServiceList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	clusterName := ""
-	if m.selectedECSCluster != nil {
-		clusterName = m.selectedECSCluster.Name
+	if em.selectedCluster != nil {
+		clusterName = em.selectedCluster.Name
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Services — %s", clusterName)))
 	b.WriteString("\n")
@@ -190,23 +264,23 @@ func (m Model) viewECSServiceList() string {
 	b.WriteString(m.renderFilterValue(filterECSServices))
 	b.WriteString("\n\n")
 
-	if len(m.filteredECSServices) == 0 {
+	if len(em.filteredServices) == 0 {
 		panel.WriteString(dimStyle.Render("  No services found"))
 		panel.WriteString("\n")
 	} else {
 		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 10
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.ecsServiceIdx >= visibleLines {
-			start = m.ecsServiceIdx - visibleLines + 1
+		if em.serviceIdx >= visibleLines {
+			start = em.serviceIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredECSServices))
+		end := min(start+visibleLines, len(em.filteredServices))
 
 		for i := start; i < end; i++ {
-			s := m.filteredECSServices[i]
+			s := em.filteredServices[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.ecsServiceIdx {
+			if i == em.serviceIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -214,7 +288,7 @@ func (m Model) viewECSServiceList() string {
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d services", len(m.filteredECSServices), len(m.ecsServices))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d services", len(em.filteredServices), len(em.services))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -225,8 +299,8 @@ func (m Model) viewECSServiceList() string {
 
 // --- Service Detail ---
 
-func (m Model) updateECSServiceDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	lines := m.ecsServiceDetailLines()
+func (em *ecsModel) updateServiceDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	lines := em.serviceDetailLines()
 	visibleLines := max(m.height-9, 5)
 	maxOffset := max(len(lines)-visibleLines, 0)
 
@@ -234,51 +308,51 @@ func (m Model) updateECSServiceDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.screen = screenECSServiceList
 	case "up", "k":
-		if m.ecsDetailScroll > 0 {
-			m.ecsDetailScroll--
+		if em.detailScroll > 0 {
+			em.detailScroll--
 		}
 	case "down", "j":
-		if m.ecsDetailScroll < maxOffset {
-			m.ecsDetailScroll++
+		if em.detailScroll < maxOffset {
+			em.detailScroll++
 		}
 	case "pgup":
-		m.ecsDetailScroll -= visibleLines
-		if m.ecsDetailScroll < 0 {
-			m.ecsDetailScroll = 0
+		em.detailScroll -= visibleLines
+		if em.detailScroll < 0 {
+			em.detailScroll = 0
 		}
 	case "pgdown":
-		m.ecsDetailScroll += visibleLines
-		if m.ecsDetailScroll > maxOffset {
-			m.ecsDetailScroll = maxOffset
+		em.detailScroll += visibleLines
+		if em.detailScroll > maxOffset {
+			em.detailScroll = maxOffset
 		}
 	case "r":
-		return m.startLoading(m.loadECSServiceDetail())
+		return m.startLoading(em.loadServiceDetail(*m))
 	case "enter":
-		return m.startLoading(m.loadECSTasks())
+		return m.startLoading(em.loadTasks(*m))
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewECSServiceDetail() string {
-	if m.selectedECSDetail == nil {
+func (em ecsModel) viewServiceDetail(m Model) string {
+	if em.selectedDetail == nil {
 		return ""
 	}
 
 	var b strings.Builder
 	var panel strings.Builder
-	detail := m.selectedECSDetail
+	detail := em.selectedDetail
 
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Service Rollout — %s", detail.Name)))
 	b.WriteString("\n\n")
 
-	lines := m.ecsServiceDetailLines()
+	lines := em.serviceDetailLines()
 	if len(lines) == 0 {
 		panel.WriteString(dimStyle.Render("  No rollout detail available"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-9, 5)
-		start := m.ecsDetailScroll
+		start := em.detailScroll
 		maxOffset := max(len(lines)-visibleLines, 0)
 		if start > maxOffset {
 			start = maxOffset
@@ -301,12 +375,12 @@ func (m Model) viewECSServiceDetail() string {
 	return b.String()
 }
 
-func (m Model) ecsServiceDetailLines() []string {
-	if m.selectedECSDetail == nil {
+func (em ecsModel) serviceDetailLines() []string {
+	if em.selectedDetail == nil {
 		return nil
 	}
 
-	detail := m.selectedECSDetail
+	detail := em.selectedDetail
 	lines := []string{
 		renderDetailLine("Status", renderECSServiceStatus(detail.Status)),
 		renderDetailLine("Launch", renderECSValue(detail.LaunchType)),
@@ -366,54 +440,54 @@ func (m Model) ecsServiceDetailLines() []string {
 
 // --- Task List ---
 
-func (m Model) updateECSTaskList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (em *ecsModel) updateTaskList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenECSServiceDetail
 	case "up", "k":
-		m.ecsTaskIdx = previousListIndex(m.ecsTaskIdx, len(m.ecsTasks))
+		em.taskIdx = previousListIndex(em.taskIdx, len(em.tasks))
 	case "down", "j":
-		m.ecsTaskIdx = nextListIndex(m.ecsTaskIdx, len(m.ecsTasks))
+		em.taskIdx = nextListIndex(em.taskIdx, len(em.tasks))
 	case "r":
-		return m.startLoading(m.loadECSTasks())
+		return m.startLoading(em.loadTasks(*m))
 	case "enter":
-		if len(m.ecsTasks) > 0 && m.ecsTaskIdx < len(m.ecsTasks) {
-			task := m.ecsTasks[m.ecsTaskIdx]
-			m.selectedECSTask = &task
-			return m.startLoading(m.loadECSContainers())
+		if len(em.tasks) > 0 && em.taskIdx < len(em.tasks) {
+			task := em.tasks[em.taskIdx]
+			em.selectedTask = &task
+			return m.startLoading(em.loadContainers(*m))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewECSTaskList() string {
+func (em ecsModel) viewTaskList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	svcName := ""
-	if m.selectedECSService != nil {
-		svcName = m.selectedECSService.Name
+	if em.selectedService != nil {
+		svcName = em.selectedService.Name
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Tasks — %s", svcName)))
 	b.WriteString("\n\n")
 
-	if len(m.ecsTasks) == 0 {
+	if len(em.tasks) == 0 {
 		panel.WriteString(dimStyle.Render("  No running tasks found"))
 		panel.WriteString("\n")
 	} else {
 		// overhead: status bar (2) + title (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 9
 		visibleLines := max(m.height-9, 5)
 		start := 0
-		if m.ecsTaskIdx >= visibleLines {
-			start = m.ecsTaskIdx - visibleLines + 1
+		if em.taskIdx >= visibleLines {
+			start = em.taskIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.ecsTasks))
+		end := min(start+visibleLines, len(em.tasks))
 
 		for i := start; i < end; i++ {
-			t := m.ecsTasks[i]
+			t := em.tasks[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.ecsTaskIdx {
+			if i == em.taskIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -421,7 +495,7 @@ func (m Model) viewECSTaskList() string {
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d tasks", len(m.ecsTasks))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d tasks", len(em.tasks))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -432,59 +506,59 @@ func (m Model) viewECSTaskList() string {
 
 // --- Container List ---
 
-func (m Model) updateECSContainerList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (em *ecsModel) updateContainerList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenECSTaskList
 	case "up", "k":
-		m.ecsContainerIdx = previousListIndex(m.ecsContainerIdx, len(m.ecsContainers))
+		em.containerIdx = previousListIndex(em.containerIdx, len(em.containers))
 	case "down", "j":
-		m.ecsContainerIdx = nextListIndex(m.ecsContainerIdx, len(m.ecsContainers))
+		em.containerIdx = nextListIndex(em.containerIdx, len(em.containers))
 	case "enter":
-		if len(m.ecsContainers) > 0 && m.ecsContainerIdx < len(m.ecsContainers) {
-			container := m.ecsContainers[m.ecsContainerIdx]
+		if len(em.containers) > 0 && em.containerIdx < len(em.containers) {
+			container := em.containers[em.containerIdx]
 			if !container.ExecEnabled {
 				m.errMsg = fmt.Sprintf(
 					"ECS Exec is not enabled for container %q.\n\nTo enable it, update the task definition with enableExecuteCommand=true\nand ensure the task IAM role has ssmmessages permissions.",
 					container.Name,
 				)
 				m.screen = screenError
-				return m, nil
+				return *m, nil
 			}
-			return m, m.startECSExec(container)
+			return *m, em.startExec(*m, container)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewECSContainerList() string {
+func (em ecsModel) viewContainerList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	taskID := ""
-	if m.selectedECSTask != nil {
-		taskID = m.selectedECSTask.TaskID
+	if em.selectedTask != nil {
+		taskID = em.selectedTask.TaskID
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Containers — %s", taskID)))
 	b.WriteString("\n\n")
 
-	if len(m.ecsContainers) == 0 {
+	if len(em.containers) == 0 {
 		panel.WriteString(dimStyle.Render("  No containers found"))
 		panel.WriteString("\n")
 	} else {
 		// overhead: status bar (2) + title (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 9
 		visibleLines := max(m.height-9, 5)
 		start := 0
-		if m.ecsContainerIdx >= visibleLines {
-			start = m.ecsContainerIdx - visibleLines + 1
+		if em.containerIdx >= visibleLines {
+			start = em.containerIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.ecsContainers))
+		end := min(start+visibleLines, len(em.containers))
 
 		for i := start; i < end; i++ {
-			c := m.ecsContainers[i]
+			c := em.containers[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.ecsContainerIdx {
+			if i == em.containerIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -492,7 +566,7 @@ func (m Model) viewECSContainerList() string {
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d containers", len(m.ecsContainers))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d containers", len(em.containers))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -503,7 +577,7 @@ func (m Model) viewECSContainerList() string {
 
 // --- Load Commands ---
 
-func (m Model) loadECSClusters() tea.Cmd {
+func (em ecsModel) loadClusters(m Model) tea.Cmd {
 	return func() tea.Msg {
 		if err := awsservice.CheckAWSCLIInstalled(); err != nil {
 			return errMsg{err: err}
@@ -525,9 +599,9 @@ func (m Model) loadECSClusters() tea.Cmd {
 	}
 }
 
-func (m Model) loadECSServices() tea.Cmd {
+func (em ecsModel) loadServices(m Model) tea.Cmd {
 	return func() tea.Msg {
-		if m.selectedECSCluster == nil {
+		if em.selectedCluster == nil {
 			return errMsg{err: fmt.Errorf("no cluster selected")}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
@@ -536,20 +610,20 @@ func (m Model) loadECSServices() tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		services, err := repo.ListServices(ctx, m.selectedECSCluster.ARN)
+		services, err := repo.ListServices(ctx, em.selectedCluster.ARN)
 		if err != nil {
 			return errMsg{err: err}
 		}
 		if len(services) == 0 {
-			return errMsg{err: fmt.Errorf("no services found in cluster %s", m.selectedECSCluster.Name)}
+			return errMsg{err: fmt.Errorf("no services found in cluster %s", em.selectedCluster.Name)}
 		}
 		return ecsServicesLoadedMsg{services: services}
 	}
 }
 
-func (m Model) loadECSTasks() tea.Cmd {
+func (em ecsModel) loadTasks(m Model) tea.Cmd {
 	return func() tea.Msg {
-		if m.selectedECSCluster == nil || m.selectedECSService == nil {
+		if em.selectedCluster == nil || em.selectedService == nil {
 			return errMsg{err: fmt.Errorf("no cluster or service selected")}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
@@ -558,20 +632,20 @@ func (m Model) loadECSTasks() tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		tasks, err := repo.ListTasks(ctx, m.selectedECSCluster.ARN, m.selectedECSService.ARN)
+		tasks, err := repo.ListTasks(ctx, em.selectedCluster.ARN, em.selectedService.ARN)
 		if err != nil {
 			return errMsg{err: err}
 		}
 		if len(tasks) == 0 {
-			return errMsg{err: fmt.Errorf("no running tasks found for service %s", m.selectedECSService.Name)}
+			return errMsg{err: fmt.Errorf("no running tasks found for service %s", em.selectedService.Name)}
 		}
 		return ecsTasksLoadedMsg{tasks: tasks}
 	}
 }
 
-func (m Model) loadECSServiceDetail() tea.Cmd {
+func (em ecsModel) loadServiceDetail(m Model) tea.Cmd {
 	return func() tea.Msg {
-		if m.selectedECSCluster == nil || m.selectedECSService == nil {
+		if em.selectedCluster == nil || em.selectedService == nil {
 			return errMsg{err: fmt.Errorf("no cluster or service selected")}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
@@ -580,7 +654,7 @@ func (m Model) loadECSServiceDetail() tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		detail, err := repo.DescribeServiceDetail(ctx, m.selectedECSCluster.ARN, m.selectedECSService.ARN)
+		detail, err := repo.DescribeServiceDetail(ctx, em.selectedCluster.ARN, em.selectedService.ARN)
 		if err != nil {
 			return errMsg{err: err}
 		}
@@ -588,9 +662,9 @@ func (m Model) loadECSServiceDetail() tea.Cmd {
 	}
 }
 
-func (m Model) loadECSContainers() tea.Cmd {
+func (em ecsModel) loadContainers(m Model) tea.Cmd {
 	return func() tea.Msg {
-		if m.selectedECSCluster == nil || m.selectedECSTask == nil {
+		if em.selectedCluster == nil || em.selectedTask == nil {
 			return errMsg{err: fmt.Errorf("no cluster or task selected")}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
@@ -599,21 +673,21 @@ func (m Model) loadECSContainers() tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		containers, err := repo.DescribeTaskContainers(ctx, m.selectedECSCluster.ARN, m.selectedECSTask.TaskARN)
+		containers, err := repo.DescribeTaskContainers(ctx, em.selectedCluster.ARN, em.selectedTask.TaskARN)
 		if err != nil {
 			return errMsg{err: err}
 		}
 		if len(containers) == 0 {
-			return errMsg{err: fmt.Errorf("no containers found for task %s", m.selectedECSTask.TaskID)}
+			return errMsg{err: fmt.Errorf("no containers found for task %s", em.selectedTask.TaskID)}
 		}
 		return ecsContainersLoadedMsg{containers: containers}
 	}
 }
 
 // startECSExec launches an ECS exec session for the given container.
-func (m Model) startECSExec(container awsservice.ECSContainer) tea.Cmd {
+func (em ecsModel) startExec(m Model, container awsservice.ECSContainer) tea.Cmd {
 	return func() tea.Msg {
-		if m.selectedECSCluster == nil || m.selectedECSTask == nil {
+		if em.selectedCluster == nil || em.selectedTask == nil {
 			return errMsg{err: fmt.Errorf("no cluster or task selected")}
 		}
 
@@ -631,8 +705,8 @@ func (m Model) startECSExec(container awsservice.ECSContainer) tea.Cmd {
 		}
 
 		cmd := awsservice.BuildECSExecCommand(
-			m.selectedECSCluster.ARN,
-			m.selectedECSTask.TaskARN,
+			em.selectedCluster.ARN,
+			em.selectedTask.TaskARN,
 			container.Name,
 			m.cfg.Region,
 			credEnv,

@@ -171,12 +171,6 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterSecurityGroups:
 		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.filterValue(target))
 		m.sgIdx = 0
-	case filterECSClusters:
-		m.filteredECSClusters = applyFilter(m.ecsClusters, m.filterValue(target))
-		m.ecsClusterIdx = 0
-	case filterECSServices:
-		m.filteredECSServices = applyFilter(m.ecsServices, m.filterValue(target))
-		m.ecsServiceIdx = 0
 	case filterEKSClusters:
 		m.filteredEKSClusters = applyFilter(m.eksClusters, m.filterValue(target))
 		m.eksClusterIdx = 0

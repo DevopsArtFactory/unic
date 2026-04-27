@@ -13,11 +13,11 @@ import (
 func TestECSServiceListEnterLoadsServiceDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenECSServiceList
-	m.selectedECSCluster = &awsservice.ECSCluster{Name: "prod-cluster", ARN: "arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"}
-	m.ecsServices = []awsservice.ECSService{
+	m.ecs.selectedCluster = &awsservice.ECSCluster{Name: "prod-cluster", ARN: "arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"}
+	m.ecs.services = []awsservice.ECSService{
 		{Name: "api-service", ARN: "arn:aws:ecs:us-east-1:123456789012:service/prod-cluster/api-service", Status: "ACTIVE", RunningCount: 2, DesiredCount: 3, PendingCount: 1, LaunchType: "FARGATE"},
 	}
-	m.filteredECSServices = m.ecsServices
+	m.ecs.filteredServices = m.ecs.services
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
@@ -27,8 +27,8 @@ func TestECSServiceListEnterLoadsServiceDetail(t *testing.T) {
 	if model.screen != screenLoading {
 		t.Fatalf("expected loading screen, got %v", model.screen)
 	}
-	if model.selectedECSService == nil || model.selectedECSService.Name != "api-service" {
-		t.Fatalf("expected selected ECS service api-service, got %+v", model.selectedECSService)
+	if model.ecs.selectedService == nil || model.ecs.selectedService.Name != "api-service" {
+		t.Fatalf("expected selected ECS service api-service, got %+v", model.ecs.selectedService)
 	}
 }
 
@@ -46,7 +46,7 @@ func TestHandleECSServiceDetailLoadedMsgShowsDetailScreen(t *testing.T) {
 		TaskDefinitionRevision: 42,
 	}
 
-	updated, _, handled := m.handleECSMsg(ecsServiceDetailLoadedMsg{detail: detail})
+	updated, _, handled := m.ecs.HandleMessage(&m, ecsServiceDetailLoadedMsg{detail: detail})
 	if !handled {
 		t.Fatal("expected detail message to be handled")
 	}
@@ -55,11 +55,11 @@ func TestHandleECSServiceDetailLoadedMsgShowsDetailScreen(t *testing.T) {
 	if model.screen != screenECSServiceDetail {
 		t.Fatalf("expected ECS service detail screen, got %v", model.screen)
 	}
-	if model.selectedECSDetail == nil || model.selectedECSDetail.Name != "api-service" {
-		t.Fatalf("expected selected ECS detail api-service, got %+v", model.selectedECSDetail)
+	if model.ecs.selectedDetail == nil || model.ecs.selectedDetail.Name != "api-service" {
+		t.Fatalf("expected selected ECS detail api-service, got %+v", model.ecs.selectedDetail)
 	}
-	if model.selectedECSService == nil || model.selectedECSService.PendingCount != 1 {
-		t.Fatalf("expected service summary sync, got %+v", model.selectedECSService)
+	if model.ecs.selectedService == nil || model.ecs.selectedService.PendingCount != 1 {
+		t.Fatalf("expected service summary sync, got %+v", model.ecs.selectedService)
 	}
 }
 
@@ -68,7 +68,7 @@ func TestECSServiceDetailViewShowsRolloutAndImages(t *testing.T) {
 	m.width = 120
 	m.height = 36
 	m.screen = screenECSServiceDetail
-	m.selectedECSDetail = &awsservice.ECSServiceDetail{
+	m.ecs.selectedDetail = &awsservice.ECSServiceDetail{
 		Name:                     "api-service",
 		Status:                   "ACTIVE",
 		LaunchType:               "FARGATE",
@@ -108,7 +108,7 @@ func TestECSServiceDetailViewShowsRolloutAndImages(t *testing.T) {
 		},
 	}
 
-	view := stripANSI(m.viewECSServiceDetail())
+	view := stripANSI(m.ecs.viewServiceDetail(m))
 	for _, want := range []string{
 		"ECS Service Rollout",
 		"running:2 desired:3 pending:1",
@@ -127,7 +127,7 @@ func TestECSServiceDetailViewShowsRolloutAndImages(t *testing.T) {
 func TestECSServiceDetailEscReturnsToServiceList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenECSServiceDetail
-	m.selectedECSDetail = &awsservice.ECSServiceDetail{Name: "api-service"}
+	m.ecs.selectedDetail = &awsservice.ECSServiceDetail{Name: "api-service"}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
