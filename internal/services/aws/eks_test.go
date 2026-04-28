@@ -11,12 +11,14 @@ import (
 )
 
 type mockEKSClient struct {
-	listClustersFunc      func(ctx context.Context, params *eks.ListClustersInput, optFns ...func(*eks.Options)) (*eks.ListClustersOutput, error)
-	describeClusterFunc   func(ctx context.Context, params *eks.DescribeClusterInput, optFns ...func(*eks.Options)) (*eks.DescribeClusterOutput, error)
-	listNodegroupsFunc    func(ctx context.Context, params *eks.ListNodegroupsInput, optFns ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error)
-	describeNodegroupFunc func(ctx context.Context, params *eks.DescribeNodegroupInput, optFns ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error)
-	listAddonsFunc        func(ctx context.Context, params *eks.ListAddonsInput, optFns ...func(*eks.Options)) (*eks.ListAddonsOutput, error)
-	describeAddonFunc     func(ctx context.Context, params *eks.DescribeAddonInput, optFns ...func(*eks.Options)) (*eks.DescribeAddonOutput, error)
+	listClustersFunc          func(ctx context.Context, params *eks.ListClustersInput, optFns ...func(*eks.Options)) (*eks.ListClustersOutput, error)
+	describeClusterFunc       func(ctx context.Context, params *eks.DescribeClusterInput, optFns ...func(*eks.Options)) (*eks.DescribeClusterOutput, error)
+	listNodegroupsFunc        func(ctx context.Context, params *eks.ListNodegroupsInput, optFns ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error)
+	describeNodegroupFunc     func(ctx context.Context, params *eks.DescribeNodegroupInput, optFns ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error)
+	listAddonsFunc            func(ctx context.Context, params *eks.ListAddonsInput, optFns ...func(*eks.Options)) (*eks.ListAddonsOutput, error)
+	describeAddonFunc         func(ctx context.Context, params *eks.DescribeAddonInput, optFns ...func(*eks.Options)) (*eks.DescribeAddonOutput, error)
+	describeAddonVersionsFunc func(ctx context.Context, params *eks.DescribeAddonVersionsInput, optFns ...func(*eks.Options)) (*eks.DescribeAddonVersionsOutput, error)
+	listInsightsFunc          func(ctx context.Context, params *eks.ListInsightsInput, optFns ...func(*eks.Options)) (*eks.ListInsightsOutput, error)
 }
 
 func (m *mockEKSClient) ListClusters(ctx context.Context, params *eks.ListClustersInput, optFns ...func(*eks.Options)) (*eks.ListClustersOutput, error) {
@@ -41,6 +43,14 @@ func (m *mockEKSClient) ListAddons(ctx context.Context, params *eks.ListAddonsIn
 
 func (m *mockEKSClient) DescribeAddon(ctx context.Context, params *eks.DescribeAddonInput, optFns ...func(*eks.Options)) (*eks.DescribeAddonOutput, error) {
 	return m.describeAddonFunc(ctx, params, optFns...)
+}
+
+func (m *mockEKSClient) DescribeAddonVersions(ctx context.Context, params *eks.DescribeAddonVersionsInput, optFns ...func(*eks.Options)) (*eks.DescribeAddonVersionsOutput, error) {
+	return m.describeAddonVersionsFunc(ctx, params, optFns...)
+}
+
+func (m *mockEKSClient) ListInsights(ctx context.Context, params *eks.ListInsightsInput, optFns ...func(*eks.Options)) (*eks.ListInsightsOutput, error) {
+	return m.listInsightsFunc(ctx, params, optFns...)
 }
 
 func TestListEKSClusters(t *testing.T) {
@@ -182,6 +192,105 @@ func TestListEKSAddons(t *testing.T) {
 	}
 	if addons[1].HealthIssues[0].Summary() == "" {
 		t.Fatal("expected add-on health issue summary")
+	}
+}
+
+func TestListEKSUpgradeReadiness(t *testing.T) {
+	mock := &mockEKSClient{
+		listNodegroupsFunc: func(_ context.Context, _ *eks.ListNodegroupsInput, _ ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error) {
+			return &eks.ListNodegroupsOutput{Nodegroups: []string{"blue", "green"}}, nil
+		},
+		describeNodegroupFunc: func(_ context.Context, params *eks.DescribeNodegroupInput, _ ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error) {
+			name := awssdk.ToString(params.NodegroupName)
+			version := "1.32"
+			if name == "green" {
+				version = "1.31"
+			}
+			return &eks.DescribeNodegroupOutput{Nodegroup: &ekstypes.Nodegroup{
+				ClusterName:   awssdk.String("prod-eks"),
+				NodegroupName: awssdk.String(name),
+				Status:        ekstypes.NodegroupStatusActive,
+				Version:       awssdk.String(version),
+			}}, nil
+		},
+		listAddonsFunc: func(_ context.Context, _ *eks.ListAddonsInput, _ ...func(*eks.Options)) (*eks.ListAddonsOutput, error) {
+			return &eks.ListAddonsOutput{Addons: []string{"coredns", "vpc-cni"}}, nil
+		},
+		describeAddonFunc: func(_ context.Context, params *eks.DescribeAddonInput, _ ...func(*eks.Options)) (*eks.DescribeAddonOutput, error) {
+			name := awssdk.ToString(params.AddonName)
+			version := "v1.11.4-eksbuild.2"
+			status := ekstypes.AddonStatusActive
+			if name == "vpc-cni" {
+				version = "v1.12.0-eksbuild.1"
+				status = ekstypes.AddonStatusDegraded
+			}
+			return &eks.DescribeAddonOutput{Addon: &ekstypes.Addon{
+				ClusterName:  awssdk.String("prod-eks"),
+				AddonName:    awssdk.String(name),
+				AddonVersion: awssdk.String(version),
+				Status:       status,
+			}}, nil
+		},
+		describeAddonVersionsFunc: func(_ context.Context, params *eks.DescribeAddonVersionsInput, _ ...func(*eks.Options)) (*eks.DescribeAddonVersionsOutput, error) {
+			if got := awssdk.ToString(params.KubernetesVersion); got != "1.32" {
+				t.Fatalf("expected Kubernetes version 1.32, got %s", got)
+			}
+			name := awssdk.ToString(params.AddonName)
+			version := "v1.11.4-eksbuild.2"
+			if name == "vpc-cni" {
+				version = "v1.16.0-eksbuild.1"
+			}
+			return &eks.DescribeAddonVersionsOutput{
+				Addons: []ekstypes.AddonInfo{{
+					AddonName: awssdk.String(name),
+					AddonVersions: []ekstypes.AddonVersionInfo{{
+						AddonVersion: awssdk.String(version),
+					}},
+				}},
+			}, nil
+		},
+		listInsightsFunc: func(_ context.Context, params *eks.ListInsightsInput, _ ...func(*eks.Options)) (*eks.ListInsightsOutput, error) {
+			if got := awssdk.ToString(params.ClusterName); got != "prod-eks" {
+				t.Fatalf("expected cluster prod-eks, got %s", got)
+			}
+			if len(params.Filter.Categories) != 1 || params.Filter.Categories[0] != ekstypes.CategoryUpgradeReadiness {
+				t.Fatalf("expected upgrade readiness filter, got %+v", params.Filter.Categories)
+			}
+			return &eks.ListInsightsOutput{Insights: []ekstypes.InsightSummary{{
+				Id:   awssdk.String("insight-1"),
+				Name: awssdk.String("Deprecated API usage"),
+				InsightStatus: &ekstypes.InsightStatus{
+					Status: ekstypes.InsightStatusValueError,
+					Reason: awssdk.String("deprecated APIs detected"),
+				},
+				KubernetesVersion: awssdk.String("1.33"),
+			}}}, nil
+		},
+	}
+
+	repo := &AwsRepository{EKSClient: mock}
+	readiness, err := repo.ListEKSUpgradeReadiness(context.Background(), EKSCluster{Name: "prod-eks", Version: "1.32"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if readiness.Summary() != "4 blocker(s), 0 warning(s)" {
+		t.Fatalf("unexpected readiness summary: %s", readiness.Summary())
+	}
+	if !readiness.HasBlockers() {
+		t.Fatal("expected readiness blockers")
+	}
+}
+
+func TestBuildEKSUpgradeReadinessReady(t *testing.T) {
+	readiness := BuildEKSUpgradeReadiness(
+		EKSCluster{Name: "prod-eks", Version: "1.32"},
+		[]EKSNodeGroup{{ClusterName: "prod-eks", Name: "blue", Version: "1.32", Status: "ACTIVE"}},
+		[]EKSAddon{{ClusterName: "prod-eks", Name: "coredns", Version: "v1.11.4-eksbuild.2", Status: "ACTIVE"}},
+		[]EKSUpgradeInsight{{ID: "insight-1", Name: "Upgrade checks", Status: "PASSING"}},
+		map[string]bool{"coredns": true},
+	)
+	if readiness.Summary() != "ready" {
+		t.Fatalf("expected ready summary, got %s", readiness.Summary())
 	}
 }
 

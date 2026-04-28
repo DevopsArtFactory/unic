@@ -406,7 +406,22 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q / esc", "Go back to the task list"},
 		}
 	case screenEKSClusterList:
-		return listScreenShortcuts("open managed node groups for the selected cluster", "go back to the feature list", true, true)
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between clusters"},
+			{"/", "Filter clusters"},
+			{"r", "Refresh clusters"},
+			{"enter", "Open managed node groups for the selected cluster"},
+			{"U", "Open current-version upgrade readiness for the selected cluster"},
+			{"q / esc", "Go back to the feature list"},
+		}
+	case screenEKSUpgradeReadiness:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Scroll the readiness report"},
+			{"pgup / pgdn", "Scroll by one page"},
+			{"r", "Refresh readiness data"},
+			{"esc", "Go back to the cluster list"},
+			{"q", "Go back to the feature list"},
+		}
 	case screenEKSNodeGroupList:
 		return listScreenShortcuts("open the selected node group", "go back to the cluster list", true, true)
 	case screenEKSNodeGroupDetail:
@@ -802,6 +817,8 @@ func (m Model) helpScreenTitle() string {
 		return "ECS Containers"
 	case screenEKSClusterList:
 		return "EKS Clusters"
+	case screenEKSUpgradeReadiness:
+		return "EKS Upgrade Readiness"
 	case screenEKSNodeGroupList:
 		return "EKS Node Groups"
 	case screenEKSNodeGroupDetail:

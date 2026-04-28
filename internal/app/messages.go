@@ -249,6 +249,10 @@ type eksAddonsLoadedMsg struct {
 	addons []awsservice.EKSAddon
 }
 
+type eksUpgradeReadinessLoadedMsg struct {
+	readiness *awsservice.EKSUpgradeReadiness
+}
+
 type ecrRepositoriesLoadedMsg struct {
 	repositories []awsservice.ECRRepository
 }

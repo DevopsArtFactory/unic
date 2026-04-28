@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -144,6 +145,87 @@ func (r *AwsRepository) ListEKSAddons(ctx context.Context, clusterName string) (
 	return addons, nil
 }
 
+func (r *AwsRepository) ListEKSUpgradeReadiness(ctx context.Context, cluster EKSCluster) (*EKSUpgradeReadiness, error) {
+	nodeGroups, err := r.ListEKSNodeGroups(ctx, cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+	addons, err := r.ListEKSAddons(ctx, cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+	insights, err := r.ListEKSUpgradeInsights(ctx, cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	compatibility := make(map[string]bool, len(addons))
+	for _, addon := range addons {
+		compatible, err := r.isEKSAddonVersionCompatible(ctx, addon, cluster.Version)
+		if err != nil {
+			return nil, err
+		}
+		compatibility[addon.Name] = compatible
+	}
+	readiness := BuildEKSUpgradeReadiness(cluster, nodeGroups, addons, insights, compatibility)
+	return &readiness, nil
+}
+
+func (r *AwsRepository) ListEKSUpgradeInsights(ctx context.Context, clusterName string) ([]EKSUpgradeInsight, error) {
+	uniclog.Debug("aws", "ListEKSUpgradeInsights called", "cluster", clusterName)
+
+	paginator := eks.NewListInsightsPaginator(r.EKSClient, &eks.ListInsightsInput{
+		ClusterName: awssdk.String(clusterName),
+		Filter: &ekstypes.InsightsFilter{
+			Categories: []ekstypes.Category{ekstypes.CategoryUpgradeReadiness},
+		},
+	})
+	insights := []EKSUpgradeInsight{}
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list EKS upgrade insights for %s: %w", clusterName, err)
+		}
+		for _, insight := range out.Insights {
+			insights = append(insights, mapEKSUpgradeInsight(insight))
+		}
+	}
+
+	sort.SliceStable(insights, func(i, j int) bool {
+		return normalizedSortKey(insights[i].Name, insights[i].ID) < normalizedSortKey(insights[j].Name, insights[j].ID)
+	})
+	return insights, nil
+}
+
+func (r *AwsRepository) isEKSAddonVersionCompatible(ctx context.Context, addon EKSAddon, clusterVersion string) (bool, error) {
+	if strings.TrimSpace(addon.Version) == "" {
+		return false, nil
+	}
+	var nextToken *string
+	for {
+		out, err := r.EKSClient.DescribeAddonVersions(ctx, &eks.DescribeAddonVersionsInput{
+			AddonName:         awssdk.String(addon.Name),
+			KubernetesVersion: awssdk.String(clusterVersion),
+			NextToken:         nextToken,
+		})
+		if err != nil {
+			return false, fmt.Errorf("failed to describe EKS add-on versions for %s: %w", addon.Name, err)
+		}
+		for _, info := range out.Addons {
+			for _, version := range info.AddonVersions {
+				if awssdk.ToString(version.AddonVersion) == addon.Version {
+					return true, nil
+				}
+			}
+		}
+		if out.NextToken == nil {
+			break
+		}
+		nextToken = out.NextToken
+	}
+	return false, nil
+}
+
 func mapEKSCluster(cluster *ekstypes.Cluster) EKSCluster {
 	item := EKSCluster{
 		Name:    awssdk.ToString(cluster.Name),
@@ -206,6 +288,20 @@ func mapEKSAddon(addon *ekstypes.Addon) EKSAddon {
 				ResourceIDs: append([]string(nil), issue.ResourceIds...),
 			})
 		}
+	}
+	return item
+}
+
+func mapEKSUpgradeInsight(insight ekstypes.InsightSummary) EKSUpgradeInsight {
+	item := EKSUpgradeInsight{
+		ID:                awssdk.ToString(insight.Id),
+		Name:              awssdk.ToString(insight.Name),
+		Category:          string(insight.Category),
+		KubernetesVersion: awssdk.ToString(insight.KubernetesVersion),
+	}
+	if insight.InsightStatus != nil {
+		item.Status = string(insight.InsightStatus.Status)
+		item.Reason = awssdk.ToString(insight.InsightStatus.Reason)
 	}
 	return item
 }
