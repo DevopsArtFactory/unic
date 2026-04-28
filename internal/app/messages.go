@@ -245,6 +245,10 @@ type eksNodeGroupsLoadedMsg struct {
 	nodeGroups []awsservice.EKSNodeGroup
 }
 
+type eksAddonsLoadedMsg struct {
+	addons []awsservice.EKSAddon
+}
+
 type inspectorScanLoadedMsg struct {
 	report *inspector.SecurityScanReport
 }

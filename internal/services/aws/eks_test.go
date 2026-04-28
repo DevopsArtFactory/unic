@@ -15,6 +15,8 @@ type mockEKSClient struct {
 	describeClusterFunc   func(ctx context.Context, params *eks.DescribeClusterInput, optFns ...func(*eks.Options)) (*eks.DescribeClusterOutput, error)
 	listNodegroupsFunc    func(ctx context.Context, params *eks.ListNodegroupsInput, optFns ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error)
 	describeNodegroupFunc func(ctx context.Context, params *eks.DescribeNodegroupInput, optFns ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error)
+	listAddonsFunc        func(ctx context.Context, params *eks.ListAddonsInput, optFns ...func(*eks.Options)) (*eks.ListAddonsOutput, error)
+	describeAddonFunc     func(ctx context.Context, params *eks.DescribeAddonInput, optFns ...func(*eks.Options)) (*eks.DescribeAddonOutput, error)
 }
 
 func (m *mockEKSClient) ListClusters(ctx context.Context, params *eks.ListClustersInput, optFns ...func(*eks.Options)) (*eks.ListClustersOutput, error) {
@@ -31,6 +33,14 @@ func (m *mockEKSClient) ListNodegroups(ctx context.Context, params *eks.ListNode
 
 func (m *mockEKSClient) DescribeNodegroup(ctx context.Context, params *eks.DescribeNodegroupInput, optFns ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error) {
 	return m.describeNodegroupFunc(ctx, params, optFns...)
+}
+
+func (m *mockEKSClient) ListAddons(ctx context.Context, params *eks.ListAddonsInput, optFns ...func(*eks.Options)) (*eks.ListAddonsOutput, error) {
+	return m.listAddonsFunc(ctx, params, optFns...)
+}
+
+func (m *mockEKSClient) DescribeAddon(ctx context.Context, params *eks.DescribeAddonInput, optFns ...func(*eks.Options)) (*eks.DescribeAddonOutput, error) {
+	return m.describeAddonFunc(ctx, params, optFns...)
 }
 
 func TestListEKSClusters(t *testing.T) {
@@ -119,6 +129,59 @@ func TestListEKSNodeGroups(t *testing.T) {
 	}
 	if nodeGroups[0].HealthIssues[0].Summary() == "" {
 		t.Fatal("expected health issue summary")
+	}
+}
+
+func TestListEKSAddons(t *testing.T) {
+	mock := &mockEKSClient{
+		listAddonsFunc: func(_ context.Context, params *eks.ListAddonsInput, _ ...func(*eks.Options)) (*eks.ListAddonsOutput, error) {
+			if got := awssdk.ToString(params.ClusterName); got != "prod-eks" {
+				t.Fatalf("expected cluster name prod-eks, got %s", got)
+			}
+			return &eks.ListAddonsOutput{Addons: []string{"vpc-cni", "coredns"}}, nil
+		},
+		describeAddonFunc: func(_ context.Context, params *eks.DescribeAddonInput, _ ...func(*eks.Options)) (*eks.DescribeAddonOutput, error) {
+			name := awssdk.ToString(params.AddonName)
+			status := ekstypes.AddonStatusActive
+			var issues []ekstypes.AddonIssue
+			if name == "vpc-cni" {
+				status = ekstypes.AddonStatusDegraded
+				issues = []ekstypes.AddonIssue{{
+					Code:        ekstypes.AddonIssueCodeAddonPermissionFailure,
+					Message:     awssdk.String("missing IAM permission"),
+					ResourceIds: []string{"aws-node"},
+				}}
+			}
+			return &eks.DescribeAddonOutput{Addon: &ekstypes.Addon{
+				ClusterName:           awssdk.String("prod-eks"),
+				AddonName:             awssdk.String(name),
+				AddonArn:              awssdk.String("arn:aws:eks:ap-northeast-2:123456789012:addon/prod-eks/" + name + "/uuid"),
+				AddonVersion:          awssdk.String("v1.16.4-eksbuild.2"),
+				Status:                status,
+				Owner:                 awssdk.String("aws"),
+				Publisher:             awssdk.String("eks"),
+				ServiceAccountRoleArn: awssdk.String("arn:aws:iam::123456789012:role/" + name),
+				Health:                &ekstypes.AddonHealth{Issues: issues},
+			}}, nil
+		},
+	}
+
+	repo := &AwsRepository{EKSClient: mock}
+	addons, err := repo.ListEKSAddons(context.Background(), "prod-eks")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(addons) != 2 {
+		t.Fatalf("expected 2 add-ons, got %d", len(addons))
+	}
+	if addons[0].Name != "coredns" {
+		t.Fatalf("expected sorted add-on coredns first, got %s", addons[0].Name)
+	}
+	if !addons[1].NeedsAttention() {
+		t.Fatal("expected degraded add-on to need attention")
+	}
+	if addons[1].HealthIssues[0].Summary() == "" {
+		t.Fatal("expected add-on health issue summary")
 	}
 }
 
