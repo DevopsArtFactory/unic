@@ -25,6 +25,8 @@ const (
 	screenInstanceList
 	screenEC2InstanceBrowserList
 	screenEC2InstanceBrowserDetail
+	screenEC2InstanceBrowserRelatedList
+	screenEC2InstanceBrowserRelatedDetail
 	screenVPCList
 	screenSubnetList
 	screenSubnetDetail

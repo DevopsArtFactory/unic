@@ -330,7 +330,7 @@ checks:
 | Area | Keys |
 |---|---|
 | EC2 SSM | `r` refresh, `Enter` connect |
-| EC2 Instance Browser | `r` refresh, `/` filter, `Enter` detail |
+| EC2 Instance Browser | `r` refresh, `/` filter, `Enter` detail, detail `g/a/t/b/n` opens related security groups/ASG/target groups/load balancers/listeners |
 | Security Groups | `a` add rule, `d` delete rule, `Tab` switch ingress/egress |
 | Reachability Analyzer | Region select first, `←`/`→` or `Tab` change type, `/` filter, `Enter` advance, `Tab`/`↑`/`↓` move config fields, `←`/`→` protocol, `r` rerun |
 | RDS | `s` start, `x` stop, `f` failover, `r` refresh |
@@ -360,7 +360,7 @@ The EKS Browser includes a current-version upgrade readiness view for each selec
 
 The EKS Browser includes an access helper for each selected cluster. Press `u` from the cluster list to review the cluster endpoint, ARN, current region/profile, and copy an `aws eks update-kubeconfig` command or a `kubectl get nodes` smoke-check command for handoff into Kubernetes workflows.
 
-The EC2 Instance Browser lists EC2 instances across available states for the active context and region, separate from the SSM session picker that only lists connectable running instances. The detail screen shows core metadata including instance ID, name tag, state, instance type, AZ, VPC, subnet, private and public IPs, launch time, platform details, IAM profile, and tags.
+The EC2 Instance Browser lists EC2 instances across available states for the active context and region, separate from the SSM session picker that only lists connectable running instances. The detail screen shows core metadata including instance ID, name tag, state, instance type, AZ, VPC, subnet, security groups, private and public IPs, launch time, platform details, IAM profile, and tags. From instance detail, related-resource drill-down screens open attached security groups (`g`), Auto Scaling membership (`a`), registered target groups (`t`), associated load balancers (`b`), and listeners (`n`). Related lists support filtering, refresh, wrap navigation, empty states for missing associations, and inline errors when a relationship cannot be loaded because of API or permission failures.
 
 Bedrock API key management uses the active unic AWS context and IAM service-specific credential APIs for `bedrock.amazonaws.com`. The TUI lists long-term Bedrock API key metadata, opens a detail screen for inspection, defaults new key generation to the current IAM user when that user can be inferred from caller identity, and keeps another-user generation as an explicit option. Creation supports an optional expiration period, where blank or `0` means no expiration, rotates secrets with a one-time result screen, and deletes keys only after typed confirmation. Generated and rotated key values are intentionally copy-only and are not printed to the terminal; on the result screen, `c` copies the key and `e` copies `export AWS_BEARER_TOKEN_BEDROCK=...`.
 

@@ -12,6 +12,7 @@ const (
 	filterServices
 	filterInstances
 	filterEC2BrowserInstances
+	filterEC2BrowserRelated
 	filterSubnetIPs
 	filterRDS
 	filterRoute53Zones

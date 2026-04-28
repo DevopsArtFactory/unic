@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"unic/internal/config"
 	"unic/internal/domain"
@@ -469,6 +470,123 @@ func TestEC2BrowserDetailViewShowsMetadata(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected EC2 detail view to contain %q, got %q", want, view)
 		}
+	}
+}
+
+func TestEC2BrowserDetailViewKeepsRowsSeparateAndClipped(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenEC2InstanceBrowserDetail
+	m.width = 96
+	m.height = 30
+	m.ec2Browser.selected = &awsservice.EC2Instance{
+		InstanceID:   "i-0f237d69dbc37d27f",
+		Name:         "plantadmext-plted_apnortheast2-v075",
+		State:        "running",
+		InstanceType: "t4g.medium",
+		SecurityGroups: []awsservice.EC2InstanceSecurityGroup{
+			{GroupID: "sg-054e6a98f4a972b67", Name: "plantadmext-plted_apnortheast2"},
+			{GroupID: "sg-0844134f83a41ab59", Name: "vpc-00a9c49eb2111f495-querypie-joined-sg-260205124724"},
+		},
+		Tags: map[string]string{
+			"ansible-tags":              "all app plantadmext apps_version plantadmext-release-202604221456-2f31d19c.jar",
+			"aws:autoscaling:groupName": "coreprobeworker-plted_apnortheast2-v020",
+			"aws:ec2launchtemplate:id":  "lt-09f7820d193aba7d1",
+			"branch":                    "main service_jar_file=plantadmext/main/plantadmext-release-202604221456-2f31d19c.jar",
+		},
+	}
+
+	view := stripANSI(m.View())
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if width := lipgloss.Width(line); width > m.width {
+			t.Fatalf("expected EC2 detail line to fit width %d, got %d: %q", m.width, width, line)
+		}
+	}
+	for _, want := range []string{"Instance ID", "Security Groups", "Tags", "ansible-tags", "branch"} {
+		found := false
+		for _, line := range lines {
+			if strings.Contains(line, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected EC2 detail view to contain separate row %q, got %q", want, view)
+		}
+	}
+	for _, line := range lines {
+		if strings.Contains(line, "oupName") && !strings.Contains(line, "aws:autoscaling:groupName") {
+			t.Fatalf("expected long tag key to stay on one row without wrapping, got fragment row %q", line)
+		}
+	}
+}
+
+func TestEC2BrowserRelatedListNavigationAndFilter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenEC2InstanceBrowserRelatedList
+	m.ec2Browser.selected = &awsservice.EC2Instance{InstanceID: "i-123", Name: "prod-web"}
+	m.ec2Browser.relatedKind = ec2RelatedTargetGroups
+	m.ec2Browser.relatedItems = []ec2RelatedItem{
+		{
+			title:  "prod-tg HTTP:80 [healthy]",
+			filter: "prod-tg http healthy",
+			details: []detailRow{
+				{"Name", "prod-tg"},
+			},
+		},
+		{
+			title:  "dev-tg HTTP:8080 [unused]",
+			filter: "dev-tg http unused",
+			details: []detailRow{
+				{"Name", "dev-tg"},
+			},
+		},
+	}
+	m.ec2Browser.filteredRelated = m.ec2Browser.relatedItems
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model := updated.(Model)
+	if model.ec2Browser.relatedIdx != 1 {
+		t.Fatalf("expected related list up from first to wrap to last, got %d", model.ec2Browser.relatedIdx)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model = updated.(Model)
+	for _, ch := range []rune("prod") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+	if len(model.ec2Browser.filteredRelated) != 1 {
+		t.Fatalf("expected 1 filtered related item, got %d", len(model.ec2Browser.filteredRelated))
+	}
+	if model.ec2Browser.filteredRelated[0].title != "prod-tg HTTP:80 [healthy]" {
+		t.Fatalf("unexpected filtered related item: %+v", model.ec2Browser.filteredRelated[0])
+	}
+}
+
+func TestEC2RelationshipsLoadedOpensRequestedRelatedList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+	msg := ec2RelationshipsLoadedMsg{
+		kind: ec2RelatedLoadBalancers,
+		relationships: &awsservice.EC2InstanceRelationships{
+			InstanceID: "i-123",
+			LoadBalancers: []awsservice.EC2LoadBalancer{
+				{Name: "app-lb", DNSName: "app.example.com", Type: "application", State: "active"},
+			},
+		},
+	}
+
+	updated, _ := m.Update(msg)
+	model := updated.(Model)
+	if model.screen != screenEC2InstanceBrowserRelatedList {
+		t.Fatalf("expected related list screen, got %d", model.screen)
+	}
+	if model.ec2Browser.relatedKind != ec2RelatedLoadBalancers {
+		t.Fatalf("expected load balancer related kind, got %q", model.ec2Browser.relatedKind)
+	}
+	if len(model.ec2Browser.relatedItems) != 1 || !strings.Contains(model.ec2Browser.relatedItems[0].title, "app-lb") {
+		t.Fatalf("unexpected related items: %+v", model.ec2Browser.relatedItems)
 	}
 }
 
