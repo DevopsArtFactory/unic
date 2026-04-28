@@ -41,23 +41,38 @@ type mockELBv2Client struct {
 }
 
 func (m *mockELBv2Client) DescribeTargetGroups(ctx context.Context, params *elasticloadbalancingv2.DescribeTargetGroupsInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error) {
-	return m.describeTargetGroupsFunc(ctx, params, optFns...)
+	if m.describeTargetGroupsFunc != nil {
+		return m.describeTargetGroupsFunc(ctx, params, optFns...)
+	}
+	return &elasticloadbalancingv2.DescribeTargetGroupsOutput{}, nil
 }
 
 func (m *mockELBv2Client) DescribeTargetHealth(ctx context.Context, params *elasticloadbalancingv2.DescribeTargetHealthInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
-	return m.describeTargetHealthFunc(ctx, params, optFns...)
+	if m.describeTargetHealthFunc != nil {
+		return m.describeTargetHealthFunc(ctx, params, optFns...)
+	}
+	return &elasticloadbalancingv2.DescribeTargetHealthOutput{}, nil
 }
 
 func (m *mockELBv2Client) DescribeLoadBalancers(ctx context.Context, params *elasticloadbalancingv2.DescribeLoadBalancersInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeLoadBalancersOutput, error) {
-	return m.describeLoadBalancersFunc(ctx, params, optFns...)
+	if m.describeLoadBalancersFunc != nil {
+		return m.describeLoadBalancersFunc(ctx, params, optFns...)
+	}
+	return &elasticloadbalancingv2.DescribeLoadBalancersOutput{}, nil
 }
 
 func (m *mockELBv2Client) DescribeListeners(ctx context.Context, params *elasticloadbalancingv2.DescribeListenersInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeListenersOutput, error) {
-	return m.describeListenersFunc(ctx, params, optFns...)
+	if m.describeListenersFunc != nil {
+		return m.describeListenersFunc(ctx, params, optFns...)
+	}
+	return &elasticloadbalancingv2.DescribeListenersOutput{}, nil
 }
 
 func (m *mockELBv2Client) DescribeRules(ctx context.Context, params *elasticloadbalancingv2.DescribeRulesInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeRulesOutput, error) {
-	return m.describeRulesFunc(ctx, params, optFns...)
+	if m.describeRulesFunc != nil {
+		return m.describeRulesFunc(ctx, params, optFns...)
+	}
+	return &elasticloadbalancingv2.DescribeRulesOutput{}, nil
 }
 
 func TestDescribeEC2InstanceRelationshipsMapsMainPaths(t *testing.T) {
