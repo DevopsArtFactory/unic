@@ -15,7 +15,16 @@ Treat the prompt as one of:
 
 ## Workflow
 
-1. Resolve scope first.
+1. Start from an isolated main-based worktree.
+- Before editing anything, fetch or verify the intended `main` base.
+- Create a fresh git worktree with a new task branch from `main` or
+  `origin/main`.
+- Do not implement in the primary checkout or on a pre-existing feature branch.
+- Use one worktree per issue or feature.
+- If the feature appears to depend on another unmerged branch, still start from
+  `main` and document the dependency before applying any stacked changes.
+
+2. Resolve scope first.
 - Before implementing anything, inspect open pull requests with
   `gh pr list --state open --limit 50`.
 - If the target issue or feature already has an open PR in progress, stop and
@@ -40,7 +49,7 @@ Treat the prompt as one of:
 - If multiple open issues fit equally well, ask only the minimum clarifying
   question needed to pick the right one.
 
-2. Gather repo context before editing.
+3. Gather repo context before editing.
 - Read `internal/domain/model.go` and `internal/domain/catalog.go`.
 - Read `internal/services/aws/repository.go`.
 - Use the RDS implementation in `internal/services/aws/rds.go`,
@@ -49,7 +58,7 @@ Treat the prompt as one of:
 - Read the owning TUI flow in `internal/app/app.go` and any extracted helper
   files nearby.
 
-3. Plan the change before writing code.
+4. Plan the change before writing code.
 - For new service work, prefer this order:
   1. domain model and catalog
   2. AWS service layer and models
@@ -60,13 +69,13 @@ Treat the prompt as one of:
 - Use `visibleLines := max(m.height-N, 5)` style windowing where applicable.
 - Destructive actions must use the existing type-to-confirm pattern.
 
-4. Implement with minimal divergence.
+5. Implement with minimal divergence.
 - Follow existing naming, layout, and error-handling patterns.
 - Use mock client interfaces in tests.
 - Avoid introducing new abstractions unless the surrounding code already points
   in that direction.
 
-5. Validate and sync docs.
+6. Validate and sync docs.
 - Run `make test`.
 - Run `make build`.
 - Update `README.md` when shipped behavior changes.

@@ -18,6 +18,20 @@ Preferred format:
 <work-type>/<issue-number>-<short-description>
 ```
 
+## Worktree Isolation
+
+Always start repository work from `main` in a fresh git worktree.
+
+1. Fetch or verify the intended `main` base.
+2. Create a new worktree and task branch from `main` or `origin/main`.
+3. Make all edits for that task inside the new worktree.
+4. Keep one worktree per issue, feature, refactor, or PR-sized change.
+
+Do not implement new work directly in the primary checkout or on an existing
+feature branch. If a task appears to depend on another unmerged branch, still
+start from `main` first and document the dependency before applying any stacked
+changes.
+
 ## Adding a New AWS Feature
 
 1. Add service or feature constants in `internal/domain/model.go`
