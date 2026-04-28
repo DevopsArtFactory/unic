@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"unic/internal/clipboard"
 	awsservice "unic/internal/services/aws"
 )
 
@@ -22,6 +23,7 @@ func (m Model) handleEKSMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.selectedEKSCluster = nil
 		m.eksUpgradeReadiness = nil
 		m.eksUpgradeScroll = 0
+		m.eksAccessCopyMsg = ""
 		m.eksNodeGroups = nil
 		m.filteredEKSNodeGroups = nil
 		m.selectedEKSNodeGroup = nil
@@ -88,6 +90,13 @@ func (m Model) updateEKSClusterList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.selectedEKSCluster = &cluster
 			return m.startLoading(m.loadEKSUpgradeReadiness())
 		}
+	case "u":
+		if len(m.filteredEKSClusters) > 0 && m.eksClusterIdx < len(m.filteredEKSClusters) {
+			cluster := m.filteredEKSClusters[m.eksClusterIdx]
+			m.selectedEKSCluster = &cluster
+			m.eksAccessCopyMsg = ""
+			m.screen = screenEKSAccessHelper
+		}
 	case "enter":
 		if len(m.filteredEKSClusters) > 0 && m.eksClusterIdx < len(m.filteredEKSClusters) {
 			cluster := m.filteredEKSClusters[m.eksClusterIdx]
@@ -146,7 +155,7 @@ func (m Model) viewEKSClusterList() string {
 		b.WriteString(renderDetailLine("ARN", cluster.ARN))
 		b.WriteString("\n\n")
 	}
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: node groups • a: add-ons • U: readiness • r: refresh • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: node groups • a: add-ons • U: readiness • u: access helper • r: refresh • esc: back • H: home"))
 	return b.String()
 }
 
@@ -208,6 +217,29 @@ func (m Model) viewEKSUpgradeReadiness() string {
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • r: refresh • esc: clusters • q: feature list • H: home"))
 	return b.String()
+}
+
+func (m Model) updateEKSAccessHelper(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q":
+		m.screen = screenFeatureList
+	case "esc":
+		m.eksAccessCopyMsg = ""
+		m.screen = screenEKSClusterList
+	case "c":
+		if err := clipboard.Copy(m.eksUpdateKubeconfigCommand()); err != nil {
+			m.eksAccessCopyMsg = fmt.Sprintf("Clipboard error: %s", err)
+		} else {
+			m.eksAccessCopyMsg = "Copied update-kubeconfig command"
+		}
+	case "k":
+		if err := clipboard.Copy(awsservice.BuildEKSKubectlSmokeCommand()); err != nil {
+			m.eksAccessCopyMsg = fmt.Sprintf("Clipboard error: %s", err)
+		} else {
+			m.eksAccessCopyMsg = "Copied kubectl command"
+		}
+	}
+	return m, nil
 }
 
 func (m Model) eksUpgradeReadinessLines() []string {
@@ -275,6 +307,66 @@ func (m Model) eksUpgradeReadinessLines() []string {
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+func (m Model) viewEKSAccessHelper() string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	title := "EKS Access Helper"
+	if m.selectedEKSCluster != nil {
+		title = fmt.Sprintf("EKS Access Helper — %s", m.selectedEKSCluster.Name)
+	}
+	b.WriteString(titleStyle.Render(title))
+	b.WriteString("\n\n")
+
+	cluster := m.selectedEKSCluster
+	if cluster == nil {
+		b.WriteString(dimStyle.Render("No EKS cluster selected"))
+		b.WriteString("\n\n")
+		b.WriteString(m.renderHelpBar("esc: clusters • H: home"))
+		return b.String()
+	}
+
+	var panel strings.Builder
+	panel.WriteString(renderDetailLine("Cluster", cluster.Name))
+	panel.WriteString("\n")
+	panel.WriteString(renderDetailLine("Region", firstNonEmpty(m.cfg.Region, "-")))
+	panel.WriteString("\n")
+	panel.WriteString(renderDetailLine("Profile", firstNonEmpty(m.cfg.Profile, "-")))
+	panel.WriteString("\n")
+	panel.WriteString(renderDetailLine("Context", firstNonEmpty(m.cfg.ContextName, "-")))
+	panel.WriteString("\n")
+	panel.WriteString(renderDetailLine("Endpoint", firstNonEmpty(cluster.Endpoint, "-")))
+	panel.WriteString("\n")
+	panel.WriteString(renderDetailLine("ARN", cluster.ARN))
+	panel.WriteString("\n\n")
+	panel.WriteString(titleStyle.Render("Commands"))
+	panel.WriteString("\n")
+	panel.WriteString("  [c] " + m.eksUpdateKubeconfigCommand())
+	panel.WriteString("\n")
+	panel.WriteString("  [k] " + awsservice.BuildEKSKubectlSmokeCommand())
+	panel.WriteString("\n")
+	if m.eksAccessCopyMsg != "" {
+		panel.WriteString("\n")
+		panel.WriteString(selectedStyle.Render("  " + m.eksAccessCopyMsg))
+		panel.WriteString("\n")
+	}
+
+	b.WriteString(m.renderListPanel(panel.String()))
+	b.WriteString("\n\n")
+	b.WriteString(m.renderHelpBar("c: copy kubeconfig • k: copy kubectl • esc: clusters • q: feature list • H: home"))
+	return b.String()
+}
+
+func (m Model) eksUpdateKubeconfigCommand() string {
+	if m.selectedEKSCluster == nil {
+		return ""
+	}
+	alias := m.selectedEKSCluster.Name
+	if strings.TrimSpace(m.cfg.ContextName) != "" {
+		alias = m.cfg.ContextName + "-" + m.selectedEKSCluster.Name
+	}
+	return awsservice.BuildEKSUpdateKubeconfigCommand(m.selectedEKSCluster.Name, m.cfg.Region, m.cfg.Profile, alias)
 }
 
 func (m Model) updateEKSNodeGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

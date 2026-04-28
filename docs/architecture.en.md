@@ -194,7 +194,7 @@ Current screen families include:
 - CloudWatch metric list/detail flows
 - CloudWatch Logs group/stream/viewer flows
 - ECS cluster/service/rollout detail/task/container flows
-- EKS cluster/node group/add-on status and upgrade readiness flows
+- EKS cluster/node group/add-on status, upgrade readiness, and access helper flows
 - ECR repository/image/detail flows
 - S3 bucket/object/detail flows
 - Inspector mode home, checklist setup, security findings/detail, and checklist results/detail flows

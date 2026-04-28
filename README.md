@@ -342,7 +342,7 @@ checks:
 | ECR Login | CLI helper: `unic ecr login [--runtime docker|podman] [--copy]` |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
-| EKS Browser | cluster/node group/add-on lists support `/` filter and `r` refresh, cluster view shows version/status/endpoint visibility/ARN summary, `a` opens managed add-ons, `U` opens current-version upgrade readiness, node group detail shows desired/min/max scaling plus health issues |
+| EKS Browser | cluster/node group/add-on lists support `/` filter and `r` refresh, cluster view shows version/status/endpoint visibility/ARN summary, `a` opens managed add-ons, `U` opens current-version upgrade readiness, `u` opens kubeconfig access helper, node group detail shows desired/min/max scaling plus health issues |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
@@ -357,6 +357,8 @@ The EKS Browser includes a managed add-on status view for each cluster. Add-on r
 The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
 
 The EKS Browser includes a current-version upgrade readiness view for each selected cluster. It compares the control plane version with managed node group versions, checks installed managed add-on versions against EKS compatibility metadata for the current cluster version, includes EKS `UPGRADE_READINESS` insights, and highlights blockers or warnings before planning a target-version upgrade.
+
+The EKS Browser includes an access helper for each selected cluster. Press `u` from the cluster list to review the cluster endpoint, ARN, current region/profile, and copy an `aws eks update-kubeconfig` command or a `kubectl get nodes` smoke-check command for handoff into Kubernetes workflows.
 
 The EC2 Instance Browser lists EC2 instances across available states for the active context and region, separate from the SSM session picker that only lists connectable running instances. The detail screen shows core metadata including instance ID, name tag, state, instance type, AZ, VPC, subnet, private and public IPs, launch time, platform details, IAM profile, and tags.
 

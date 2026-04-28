@@ -66,6 +66,7 @@ const (
 	screenECSContainerList
 	screenEKSClusterList
 	screenEKSUpgradeReadiness
+	screenEKSAccessHelper
 	screenEKSNodeGroupList
 	screenEKSNodeGroupDetail
 	screenEKSAddonList
@@ -151,6 +152,7 @@ type Model struct {
 	selectedEKSCluster  *awsservice.EKSCluster
 	eksUpgradeReadiness *awsservice.EKSUpgradeReadiness
 	eksUpgradeScroll    int
+	eksAccessCopyMsg    string
 
 	eksNodeGroups         []awsservice.EKSNodeGroup
 	filteredEKSNodeGroups []awsservice.EKSNodeGroup
@@ -492,6 +494,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateEKSClusterList(msg)
 		case screenEKSUpgradeReadiness:
 			return m.updateEKSUpgradeReadiness(msg)
+		case screenEKSAccessHelper:
+			return m.updateEKSAccessHelper(msg)
 		case screenEKSNodeGroupList:
 			return m.updateEKSNodeGroupList(msg)
 		case screenEKSNodeGroupDetail:
@@ -688,6 +692,8 @@ func (m Model) View() string {
 		v = m.viewEKSClusterList()
 	case screenEKSUpgradeReadiness:
 		v = m.viewEKSUpgradeReadiness()
+	case screenEKSAccessHelper:
+		v = m.viewEKSAccessHelper()
 	case screenEKSNodeGroupList:
 		v = m.viewEKSNodeGroupList()
 	case screenEKSNodeGroupDetail:

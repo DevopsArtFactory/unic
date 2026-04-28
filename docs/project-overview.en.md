@@ -24,7 +24,7 @@ Implemented service areas currently include:
 - Lambda
 - Inspector mode
 
-The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens. CloudWatch Metrics now includes resource-centric preset groups plus time-range, period, and statistic controls for faster terminal triage. EKS includes managed add-on status review plus current-version upgrade readiness checks that compare control plane, managed node group, managed add-on version alignment, and EKS upgrade insights before a target upgrade is planned. ECR includes repository and image/tag browsing with cleanup-oriented untagged and stale image signals.
+The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens. CloudWatch Metrics now includes resource-centric preset groups plus time-range, period, and statistic controls for faster terminal triage. EKS includes managed add-on status review, current-version upgrade readiness checks that compare control plane, managed node group, managed add-on version alignment, and EKS upgrade insights before a target upgrade is planned, plus a kubeconfig access helper that prepares copyable `aws eks update-kubeconfig` and `kubectl` handoff commands. ECR includes repository and image/tag browsing with cleanup-oriented untagged and stale image signals.
 Inspector mode now includes built-in security scans plus checklist-driven readiness checks for RDS, security groups, secrets, Route53, VPCs/subnets, CloudWatch Logs, and baseline posture wrappers.
 
 ## Primary User Flows

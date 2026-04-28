@@ -11,6 +11,7 @@ type EKSCluster struct {
 	ARN                   string
 	Version               string
 	Status                string
+	Endpoint              string
 	EndpointPublicAccess  bool
 	EndpointPrivateAccess bool
 }
@@ -25,6 +26,33 @@ func (c EKSCluster) FilterText() string {
 
 func (c EKSCluster) EndpointVisibility() string {
 	return fmt.Sprintf("pub:%s priv:%s", enabledMarker(c.EndpointPublicAccess), enabledMarker(c.EndpointPrivateAccess))
+}
+
+// BuildEKSUpdateKubeconfigCommand returns a shell-safe AWS CLI command for kubeconfig setup.
+func BuildEKSUpdateKubeconfigCommand(clusterName, region, profile, alias string) string {
+	parts := []string{"aws", "eks", "update-kubeconfig", "--name", shellQuote(clusterName)}
+	if strings.TrimSpace(region) != "" {
+		parts = append(parts, "--region", shellQuote(region))
+	}
+	if strings.TrimSpace(profile) != "" {
+		parts = append(parts, "--profile", shellQuote(profile))
+	}
+	if strings.TrimSpace(alias) != "" {
+		parts = append(parts, "--alias", shellQuote(alias))
+	}
+	return strings.Join(parts, " ")
+}
+
+func BuildEKSKubectlSmokeCommand() string {
+	return "kubectl get nodes"
+}
+
+func shellQuote(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
 // EKSHealthIssue describes one managed node group health issue.
