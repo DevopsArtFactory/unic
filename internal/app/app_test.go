@@ -932,6 +932,98 @@ func TestFeatureListRDSBrowserGoesToLoading(t *testing.T) {
 	}
 }
 
+func TestFeatureListECRRepositoryBrowserGoesToLoading(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFeatureList
+	m.features = []domain.Feature{
+		{Kind: domain.FeatureECRRepositoryBrowser, Description: "Browse ECR repositories"},
+	}
+	m.featIdx = 0
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Error("expected a command to load ECR repositories")
+	}
+}
+
+func TestECRRepositoriesLoadedGoesToRepositoryList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+
+	repositories := []awsservice.ECRRepository{
+		{Name: "app", URI: "123456789012.dkr.ecr.us-east-1.amazonaws.com/app"},
+	}
+	updated, _ := m.Update(ecrRepositoriesLoadedMsg{repositories: repositories})
+	model := updated.(Model)
+	if model.screen != screenECRRepositoryList {
+		t.Errorf("expected ECR repository list screen, got %d", model.screen)
+	}
+	if len(model.ecrRepositories) != 1 {
+		t.Errorf("expected 1 repository, got %d", len(model.ecrRepositories))
+	}
+}
+
+func TestECRRepositoryEnterLoadsImages(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenECRRepositoryList
+	m.ecrRepositories = []awsservice.ECRRepository{
+		{Name: "app", URI: "123456789012.dkr.ecr.us-east-1.amazonaws.com/app"},
+	}
+	m.filteredECRRepositories = m.ecrRepositories
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.selectedECRRepository == nil || model.selectedECRRepository.Name != "app" {
+		t.Fatalf("expected selected ECR repository app, got %#v", model.selectedECRRepository)
+	}
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected a command to load ECR images")
+	}
+}
+
+func TestECRImagesLoadedGoesToImageList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+	m.selectedECRRepository = &awsservice.ECRRepository{Name: "app"}
+
+	images := []awsservice.ECRImage{
+		{RepositoryName: "app", Digest: "sha256:abc", Tags: []string{"latest"}},
+	}
+	updated, _ := m.Update(ecrImagesLoadedMsg{repository: "app", images: images})
+	model := updated.(Model)
+	if model.screen != screenECRImageList {
+		t.Errorf("expected ECR image list screen, got %d", model.screen)
+	}
+	if len(model.ecrImages) != 1 {
+		t.Errorf("expected 1 image, got %d", len(model.ecrImages))
+	}
+}
+
+func TestECRImageViewHighlightsCleanupSignals(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenECRImageList
+	m.height = 30
+	m.selectedECRRepository = &awsservice.ECRRepository{Name: "app"}
+	m.ecrImages = []awsservice.ECRImage{
+		{RepositoryName: "app", Digest: "sha256:untagged"},
+	}
+	m.filteredECRImages = m.ecrImages
+
+	view := m.View()
+	for _, want := range []string{"ECR Images", "(untagged)", "sha256:untagged"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected view to contain %q, got %q", want, view)
+		}
+	}
+}
+
 func TestRDSViewNotEmpty(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenRDSList

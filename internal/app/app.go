@@ -69,6 +69,10 @@ const (
 	screenEKSNodeGroupDetail
 	screenEKSAddonList
 	screenEKSAddonDetail
+	screenECRRepositoryList
+	screenECRRepositoryDetail
+	screenECRImageList
+	screenECRImageDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -213,6 +217,17 @@ type Model struct {
 	eksAddonIdx       int
 	selectedEKSAddon  *awsservice.EKSAddon
 	eksAddonScroll    int
+
+	// ECR repository browser state
+	ecrRepositories         []awsservice.ECRRepository
+	filteredECRRepositories []awsservice.ECRRepository
+	ecrRepositoryIdx        int
+	selectedECRRepository   *awsservice.ECRRepository
+	ecrImages               []awsservice.ECRImage
+	filteredECRImages       []awsservice.ECRImage
+	ecrImageIdx             int
+	selectedECRImage        *awsservice.ECRImage
+	ecrCopyMsg              string
 
 	// Feature submodels
 	ec2Browser ec2InstanceBrowserModel
@@ -432,6 +447,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleSecurityGroupMsg,
 		m.handleECSMsg,
 		m.handleEKSMsg,
+		m.handleECRMsg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
@@ -557,6 +573,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateEKSAddonList(msg)
 		case screenEKSAddonDetail:
 			return m.updateEKSAddonDetail(msg)
+		case screenECRRepositoryList:
+			return m.updateECRRepositoryList(msg)
+		case screenECRRepositoryDetail:
+			return m.updateECRRepositoryDetail(msg)
+		case screenECRImageList:
+			return m.updateECRImageList(msg)
+		case screenECRImageDetail:
+			return m.updateECRImageDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -679,6 +703,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.iam.StartKeys(&m, true)
 			case domain.FeatureECSExec:
 				return m.startLoading(m.loadECSClusters())
+			case domain.FeatureECRRepositoryBrowser:
+				return m.startLoading(m.loadECRRepositories())
 			case domain.FeatureEKSBrowser:
 				return m.startLoading(m.loadEKSClusters())
 			case domain.FeatureLambdaBrowser:
@@ -785,6 +811,14 @@ func (m Model) View() string {
 		v = m.viewEKSAddonList()
 	case screenEKSAddonDetail:
 		v = m.viewEKSAddonDetail()
+	case screenECRRepositoryList:
+		v = m.viewECRRepositoryList()
+	case screenECRRepositoryDetail:
+		v = m.viewECRRepositoryDetail()
+	case screenECRImageList:
+		v = m.viewECRImageList()
+	case screenECRImageDetail:
+		v = m.viewECRImageDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:

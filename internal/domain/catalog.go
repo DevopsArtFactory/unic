@@ -88,6 +88,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceECR,
+			Features: []Feature{
+				{
+					Kind:        FeatureECRRepositoryBrowser,
+					Description: "Browse ECR repositories and review image policy settings",
+				},
+			},
+		},
+		{
 			Name: ServiceEKS,
 			Features: []Feature{
 				{

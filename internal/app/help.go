@@ -425,6 +425,23 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"esc", "Go back to the add-on list"},
 			{"q", "Go back to the feature list"},
 		}
+	case screenECRRepositoryList:
+		shortcuts := listScreenShortcuts("open image/tag list for the selected repository", "go back to the feature list", true, false)
+		return append(shortcuts[:3], append([]helpShortcut{{"d", "Open repository detail"}}, shortcuts[3:]...)...)
+	case screenECRRepositoryDetail:
+		return []helpShortcut{
+			{"r", "Refresh repository list"},
+			{"q / esc", "Go back to the repository list"},
+		}
+	case screenECRImageList:
+		return listScreenShortcuts("open the selected image", "go back to the repository list", true, false)
+	case screenECRImageDetail:
+		return []helpShortcut{
+			{"c", "Copy image digest"},
+			{"t", "Copy the first image tag"},
+			{"q", "Go back to the feature list"},
+			{"esc", "Go back to the image list"},
+		}
 	case screenS3BucketList:
 		return listScreenShortcuts("browse the selected bucket", "go back to the feature list", true, false)
 	case screenS3ObjectList:
@@ -793,6 +810,14 @@ func (m Model) helpScreenTitle() string {
 		return "EKS Add-ons"
 	case screenEKSAddonDetail:
 		return "EKS Add-on Detail"
+	case screenECRRepositoryList:
+		return "ECR Repositories"
+	case screenECRRepositoryDetail:
+		return "ECR Repository Detail"
+	case screenECRImageList:
+		return "ECR Images"
+	case screenECRImageDetail:
+		return "ECR Image Detail"
 	case screenS3BucketList:
 		return "S3 Buckets"
 	case screenS3ObjectList:
