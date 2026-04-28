@@ -129,43 +129,6 @@ type Model struct {
 	// SSM session state
 	selectedInstance *awsservice.EC2Instance
 
-	// VPC browser state
-	vpcs                        []awsservice.VPC
-	filteredVPCs                []awsservice.VPC
-	vpcIdx                      int
-	subnets                     []awsservice.Subnet
-	filteredSubnets             []awsservice.Subnet
-	subnetIdx                   int
-	selectedVPC                 *awsservice.VPC
-	selectedSubnet              *awsservice.Subnet
-	availableIPs                []string
-	filteredIPs                 []string
-	ipScrollOffset              int
-	ipFilter                    string
-	ipFilterActive              bool
-	reachabilityRegions         []string
-	filteredReachabilityRegions []string
-	reachabilityRegion          string
-	reachabilityRegionIdx       int
-	reachabilityRegionFilter    string
-	reachabilityRegionFiltering bool
-	reachabilityTargets         []awsservice.ReachabilityTarget
-	filteredReachabilityTargets []awsservice.ReachabilityTarget
-	reachabilitySourceTypes     []string
-	reachabilitySourceTypeIdx   int
-	reachabilityDestTypes       []string
-	reachabilityDestTypeIdx     int
-	reachabilityIdx             int
-	reachabilityFilter          string
-	reachabilityFilterActive    bool
-	reachabilitySource          *awsservice.ReachabilityTarget
-	reachabilityDestination     *awsservice.ReachabilityTarget
-	reachabilityDestinationIP   string
-	reachabilityProtocolIdx     int
-	reachabilityPortInput       string
-	reachabilityConfigField     int
-	reachabilityResult          *awsservice.ReachabilityAnalysisResult
-	reachabilityScrollOffset    int
 	// Security Group browser state
 	securityGroups         []awsservice.SecurityGroup
 	filteredSecurityGroups []awsservice.SecurityGroup
@@ -179,26 +142,6 @@ type Model struct {
 	sgAddValues            map[string]string // accumulated form values
 	sgAddInput             string            // current field text input
 	sgAddSelectIdx         int               // index for select-type fields (direction, protocol)
-
-	// ECS browser state
-	ecsClusters         []awsservice.ECSCluster
-	filteredECSClusters []awsservice.ECSCluster
-	ecsClusterIdx       int
-	selectedECSCluster  *awsservice.ECSCluster
-
-	ecsServices         []awsservice.ECSService
-	filteredECSServices []awsservice.ECSService
-	ecsServiceIdx       int
-	selectedECSService  *awsservice.ECSService
-	selectedECSDetail   *awsservice.ECSServiceDetail
-	ecsDetailScroll     int
-
-	ecsTasks        []awsservice.ECSTask
-	ecsTaskIdx      int
-	selectedECSTask *awsservice.ECSTask
-
-	ecsContainers   []awsservice.ECSContainer
-	ecsContainerIdx int
 
 	// EKS browser state
 	eksClusters         []awsservice.EKSCluster
@@ -230,16 +173,19 @@ type Model struct {
 	ecrCopyMsg              string
 
 	// Feature submodels
-	ec2Browser ec2InstanceBrowserModel
-	cwMetrics  cloudWatchMetricsModel
-	cwLogs     cloudWatchLogsModel
-	rds        rdsModel
-	route53    route53Model
-	iam        iamModel
-	bedrock    bedrockModel
-	secrets    secretsModel
-	s3         s3Model
-	lambda     lambdaModel
+	ec2Browser   ec2InstanceBrowserModel
+	ecs          ecsModel
+	vpc          vpcModel
+	reachability reachabilityModel
+	cwMetrics    cloudWatchMetricsModel
+	cwLogs       cloudWatchLogsModel
+	rds          rdsModel
+	route53      route53Model
+	iam          iamModel
+	bedrock      bedrockModel
+	secrets      secretsModel
+	s3           s3Model
+	lambda       lambdaModel
 
 	// Inspector browser state
 	inspectorWorkflows        []inspector.Workflow
@@ -339,6 +285,9 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		contextTable:           newContextTable(),
 	}
 	model.ec2Browser = newEC2InstanceBrowserModel()
+	model.ecs = newECSModel()
+	model.vpc = newVPCModel()
+	model.reachability = newReachabilityModel()
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
@@ -445,7 +394,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	for _, h := range []func(tea.Msg) (tea.Model, tea.Cmd, bool){
 		m.handleEC2VPCMsg,
 		m.handleSecurityGroupMsg,
-		m.handleECSMsg,
 		m.handleEKSMsg,
 		m.handleECRMsg,
 		m.handleInspectorMsg,
@@ -515,22 +463,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateFeatureList(msg)
 		case screenInstanceList:
 			return m.updateInstanceList(msg)
-		case screenVPCList:
-			return m.updateVPCList(msg)
-		case screenSubnetList:
-			return m.updateSubnetList(msg)
-		case screenSubnetDetail:
-			return m.updateSubnetDetail(msg)
-		case screenReachabilityRegionList:
-			return m.updateReachabilityRegionList(msg)
-		case screenReachabilitySourceList:
-			return m.updateReachabilitySourceList(msg)
-		case screenReachabilityDestinationList:
-			return m.updateReachabilityDestinationList(msg)
-		case screenReachabilityConfig:
-			return m.updateReachabilityConfig(msg)
-		case screenReachabilityResult:
-			return m.updateReachabilityResult(msg)
 		case screenInspectorHome:
 			return m.updateInspectorHome(msg)
 		case screenInspectorWorkflowPlaceholder:
@@ -553,16 +485,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSecurityGroupAddRule(msg)
 		case screenSecurityGroupDeleteConfirm:
 			return m.updateSecurityGroupDeleteConfirm(msg)
-		case screenECSClusterList:
-			return m.updateECSClusterList(msg)
-		case screenECSServiceList:
-			return m.updateECSServiceList(msg)
-		case screenECSServiceDetail:
-			return m.updateECSServiceDetail(msg)
-		case screenECSTaskList:
-			return m.updateECSTaskList(msg)
-		case screenECSContainerList:
-			return m.updateECSContainerList(msg)
 		case screenEKSClusterList:
 			return m.updateEKSClusterList(msg)
 		case screenEKSNodeGroupList:
@@ -660,27 +582,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureEC2InstanceBrowser:
 				return m.ec2Browser.Start(&m)
 			case domain.FeatureVPCBrowser:
-				return m.startLoading(m.loadVPCs())
+				return m.vpc.Start(&m)
 			case domain.FeatureReachabilityAnalyzer:
-				m.reachabilityRegions = availableReachabilityRegions(m.cfg.Region)
-				m.filteredReachabilityRegions = m.reachabilityRegions
-				m.reachabilityRegion = m.cfg.Region
-				m.reachabilityRegionIdx = indexOfString(m.reachabilityRegions, m.reachabilityRegion)
-				if m.reachabilityRegionIdx < 0 {
-					m.reachabilityRegionIdx = 0
-				}
-				m.reachabilityRegionFilter = ""
-				m.reachabilityRegionFiltering = false
-				m.reachabilityTargets = nil
-				m.filteredReachabilityTargets = nil
-				m.reachabilitySource = nil
-				m.reachabilityDestination = nil
-				m.reachabilityDestinationIP = ""
-				m.reachabilityResult = nil
-				m.reachabilityScrollOffset = 0
-				m.awsRepo = nil
-				m.screen = screenReachabilityRegionList
-				return m, nil
+				return m.reachability.Start(&m)
 			case domain.FeatureRDSBrowser:
 				return m.rds.Start(&m)
 			case domain.FeatureRoute53Browser:
@@ -702,7 +606,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureRotateAccessKey:
 				return m.iam.StartKeys(&m, true)
 			case domain.FeatureECSExec:
-				return m.startLoading(m.loadECSClusters())
+				return m.ecs.Start(&m)
 			case domain.FeatureECRRepositoryBrowser:
 				return m.startLoading(m.loadECRRepositories())
 			case domain.FeatureEKSBrowser:
@@ -751,22 +655,6 @@ func (m Model) View() string {
 		v = m.viewFeatureList()
 	case screenInstanceList:
 		v = m.viewInstanceList()
-	case screenVPCList:
-		v = m.viewVPCList()
-	case screenSubnetList:
-		v = m.viewSubnetList()
-	case screenSubnetDetail:
-		v = m.viewSubnetDetail()
-	case screenReachabilityRegionList:
-		v = m.viewReachabilityRegionList()
-	case screenReachabilitySourceList:
-		v = m.viewReachabilitySourceList()
-	case screenReachabilityDestinationList:
-		v = m.viewReachabilityDestinationList()
-	case screenReachabilityConfig:
-		v = m.viewReachabilityConfig()
-	case screenReachabilityResult:
-		v = m.viewReachabilityResult()
 	case screenInspectorHome:
 		v = m.viewInspectorHome()
 	case screenInspectorWorkflowPlaceholder:
@@ -791,16 +679,6 @@ func (m Model) View() string {
 		v = m.viewSecurityGroupAddRule()
 	case screenSecurityGroupDeleteConfirm:
 		v = m.viewSecurityGroupDeleteConfirm()
-	case screenECSClusterList:
-		v = m.viewECSClusterList()
-	case screenECSServiceList:
-		v = m.viewECSServiceList()
-	case screenECSServiceDetail:
-		v = m.viewECSServiceDetail()
-	case screenECSTaskList:
-		v = m.viewECSTaskList()
-	case screenECSContainerList:
-		v = m.viewECSContainerList()
 	case screenEKSClusterList:
 		v = m.viewEKSClusterList()
 	case screenEKSNodeGroupList:

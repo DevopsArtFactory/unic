@@ -10,100 +10,192 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
-func (m Model) updateVPCList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+type vpcModel struct {
+	vpcs            []awsservice.VPC
+	filteredVPCs    []awsservice.VPC
+	vpcIdx          int
+	subnets         []awsservice.Subnet
+	filteredSubnets []awsservice.Subnet
+	subnetIdx       int
+	selectedVPC     *awsservice.VPC
+	selectedSubnet  *awsservice.Subnet
+	availableIPs    []string
+	filteredIPs     []string
+	ipScrollOffset  int
+}
+
+func newVPCModel() vpcModel {
+	return vpcModel{}
+}
+
+func (vm *vpcModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(vm.loadVPCs(*m))
+}
+
+func (vm *vpcModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case vpcsLoadedMsg:
+		vm.vpcs = msg.vpcs
+		m.resetFilter(filterVPCs)
+		vm.vpcIdx = 0
+		m.screen = screenVPCList
+		return *m, nil, true
+	case subnetsLoadedMsg:
+		vm.subnets = msg.subnets
+		m.resetFilter(filterSubnets)
+		vm.subnetIdx = 0
+		m.screen = screenSubnetList
+		return *m, nil, true
+	case availableIPsLoadedMsg:
+		vm.availableIPs = msg.ips
+		m.resetFilter(filterSubnetIPs)
+		m.screen = screenSubnetDetail
+		return *m, nil, true
+	}
+	return *m, nil, false
+}
+
+func (vm *vpcModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenVPCList:
+		newM, cmd := vm.updateVPCList(m, msg)
+		return newM, cmd, true
+	case screenSubnetList:
+		newM, cmd := vm.updateSubnetList(m, msg)
+		return newM, cmd, true
+	case screenSubnetDetail:
+		newM, cmd := vm.updateSubnetDetail(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (vm vpcModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenVPCList:
+		return vm.viewVPCList(m), true
+	case screenSubnetList:
+		return vm.viewSubnetList(m), true
+	case screenSubnetDetail:
+		return vm.viewSubnetDetail(m), true
+	default:
+		return "", false
+	}
+}
+
+func (vm *vpcModel) ApplyFilter(m *Model, target filterTarget) bool {
+	switch target {
+	case filterVPCs:
+		vm.filteredVPCs = applyFilter(vm.vpcs, m.filterValue(target))
+		vm.vpcIdx = 0
+		return true
+	case filterSubnets:
+		vm.filteredSubnets = applyFilter(vm.subnets, m.filterValue(target))
+		vm.subnetIdx = 0
+		return true
+	case filterSubnetIPs:
+		vm.applyIPFilter(m)
+		return true
+	default:
+		return false
+	}
+}
+
+func (vm *vpcModel) updateVPCList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if cmd, handled := m.updateSharedFilter(msg, filterVPCs); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenFeatureList
-		m.vpcIdx = 0
+		vm.vpcIdx = 0
 		m.resetFilter(filterVPCs)
 	case "up", "k":
-		m.vpcIdx = previousListIndex(m.vpcIdx, len(m.filteredVPCs))
+		vm.vpcIdx = previousListIndex(vm.vpcIdx, len(vm.filteredVPCs))
 	case "down", "j":
-		m.vpcIdx = nextListIndex(m.vpcIdx, len(m.filteredVPCs))
+		vm.vpcIdx = nextListIndex(vm.vpcIdx, len(vm.filteredVPCs))
 	case "/":
-		return m, m.activateFilter(filterVPCs)
+		return *m, m.activateFilter(filterVPCs)
 	case "enter":
-		if len(m.filteredVPCs) > 0 && m.vpcIdx < len(m.filteredVPCs) {
-			selected := m.filteredVPCs[m.vpcIdx]
-			m.selectedVPC = &selected
-			return m.startLoading(m.loadSubnets(selected.VPCID))
+		if len(vm.filteredVPCs) > 0 && vm.vpcIdx < len(vm.filteredVPCs) {
+			selected := vm.filteredVPCs[vm.vpcIdx]
+			vm.selectedVPC = &selected
+			return m.startLoading(vm.loadSubnets(*m, selected.VPCID))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateSubnetList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (vm *vpcModel) updateSubnetList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if cmd, handled := m.updateSharedFilter(msg, filterSubnets); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenVPCList
-		m.subnetIdx = 0
+		vm.subnetIdx = 0
 		m.resetFilter(filterSubnets)
 	case "up", "k":
-		m.subnetIdx = previousListIndex(m.subnetIdx, len(m.filteredSubnets))
+		vm.subnetIdx = previousListIndex(vm.subnetIdx, len(vm.filteredSubnets))
 	case "down", "j":
-		m.subnetIdx = nextListIndex(m.subnetIdx, len(m.filteredSubnets))
+		vm.subnetIdx = nextListIndex(vm.subnetIdx, len(vm.filteredSubnets))
 	case "/":
-		return m, m.activateFilter(filterSubnets)
+		return *m, m.activateFilter(filterSubnets)
 	case "enter":
-		if len(m.filteredSubnets) > 0 && m.subnetIdx < len(m.filteredSubnets) {
-			selected := m.filteredSubnets[m.subnetIdx]
-			m.selectedSubnet = &selected
-			return m.startLoading(m.loadAvailableIPs(selected))
+		if len(vm.filteredSubnets) > 0 && vm.subnetIdx < len(vm.filteredSubnets) {
+			selected := vm.filteredSubnets[vm.subnetIdx]
+			vm.selectedSubnet = &selected
+			return m.startLoading(vm.loadAvailableIPs(*m, selected))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateSubnetDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (vm *vpcModel) updateSubnetDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterSubnetIPs); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
 	case "q", "esc":
 		m.screen = screenSubnetList
 	case "up", "k":
-		if m.ipScrollOffset > 0 {
-			m.ipScrollOffset--
+		if vm.ipScrollOffset > 0 {
+			vm.ipScrollOffset--
 		}
 	case "down", "j":
 		visibleLines := max(m.height-12, 5)
-		if m.ipScrollOffset < len(m.filteredIPs)-visibleLines {
-			m.ipScrollOffset++
+		if vm.ipScrollOffset < len(vm.filteredIPs)-visibleLines {
+			vm.ipScrollOffset++
 		}
 	case "/":
-		return m, m.activateFilter(filterSubnetIPs)
+		return *m, m.activateFilter(filterSubnetIPs)
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m *Model) applyIPFilter() {
+func (vm *vpcModel) applyIPFilter(m *Model) {
 	query := m.filterValue(filterSubnetIPs)
 	if query == "" {
-		m.filteredIPs = m.availableIPs
+		vm.filteredIPs = vm.availableIPs
 	} else {
 		var result []string
-		for _, ip := range m.availableIPs {
+		for _, ip := range vm.availableIPs {
 			if strings.Contains(ip, query) {
 				result = append(result, ip)
 			}
 		}
-		m.filteredIPs = result
+		vm.filteredIPs = result
 	}
-	m.ipScrollOffset = 0
+	vm.ipScrollOffset = 0
 }
 
-func (m Model) loadVPCs() tea.Cmd {
+func (vm vpcModel) loadVPCs(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -123,7 +215,7 @@ func (m Model) loadVPCs() tea.Cmd {
 	}
 }
 
-func (m Model) loadSubnets(vpcID string) tea.Cmd {
+func (vm vpcModel) loadSubnets(m Model, vpcID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -146,7 +238,7 @@ func (m Model) loadSubnets(vpcID string) tea.Cmd {
 	}
 }
 
-func (m Model) loadAvailableIPs(subnet awsservice.Subnet) tea.Cmd {
+func (vm vpcModel) loadAvailableIPs(m Model, subnet awsservice.Subnet) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -165,7 +257,7 @@ func (m Model) loadAvailableIPs(subnet awsservice.Subnet) tea.Cmd {
 	}
 }
 
-func (m Model) viewVPCList() string {
+func (vm vpcModel) viewVPCList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -175,22 +267,22 @@ func (m Model) viewVPCList() string {
 	b.WriteString(m.renderFilterValue(filterVPCs))
 	b.WriteString("\n\n")
 
-	if len(m.filteredVPCs) == 0 {
+	if len(vm.filteredVPCs) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching VPCs"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-11, 5)
 		start := 0
-		if m.vpcIdx >= visibleLines {
-			start = m.vpcIdx - visibleLines + 1
+		if vm.vpcIdx >= visibleLines {
+			start = vm.vpcIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredVPCs))
+		end := min(start+visibleLines, len(vm.filteredVPCs))
 
 		for i := start; i < end; i++ {
-			vpc := m.filteredVPCs[i]
+			vpc := vm.filteredVPCs[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.vpcIdx {
+			if i == vm.vpcIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -198,7 +290,7 @@ func (m Model) viewVPCList() string {
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d VPCs", len(m.filteredVPCs), len(m.vpcs))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d VPCs", len(vm.filteredVPCs), len(vm.vpcs))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -207,13 +299,13 @@ func (m Model) viewVPCList() string {
 	return b.String()
 }
 
-func (m Model) viewSubnetList() string {
+func (vm vpcModel) viewSubnetList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	vpcName := ""
-	if m.selectedVPC != nil {
-		vpcName = fmt.Sprintf(" (%s)", m.selectedVPC.Name)
+	if vm.selectedVPC != nil {
+		vpcName = fmt.Sprintf(" (%s)", vm.selectedVPC.Name)
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Subnets%s", vpcName)))
 	b.WriteString("\n")
@@ -221,22 +313,22 @@ func (m Model) viewSubnetList() string {
 	b.WriteString(m.renderFilterValue(filterSubnets))
 	b.WriteString("\n\n")
 
-	if len(m.filteredSubnets) == 0 {
+	if len(vm.filteredSubnets) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching subnets"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-11, 5)
 		start := 0
-		if m.subnetIdx >= visibleLines {
-			start = m.subnetIdx - visibleLines + 1
+		if vm.subnetIdx >= visibleLines {
+			start = vm.subnetIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredSubnets))
+		end := min(start+visibleLines, len(vm.filteredSubnets))
 
 		for i := start; i < end; i++ {
-			s := m.filteredSubnets[i]
+			s := vm.filteredSubnets[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.subnetIdx {
+			if i == vm.subnetIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -244,7 +336,7 @@ func (m Model) viewSubnetList() string {
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d subnets", len(m.filteredSubnets), len(m.subnets))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d subnets", len(vm.filteredSubnets), len(vm.subnets))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -253,11 +345,11 @@ func (m Model) viewSubnetList() string {
 	return b.String()
 }
 
-func (m Model) viewSubnetDetail() string {
-	if m.selectedSubnet == nil {
+func (vm vpcModel) viewSubnetDetail(m Model) string {
+	if vm.selectedSubnet == nil {
 		return ""
 	}
-	s := m.selectedSubnet
+	s := vm.selectedSubnet
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Subnet Detail"))
@@ -270,26 +362,26 @@ func (m Model) viewSubnetDetail() string {
 	b.WriteString("\n")
 	b.WriteString(renderDetailLine("AZ", normalStyle.Render(s.AvailabilityZone)))
 	b.WriteString("\n")
-	b.WriteString(renderDetailLine("Available IPs", normalStyle.Render(fmt.Sprintf("%d", len(m.availableIPs)))))
+	b.WriteString(renderDetailLine("Available IPs", normalStyle.Render(fmt.Sprintf("%d", len(vm.availableIPs)))))
 	b.WriteString("\n\n")
 
 	b.WriteString(m.renderFilterValue(filterSubnetIPs))
 	b.WriteString("\n")
 
-	if len(m.filteredIPs) == 0 {
+	if len(vm.filteredIPs) == 0 {
 		b.WriteString(dimStyle.Render("  No matching IPs"))
 		b.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-14, 5)
-		start := m.ipScrollOffset
-		end := min(start+visibleLines, len(m.filteredIPs))
+		start := vm.ipScrollOffset
+		end := min(start+visibleLines, len(vm.filteredIPs))
 
-		for _, ip := range m.filteredIPs[start:end] {
+		for _, ip := range vm.filteredIPs[start:end] {
 			b.WriteString(normalStyle.Render(fmt.Sprintf("  %s", ip)))
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d-%d of %d IPs", start+1, end, len(m.filteredIPs))))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d-%d of %d IPs", start+1, end, len(vm.filteredIPs))))
 	}
 
 	b.WriteString("\n")

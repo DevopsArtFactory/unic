@@ -486,15 +486,15 @@ func TestReachabilityFeatureOpensRegionSelection(t *testing.T) {
 	if model.screen != screenReachabilityRegionList {
 		t.Fatalf("expected region selection screen, got %v", model.screen)
 	}
-	if model.reachabilityRegion != "us-east-1" {
-		t.Fatalf("expected default reachability region us-east-1, got %q", model.reachabilityRegion)
+	if model.reachability.region != "us-east-1" {
+		t.Fatalf("expected default reachability region us-east-1, got %q", model.reachability.region)
 	}
 }
 
 func TestReachabilityStatusBarUsesOverrideRegion(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenReachabilitySourceList
-	m.reachabilityRegion = "ap-northeast-2"
+	m.reachability.region = "ap-northeast-2"
 
 	bar := m.renderStatusBar()
 	if !strings.Contains(bar, "region:ap-northeast-2") {
@@ -511,19 +511,19 @@ func TestReachabilityTargetsLoadedBuildsSourceTypeFilter(t *testing.T) {
 		},
 	}
 
-	updated, _, handled := m.handleEC2VPCMsg(msg)
+	updated, _, handled := m.reachability.HandleMessage(&m, msg)
 	if !handled {
 		t.Fatal("expected message to be handled")
 	}
 	model := updated.(Model)
-	if got := strings.Join(model.reachabilitySourceTypes, ","); got != "EC2 instances,Network interfaces" {
+	if got := strings.Join(model.reachability.sourceTypes, ","); got != "EC2 instances,Network interfaces" {
 		t.Fatalf("unexpected source types: %q", got)
 	}
-	if len(model.filteredReachabilityTargets) != 1 {
-		t.Fatalf("expected only EC2 instances to be visible initially, got %d", len(model.filteredReachabilityTargets))
+	if len(model.reachability.filteredTargets) != 1 {
+		t.Fatalf("expected only EC2 instances to be visible initially, got %d", len(model.reachability.filteredTargets))
 	}
-	if model.filteredReachabilityTargets[0].Type != "EC2 instances" {
-		t.Fatalf("expected EC2 instances to be prioritized, got %+v", model.filteredReachabilityTargets)
+	if model.reachability.filteredTargets[0].Type != "EC2 instances" {
+		t.Fatalf("expected EC2 instances to be prioritized, got %+v", model.reachability.filteredTargets)
 	}
 }
 
@@ -2664,7 +2664,7 @@ func TestCWLogStreamsLoadedAppendExtendsExistingList(t *testing.T) {
 
 func TestReachabilityResultLinesUseReadableSections(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.reachabilityResult = &awsservice.ReachabilityAnalysisResult{
+	m.reachability.result = &awsservice.ReachabilityAnalysisResult{
 		Status:           "failed",
 		NetworkPathFound: false,
 		Source:           awsservice.ReachabilityTarget{Name: "src", ID: "eni-1"},
@@ -2679,7 +2679,7 @@ func TestReachabilityResultLinesUseReadableSections(t *testing.T) {
 		},
 	}
 
-	lines := m.reachabilityResultLines()
+	lines := m.reachability.resultLines(m)
 	rendered := strings.Join(lines, "\n")
 	if !strings.Contains(rendered, "Summary") {
 		t.Fatalf("expected Summary section, got %q", rendered)
@@ -2694,13 +2694,13 @@ func TestReachabilityResultLinesUseReadableSections(t *testing.T) {
 
 func TestReachabilityLoadingDetailsShowSourceAndDestination(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.reachabilityRegion = "ap-northeast-2"
-	m.reachabilitySource = &awsservice.ReachabilityTarget{Name: "source-eni", ID: "eni-1"}
-	m.reachabilityDestination = &awsservice.ReachabilityTarget{Name: "dest-eni", ID: "eni-2"}
-	m.reachabilityProtocolIdx = 0
-	m.reachabilityPortInput = "443"
+	m.reachability.region = "ap-northeast-2"
+	m.reachability.source = &awsservice.ReachabilityTarget{Name: "source-eni", ID: "eni-1"}
+	m.reachability.destination = &awsservice.ReachabilityTarget{Name: "dest-eni", ID: "eni-2"}
+	m.reachability.protocolIdx = 0
+	m.reachability.portInput = "443"
 
-	details := m.reachabilityLoadingDetails()
+	details := m.reachability.loadingDetails(m)
 	if len(details) < 4 {
 		t.Fatalf("expected vertical loading details, got %#v", details)
 	}
@@ -2727,10 +2727,10 @@ func TestReachabilityLoadingDetailsShowSourceAndDestination(t *testing.T) {
 func TestReachabilityLoadingDetailsTruncateLongLabelsForNarrowWidth(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 30
-	m.reachabilitySource = &awsservice.ReachabilityTarget{Name: strings.Repeat("source-", 8), ID: "eni-1"}
-	m.reachabilityDestination = &awsservice.ReachabilityTarget{Name: strings.Repeat("dest-", 8), ID: "eni-2"}
+	m.reachability.source = &awsservice.ReachabilityTarget{Name: strings.Repeat("source-", 8), ID: "eni-1"}
+	m.reachability.destination = &awsservice.ReachabilityTarget{Name: strings.Repeat("dest-", 8), ID: "eni-2"}
 
-	details := m.reachabilityLoadingDetails()
+	details := m.reachability.loadingDetails(m)
 	if !strings.Contains(details[1], "…") {
 		t.Fatalf("expected truncated source label, got %#v", details)
 	}

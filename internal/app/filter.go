@@ -168,17 +168,9 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterInstances:
 		m.filtered = applyFilter(m.instances, m.filterValue(target))
 		m.instIdx = 0
-	case filterSubnetIPs:
-		m.applyIPFilter()
 	case filterSecurityGroups:
 		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.filterValue(target))
 		m.sgIdx = 0
-	case filterECSClusters:
-		m.filteredECSClusters = applyFilter(m.ecsClusters, m.filterValue(target))
-		m.ecsClusterIdx = 0
-	case filterECSServices:
-		m.filteredECSServices = applyFilter(m.ecsServices, m.filterValue(target))
-		m.ecsServiceIdx = 0
 	case filterEKSClusters:
 		m.filteredEKSClusters = applyFilter(m.eksClusters, m.filterValue(target))
 		m.eksClusterIdx = 0
@@ -198,12 +190,6 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 		m.filteredCtxList = applyFilter(m.ctxList, m.filterValue(target))
 		m.ctxIdx = 0
 		m.syncContextTable()
-	case filterVPCs:
-		m.filteredVPCs = applyFilter(m.vpcs, m.filterValue(target))
-		m.vpcIdx = 0
-	case filterSubnets:
-		m.filteredSubnets = applyFilter(m.subnets, m.filterValue(target))
-		m.subnetIdx = 0
 	case filterInspectorChecklistFiles:
 		m.filteredChecklistFiles = applyFilter(m.inspectorChecklistFiles, m.filterValue(target))
 		m.inspectorChecklistFileIdx = 0

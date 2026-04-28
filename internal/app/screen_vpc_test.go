@@ -14,7 +14,7 @@ func TestVPCListSharedFilterUsesFuzzyMatching(t *testing.T) {
 	m.width = 80
 	m.height = 20
 
-	updated, _, handled := m.handleEC2VPCMsg(vpcsLoadedMsg{vpcs: []awsservice.VPC{
+	updated, _, handled := m.vpc.HandleMessage(&m, vpcsLoadedMsg{vpcs: []awsservice.VPC{
 		{VPCID: "vpc-111", Name: "dev-core", CIDR: "10.0.0.0/16"},
 		{VPCID: "vpc-222", Name: "prod-core", CIDR: "10.1.0.0/16"},
 	}})
@@ -33,14 +33,14 @@ func TestVPCListSharedFilterUsesFuzzyMatching(t *testing.T) {
 	if !model.isFiltering(filterVPCs) {
 		t.Fatal("expected VPC filter to be active")
 	}
-	if got := len(model.filteredVPCs); got != 1 {
+	if got := len(model.vpc.filteredVPCs); got != 1 {
 		t.Fatalf("expected 1 filtered VPC, got %d", got)
 	}
-	if got := model.filteredVPCs[0].Name; got != "prod-core" {
+	if got := model.vpc.filteredVPCs[0].Name; got != "prod-core" {
 		t.Fatalf("expected filtered VPC prod-core, got %q", got)
 	}
 
-	view := model.viewVPCList()
+	view := model.vpc.viewVPCList(model)
 	if !strings.Contains(stripANSI(view), "Filter: prd") {
 		t.Fatalf("expected view to show VPC filter value, got %q", stripANSI(view))
 	}
@@ -53,9 +53,9 @@ func TestSubnetListSharedFilterDrivesSelection(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 80
 	m.height = 20
-	m.selectedVPC = &awsservice.VPC{Name: "prod-core", VPCID: "vpc-222"}
+	m.vpc.selectedVPC = &awsservice.VPC{Name: "prod-core", VPCID: "vpc-222"}
 
-	updated, _, handled := m.handleEC2VPCMsg(subnetsLoadedMsg{subnets: []awsservice.Subnet{
+	updated, _, handled := m.vpc.HandleMessage(&m, subnetsLoadedMsg{subnets: []awsservice.Subnet{
 		{SubnetID: "subnet-111", Name: "private-a", CIDR: "10.1.1.0/24", AvailabilityZone: "us-west-2a"},
 		{SubnetID: "subnet-222", Name: "public-b", CIDR: "10.1.2.0/24", AvailabilityZone: "us-west-2b"},
 	}})
@@ -71,10 +71,10 @@ func TestSubnetListSharedFilterDrivesSelection(t *testing.T) {
 		model = updated.(Model)
 	}
 
-	if got := len(model.filteredSubnets); got != 1 {
+	if got := len(model.vpc.filteredSubnets); got != 1 {
 		t.Fatalf("expected 1 filtered subnet, got %d", got)
 	}
-	if got := model.filteredSubnets[0].SubnetID; got != "subnet-222" {
+	if got := model.vpc.filteredSubnets[0].SubnetID; got != "subnet-222" {
 		t.Fatalf("expected subnet-222 after filtering, got %q", got)
 	}
 
@@ -89,8 +89,8 @@ func TestSubnetListSharedFilterDrivesSelection(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected subnet detail load command on enter")
 	}
-	if model.selectedSubnet == nil || model.selectedSubnet.SubnetID != "subnet-222" {
-		t.Fatalf("expected enter to select filtered subnet, got %+v", model.selectedSubnet)
+	if model.vpc.selectedSubnet == nil || model.vpc.selectedSubnet.SubnetID != "subnet-222" {
+		t.Fatalf("expected enter to select filtered subnet, got %+v", model.vpc.selectedSubnet)
 	}
 	if model.screen != screenLoading {
 		t.Fatalf("expected loading screen after selecting subnet, got %v", model.screen)
