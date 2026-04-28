@@ -47,6 +47,17 @@ type ECRImage struct {
 	SizeBytes      int64
 }
 
+// Column widths for the ECR image list. Tuned so a typical row
+// (`v1.2.3`, sha256-19, `2026-04-28 12:34`, ` 12.3 MB`, ` [stale]`) fits
+// comfortably while a long tag truncates with an ellipsis instead of
+// pushing the later columns out of alignment (#195).
+const (
+	ecrTagColWidth    = 30
+	ecrDigestColWidth = 19 // shortDigest already pads/truncates to <= 19
+	ecrPushedColWidth = 16 // "2006-01-02 15:04"
+	ecrSizeColWidth   = 9
+)
+
 func (i ECRImage) DisplayTitle() string {
 	pushed := "-"
 	if !i.PushedAt.IsZero() {
@@ -58,7 +69,34 @@ func (i ECRImage) DisplayTitle() string {
 	} else if i.IsStale(time.Now()) {
 		status = " [stale]"
 	}
-	return fmt.Sprintf("%s  %s  %s  %s%s", i.PrimaryLabel(), shortDigest(i.Digest), pushed, FormatBytes(i.SizeBytes), status)
+	return fmt.Sprintf("%s  %-*s  %-*s  %*s%s",
+		fitColumn(i.PrimaryLabel(), ecrTagColWidth),
+		ecrDigestColWidth, shortDigest(i.Digest),
+		ecrPushedColWidth, pushed,
+		ecrSizeColWidth, FormatBytes(i.SizeBytes),
+		status,
+	)
+}
+
+// fitColumn left-pads `s` to exactly `width` runes so subsequent columns
+// align in the rendered list. Long values are truncated with a single
+// trailing ellipsis. Width is measured in runes (not bytes) so multi-byte
+// tag characters don't break the layout.
+func fitColumn(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	runes := []rune(s)
+	if len(runes) == width {
+		return s
+	}
+	if len(runes) < width {
+		return s + strings.Repeat(" ", width-len(runes))
+	}
+	if width <= 1 {
+		return string(runes[:width])
+	}
+	return string(runes[:width-1]) + "…"
 }
 
 func (i ECRImage) FilterText() string {
