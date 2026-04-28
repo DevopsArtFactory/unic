@@ -136,7 +136,13 @@ func TestDescribeEC2InstanceRelationshipsMapsMainPaths(t *testing.T) {
 		},
 	}
 	elbMock := &mockELBv2Client{
-		describeTargetGroupsFunc: func(_ context.Context, _ *elasticloadbalancingv2.DescribeTargetGroupsInput, _ ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error) {
+		describeTargetGroupsFunc: func(_ context.Context, params *elasticloadbalancingv2.DescribeTargetGroupsInput, _ ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error) {
+			if len(params.TargetGroupArns) != 1 || params.TargetGroupArns[0] != "arn:tg" {
+				t.Fatalf("expected bounded target group ARN lookup, got %+v", params.TargetGroupArns)
+			}
+			if params.Marker != nil || params.PageSize != nil {
+				t.Fatalf("expected no account-wide target group pagination, got marker=%v pageSize=%v", params.Marker, params.PageSize)
+			}
 			return &elasticloadbalancingv2.DescribeTargetGroupsOutput{
 				TargetGroups: []elbtypes.TargetGroup{
 					{

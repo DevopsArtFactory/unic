@@ -36,7 +36,8 @@ func (r *AwsRepository) DescribeEC2InstanceRelationships(ctx context.Context, in
 		result.Errors = append(result.Errors, EC2RelationshipError{Section: "auto scaling", Err: err})
 	}
 
-	targetGroups, err := r.describeRelatedTargetGroups(ctx, inst.InstanceID)
+	targetGroupARNs := relatedAutoScalingTargetGroupARNs(result.AutoScaling)
+	targetGroups, err := r.describeRelatedTargetGroups(ctx, inst.InstanceID, targetGroupARNs)
 	result.TargetGroups = targetGroups
 	if err != nil {
 		result.Errors = append(result.Errors, EC2RelationshipError{Section: "target groups", Err: err})
@@ -144,19 +145,24 @@ func mergeAutoScalingGroupDetails(group *EC2AutoScalingGroup, sdkGroup asgtypes.
 	sort.Strings(group.LoadBalancerNames)
 }
 
-func (r *AwsRepository) describeRelatedTargetGroups(ctx context.Context, instanceID string) ([]EC2TargetGroup, error) {
-	if r.ELBv2Client == nil {
+func relatedAutoScalingTargetGroupARNs(group *EC2AutoScalingGroup) []string {
+	if group == nil || len(group.TargetGroupARNs) == 0 {
+		return nil
+	}
+	return append([]string(nil), group.TargetGroupARNs...)
+}
+
+func (r *AwsRepository) describeRelatedTargetGroups(ctx context.Context, instanceID string, targetGroupARNs []string) ([]EC2TargetGroup, error) {
+	if r.ELBv2Client == nil || len(targetGroupARNs) == 0 {
 		return nil, nil
 	}
 	var groups []EC2TargetGroup
-	var nextToken *string
-	for {
+	for _, chunk := range chunkStrings(targetGroupARNs, 20) {
 		out, err := r.ELBv2Client.DescribeTargetGroups(ctx, &elasticloadbalancingv2.DescribeTargetGroupsInput{
-			PageSize: awssdk.Int32(400),
-			Marker:   nextToken,
+			TargetGroupArns: chunk,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to describe target groups: %w", err)
+			return groups, fmt.Errorf("failed to describe target groups: %w", err)
 		}
 		for _, tg := range out.TargetGroups {
 			if string(tg.TargetType) != "instance" {
@@ -170,10 +176,6 @@ func (r *AwsRepository) describeRelatedTargetGroups(ctx context.Context, instanc
 				groups = append(groups, targetGroupFromSDK(tg, healthState, healthReason, healthDescription))
 			}
 		}
-		if out.NextMarker == nil || awssdk.ToString(out.NextMarker) == "" {
-			break
-		}
-		nextToken = out.NextMarker
 	}
 	sort.Slice(groups, func(i, j int) bool {
 		left := normalizedSortKey(groups[i].Name, groups[i].ARN)
@@ -184,6 +186,21 @@ func (r *AwsRepository) describeRelatedTargetGroups(ctx context.Context, instanc
 		return left < right
 	})
 	return groups, nil
+}
+
+func chunkStrings(values []string, size int) [][]string {
+	if size <= 0 || len(values) == 0 {
+		return nil
+	}
+	chunks := make([][]string, 0, (len(values)+size-1)/size)
+	for start := 0; start < len(values); start += size {
+		end := start + size
+		if end > len(values) {
+			end = len(values)
+		}
+		chunks = append(chunks, values[start:end])
+	}
+	return chunks
 }
 
 func (r *AwsRepository) targetGroupHasInstance(ctx context.Context, targetGroupARN, instanceID string) (bool, string, string, string, error) {
