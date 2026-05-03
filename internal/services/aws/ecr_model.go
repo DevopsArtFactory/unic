@@ -78,7 +78,7 @@ func (i ECRImage) DisplayTitle() string {
 	)
 }
 
-// fitColumn left-pads `s` to exactly `width` runes so subsequent columns
+// fitColumn right-pads `s` to exactly `width` runes so subsequent columns
 // align in the rendered list. Long values are truncated with a single
 // trailing ellipsis. Width is measured in runes (not bytes) so multi-byte
 // tag characters don't break the layout.
