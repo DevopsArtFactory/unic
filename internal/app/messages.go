@@ -267,6 +267,14 @@ type ecrImagesLoadedMsg struct {
 	images     []awsservice.ECRImage
 }
 
+type fisTemplatesLoadedMsg struct {
+	templates []awsservice.FISExperimentTemplate
+}
+
+type fisTemplateDetailLoadedMsg struct {
+	template *awsservice.FISExperimentTemplate
+}
+
 type inspectorScanLoadedMsg struct {
 	report *inspector.SecurityScanReport
 }

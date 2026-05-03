@@ -27,6 +27,7 @@ const (
 	filterEKSAddons
 	filterECRRepositories
 	filterECRImages
+	filterFISTemplates
 	filterCWMetrics
 	filterCWLogGroups
 	filterCWLogStreams
@@ -187,6 +188,9 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterECRImages:
 		m.filteredECRImages = applyFilter(m.ecrImages, m.filterValue(target))
 		m.ecrImageIdx = 0
+	case filterFISTemplates:
+		m.filteredFISTemplates = applyFilter(m.fisTemplates, m.filterValue(target))
+		m.fisTemplateIdx = 0
 	case filterContexts:
 		m.filteredCtxList = applyFilter(m.ctxList, m.filterValue(target))
 		m.ctxIdx = 0

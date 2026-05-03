@@ -93,6 +93,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - CloudWatch Logs
 - ECS
 - ECR
+- FIS
 - S3
 
 패턴:
@@ -196,6 +197,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - ECS cluster/service/rollout detail/task/container
 - EKS cluster/node group/add-on status, upgrade readiness, access helper
 - ECR repository/image/detail
+- FIS experiment template list/detail
 - S3 bucket/object/detail
 - Inspector mode home, checklist setup, security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
