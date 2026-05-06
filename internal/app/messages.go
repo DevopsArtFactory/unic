@@ -15,6 +15,11 @@ type ec2BrowserInstancesLoadedMsg struct {
 	instances []awsservice.EC2Instance
 }
 
+type ec2RelationshipsLoadedMsg struct {
+	relationships *awsservice.EC2InstanceRelationships
+	kind          ec2RelatedKind
+}
+
 type vpcsLoadedMsg struct {
 	vpcs []awsservice.VPC
 }

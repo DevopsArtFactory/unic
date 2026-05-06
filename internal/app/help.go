@@ -136,7 +136,18 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
 	case screenEC2InstanceBrowserDetail:
 		return []helpShortcut{
+			{"g", "Open attached security groups"},
+			{"a", "Open Auto Scaling membership"},
+			{"t", "Open registered target groups"},
+			{"b", "Open associated load balancers"},
+			{"n", "Open associated listeners"},
 			{"q / esc", "Go back to the instance list"},
+		}
+	case screenEC2InstanceBrowserRelatedList:
+		return listScreenShortcuts("open the selected related resource", "go back to the instance detail", true, true)
+	case screenEC2InstanceBrowserRelatedDetail:
+		return []helpShortcut{
+			{"q / esc", "Go back to the related resource list"},
 		}
 	case screenVPCList:
 		return []helpShortcut{
@@ -746,6 +757,10 @@ func (m Model) helpScreenTitle() string {
 		return "EC2 Instance Browser"
 	case screenEC2InstanceBrowserDetail:
 		return "EC2 Instance Detail"
+	case screenEC2InstanceBrowserRelatedList:
+		return "EC2 Related Resources"
+	case screenEC2InstanceBrowserRelatedDetail:
+		return "EC2 Related Resource Detail"
 	case screenVPCList:
 		return "VPC List"
 	case screenSubnetList:

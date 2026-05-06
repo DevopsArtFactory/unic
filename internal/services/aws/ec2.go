@@ -131,6 +131,7 @@ func ec2InstanceFromSDK(inst types.Instance) EC2Instance {
 		PublicIP:        derefString(inst.PublicIpAddress),
 		VPCID:           derefString(inst.VpcId),
 		SubnetID:        derefString(inst.SubnetId),
+		SecurityGroups:  ec2InstanceSecurityGroupsFromSDK(inst.SecurityGroups),
 		InstanceType:    string(inst.InstanceType),
 		State:           ec2InstanceStateName(inst.State),
 		PlatformDetails: derefString(inst.PlatformDetails),
@@ -146,6 +147,28 @@ func ec2InstanceFromSDK(inst types.Instance) EC2Instance {
 		instance.IAMProfile = derefString(inst.IamInstanceProfile.Arn)
 	}
 	return instance
+}
+
+func ec2InstanceSecurityGroupsFromSDK(groups []types.GroupIdentifier) []EC2InstanceSecurityGroup {
+	if len(groups) == 0 {
+		return nil
+	}
+	out := make([]EC2InstanceSecurityGroup, 0, len(groups))
+	for _, group := range groups {
+		out = append(out, EC2InstanceSecurityGroup{
+			GroupID: derefString(group.GroupId),
+			Name:    derefString(group.GroupName),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		left := normalizedSortKey(out[i].Name, out[i].GroupID)
+		right := normalizedSortKey(out[j].Name, out[j].GroupID)
+		if left == right {
+			return out[i].GroupID < out[j].GroupID
+		}
+		return left < right
+	})
+	return out
 }
 
 func ec2InstanceStateName(state *types.InstanceState) string {

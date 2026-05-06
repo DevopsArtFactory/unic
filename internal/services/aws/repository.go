@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -16,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
+	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/aws/aws-sdk-go-v2/service/guardduty"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -75,8 +77,14 @@ var _ ECRClientAPI = (*ecr.Client)(nil)
 // Verify *eks.Client satisfies EKSClientAPI at compile time.
 var _ EKSClientAPI = (*eks.Client)(nil)
 
+// Verify *autoscaling.Client satisfies AutoScalingClientAPI at compile time.
+var _ AutoScalingClientAPI = (*autoscaling.Client)(nil)
+
 // Verify *elasticache.Client satisfies ElastiCacheClientAPI at compile time.
 var _ ElastiCacheClientAPI = (*elasticache.Client)(nil)
+
+// Verify *elasticloadbalancingv2.Client satisfies ELBv2ClientAPI at compile time.
+var _ ELBv2ClientAPI = (*elasticloadbalancingv2.Client)(nil)
 
 // Verify *s3.Client satisfies S3ClientAPI at compile time.
 var _ S3ClientAPI = (*s3.Client)(nil)
@@ -204,6 +212,21 @@ type EKSClientAPI interface {
 	ListInsights(ctx context.Context, params *eks.ListInsightsInput, optFns ...func(*eks.Options)) (*eks.ListInsightsOutput, error)
 }
 
+// AutoScalingClientAPI is the interface for Auto Scaling operations used by AwsRepository.
+type AutoScalingClientAPI interface {
+	DescribeAutoScalingInstances(ctx context.Context, params *autoscaling.DescribeAutoScalingInstancesInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingInstancesOutput, error)
+	DescribeAutoScalingGroups(ctx context.Context, params *autoscaling.DescribeAutoScalingGroupsInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
+}
+
+// ELBv2ClientAPI is the interface for Elastic Load Balancing v2 operations used by AwsRepository.
+type ELBv2ClientAPI interface {
+	DescribeTargetGroups(ctx context.Context, params *elasticloadbalancingv2.DescribeTargetGroupsInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error)
+	DescribeTargetHealth(ctx context.Context, params *elasticloadbalancingv2.DescribeTargetHealthInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error)
+	DescribeLoadBalancers(ctx context.Context, params *elasticloadbalancingv2.DescribeLoadBalancersInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeLoadBalancersOutput, error)
+	DescribeListeners(ctx context.Context, params *elasticloadbalancingv2.DescribeListenersInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeListenersOutput, error)
+	DescribeRules(ctx context.Context, params *elasticloadbalancingv2.DescribeRulesInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeRulesOutput, error)
+}
+
 // S3ClientAPI is the interface for S3 operations used by AwsRepository.
 type S3ClientAPI interface {
 	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
@@ -279,7 +302,9 @@ type AwsRepository struct {
 	ECSClient            ECSClientAPI
 	ECRClient            ECRClientAPI
 	EKSClient            EKSClientAPI
+	AutoScalingClient    AutoScalingClientAPI
 	ElastiCacheClient    ElastiCacheClientAPI
+	ELBv2Client          ELBv2ClientAPI
 	S3Client             S3ClientAPI
 	LambdaClient         LambdaClientAPI
 	Region               string
@@ -352,7 +377,9 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		ECSClient:            ecs.NewFromConfig(awsCfg),
 		ECRClient:            ecr.NewFromConfig(awsCfg),
 		EKSClient:            eks.NewFromConfig(awsCfg),
+		AutoScalingClient:    autoscaling.NewFromConfig(awsCfg),
 		ElastiCacheClient:    elasticache.NewFromConfig(awsCfg),
+		ELBv2Client:          elasticloadbalancingv2.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),
 		LambdaClient:         lambda.NewFromConfig(awsCfg),
 		Region:               cfg.Region,

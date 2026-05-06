@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.12
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.12
+	github.com/aws/aws-sdk-go-v2/service/autoscaling v1.61.1
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.9
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.56.0
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.68.0
@@ -15,6 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.76.0
 	github.com/aws/aws-sdk-go-v2/service/eks v1.82.1
 	github.com/aws/aws-sdk-go-v2/service/elasticache v1.52.0
+	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.54.11
 	github.com/aws/aws-sdk-go-v2/service/guardduty v1.75.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.53.7
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.89.0
