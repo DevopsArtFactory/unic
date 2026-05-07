@@ -106,6 +106,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceFIS,
+			Features: []Feature{
+				{
+					Kind:        FeatureFISTemplateBrowser,
+					Description: "Browse FIS experiment templates, targets, actions, and stop conditions",
+				},
+			},
+		},
+		{
 			Name: ServiceS3,
 			Features: []Feature{
 				{

@@ -1068,6 +1068,24 @@ func TestFeatureListECRRepositoryBrowserGoesToLoading(t *testing.T) {
 	}
 }
 
+func TestFeatureListFISTemplateBrowserGoesToLoading(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFeatureList
+	m.features = []domain.Feature{
+		{Kind: domain.FeatureFISTemplateBrowser, Description: "Browse FIS experiment templates"},
+	}
+	m.featIdx = 0
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Error("expected a command to load FIS experiment templates")
+	}
+}
+
 func TestECRRepositoriesLoadedGoesToRepositoryList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenLoading
@@ -1082,6 +1100,71 @@ func TestECRRepositoriesLoadedGoesToRepositoryList(t *testing.T) {
 	}
 	if len(model.ecrRepositories) != 1 {
 		t.Errorf("expected 1 repository, got %d", len(model.ecrRepositories))
+	}
+}
+
+func TestFISTemplatesLoadedGoesToTemplateList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+
+	templates := []awsservice.FISExperimentTemplate{
+		{ID: "app-outage", Description: "Terminate application targets"},
+	}
+	updated, _ := m.Update(fisTemplatesLoadedMsg{templates: templates})
+	model := updated.(Model)
+	if model.screen != screenFISTemplateList {
+		t.Errorf("expected FIS template list screen, got %d", model.screen)
+	}
+	if len(model.fisTemplates) != 1 {
+		t.Errorf("expected 1 template, got %d", len(model.fisTemplates))
+	}
+}
+
+func TestFISTemplateEnterLoadsDetail(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFISTemplateList
+	m.fisTemplates = []awsservice.FISExperimentTemplate{
+		{ID: "app-outage", Description: "Terminate application targets"},
+	}
+	m.filteredFISTemplates = m.fisTemplates
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.selectedFISTemplate == nil || model.selectedFISTemplate.ID != "app-outage" {
+		t.Fatalf("expected selected FIS template app-outage, got %#v", model.selectedFISTemplate)
+	}
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected a command to load FIS template detail")
+	}
+}
+
+func TestFISTemplateDetailViewShowsTargetsActionsAndStops(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFISTemplateDetail
+	m.height = 40
+	m.selectedFISTemplate = &awsservice.FISExperimentTemplate{
+		ID:          "app-outage",
+		Description: "Terminate application targets",
+		RoleARN:     "arn:aws:iam::123456789012:role/fis-role",
+		Targets: []awsservice.FISTemplateTarget{
+			{Name: "instances", ResourceType: "aws:ec2:instance", SelectionMode: "COUNT(1)"},
+		},
+		Actions: []awsservice.FISTemplateAction{
+			{Name: "stop", ActionID: "aws:ec2:stop-instances"},
+		},
+		StopConditions: []awsservice.FISTemplateStopCondition{
+			{Source: "aws:cloudwatch:alarm", Value: "arn:aws:cloudwatch:us-east-1:123456789012:alarm:fis-stop"},
+		},
+	}
+
+	view := stripANSI(m.View())
+	for _, want := range []string{"FIS Experiment Template Detail", "Role ARN", "Targets", "aws:ec2:instance", "Actions", "aws:ec2:stop-instances", "Stop Conditions", "fis-stop"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected view to contain %q, got %q", want, view)
+		}
 	}
 }
 

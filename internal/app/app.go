@@ -77,6 +77,8 @@ const (
 	screenECRRepositoryDetail
 	screenECRImageList
 	screenECRImageDetail
+	screenFISTemplateList
+	screenFISTemplateDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -178,6 +180,13 @@ type Model struct {
 	ecrImageIdx             int
 	selectedECRImage        *awsservice.ECRImage
 	ecrCopyMsg              string
+
+	// FIS experiment template browser state
+	fisTemplates         []awsservice.FISExperimentTemplate
+	filteredFISTemplates []awsservice.FISExperimentTemplate
+	fisTemplateIdx       int
+	selectedFISTemplate  *awsservice.FISExperimentTemplate
+	fisTemplateScroll    int
 
 	// Feature submodels
 	ec2Browser   ec2InstanceBrowserModel
@@ -403,6 +412,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleSecurityGroupMsg,
 		m.handleEKSMsg,
 		m.handleECRMsg,
+		m.handleFISMsg,
 		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
@@ -514,6 +524,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateECRImageList(msg)
 		case screenECRImageDetail:
 			return m.updateECRImageDetail(msg)
+		case screenFISTemplateList:
+			return m.updateFISTemplateList(msg)
+		case screenFISTemplateDetail:
+			return m.updateFISTemplateDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -622,6 +636,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.startLoading(m.loadECRRepositories())
 			case domain.FeatureEKSBrowser:
 				return m.startLoading(m.loadEKSClusters())
+			case domain.FeatureFISTemplateBrowser:
+				return m.startLoading(m.loadFISTemplates())
 			case domain.FeatureLambdaBrowser:
 				return m.lambda.Start(&m)
 			case domain.FeatureBedrockAPIKeys:
@@ -712,6 +728,10 @@ func (m Model) View() string {
 		v = m.viewECRImageList()
 	case screenECRImageDetail:
 		v = m.viewECRImageDetail()
+	case screenFISTemplateList:
+		v = m.viewFISTemplateList()
+	case screenFISTemplateDetail:
+		v = m.viewFISTemplateDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:

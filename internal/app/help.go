@@ -477,6 +477,16 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q", "Go back to the feature list"},
 			{"esc", "Go back to the image list"},
 		}
+	case screenFISTemplateList:
+		return listScreenShortcuts("open the selected experiment template", "go back to the feature list", true, false)
+	case screenFISTemplateDetail:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Scroll template targets, actions, and stop conditions"},
+			{"pgup / pgdn", "Scroll by one page"},
+			{"r", "Refresh template detail"},
+			{"esc", "Go back to the template list"},
+			{"q", "Go back to the feature list"},
+		}
 	case screenS3BucketList:
 		return listScreenShortcuts("browse the selected bucket", "go back to the feature list", true, false)
 	case screenS3ObjectList:
@@ -861,6 +871,10 @@ func (m Model) helpScreenTitle() string {
 		return "ECR Images"
 	case screenECRImageDetail:
 		return "ECR Image Detail"
+	case screenFISTemplateList:
+		return "FIS Experiment Templates"
+	case screenFISTemplateDetail:
+		return "FIS Experiment Template Detail"
 	case screenS3BucketList:
 		return "S3 Buckets"
 	case screenS3ObjectList:
