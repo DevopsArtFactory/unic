@@ -478,13 +478,28 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"esc", "Go back to the image list"},
 		}
 	case screenFISTemplateList:
-		return listScreenShortcuts("open the selected experiment template", "go back to the feature list", true, false)
+		shortcuts := listScreenShortcuts("open the selected experiment template", "go back to the feature list", true, false)
+		return append(shortcuts[:3], append([]helpShortcut{
+			{"h", "Open history for the selected template"},
+			{"H", "Open recent history for this account/region"},
+		}, shortcuts[3:]...)...)
 	case screenFISTemplateDetail:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Scroll template targets, actions, and stop conditions"},
 			{"pgup / pgdn", "Scroll by one page"},
+			{"h", "Open experiment history for this template"},
 			{"r", "Refresh template detail"},
 			{"esc", "Go back to the template list"},
+			{"q", "Go back to the feature list"},
+		}
+	case screenFISExperimentList:
+		return listScreenShortcuts("open the selected experiment run", "go back to FIS templates", true, false)
+	case screenFISExperimentDetail:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Scroll experiment detail"},
+			{"pgup / pgdn", "Scroll by one page"},
+			{"r", "Refresh experiment detail"},
+			{"esc", "Go back to experiment history"},
 			{"q", "Go back to the feature list"},
 		}
 	case screenS3BucketList:
@@ -875,6 +890,10 @@ func (m Model) helpScreenTitle() string {
 		return "FIS Experiment Templates"
 	case screenFISTemplateDetail:
 		return "FIS Experiment Template Detail"
+	case screenFISExperimentList:
+		return "FIS Experiment History"
+	case screenFISExperimentDetail:
+		return "FIS Experiment Detail"
 	case screenS3BucketList:
 		return "S3 Buckets"
 	case screenS3ObjectList:

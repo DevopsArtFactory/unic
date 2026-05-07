@@ -1168,6 +1168,130 @@ func TestFISTemplateDetailViewShowsTargetsActionsAndStops(t *testing.T) {
 	}
 }
 
+func TestFISTemplateHistoryKeyLoadsSelectedTemplateHistory(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFISTemplateList
+	m.fis.templates = []awsservice.FISExperimentTemplate{
+		{ID: "app-outage", Description: "Terminate application targets"},
+	}
+	m.fis.filteredTemplates = m.fis.templates
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected a command to load selected FIS experiment history")
+	}
+}
+
+func TestFISTemplateAllHistoryKeyLoadsAccountRegionHistory(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFISTemplateList
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'H'}})
+	model := updated.(Model)
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected a command to load all FIS experiment history")
+	}
+}
+
+func TestFISExperimentsLoadedGoesToHistoryList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+
+	started := time.Date(2026, 5, 7, 10, 0, 0, 0, time.UTC)
+	experiments := []awsservice.FISExperiment{
+		{ID: "EXP123", TemplateID: "app-outage", Status: "failed", StartedAt: started, StateReason: "Alarm triggered"},
+	}
+	updated, _ := m.Update(fisExperimentsLoadedMsg{templateID: "app-outage", experiments: experiments})
+	model := updated.(Model)
+	if model.screen != screenFISExperimentList {
+		t.Errorf("expected FIS experiment history screen, got %d", model.screen)
+	}
+	if model.fis.historyTemplateID != "app-outage" {
+		t.Errorf("expected history template id app-outage, got %q", model.fis.historyTemplateID)
+	}
+	if len(model.fis.experiments) != 1 {
+		t.Errorf("expected 1 experiment, got %d", len(model.fis.experiments))
+	}
+}
+
+func TestFISExperimentHistoryViewShowsFailureSignals(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFISExperimentList
+	m.height = 40
+	m.fis.historyTemplateID = "app-outage"
+	m.fis.experiments = []awsservice.FISExperiment{
+		{ID: "EXP123", TemplateID: "app-outage", Status: "failed", CreatedAt: time.Date(2026, 5, 7, 9, 0, 0, 0, time.UTC), StateReason: "Target unavailable"},
+	}
+	m.fis.filteredExperiments = m.fis.experiments
+
+	view := stripANSI(m.View())
+	for _, want := range []string{"FIS Experiment History", "app-outage", "EXP123", "failed", "Target unavailable"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected view to contain %q, got %q", want, view)
+		}
+	}
+}
+
+func TestFISExperimentEnterLoadsDetail(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFISExperimentList
+	m.fis.experiments = []awsservice.FISExperiment{
+		{ID: "EXP123", TemplateID: "app-outage", Status: "completed"},
+	}
+	m.fis.filteredExperiments = m.fis.experiments
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if model.fis.selectedExperiment == nil || model.fis.selectedExperiment.ID != "EXP123" {
+		t.Fatalf("expected selected FIS experiment EXP123, got %#v", model.fis.selectedExperiment)
+	}
+	if model.screen != screenLoading {
+		t.Errorf("expected loading screen, got %d", model.screen)
+	}
+	if cmd == nil {
+		t.Fatal("expected a command to load FIS experiment detail")
+	}
+}
+
+func TestFISExperimentDetailViewShowsTimingActionsTargetsAndStops(t *testing.T) {
+	started := time.Date(2026, 5, 7, 10, 0, 0, 0, time.UTC)
+	ended := started.Add(2 * time.Minute)
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFISExperimentDetail
+	m.height = 40
+	m.fis.selectedExperiment = &awsservice.FISExperiment{
+		ID:          "EXP123",
+		TemplateID:  "app-outage",
+		Status:      "stopped",
+		StateReason: "User requested stop",
+		StartedAt:   started,
+		EndedAt:     ended,
+		Actions: []awsservice.FISExperimentAction{
+			{Name: "stop", ActionID: "aws:ec2:stop-instances", Status: "completed", StartedAt: started, EndedAt: ended},
+		},
+		Targets: []awsservice.FISTemplateTarget{
+			{Name: "instances", ResourceType: "aws:ec2:instance", SelectionMode: "COUNT(1)"},
+		},
+		StopConditions: []awsservice.FISTemplateStopCondition{
+			{Source: "aws:cloudwatch:alarm", Value: "fis-stop"},
+		},
+	}
+
+	view := stripANSI(m.View())
+	for _, want := range []string{"FIS Experiment Detail", "Status", "stopped", "User requested stop", "Duration", "2m0s", "Actions", "aws:ec2:stop-instances", "Targets", "aws:ec2:instance", "Stop Conditions", "fis-stop"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected view to contain %q, got %q", want, view)
+		}
+	}
+}
+
 func TestECRRepositoryEnterLoadsImages(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenECRRepositoryList

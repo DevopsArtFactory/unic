@@ -78,6 +78,8 @@ const (
 	screenECRImageDetail
 	screenFISTemplateList
 	screenFISTemplateDetail
+	screenFISExperimentList
+	screenFISExperimentDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -383,7 +385,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
 			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
 			m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
-			m.screen != screenBedrockKeyConfirm {
+			m.screen != screenBedrockKeyConfirm && m.screen != screenFISTemplateList {
 			m.deactivateFilter()
 			m.screen = screenServiceList
 			return m, nil
