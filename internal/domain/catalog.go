@@ -110,7 +110,7 @@ func Catalog() []Service {
 			Features: []Feature{
 				{
 					Kind:        FeatureFISTemplateBrowser,
-					Description: "Browse FIS experiment templates, targets, actions, and stop conditions",
+					Description: "Browse FIS experiment templates and recent experiment history with status, timing, and stop reasons",
 				},
 			},
 		},

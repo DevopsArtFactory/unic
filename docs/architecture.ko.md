@@ -211,7 +211,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - ECS cluster/service/rollout detail/task/container
 - EKS cluster/node group/add-on status, upgrade readiness, access helper
 - ECR repository/image/detail
-- FIS experiment template list/detail
+- FIS experiment template list/detail 및 experiment history/detail
 - S3 bucket/object/detail
 - Inspector mode home, checklist setup, security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset

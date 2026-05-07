@@ -275,6 +275,15 @@ type fisTemplateDetailLoadedMsg struct {
 	template *awsservice.FISExperimentTemplate
 }
 
+type fisExperimentsLoadedMsg struct {
+	templateID  string
+	experiments []awsservice.FISExperiment
+}
+
+type fisExperimentDetailLoadedMsg struct {
+	experiment *awsservice.FISExperiment
+}
+
 type inspectorScanLoadedMsg struct {
 	report *inspector.SecurityScanReport
 }

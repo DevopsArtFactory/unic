@@ -28,6 +28,7 @@ const (
 	filterECRRepositories
 	filterECRImages
 	filterFISTemplates
+	filterFISExperiments
 	filterCWMetrics
 	filterCWLogGroups
 	filterCWLogStreams

@@ -20,6 +20,124 @@ type FISExperimentTemplate struct {
 	StopConditions []FISTemplateStopCondition
 }
 
+type FISExperiment struct {
+	ID             string
+	ARN            string
+	TemplateID     string
+	Status         string
+	StateReason    string
+	ErrorCode      string
+	ErrorLocation  string
+	ErrorAccountID string
+	CreatedAt      time.Time
+	StartedAt      time.Time
+	EndedAt        time.Time
+	Tags           map[string]string
+	StopConditions []FISTemplateStopCondition
+	Targets        []FISTemplateTarget
+	Actions        []FISExperimentAction
+}
+
+func (e FISExperiment) DisplayTitle() string {
+	when := "-"
+	if !e.StartedAt.IsZero() {
+		when = e.StartedAt.Format("2006-01-02 15:04")
+	} else if !e.CreatedAt.IsZero() {
+		when = e.CreatedAt.Format("2006-01-02 15:04")
+	}
+	reason := e.StopSummary()
+	if reason != "" && reason != "-" {
+		reason = "  " + reason
+	} else {
+		reason = ""
+	}
+	return fmt.Sprintf("%-24s  %-10s  %s%s", e.ID, defaultString(e.Status, "-"), when, reason)
+}
+
+func (e FISExperiment) FilterText() string {
+	parts := []string{
+		e.ID,
+		e.ARN,
+		e.TemplateID,
+		e.Status,
+		e.StateReason,
+		e.ErrorCode,
+		e.ErrorLocation,
+		e.ErrorAccountID,
+		formatStringMap(e.Tags),
+	}
+	for _, condition := range e.StopConditions {
+		parts = append(parts, condition.FilterText())
+	}
+	for _, target := range e.Targets {
+		parts = append(parts, target.FilterText())
+	}
+	for _, action := range e.Actions {
+		parts = append(parts, action.FilterText())
+	}
+	return strings.ToLower(strings.Join(parts, " "))
+}
+
+func (e FISExperiment) StopSummary() string {
+	if e.ErrorCode != "" {
+		return strings.Join(nonEmptyStrings([]string{e.ErrorCode, e.ErrorLocation, e.StateReason}), " • ")
+	}
+	if e.StateReason != "" {
+		return e.StateReason
+	}
+	return "-"
+}
+
+func (e FISExperiment) NeedsAttention() bool {
+	switch strings.ToLower(strings.TrimSpace(e.Status)) {
+	case "failed", "cancelled", "stopped", "stopping":
+		return true
+	default:
+		return false
+	}
+}
+
+func (e FISExperiment) DurationLabel() string {
+	if e.StartedAt.IsZero() || e.EndedAt.IsZero() {
+		return "-"
+	}
+	return e.EndedAt.Sub(e.StartedAt).Round(time.Second).String()
+}
+
+type FISExperimentAction struct {
+	Name        string
+	ActionID    string
+	Description string
+	Status      string
+	Reason      string
+	StartedAt   time.Time
+	EndedAt     time.Time
+	Parameters  map[string]string
+	StartAfter  []string
+	Targets     map[string]string
+}
+
+func (a FISExperimentAction) Summary() string {
+	parts := []string{a.Name, a.ActionID, a.Status}
+	if a.Reason != "" {
+		parts = append(parts, a.Reason)
+	}
+	return strings.Join(nonEmptyStrings(parts), "  ")
+}
+
+func (a FISExperimentAction) FilterText() string {
+	return strings.Join([]string{
+		a.Name,
+		a.ActionID,
+		a.Description,
+		a.Status,
+		a.Reason,
+		formatStringMap(a.Parameters),
+		strings.Join(a.StartAfter, " "),
+		formatStringMap(a.Targets),
+	}, " ")
+}
+
 func (t FISExperimentTemplate) DisplayTitle() string {
 	description := t.Description
 	if description == "" {
@@ -139,6 +257,13 @@ func nonEmptyStrings(values []string) []string {
 		}
 	}
 	return filtered
+}
+
+func defaultString(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func cloneStringMap(values map[string]string) map[string]string {

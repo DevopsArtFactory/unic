@@ -235,6 +235,8 @@ type ELBv2ClientAPI interface {
 type FISClientAPI interface {
 	ListExperimentTemplates(ctx context.Context, params *fis.ListExperimentTemplatesInput, optFns ...func(*fis.Options)) (*fis.ListExperimentTemplatesOutput, error)
 	GetExperimentTemplate(ctx context.Context, params *fis.GetExperimentTemplateInput, optFns ...func(*fis.Options)) (*fis.GetExperimentTemplateOutput, error)
+	ListExperiments(ctx context.Context, params *fis.ListExperimentsInput, optFns ...func(*fis.Options)) (*fis.ListExperimentsOutput, error)
+	GetExperiment(ctx context.Context, params *fis.GetExperimentInput, optFns ...func(*fis.Options)) (*fis.GetExperimentOutput, error)
 }
 
 // S3ClientAPI is the interface for S3 operations used by AwsRepository.
