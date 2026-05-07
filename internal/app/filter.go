@@ -169,31 +169,10 @@ func (m *Model) applyFilterTarget(target filterTarget) {
 	case filterInstances:
 		m.filtered = applyFilter(m.instances, m.filterValue(target))
 		m.instIdx = 0
-	case filterSecurityGroups:
-		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.filterValue(target))
-		m.sgIdx = 0
-	case filterEKSClusters:
-		m.filteredEKSClusters = applyFilter(m.eksClusters, m.filterValue(target))
-		m.eksClusterIdx = 0
-	case filterEKSNodeGroups:
-		m.filteredEKSNodeGroups = applyFilter(m.eksNodeGroups, m.filterValue(target))
-		m.eksNodeGroupIdx = 0
-	case filterEKSAddons:
-		m.filteredEKSAddons = applyFilter(m.eksAddons, m.filterValue(target))
-		m.eksAddonIdx = 0
-	case filterECRRepositories:
-		m.filteredECRRepositories = applyFilter(m.ecrRepositories, m.filterValue(target))
-		m.ecrRepositoryIdx = 0
-	case filterECRImages:
-		m.filteredECRImages = applyFilter(m.ecrImages, m.filterValue(target))
-		m.ecrImageIdx = 0
 	case filterContexts:
 		m.filteredCtxList = applyFilter(m.ctxList, m.filterValue(target))
 		m.ctxIdx = 0
 		m.syncContextTable()
-	case filterInspectorChecklistFiles:
-		m.filteredChecklistFiles = applyFilter(m.inspectorChecklistFiles, m.filterValue(target))
-		m.inspectorChecklistFileIdx = 0
 	}
 }
 

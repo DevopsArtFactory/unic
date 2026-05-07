@@ -12,40 +12,108 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
-func (m Model) handleECRMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
-	switch msg := msg.(type) {
-	case ecrRepositoriesLoadedMsg:
-		m.ecrRepositories = msg.repositories
-		m.filteredECRRepositories = msg.repositories
-		m.ecrRepositoryIdx = 0
-		m.selectedECRRepository = nil
-		m.ecrImages = nil
-		m.filteredECRImages = nil
-		m.selectedECRImage = nil
-		m.ecrCopyMsg = ""
-		m.screen = screenECRRepositoryList
-		return m, nil, true
-	case ecrImagesLoadedMsg:
-		if m.selectedECRRepository == nil || m.selectedECRRepository.Name != msg.repository {
-			return m, nil, true
-		}
-		m.ecrImages = msg.images
-		m.filteredECRImages = msg.images
-		m.ecrImageIdx = 0
-		m.selectedECRImage = nil
-		m.ecrCopyMsg = ""
-		m.resetFilter(filterECRImages)
-		m.screen = screenECRImageList
-		return m, nil, true
-	}
-	return m, nil, false
+type ecrModel struct {
+	repositories         []awsservice.ECRRepository
+	filteredRepositories []awsservice.ECRRepository
+	repositoryIdx        int
+	selectedRepository   *awsservice.ECRRepository
+	images               []awsservice.ECRImage
+	filteredImages       []awsservice.ECRImage
+	imageIdx             int
+	selectedImage        *awsservice.ECRImage
+	copyMsg              string
 }
 
-func (m Model) updateECRRepositoryList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func newECRModel() ecrModel {
+	return ecrModel{}
+}
+
+func (em *ecrModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(em.loadRepositories(*m))
+}
+
+func (em *ecrModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case ecrRepositoriesLoadedMsg:
+		em.repositories = msg.repositories
+		em.filteredRepositories = msg.repositories
+		em.repositoryIdx = 0
+		em.selectedRepository = nil
+		em.images = nil
+		em.filteredImages = nil
+		em.selectedImage = nil
+		em.copyMsg = ""
+		m.screen = screenECRRepositoryList
+		return *m, nil, true
+	case ecrImagesLoadedMsg:
+		if em.selectedRepository == nil || em.selectedRepository.Name != msg.repository {
+			return *m, nil, true
+		}
+		em.images = msg.images
+		em.filteredImages = msg.images
+		em.imageIdx = 0
+		em.selectedImage = nil
+		em.copyMsg = ""
+		m.resetFilter(filterECRImages)
+		m.screen = screenECRImageList
+		return *m, nil, true
+	}
+	return *m, nil, false
+}
+
+func (em *ecrModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenECRRepositoryList:
+		newM, cmd := em.updateRepositoryList(m, msg)
+		return newM, cmd, true
+	case screenECRRepositoryDetail:
+		newM, cmd := em.updateRepositoryDetail(m, msg)
+		return newM, cmd, true
+	case screenECRImageList:
+		newM, cmd := em.updateImageList(m, msg)
+		return newM, cmd, true
+	case screenECRImageDetail:
+		newM, cmd := em.updateImageDetail(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (em ecrModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenECRRepositoryList:
+		return em.viewRepositoryList(m), true
+	case screenECRRepositoryDetail:
+		return em.viewRepositoryDetail(m), true
+	case screenECRImageList:
+		return em.viewImageList(m), true
+	case screenECRImageDetail:
+		return em.viewImageDetail(m), true
+	default:
+		return "", false
+	}
+}
+
+func (em *ecrModel) ApplyFilter(m *Model, target filterTarget) bool {
+	switch target {
+	case filterECRRepositories:
+		em.filteredRepositories = applyFilter(em.repositories, m.filterValue(target))
+		em.repositoryIdx = 0
+	case filterECRImages:
+		em.filteredImages = applyFilter(em.images, m.filterValue(target))
+		em.imageIdx = 0
+	default:
+		return false
+	}
+	return true
+}
+
+func (em *ecrModel) updateRepositoryList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterECRRepositories); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -53,49 +121,49 @@ func (m Model) updateECRRepositoryList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterECRRepositories)
 	case "up", "k":
-		if m.ecrRepositoryIdx > 0 {
-			m.ecrRepositoryIdx--
+		if em.repositoryIdx > 0 {
+			em.repositoryIdx--
 		}
 	case "down", "j":
-		if m.ecrRepositoryIdx < len(m.filteredECRRepositories)-1 {
-			m.ecrRepositoryIdx++
+		if em.repositoryIdx < len(em.filteredRepositories)-1 {
+			em.repositoryIdx++
 		}
 	case "/":
-		return m, m.activateFilter(filterECRRepositories)
+		return *m, m.activateFilter(filterECRRepositories)
 	case "r":
-		return m.startLoading(m.loadECRRepositories())
+		return m.startLoading(em.loadRepositories(*m))
 	case "d":
-		if len(m.filteredECRRepositories) > 0 && m.ecrRepositoryIdx < len(m.filteredECRRepositories) {
-			selected := m.filteredECRRepositories[m.ecrRepositoryIdx]
-			m.selectedECRRepository = &selected
+		if len(em.filteredRepositories) > 0 && em.repositoryIdx < len(em.filteredRepositories) {
+			selected := em.filteredRepositories[em.repositoryIdx]
+			em.selectedRepository = &selected
 			m.screen = screenECRRepositoryDetail
 		}
 	case "enter":
-		if len(m.filteredECRRepositories) > 0 && m.ecrRepositoryIdx < len(m.filteredECRRepositories) {
-			selected := m.filteredECRRepositories[m.ecrRepositoryIdx]
-			m.selectedECRRepository = &selected
-			return m.startLoading(m.loadECRImages(selected.Name))
+		if len(em.filteredRepositories) > 0 && em.repositoryIdx < len(em.filteredRepositories) {
+			selected := em.filteredRepositories[em.repositoryIdx]
+			em.selectedRepository = &selected
+			return m.startLoading(em.loadImages(*m, selected.Name))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateECRRepositoryDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (em *ecrModel) updateRepositoryDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
-		m.selectedECRRepository = nil
+		em.selectedRepository = nil
 		m.screen = screenECRRepositoryList
 	case "r":
-		return m.startLoading(m.loadECRRepositories())
+		return m.startLoading(em.loadRepositories(*m))
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateECRImageList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (em *ecrModel) updateImageList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterECRImages); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -103,63 +171,63 @@ func (m Model) updateECRImageList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterECRImages)
 	case "esc":
-		m.selectedECRImage = nil
-		m.ecrCopyMsg = ""
+		em.selectedImage = nil
+		em.copyMsg = ""
 		m.screen = screenECRRepositoryList
 	case "up", "k":
-		m.ecrImageIdx = previousListIndex(m.ecrImageIdx, len(m.filteredECRImages))
+		em.imageIdx = previousListIndex(em.imageIdx, len(em.filteredImages))
 	case "down", "j":
-		m.ecrImageIdx = nextListIndex(m.ecrImageIdx, len(m.filteredECRImages))
+		em.imageIdx = nextListIndex(em.imageIdx, len(em.filteredImages))
 	case "/":
-		return m, m.activateFilter(filterECRImages)
+		return *m, m.activateFilter(filterECRImages)
 	case "r":
-		if m.selectedECRRepository != nil {
-			return m.startLoading(m.loadECRImages(m.selectedECRRepository.Name))
+		if em.selectedRepository != nil {
+			return m.startLoading(em.loadImages(*m, em.selectedRepository.Name))
 		}
 	case "enter":
-		if len(m.filteredECRImages) > 0 && m.ecrImageIdx < len(m.filteredECRImages) {
-			selected := m.filteredECRImages[m.ecrImageIdx]
-			m.selectedECRImage = &selected
-			m.ecrCopyMsg = ""
+		if len(em.filteredImages) > 0 && em.imageIdx < len(em.filteredImages) {
+			selected := em.filteredImages[em.imageIdx]
+			em.selectedImage = &selected
+			em.copyMsg = ""
 			m.screen = screenECRImageDetail
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateECRImageDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (em *ecrModel) updateImageDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		m.screen = screenFeatureList
 	case "esc":
-		m.ecrCopyMsg = ""
+		em.copyMsg = ""
 		m.screen = screenECRImageList
 	case "c":
-		if m.selectedECRImage != nil {
-			if err := clipboard.Copy(m.selectedECRImage.Digest); err != nil {
-				m.ecrCopyMsg = fmt.Sprintf("Clipboard error: %s", err)
+		if em.selectedImage != nil {
+			if err := clipboard.Copy(em.selectedImage.Digest); err != nil {
+				em.copyMsg = fmt.Sprintf("Clipboard error: %s", err)
 			} else {
-				m.ecrCopyMsg = "Copied digest to clipboard"
+				em.copyMsg = "Copied digest to clipboard"
 			}
 		}
 	case "t":
-		if m.selectedECRImage != nil {
-			tag := m.selectedECRImage.CopyTagValue()
+		if em.selectedImage != nil {
+			tag := em.selectedImage.CopyTagValue()
 			if tag == "" {
-				m.ecrCopyMsg = "No tag to copy"
-				return m, nil
+				em.copyMsg = "No tag to copy"
+				return *m, nil
 			}
 			if err := clipboard.Copy(tag); err != nil {
-				m.ecrCopyMsg = fmt.Sprintf("Clipboard error: %s", err)
+				em.copyMsg = fmt.Sprintf("Clipboard error: %s", err)
 			} else {
-				m.ecrCopyMsg = "Copied tag to clipboard"
+				em.copyMsg = "Copied tag to clipboard"
 			}
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) loadECRRepositories() tea.Cmd {
+func (em *ecrModel) loadRepositories(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -179,7 +247,7 @@ func (m Model) loadECRRepositories() tea.Cmd {
 	}
 }
 
-func (m Model) loadECRImages(repositoryName string) tea.Cmd {
+func (em *ecrModel) loadImages(m Model, repositoryName string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -199,7 +267,7 @@ func (m Model) loadECRImages(repositoryName string) tea.Cmd {
 	}
 }
 
-func (m Model) viewECRRepositoryList() string {
+func (em ecrModel) viewRepositoryList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -209,22 +277,22 @@ func (m Model) viewECRRepositoryList() string {
 	b.WriteString(m.renderFilterValue(filterECRRepositories))
 	b.WriteString("\n\n")
 
-	if len(m.filteredECRRepositories) == 0 {
+	if len(em.filteredRepositories) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching repositories"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.ecrRepositoryIdx >= visibleLines {
-			start = m.ecrRepositoryIdx - visibleLines + 1
+		if em.repositoryIdx >= visibleLines {
+			start = em.repositoryIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredECRRepositories))
+		end := min(start+visibleLines, len(em.filteredRepositories))
 
 		for i := start; i < end; i++ {
-			repo := m.filteredECRRepositories[i]
+			repo := em.filteredRepositories[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.ecrRepositoryIdx {
+			if i == em.repositoryIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -233,7 +301,7 @@ func (m Model) viewECRRepositoryList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d repositories", len(m.filteredECRRepositories), len(m.ecrRepositories))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d repositories", len(em.filteredRepositories), len(em.repositories))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -242,11 +310,11 @@ func (m Model) viewECRRepositoryList() string {
 	return b.String()
 }
 
-func (m Model) viewECRRepositoryDetail() string {
-	if m.selectedECRRepository == nil {
+func (em ecrModel) viewRepositoryDetail(m Model) string {
+	if em.selectedRepository == nil {
 		return ""
 	}
-	repo := m.selectedECRRepository
+	repo := em.selectedRepository
 
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -275,12 +343,12 @@ func (m Model) viewECRRepositoryDetail() string {
 	return b.String()
 }
 
-func (m Model) viewECRImageList() string {
+func (em ecrModel) viewImageList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	repositoryName := ""
-	if m.selectedECRRepository != nil {
-		repositoryName = m.selectedECRRepository.Name
+	if em.selectedRepository != nil {
+		repositoryName = em.selectedRepository.Name
 	}
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render(fmt.Sprintf("ECR Images — %s", repositoryName)))
@@ -289,25 +357,25 @@ func (m Model) viewECRImageList() string {
 	b.WriteString(m.renderFilterValue(filterECRImages))
 	b.WriteString("\n\n")
 
-	if len(m.filteredECRImages) == 0 {
+	if len(em.filteredImages) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching images"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.ecrImageIdx >= visibleLines {
-			start = m.ecrImageIdx - visibleLines + 1
+		if em.imageIdx >= visibleLines {
+			start = em.imageIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredECRImages))
+		end := min(start+visibleLines, len(em.filteredImages))
 
 		for i := start; i < end; i++ {
-			image := m.filteredECRImages[i]
+			image := em.filteredImages[i]
 			cursor := "  "
 			style := normalStyle
 			if image.IsUntagged() || image.IsStale(time.Now()) {
 				style = warningStyle
 			}
-			if i == m.ecrImageIdx {
+			if i == em.imageIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -316,7 +384,7 @@ func (m Model) viewECRImageList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d images", len(m.filteredECRImages), len(m.ecrImages))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d images", len(em.filteredImages), len(em.images))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -325,11 +393,11 @@ func (m Model) viewECRImageList() string {
 	return b.String()
 }
 
-func (m Model) viewECRImageDetail() string {
-	if m.selectedECRImage == nil {
+func (em ecrModel) viewImageDetail(m Model) string {
+	if em.selectedImage == nil {
 		return ""
 	}
-	image := m.selectedECRImage
+	image := em.selectedImage
 
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -359,9 +427,9 @@ func (m Model) viewECRImageDetail() string {
 	b.WriteString(renderDetailLine("Cleanup", signal))
 	b.WriteString("\n")
 
-	if m.ecrCopyMsg != "" {
+	if em.copyMsg != "" {
 		b.WriteString("\n")
-		b.WriteString(selectedStyle.Render("  " + m.ecrCopyMsg))
+		b.WriteString(selectedStyle.Render("  " + em.copyMsg))
 		b.WriteString("\n")
 	}
 

@@ -11,7 +11,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"unic/internal/config"
 	"unic/internal/domain"
-	"unic/internal/inspector"
 	awsservice "unic/internal/services/aws"
 	"unic/internal/update"
 )
@@ -133,55 +132,11 @@ type Model struct {
 	// SSM session state
 	selectedInstance *awsservice.EC2Instance
 
-	// Security Group browser state
-	securityGroups         []awsservice.SecurityGroup
-	filteredSecurityGroups []awsservice.SecurityGroup
-	sgIdx                  int
-	selectedSecurityGroup  *awsservice.SecurityGroup
-	sgRuleSection          string // "ingress" or "egress" — active section in detail view
-	sgRuleIdx              int    // selected rule index within the active section
-	sgDeleteConfirm        string // type-to-confirm input for rule deletion
-	sgDeleteRule           *awsservice.SecurityGroupRule
-	sgAddField             int               // current field in add form (0=direction, 1=protocol, 2=fromPort, 3=toPort, 4=source, 5=description)
-	sgAddValues            map[string]string // accumulated form values
-	sgAddInput             string            // current field text input
-	sgAddSelectIdx         int               // index for select-type fields (direction, protocol)
-
-	// EKS browser state
-	eksClusters         []awsservice.EKSCluster
-	filteredEKSClusters []awsservice.EKSCluster
-	eksClusterIdx       int
-	selectedEKSCluster  *awsservice.EKSCluster
-	eksUpgradeReadiness *awsservice.EKSUpgradeReadiness
-	eksUpgradeScroll    int
-	eksAccessCopyMsg    string
-
-	eksNodeGroups         []awsservice.EKSNodeGroup
-	filteredEKSNodeGroups []awsservice.EKSNodeGroup
-	eksNodeGroupIdx       int
-	selectedEKSNodeGroup  *awsservice.EKSNodeGroup
-	eksNodeGroupScroll    int
-
-	eksAddons         []awsservice.EKSAddon
-	filteredEKSAddons []awsservice.EKSAddon
-	eksAddonIdx       int
-	selectedEKSAddon  *awsservice.EKSAddon
-	eksAddonScroll    int
-
-	// ECR repository browser state
-	ecrRepositories         []awsservice.ECRRepository
-	filteredECRRepositories []awsservice.ECRRepository
-	ecrRepositoryIdx        int
-	selectedECRRepository   *awsservice.ECRRepository
-	ecrImages               []awsservice.ECRImage
-	filteredECRImages       []awsservice.ECRImage
-	ecrImageIdx             int
-	selectedECRImage        *awsservice.ECRImage
-	ecrCopyMsg              string
-
 	// Feature submodels
 	ec2Browser   ec2InstanceBrowserModel
 	ecs          ecsModel
+	eks          eksModel
+	ecr          ecrModel
 	vpc          vpcModel
 	reachability reachabilityModel
 	cwMetrics    cloudWatchMetricsModel
@@ -191,26 +146,10 @@ type Model struct {
 	iam          iamModel
 	bedrock      bedrockModel
 	secrets      secretsModel
+	security     securityGroupModel
 	s3           s3Model
 	lambda       lambdaModel
-
-	// Inspector browser state
-	inspectorWorkflows        []inspector.Workflow
-	inspectorWorkflowIdx      int
-	inspectorChecklistPath    string
-	inspectorChecklistDir     string
-	inspectorChecklistFiles   []checklistPickerEntry
-	filteredChecklistFiles    []checklistPickerEntry
-	inspectorChecklistFileIdx int
-	inspectorChecklistError   string
-	inspectorReport           *inspector.SecurityScanReport
-	inspectorFindings         []inspector.SecurityFinding
-	inspectorIdx              int
-	inspectorSeverityFilter   inspector.RuleSeverity
-	selectedInspectorFinding  *inspector.SecurityFinding
-	inspectorChecklistReport  *inspector.ChecklistReport
-	inspectorChecklistIdx     int
-	selectedChecklistResult   *inspector.ChecklistResult
+	inspector    inspectorModel
 
 	// Context picker
 	configPath         string
@@ -277,22 +216,22 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		favoriteServiceNames = cfg.FavoriteServices
 	}
 	model := Model{
-		cfg:                    cfg,
-		configPath:             configPath,
-		currentVersion:         version,
-		screen:                 screenContextPicker,
-		ctxPrevScreen:          screenServiceList,
-		services:               services,
-		favoriteServices:       favoriteServiceSet(favoriteServiceNames),
-		inspectorChecklistPath: configuredChecklistPath,
-		inspectorWorkflows:     inspector.Workflows(configuredChecklistPath),
-		loadingSpinner:         newLoadingSpinner(),
-		filterTI:               filterTI,
-		filters:                make(map[filterTarget]string),
-		contextTable:           newContextTable(),
+		cfg:              cfg,
+		configPath:       configPath,
+		currentVersion:   version,
+		screen:           screenContextPicker,
+		ctxPrevScreen:    screenServiceList,
+		services:         services,
+		favoriteServices: favoriteServiceSet(favoriteServiceNames),
+		loadingSpinner:   newLoadingSpinner(),
+		filterTI:         filterTI,
+		filters:          make(map[filterTarget]string),
+		contextTable:     newContextTable(),
 	}
 	model.ec2Browser = newEC2InstanceBrowserModel()
 	model.ecs = newECSModel()
+	model.eks = newEKSModel()
+	model.ecr = newECRModel()
 	model.vpc = newVPCModel()
 	model.reachability = newReachabilityModel()
 	model.cwMetrics = newCloudWatchMetricsModel()
@@ -302,8 +241,10 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.iam = newIAMModel()
 	model.bedrock = newBedrockModel()
 	model.secrets = newSecretsModel()
+	model.security = newSecurityGroupModel()
 	model.s3 = newS3Model()
 	model.lambda = newLambdaModel()
+	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
 	return model
 }
@@ -400,10 +341,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Domain message handlers
 	for _, h := range []func(tea.Msg) (tea.Model, tea.Cmd, bool){
 		m.handleEC2VPCMsg,
-		m.handleSecurityGroupMsg,
-		m.handleEKSMsg,
-		m.handleECRMsg,
-		m.handleInspectorMsg,
 		m.handleContextMsg,
 	} {
 		if newM, cmd, handled := h(msg); handled {
@@ -470,50 +407,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateFeatureList(msg)
 		case screenInstanceList:
 			return m.updateInstanceList(msg)
-		case screenInspectorHome:
-			return m.updateInspectorHome(msg)
-		case screenInspectorWorkflowPlaceholder:
-			return m.updateInspectorWorkflowPlaceholder(msg)
-		case screenInspectorChecklistPicker:
-			return m.updateInspectorChecklistPicker(msg)
-		case screenInspectorResults:
-			return m.updateInspectorResults(msg)
-		case screenInspectorFindingDetail:
-			return m.updateInspectorFindingDetail(msg)
-		case screenInspectorChecklistResults:
-			return m.updateInspectorChecklistResults(msg)
-		case screenInspectorChecklistDetail:
-			return m.updateInspectorChecklistDetail(msg)
-		case screenSecurityGroupList:
-			return m.updateSecurityGroupList(msg)
-		case screenSecurityGroupDetail:
-			return m.updateSecurityGroupDetail(msg)
-		case screenSecurityGroupAddRule:
-			return m.updateSecurityGroupAddRule(msg)
-		case screenSecurityGroupDeleteConfirm:
-			return m.updateSecurityGroupDeleteConfirm(msg)
-		case screenEKSClusterList:
-			return m.updateEKSClusterList(msg)
-		case screenEKSUpgradeReadiness:
-			return m.updateEKSUpgradeReadiness(msg)
-		case screenEKSAccessHelper:
-			return m.updateEKSAccessHelper(msg)
-		case screenEKSNodeGroupList:
-			return m.updateEKSNodeGroupList(msg)
-		case screenEKSNodeGroupDetail:
-			return m.updateEKSNodeGroupDetail(msg)
-		case screenEKSAddonList:
-			return m.updateEKSAddonList(msg)
-		case screenEKSAddonDetail:
-			return m.updateEKSAddonDetail(msg)
-		case screenECRRepositoryList:
-			return m.updateECRRepositoryList(msg)
-		case screenECRRepositoryDetail:
-			return m.updateECRRepositoryDetail(msg)
-		case screenECRImageList:
-			return m.updateECRImageList(msg)
-		case screenECRImageDetail:
-			return m.updateECRImageDetail(msg)
 		case screenContextPicker:
 			return m.updateContextPicker(msg)
 		case screenContextAdd:
@@ -565,7 +458,7 @@ func (m Model) updateServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case "i":
-		m.enterInspectorMode()
+		m.inspector.Enter(&m)
 	case "enter":
 		if service, ok := m.selectedService(); ok {
 			m.features = service.Features
@@ -609,7 +502,7 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureS3Browser:
 				return m.s3.Start(&m)
 			case domain.FeatureSecurityGroupBrowser:
-				return m.startLoading(m.loadSecurityGroups())
+				return m.security.Start(&m)
 			case domain.FeatureIAMUsersBrowser:
 				return m.iam.StartUsers(&m)
 			case domain.FeatureListAccessKeys:
@@ -619,9 +512,9 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case domain.FeatureECSExec:
 				return m.ecs.Start(&m)
 			case domain.FeatureECRRepositoryBrowser:
-				return m.startLoading(m.loadECRRepositories())
+				return m.ecr.Start(&m)
 			case domain.FeatureEKSBrowser:
-				return m.startLoading(m.loadEKSClusters())
+				return m.eks.Start(&m)
 			case domain.FeatureLambdaBrowser:
 				return m.lambda.Start(&m)
 			case domain.FeatureBedrockAPIKeys:
@@ -666,52 +559,6 @@ func (m Model) View() string {
 		v = m.viewFeatureList()
 	case screenInstanceList:
 		v = m.viewInstanceList()
-	case screenInspectorHome:
-		v = m.viewInspectorHome()
-	case screenInspectorWorkflowPlaceholder:
-		v = m.viewInspectorWorkflowPlaceholder()
-	case screenInspectorChecklistPicker:
-		v = m.viewInspectorChecklistPicker()
-	case screenInspectorScanning:
-		v = m.viewInspectorScanning()
-	case screenInspectorResults:
-		v = m.viewInspectorResults()
-	case screenInspectorFindingDetail:
-		v = m.viewInspectorFindingDetail()
-	case screenInspectorChecklistResults:
-		v = m.viewInspectorChecklistResults()
-	case screenInspectorChecklistDetail:
-		v = m.viewInspectorChecklistDetail()
-	case screenSecurityGroupList:
-		v = m.viewSecurityGroupList()
-	case screenSecurityGroupDetail:
-		v = m.viewSecurityGroupDetail()
-	case screenSecurityGroupAddRule:
-		v = m.viewSecurityGroupAddRule()
-	case screenSecurityGroupDeleteConfirm:
-		v = m.viewSecurityGroupDeleteConfirm()
-	case screenEKSClusterList:
-		v = m.viewEKSClusterList()
-	case screenEKSUpgradeReadiness:
-		v = m.viewEKSUpgradeReadiness()
-	case screenEKSAccessHelper:
-		v = m.viewEKSAccessHelper()
-	case screenEKSNodeGroupList:
-		v = m.viewEKSNodeGroupList()
-	case screenEKSNodeGroupDetail:
-		v = m.viewEKSNodeGroupDetail()
-	case screenEKSAddonList:
-		v = m.viewEKSAddonList()
-	case screenEKSAddonDetail:
-		v = m.viewEKSAddonDetail()
-	case screenECRRepositoryList:
-		v = m.viewECRRepositoryList()
-	case screenECRRepositoryDetail:
-		v = m.viewECRRepositoryDetail()
-	case screenECRImageList:
-		v = m.viewECRImageList()
-	case screenECRImageDetail:
-		v = m.viewECRImageDetail()
 	case screenContextPicker:
 		v = m.viewContextPicker()
 	case screenContextAdd:
