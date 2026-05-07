@@ -228,6 +228,7 @@ Context ordering:
 | ECR | Repository Browser |
 | ECS | ECS Browser & Exec |
 | EKS | Cluster & Node Group Browser |
+| FIS | Experiment Template Browser |
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
 | Bedrock | API Key Manager |
@@ -343,6 +344,7 @@ checks:
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
 | EKS Browser | cluster/node group/add-on lists support `/` filter and `r` refresh, cluster view shows version/status/endpoint visibility/ARN summary, `a` opens managed add-ons, `U` opens current-version upgrade readiness, `u` opens kubeconfig access helper, node group detail shows desired/min/max scaling plus health issues |
+| FIS | `Enter` template detail, `/` filter, `r` refresh, detail scrolls through targets/actions/stop conditions |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
@@ -350,11 +352,13 @@ checks:
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
 | Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
-The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups/add-ons, ECR repositories/images, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
+The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups/add-ons, ECR repositories/images, FIS experiment templates, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
 
 The EKS Browser includes a managed add-on status view for each cluster. Add-on rows show the installed version, status, and health summary, with degraded or unhealthy add-ons highlighted so core components such as CoreDNS, kube-proxy, VPC CNI, and CSI drivers are easy to spot.
 
 The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
+
+The FIS Experiment Template Browser lists experiment templates in the active region and opens a detail screen with role ARN, targets, actions, target mappings, parameters, filters, and stop condition summaries without leaving the TUI.
 
 The EKS Browser includes a current-version upgrade readiness view for each selected cluster. It compares the control plane version with managed node group versions, checks installed managed add-on versions against EKS compatibility metadata for the current cluster version, includes EKS `UPGRADE_READINESS` insights, and highlights blockers or warnings before planning a target-version upgrade.
 

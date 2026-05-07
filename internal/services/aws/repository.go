@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/fis"
 	"github.com/aws/aws-sdk-go-v2/service/guardduty"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -79,6 +80,9 @@ var _ EKSClientAPI = (*eks.Client)(nil)
 
 // Verify *autoscaling.Client satisfies AutoScalingClientAPI at compile time.
 var _ AutoScalingClientAPI = (*autoscaling.Client)(nil)
+
+// Verify *fis.Client satisfies FISClientAPI at compile time.
+var _ FISClientAPI = (*fis.Client)(nil)
 
 // Verify *elasticache.Client satisfies ElastiCacheClientAPI at compile time.
 var _ ElastiCacheClientAPI = (*elasticache.Client)(nil)
@@ -227,6 +231,12 @@ type ELBv2ClientAPI interface {
 	DescribeRules(ctx context.Context, params *elasticloadbalancingv2.DescribeRulesInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeRulesOutput, error)
 }
 
+// FISClientAPI is the interface for FIS operations used by AwsRepository.
+type FISClientAPI interface {
+	ListExperimentTemplates(ctx context.Context, params *fis.ListExperimentTemplatesInput, optFns ...func(*fis.Options)) (*fis.ListExperimentTemplatesOutput, error)
+	GetExperimentTemplate(ctx context.Context, params *fis.GetExperimentTemplateInput, optFns ...func(*fis.Options)) (*fis.GetExperimentTemplateOutput, error)
+}
+
 // S3ClientAPI is the interface for S3 operations used by AwsRepository.
 type S3ClientAPI interface {
 	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
@@ -303,6 +313,7 @@ type AwsRepository struct {
 	ECRClient            ECRClientAPI
 	EKSClient            EKSClientAPI
 	AutoScalingClient    AutoScalingClientAPI
+	FISClient            FISClientAPI
 	ElastiCacheClient    ElastiCacheClientAPI
 	ELBv2Client          ELBv2ClientAPI
 	S3Client             S3ClientAPI
@@ -378,6 +389,7 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		ECRClient:            ecr.NewFromConfig(awsCfg),
 		EKSClient:            eks.NewFromConfig(awsCfg),
 		AutoScalingClient:    autoscaling.NewFromConfig(awsCfg),
+		FISClient:            fis.NewFromConfig(awsCfg),
 		ElastiCacheClient:    elasticache.NewFromConfig(awsCfg),
 		ELBv2Client:          elasticloadbalancingv2.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),

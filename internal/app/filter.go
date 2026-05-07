@@ -27,6 +27,7 @@ const (
 	filterEKSAddons
 	filterECRRepositories
 	filterECRImages
+	filterFISTemplates
 	filterCWMetrics
 	filterCWLogGroups
 	filterCWLogStreams

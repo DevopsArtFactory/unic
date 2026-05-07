@@ -76,6 +76,8 @@ const (
 	screenECRRepositoryDetail
 	screenECRImageList
 	screenECRImageDetail
+	screenFISTemplateList
+	screenFISTemplateDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -137,6 +139,7 @@ type Model struct {
 	ecs          ecsModel
 	eks          eksModel
 	ecr          ecrModel
+	fis          fisModel
 	vpc          vpcModel
 	reachability reachabilityModel
 	cwMetrics    cloudWatchMetricsModel
@@ -232,6 +235,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.ecs = newECSModel()
 	model.eks = newEKSModel()
 	model.ecr = newECRModel()
+	model.fis = newFISModel()
 	model.vpc = newVPCModel()
 	model.reachability = newReachabilityModel()
 	model.cwMetrics = newCloudWatchMetricsModel()
@@ -515,6 +519,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.ecr.Start(&m)
 			case domain.FeatureEKSBrowser:
 				return m.eks.Start(&m)
+			case domain.FeatureFISTemplateBrowser:
+				return m.fis.Start(&m)
 			case domain.FeatureLambdaBrowser:
 				return m.lambda.Start(&m)
 			case domain.FeatureBedrockAPIKeys:

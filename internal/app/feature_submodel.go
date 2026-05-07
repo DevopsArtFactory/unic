@@ -10,5 +10,5 @@ type featureSubmodel interface {
 }
 
 func (m *Model) featureSubmodels() []featureSubmodel {
-	return []featureSubmodel{&m.ec2Browser, &m.ecs, &m.eks, &m.ecr, &m.vpc, &m.reachability, &m.cwMetrics, &m.cwLogs, &m.rds, &m.route53, &m.iam, &m.bedrock, &m.secrets, &m.security, &m.s3, &m.lambda, &m.inspector}
+	return []featureSubmodel{&m.ec2Browser, &m.ecs, &m.eks, &m.ecr, &m.fis, &m.vpc, &m.reachability, &m.cwMetrics, &m.cwLogs, &m.rds, &m.route53, &m.iam, &m.bedrock, &m.secrets, &m.security, &m.s3, &m.lambda, &m.inspector}
 }

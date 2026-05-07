@@ -93,6 +93,7 @@ Current repository clients include:
 - CloudWatch Logs
 - ECS
 - ECR
+- FIS
 - S3
 
 Pattern:
@@ -202,6 +203,7 @@ Current screen families include:
 - ECS cluster/service/rollout detail/task/container flows
 - EKS cluster/node group/add-on status, upgrade readiness, and access helper flows
 - ECR repository/image/detail flows
+- FIS experiment template list/detail flows
 - S3 bucket/object/detail flows
 - Inspector mode home, checklist setup, security findings/detail, and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
