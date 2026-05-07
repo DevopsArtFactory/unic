@@ -126,6 +126,14 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - feature submodel은 기능별 상태, 메시지 처리, 키 처리, 렌더링 담당
 - service 선택, feature 선택, context 선택, SSM session picker, loading, error handling 같은 app-shell flow는 별도 shell-flow 추상화를 결정하기 전까지 루트에 남긴다
 
+소유권 경계:
+
+- App-shell flow는 전역 application context를 선택하거나, feature를 고르거나, 공통 chrome을 조정하거나, subprocess/session을 실행하거나, feature 간 전환 상태를 표현할 때 루트가 소유한다.
+- Feature submodel은 feature list에서 시작하고 상태, 메시지, 필터, 키 처리, command, view를 기능 내부에 둘 수 있는 AWS resource browser flow를 소유한다.
+- Context picker/add/SSO flow는 모든 feature가 사용하는 AWS context를 선택하거나 변경하므로 app-shell로 남긴다.
+- EC2 SSM session picker는 feature-local resource graph 탐색이 아니라 외부 session workflow를 실행하므로 app-shell로 남긴다.
+- Loading, error, exit, service list, feature list, global help, home navigation, context switching은 루트가 소유하는 공통 infrastructure로 남긴다.
+
 화면별 렌더링은 여전히 전용 파일로 분리되어 있다.
 
 - `screen_ec2.go`
@@ -218,6 +226,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 2. `internal/domain/catalog.go`에 등록
 3. `internal/services/aws/`에 repository 메서드와 모델 추가
 4. cross-service inspector 작업이면 `internal/inspector/`에 workflow/rule 로직 추가
-5. `internal/app/`에 화면 전환 연결
-6. repository 로직과 app 전환 테스트 작성
-6. 사용자에게 보이는 동작이면 README와 `docs/` 갱신
+5. 일반 AWS feature browser는 `internal/app/`의 feature submodel로 연결
+6. 별도 shell abstraction이 도입되기 전까지 app-shell flow는 루트에 유지
+7. repository 로직과 app 전환 테스트 작성
+8. 사용자에게 보이는 동작이면 README와 `docs/` 갱신

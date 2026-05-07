@@ -116,6 +116,9 @@ type Model struct {
 	exitMessage string
 	exitTitle   string
 
+	// App-shell state stays root-owned because it coordinates global navigation,
+	// context/session setup, shared chrome, and cross-feature transitions.
+
 	// Service selection
 	services         []domain.Service
 	filteredServices []domain.Service

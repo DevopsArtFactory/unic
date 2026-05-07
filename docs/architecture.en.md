@@ -126,6 +126,14 @@ Current direction:
 - feature submodels handle feature-local state, message handling, key handling, and view rendering
 - app-shell flows such as service selection, feature selection, context selection, SSM session picking, loading, and error handling remain root-owned until a separate shell-flow abstraction is chosen
 
+Ownership boundary:
+
+- App-shell flows are root-owned when they select global application context, choose a feature, coordinate shared chrome, launch a subprocess/session, or represent cross-feature transition state.
+- Feature submodels own AWS resource browser flows that start from a feature-list choice and can keep their state, messages, filters, key handling, commands, and views feature-local.
+- Context picker/add/SSO flows remain app-shell because they mutate or choose the AWS context used by all features.
+- The EC2 SSM session picker remains app-shell because it launches an external session workflow rather than browsing a feature-local resource graph.
+- Loading, error, exit, service list, feature list, global help, home navigation, and context switching remain root-owned shared infrastructure.
+
 Screen-specific rendering still lives in dedicated files such as:
 
 - `screen_ec2.go`
@@ -218,6 +226,7 @@ When adding a feature:
 2. register them in `internal/domain/catalog.go`
 3. add repository methods and models under `internal/services/aws/`
 4. for cross-service inspector work, add workflow/rule logic under `internal/inspector/`
-5. wire the screen flow in `internal/app/`
-6. add tests for repository logic and app transitions
-6. update README and `docs/` if behavior is user-visible
+5. wire normal AWS feature browsers as feature submodels in `internal/app/`
+6. keep app-shell flows root-owned unless a separate shell abstraction is introduced
+7. add tests for repository logic and app transitions
+8. update README and `docs/` if behavior is user-visible
