@@ -118,17 +118,18 @@ cross-service inspector workflow와 rule pack을 담당한다.
 ### `internal/app/`
 
 Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
-루트 모델은 유지하지만, 기능별 동작은 점진적으로 서브모델 계약 뒤로 이동시키고 있다. 이렇게 해서 루트 모델은 부트스트랩, 전역 네비게이션, 공통 chrome, 화면 전환에 집중할 수 있다.
+루트 모델은 유지하지만, AWS feature browser는 이제 서브모델 계약 뒤에 둔다. 이렇게 해서 루트 모델은 부트스트랩, 전역 네비게이션, 공통 chrome, 화면 전환에 집중할 수 있다.
 
 현재 방향:
 
 - `app.go`는 루트 모델과 전역 이벤트 루프 유지
 - feature submodel은 기능별 상태, 메시지 처리, 키 처리, 렌더링 담당
-- CloudWatch Logs가 이 패턴으로 먼저 분리된 대표 사례
+- service 선택, feature 선택, context 선택, SSM session picker, loading, error handling 같은 app-shell flow는 별도 shell-flow 추상화를 결정하기 전까지 루트에 남긴다
 
 화면별 렌더링은 여전히 전용 파일로 분리되어 있다.
 
 - `screen_ec2.go`
+- `screen_ec2_browser.go`
 - `screen_vpc.go`
 - `screen_rds.go`
 - `screen_route53.go`
@@ -137,7 +138,12 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_cloudwatchmetrics.go`
 - `screen_cloudwatchlogs.go`
 - `screen_ecs.go`
+- `screen_eks.go`
+- `screen_ecr.go`
 - `screen_s3.go`
+- `screen_lambda.go`
+- `screen_bedrock.go`
+- `screen_secrets.go`
 - `screen_inspector.go`
 - `screen_context.go`
 

@@ -1098,8 +1098,8 @@ func TestECRRepositoriesLoadedGoesToRepositoryList(t *testing.T) {
 	if model.screen != screenECRRepositoryList {
 		t.Errorf("expected ECR repository list screen, got %d", model.screen)
 	}
-	if len(model.ecrRepositories) != 1 {
-		t.Errorf("expected 1 repository, got %d", len(model.ecrRepositories))
+	if len(model.ecr.repositories) != 1 {
+		t.Errorf("expected 1 repository, got %d", len(model.ecr.repositories))
 	}
 }
 
@@ -1115,23 +1115,23 @@ func TestFISTemplatesLoadedGoesToTemplateList(t *testing.T) {
 	if model.screen != screenFISTemplateList {
 		t.Errorf("expected FIS template list screen, got %d", model.screen)
 	}
-	if len(model.fisTemplates) != 1 {
-		t.Errorf("expected 1 template, got %d", len(model.fisTemplates))
+	if len(model.fis.templates) != 1 {
+		t.Errorf("expected 1 template, got %d", len(model.fis.templates))
 	}
 }
 
 func TestFISTemplateEnterLoadsDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenFISTemplateList
-	m.fisTemplates = []awsservice.FISExperimentTemplate{
+	m.fis.templates = []awsservice.FISExperimentTemplate{
 		{ID: "app-outage", Description: "Terminate application targets"},
 	}
-	m.filteredFISTemplates = m.fisTemplates
+	m.fis.filteredTemplates = m.fis.templates
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
-	if model.selectedFISTemplate == nil || model.selectedFISTemplate.ID != "app-outage" {
-		t.Fatalf("expected selected FIS template app-outage, got %#v", model.selectedFISTemplate)
+	if model.fis.selectedTemplate == nil || model.fis.selectedTemplate.ID != "app-outage" {
+		t.Fatalf("expected selected FIS template app-outage, got %#v", model.fis.selectedTemplate)
 	}
 	if model.screen != screenLoading {
 		t.Errorf("expected loading screen, got %d", model.screen)
@@ -1145,7 +1145,7 @@ func TestFISTemplateDetailViewShowsTargetsActionsAndStops(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenFISTemplateDetail
 	m.height = 40
-	m.selectedFISTemplate = &awsservice.FISExperimentTemplate{
+	m.fis.selectedTemplate = &awsservice.FISExperimentTemplate{
 		ID:          "app-outage",
 		Description: "Terminate application targets",
 		RoleARN:     "arn:aws:iam::123456789012:role/fis-role",
@@ -1171,15 +1171,15 @@ func TestFISTemplateDetailViewShowsTargetsActionsAndStops(t *testing.T) {
 func TestECRRepositoryEnterLoadsImages(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenECRRepositoryList
-	m.ecrRepositories = []awsservice.ECRRepository{
+	m.ecr.repositories = []awsservice.ECRRepository{
 		{Name: "app", URI: "123456789012.dkr.ecr.us-east-1.amazonaws.com/app"},
 	}
-	m.filteredECRRepositories = m.ecrRepositories
+	m.ecr.filteredRepositories = m.ecr.repositories
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
-	if model.selectedECRRepository == nil || model.selectedECRRepository.Name != "app" {
-		t.Fatalf("expected selected ECR repository app, got %#v", model.selectedECRRepository)
+	if model.ecr.selectedRepository == nil || model.ecr.selectedRepository.Name != "app" {
+		t.Fatalf("expected selected ECR repository app, got %#v", model.ecr.selectedRepository)
 	}
 	if model.screen != screenLoading {
 		t.Errorf("expected loading screen, got %d", model.screen)
@@ -1192,7 +1192,7 @@ func TestECRRepositoryEnterLoadsImages(t *testing.T) {
 func TestECRImagesLoadedGoesToImageList(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenLoading
-	m.selectedECRRepository = &awsservice.ECRRepository{Name: "app"}
+	m.ecr.selectedRepository = &awsservice.ECRRepository{Name: "app"}
 
 	images := []awsservice.ECRImage{
 		{RepositoryName: "app", Digest: "sha256:abc", Tags: []string{"latest"}},
@@ -1202,8 +1202,8 @@ func TestECRImagesLoadedGoesToImageList(t *testing.T) {
 	if model.screen != screenECRImageList {
 		t.Errorf("expected ECR image list screen, got %d", model.screen)
 	}
-	if len(model.ecrImages) != 1 {
-		t.Errorf("expected 1 image, got %d", len(model.ecrImages))
+	if len(model.ecr.images) != 1 {
+		t.Errorf("expected 1 image, got %d", len(model.ecr.images))
 	}
 }
 
@@ -1211,11 +1211,11 @@ func TestECRImageViewHighlightsCleanupSignals(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenECRImageList
 	m.height = 30
-	m.selectedECRRepository = &awsservice.ECRRepository{Name: "app"}
-	m.ecrImages = []awsservice.ECRImage{
+	m.ecr.selectedRepository = &awsservice.ECRRepository{Name: "app"}
+	m.ecr.images = []awsservice.ECRImage{
 		{RepositoryName: "app", Digest: "sha256:untagged"},
 	}
-	m.filteredECRImages = m.ecrImages
+	m.ecr.filteredImages = m.ecr.images
 
 	view := m.View()
 	for _, want := range []string{"ECR Images", "(untagged)", "sha256:untagged"} {
@@ -1726,39 +1726,39 @@ func TestViewFitsTerminalHeight(t *testing.T) {
 func TestSecurityGroupListNavigation(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupList
-	m.securityGroups = []awsservice.SecurityGroup{
+	m.security.securityGroups = []awsservice.SecurityGroup{
 		{GroupID: "sg-1", Name: "web", VPCID: "vpc-1"},
 		{GroupID: "sg-2", Name: "db", VPCID: "vpc-1"},
 	}
-	m.filteredSecurityGroups = m.securityGroups
+	m.security.filteredSecurityGroups = m.security.securityGroups
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	model := updated.(Model)
-	if model.sgIdx != 1 {
-		t.Errorf("expected sgIdx 1, got %d", model.sgIdx)
+	if model.security.sgIdx != 1 {
+		t.Errorf("expected sgIdx 1, got %d", model.security.sgIdx)
 	}
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 	model = updated.(Model)
-	if model.sgIdx != 0 {
-		t.Errorf("expected sgIdx 0, got %d", model.sgIdx)
+	if model.security.sgIdx != 0 {
+		t.Errorf("expected sgIdx 0, got %d", model.security.sgIdx)
 	}
 }
 
 func TestSecurityGroupListEnterGoesToDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupList
-	m.securityGroups = []awsservice.SecurityGroup{
+	m.security.securityGroups = []awsservice.SecurityGroup{
 		{GroupID: "sg-1", Name: "web", VPCID: "vpc-1"},
 	}
-	m.filteredSecurityGroups = m.securityGroups
+	m.security.filteredSecurityGroups = m.security.securityGroups
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 	if model.screen != screenSecurityGroupDetail {
 		t.Errorf("expected detail screen, got %d", model.screen)
 	}
-	if model.selectedSecurityGroup == nil {
+	if model.security.selectedSecurityGroup == nil {
 		t.Error("selectedSecurityGroup should not be nil")
 	}
 }
@@ -1766,7 +1766,7 @@ func TestSecurityGroupListEnterGoesToDetail(t *testing.T) {
 func TestSecurityGroupDetailEscGoesBack(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupDetail
-	m.selectedSecurityGroup = &awsservice.SecurityGroup{GroupID: "sg-1"}
+	m.security.selectedSecurityGroup = &awsservice.SecurityGroup{GroupID: "sg-1"}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
@@ -1778,11 +1778,11 @@ func TestSecurityGroupDetailEscGoesBack(t *testing.T) {
 func TestSecurityGroupFilter(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupList
-	m.securityGroups = []awsservice.SecurityGroup{
+	m.security.securityGroups = []awsservice.SecurityGroup{
 		{GroupID: "sg-1", Name: "web-sg", VPCID: "vpc-1"},
 		{GroupID: "sg-2", Name: "db-sg", VPCID: "vpc-1"},
 	}
-	m.filteredSecurityGroups = m.securityGroups
+	m.security.filteredSecurityGroups = m.security.securityGroups
 
 	// Activate filter
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
@@ -1796,8 +1796,8 @@ func TestSecurityGroupFilter(t *testing.T) {
 		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
 		model = updated.(Model)
 	}
-	if len(model.filteredSecurityGroups) != 1 {
-		t.Errorf("expected 1 filtered SG, got %d", len(model.filteredSecurityGroups))
+	if len(model.security.filteredSecurityGroups) != 1 {
+		t.Errorf("expected 1 filtered SG, got %d", len(model.security.filteredSecurityGroups))
 	}
 }
 
@@ -1805,7 +1805,7 @@ func TestSecurityGroupDetailView(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenSecurityGroupDetail
 	m.height = 30
-	m.selectedSecurityGroup = &awsservice.SecurityGroup{
+	m.security.selectedSecurityGroup = &awsservice.SecurityGroup{
 		GroupID:     "sg-aaa",
 		Name:        "web-sg",
 		Description: "Web servers",
@@ -2305,7 +2305,7 @@ func TestHandleInspectorScanLoadedMsgShowsResults(t *testing.T) {
 		},
 	}
 
-	updated, _, handled := m.handleInspectorMsg(inspectorScanLoadedMsg{report: report})
+	updated, _, handled := m.inspector.HandleMessage(&m, inspectorScanLoadedMsg{report: report})
 	if !handled {
 		t.Fatal("expected inspector scan message to be handled")
 	}
@@ -2314,21 +2314,21 @@ func TestHandleInspectorScanLoadedMsgShowsResults(t *testing.T) {
 	if model.screen != screenInspectorResults {
 		t.Fatalf("expected inspector results screen, got %d", model.screen)
 	}
-	if len(model.inspectorFindings) != 1 {
-		t.Fatalf("expected 1 filtered finding, got %d", len(model.inspectorFindings))
+	if len(model.inspector.findings) != 1 {
+		t.Fatalf("expected 1 filtered finding, got %d", len(model.inspector.findings))
 	}
 }
 
 func TestNewModelMarksChecklistWorkflowReadyWhenConfigured(t *testing.T) {
 	m := New(testConfig(), "", "dev", "/tmp/checklist.yaml")
 
-	if len(m.inspectorWorkflows) < 2 {
-		t.Fatalf("expected checklist workflow to be present, got %d workflows", len(m.inspectorWorkflows))
+	if len(m.inspector.workflows) < 2 {
+		t.Fatalf("expected checklist workflow to be present, got %d workflows", len(m.inspector.workflows))
 	}
-	if !m.inspectorWorkflows[1].Available {
-		t.Fatalf("expected checklist workflow to be available, got %+v", m.inspectorWorkflows[1])
+	if !m.inspector.workflows[1].Available {
+		t.Fatalf("expected checklist workflow to be available, got %+v", m.inspector.workflows[1])
 	}
-	if got := m.inspectorWorkflows[1].StatusLabel(); got != "READY" {
+	if got := m.inspector.workflows[1].StatusLabel(); got != "READY" {
 		t.Fatalf("expected READY status label, got %q", got)
 	}
 }
@@ -2336,28 +2336,28 @@ func TestNewModelMarksChecklistWorkflowReadyWhenConfigured(t *testing.T) {
 func TestInspectorResultsSeverityFilterNarrowsFindings(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenInspectorResults
-	m.inspectorReport = &inspector.SecurityScanReport{
+	m.inspector.report = &inspector.SecurityScanReport{
 		Findings: []inspector.SecurityFinding{
 			{RuleName: "Critical finding", Severity: inspector.RuleSeverityCritical, ResourceID: "sg-1"},
 			{RuleName: "Medium finding", Severity: inspector.RuleSeverityMedium, ResourceID: "db-1"},
 		},
 	}
-	m.applyInspectorSeverityFilter()
+	m.inspector.applySeverityFilter()
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
 	model := updated.(Model)
-	if model.inspectorSeverityFilter != inspector.RuleSeverityCritical {
-		t.Fatalf("expected critical severity filter, got %q", model.inspectorSeverityFilter)
+	if model.inspector.severityFilter != inspector.RuleSeverityCritical {
+		t.Fatalf("expected critical severity filter, got %q", model.inspector.severityFilter)
 	}
-	if len(model.inspectorFindings) != 1 || model.inspectorFindings[0].Severity != inspector.RuleSeverityCritical {
-		t.Fatalf("expected only critical findings, got %+v", model.inspectorFindings)
+	if len(model.inspector.findings) != 1 || model.inspector.findings[0].Severity != inspector.RuleSeverityCritical {
+		t.Fatalf("expected only critical findings, got %+v", model.inspector.findings)
 	}
 }
 
 func TestInspectorResultsEnterShowsDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenInspectorResults
-	m.inspectorFindings = []inspector.SecurityFinding{
+	m.inspector.findings = []inspector.SecurityFinding{
 		{
 			RuleName:       "SSH exposed to the internet",
 			Severity:       inspector.RuleSeverityHigh,
@@ -2372,7 +2372,7 @@ func TestInspectorResultsEnterShowsDetail(t *testing.T) {
 	if model.screen != screenInspectorFindingDetail {
 		t.Fatalf("expected inspector detail screen, got %d", model.screen)
 	}
-	if model.selectedInspectorFinding == nil {
+	if model.inspector.selectedFinding == nil {
 		t.Fatal("expected selected inspector finding")
 	}
 }
@@ -2394,7 +2394,7 @@ func TestHandleInspectorChecklistLoadedMsgShowsResults(t *testing.T) {
 		},
 	}
 
-	updated, _, handled := m.handleInspectorMsg(inspectorChecklistLoadedMsg{report: report})
+	updated, _, handled := m.inspector.HandleMessage(&m, inspectorChecklistLoadedMsg{report: report})
 	if !handled {
 		t.Fatal("expected checklist scan message to be handled")
 	}
@@ -2403,15 +2403,15 @@ func TestHandleInspectorChecklistLoadedMsgShowsResults(t *testing.T) {
 	if model.screen != screenInspectorChecklistResults {
 		t.Fatalf("expected checklist results screen, got %d", model.screen)
 	}
-	if model.inspectorChecklistReport == nil || len(model.inspectorChecklistReport.Results) != 1 {
-		t.Fatalf("expected stored checklist report, got %+v", model.inspectorChecklistReport)
+	if model.inspector.checklistReport == nil || len(model.inspector.checklistReport.Results) != 1 {
+		t.Fatalf("expected stored checklist report, got %+v", model.inspector.checklistReport)
 	}
 }
 
 func TestInspectorHomeChecklistStartsDedicatedScanWhenConfigured(t *testing.T) {
 	m := New(testConfig(), "", "dev", "/tmp/checklist.yaml")
 	m.screen = screenInspectorHome
-	m.inspectorWorkflowIdx = 1
+	m.inspector.workflowIdx = 1
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
@@ -2436,8 +2436,8 @@ checks:
 
 	m := New(testConfig(), "", "dev")
 	m.screen = screenInspectorHome
-	m.inspectorWorkflowIdx = 1
-	m.inspectorChecklistDir = dir
+	m.inspector.workflowIdx = 1
+	m.inspector.checklistDir = dir
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
@@ -2447,19 +2447,19 @@ checks:
 	if cmd != nil {
 		t.Fatal("expected no command when opening the checklist picker")
 	}
-	if len(model.filteredChecklistFiles) == 0 {
+	if len(model.inspector.filteredChecklistFiles) == 0 {
 		t.Fatal("expected checklist picker entries to be loaded")
 	}
 
 	found := false
-	for _, entry := range model.filteredChecklistFiles {
+	for _, entry := range model.inspector.filteredChecklistFiles {
 		if entry.Path == checklistPath {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected picker to include %s, got %+v", checklistPath, model.filteredChecklistFiles)
+		t.Fatalf("expected picker to include %s, got %+v", checklistPath, model.inspector.filteredChecklistFiles)
 	}
 }
 
@@ -2476,14 +2476,14 @@ checks:
 
 	m := New(testConfig(), "", "dev")
 	m.screen = screenInspectorHome
-	m.inspectorWorkflowIdx = 1
-	m.inspectorChecklistDir = dir
+	m.inspector.workflowIdx = 1
+	m.inspector.checklistDir = dir
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
-	for i, entry := range model.filteredChecklistFiles {
+	for i, entry := range model.inspector.filteredChecklistFiles {
 		if entry.Path == checklistPath {
-			model.inspectorChecklistFileIdx = i
+			model.inspector.checklistFileIdx = i
 			break
 		}
 	}
@@ -2496,11 +2496,11 @@ checks:
 	if cmd == nil {
 		t.Fatal("expected checklist scan command")
 	}
-	if model.inspectorChecklistPath != checklistPath {
-		t.Fatalf("expected checklist path %q, got %q", checklistPath, model.inspectorChecklistPath)
+	if model.inspector.checklistPath != checklistPath {
+		t.Fatalf("expected checklist path %q, got %q", checklistPath, model.inspector.checklistPath)
 	}
-	if !model.inspectorWorkflows[1].Available {
-		t.Fatalf("expected checklist workflow to be available after load, got %+v", model.inspectorWorkflows[1])
+	if !model.inspector.workflows[1].Available {
+		t.Fatalf("expected checklist workflow to be available after load, got %+v", model.inspector.workflows[1])
 	}
 }
 
@@ -2510,14 +2510,14 @@ func TestInspectorChecklistPickerInvalidFileStaysOnPicker(t *testing.T) {
 
 	m := New(testConfig(), "", "dev")
 	m.screen = screenInspectorHome
-	m.inspectorWorkflowIdx = 1
-	m.inspectorChecklistDir = dir
+	m.inspector.workflowIdx = 1
+	m.inspector.checklistDir = dir
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
-	for i, entry := range model.filteredChecklistFiles {
+	for i, entry := range model.inspector.filteredChecklistFiles {
 		if entry.Path == checklistPath {
-			model.inspectorChecklistFileIdx = i
+			model.inspector.checklistFileIdx = i
 			break
 		}
 	}
@@ -2530,7 +2530,7 @@ func TestInspectorChecklistPickerInvalidFileStaysOnPicker(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected no checklist scan command for an invalid file")
 	}
-	if model.inspectorChecklistError == "" {
+	if model.inspector.checklistError == "" {
 		t.Fatal("expected checklist picker error for invalid YAML")
 	}
 }
@@ -2546,16 +2546,17 @@ func TestOpenChecklistPickerErrorReturnsUpdatedModel(t *testing.T) {
 	}
 	defer os.Chmod(lockedDir, 0o755)
 
-	m.inspectorChecklistDir = lockedDir
+	m.inspector.checklistDir = lockedDir
 
-	updated, cmd := m.openChecklistPicker()
+	updated, cmd := m.inspector.openChecklistPicker(&m)
 	if cmd != nil {
 		t.Fatal("expected no command when checklist picker loading fails")
 	}
-	if updated.screen != screenError {
-		t.Fatalf("expected error screen, got %d", updated.screen)
+	model := updated.(Model)
+	if model.screen != screenError {
+		t.Fatalf("expected error screen, got %d", model.screen)
 	}
-	if updated.errMsg == "" {
+	if model.errMsg == "" {
 		t.Fatal("expected error message when checklist picker directory cannot be loaded")
 	}
 }
@@ -2563,7 +2564,7 @@ func TestOpenChecklistPickerErrorReturnsUpdatedModel(t *testing.T) {
 func TestInspectorChecklistResultsEnterShowsDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev", "/tmp/checklist.yaml")
 	m.screen = screenInspectorChecklistResults
-	m.inspectorChecklistReport = &inspector.ChecklistReport{
+	m.inspector.checklistReport = &inspector.ChecklistReport{
 		Results: []inspector.ChecklistResult{
 			{
 				CheckID:  "db-ready",
@@ -2581,7 +2582,7 @@ func TestInspectorChecklistResultsEnterShowsDetail(t *testing.T) {
 	if model.screen != screenInspectorChecklistDetail {
 		t.Fatalf("expected checklist detail screen, got %d", model.screen)
 	}
-	if model.selectedChecklistResult == nil {
+	if model.inspector.selectedChecklistResult == nil {
 		t.Fatal("expected selected checklist result")
 	}
 }

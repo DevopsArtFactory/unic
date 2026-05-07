@@ -11,30 +11,79 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
-func (m Model) handleFISMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
-	switch msg := msg.(type) {
-	case fisTemplatesLoadedMsg:
-		m.fisTemplates = msg.templates
-		m.filteredFISTemplates = msg.templates
-		m.fisTemplateIdx = 0
-		m.selectedFISTemplate = nil
-		m.fisTemplateScroll = 0
-		m.screen = screenFISTemplateList
-		return m, nil, true
-	case fisTemplateDetailLoadedMsg:
-		m.selectedFISTemplate = msg.template
-		m.fisTemplateScroll = 0
-		m.screen = screenFISTemplateDetail
-		return m, nil, true
-	}
-	return m, nil, false
+type fisModel struct {
+	templates         []awsservice.FISExperimentTemplate
+	filteredTemplates []awsservice.FISExperimentTemplate
+	templateIdx       int
+	selectedTemplate  *awsservice.FISExperimentTemplate
+	templateScroll    int
 }
 
-func (m Model) updateFISTemplateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func newFISModel() fisModel {
+	return fisModel{}
+}
+
+func (fm *fisModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(fm.loadTemplates(*m))
+}
+
+func (fm *fisModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case fisTemplatesLoadedMsg:
+		fm.templates = msg.templates
+		fm.filteredTemplates = msg.templates
+		fm.templateIdx = 0
+		fm.selectedTemplate = nil
+		fm.templateScroll = 0
+		m.screen = screenFISTemplateList
+		return *m, nil, true
+	case fisTemplateDetailLoadedMsg:
+		fm.selectedTemplate = msg.template
+		fm.templateScroll = 0
+		m.screen = screenFISTemplateDetail
+		return *m, nil, true
+	}
+	return *m, nil, false
+}
+
+func (fm *fisModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenFISTemplateList:
+		newM, cmd := fm.updateTemplateList(m, msg)
+		return newM, cmd, true
+	case screenFISTemplateDetail:
+		newM, cmd := fm.updateTemplateDetail(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (fm fisModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenFISTemplateList:
+		return fm.viewTemplateList(m), true
+	case screenFISTemplateDetail:
+		return fm.viewTemplateDetail(m), true
+	default:
+		return "", false
+	}
+}
+
+func (fm *fisModel) ApplyFilter(m *Model, target filterTarget) bool {
+	if target != filterFISTemplates {
+		return false
+	}
+	fm.filteredTemplates = applyFilter(fm.templates, m.filterValue(target))
+	fm.templateIdx = 0
+	return true
+}
+
+func (fm *fisModel) updateTemplateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterFISTemplates); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -42,52 +91,52 @@ func (m Model) updateFISTemplateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterFISTemplates)
 	case "up", "k":
-		m.fisTemplateIdx = previousListIndex(m.fisTemplateIdx, len(m.filteredFISTemplates))
+		fm.templateIdx = previousListIndex(fm.templateIdx, len(fm.filteredTemplates))
 	case "down", "j":
-		m.fisTemplateIdx = nextListIndex(m.fisTemplateIdx, len(m.filteredFISTemplates))
+		fm.templateIdx = nextListIndex(fm.templateIdx, len(fm.filteredTemplates))
 	case "/":
-		return m, m.activateFilter(filterFISTemplates)
+		return *m, m.activateFilter(filterFISTemplates)
 	case "r":
-		return m.startLoading(m.loadFISTemplates())
+		return m.startLoading(fm.loadTemplates(*m))
 	case "enter":
-		if len(m.filteredFISTemplates) > 0 && m.fisTemplateIdx < len(m.filteredFISTemplates) {
-			selected := m.filteredFISTemplates[m.fisTemplateIdx]
-			m.selectedFISTemplate = &selected
-			return m.startLoading(m.loadFISTemplateDetail(selected.ID))
+		if len(fm.filteredTemplates) > 0 && fm.templateIdx < len(fm.filteredTemplates) {
+			selected := fm.filteredTemplates[fm.templateIdx]
+			fm.selectedTemplate = &selected
+			return m.startLoading(fm.loadTemplateDetail(*m, selected.ID))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateFISTemplateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (fm *fisModel) updateTemplateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		m.screen = screenFeatureList
 	case "esc":
 		m.screen = screenFISTemplateList
 	case "up", "k":
-		if m.fisTemplateScroll > 0 {
-			m.fisTemplateScroll--
+		if fm.templateScroll > 0 {
+			fm.templateScroll--
 		}
 	case "down", "j":
-		if m.selectedFISTemplate != nil {
-			m.fisTemplateScroll = min(m.fisTemplateScroll+1, max(len(m.fisTemplateDetailLines(*m.selectedFISTemplate))-1, 0))
+		if fm.selectedTemplate != nil {
+			fm.templateScroll = min(fm.templateScroll+1, max(len(fm.templateDetailLines(*fm.selectedTemplate))-1, 0))
 		}
 	case "pgup":
-		m.fisTemplateScroll = max(m.fisTemplateScroll-10, 0)
+		fm.templateScroll = max(fm.templateScroll-10, 0)
 	case "pgdown":
-		if m.selectedFISTemplate != nil {
-			m.fisTemplateScroll = min(m.fisTemplateScroll+10, max(len(m.fisTemplateDetailLines(*m.selectedFISTemplate))-1, 0))
+		if fm.selectedTemplate != nil {
+			fm.templateScroll = min(fm.templateScroll+10, max(len(fm.templateDetailLines(*fm.selectedTemplate))-1, 0))
 		}
 	case "r":
-		if m.selectedFISTemplate != nil {
-			return m.startLoading(m.loadFISTemplateDetail(m.selectedFISTemplate.ID))
+		if fm.selectedTemplate != nil {
+			return m.startLoading(fm.loadTemplateDetail(*m, fm.selectedTemplate.ID))
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) loadFISTemplates() tea.Cmd {
+func (fm *fisModel) loadTemplates(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -107,7 +156,7 @@ func (m Model) loadFISTemplates() tea.Cmd {
 	}
 }
 
-func (m Model) loadFISTemplateDetail(id string) tea.Cmd {
+func (fm *fisModel) loadTemplateDetail(m Model, id string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -127,7 +176,7 @@ func (m Model) loadFISTemplateDetail(id string) tea.Cmd {
 	}
 }
 
-func (m Model) viewFISTemplateList() string {
+func (fm fisModel) viewTemplateList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -137,22 +186,22 @@ func (m Model) viewFISTemplateList() string {
 	b.WriteString(m.renderFilterValue(filterFISTemplates))
 	b.WriteString("\n\n")
 
-	if len(m.filteredFISTemplates) == 0 {
+	if len(fm.filteredTemplates) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching experiment templates"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.fisTemplateIdx >= visibleLines {
-			start = m.fisTemplateIdx - visibleLines + 1
+		if fm.templateIdx >= visibleLines {
+			start = fm.templateIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredFISTemplates))
+		end := min(start+visibleLines, len(fm.filteredTemplates))
 
 		for i := start; i < end; i++ {
-			template := m.filteredFISTemplates[i]
+			template := fm.filteredTemplates[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.fisTemplateIdx {
+			if i == fm.templateIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -161,7 +210,7 @@ func (m Model) viewFISTemplateList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d templates", len(m.filteredFISTemplates), len(m.fisTemplates))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d templates", len(fm.filteredTemplates), len(fm.templates))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -170,14 +219,14 @@ func (m Model) viewFISTemplateList() string {
 	return b.String()
 }
 
-func (m Model) viewFISTemplateDetail() string {
-	if m.selectedFISTemplate == nil {
+func (fm fisModel) viewTemplateDetail(m Model) string {
+	if fm.selectedTemplate == nil {
 		return ""
 	}
-	template := *m.selectedFISTemplate
-	lines := m.fisTemplateDetailLines(template)
+	template := *fm.selectedTemplate
+	lines := fm.templateDetailLines(template)
 	visibleLines := max(m.height-7, 5)
-	start := min(m.fisTemplateScroll, max(len(lines)-1, 0))
+	start := min(fm.templateScroll, max(len(lines)-1, 0))
 	end := min(start+visibleLines, len(lines))
 
 	var b strings.Builder
@@ -197,7 +246,7 @@ func (m Model) viewFISTemplateDetail() string {
 	return b.String()
 }
 
-func (m Model) fisTemplateDetailLines(template awsservice.FISExperimentTemplate) []string {
+func (fm fisModel) templateDetailLines(template awsservice.FISExperimentTemplate) []string {
 	lines := []string{
 		renderDetailLine("ID", normalStyle.Render(template.ID)),
 		renderDetailLine("Description", normalStyle.Render(defaultDash(template.Description))),

@@ -20,56 +20,122 @@ type sgRefreshedMsg struct {
 	err error
 }
 
-func (m Model) handleSecurityGroupMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+type securityGroupModel struct {
+	securityGroups         []awsservice.SecurityGroup
+	filteredSecurityGroups []awsservice.SecurityGroup
+	sgIdx                  int
+	selectedSecurityGroup  *awsservice.SecurityGroup
+	sgRuleSection          string
+	sgRuleIdx              int
+	sgDeleteConfirm        string
+	sgDeleteRule           *awsservice.SecurityGroupRule
+	sgAddField             int
+	sgAddValues            map[string]string
+	sgAddInput             string
+	sgAddSelectIdx         int
+}
+
+func newSecurityGroupModel() securityGroupModel {
+	return securityGroupModel{}
+}
+
+func (sm *securityGroupModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(sm.loadSecurityGroups(*m))
+}
+
+func (sm *securityGroupModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case securityGroupsLoadedMsg:
-		m.securityGroups = msg.securityGroups
-		m.filteredSecurityGroups = msg.securityGroups
-		m.sgIdx = 0
+		sm.securityGroups = msg.securityGroups
+		sm.filteredSecurityGroups = msg.securityGroups
+		sm.sgIdx = 0
 		m.screen = screenSecurityGroupList
-		return m, nil, true
+		return *m, nil, true
 
 	case sgRuleAddedMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			m.screen = screenError
-			return m, nil, true
+			return *m, nil, true
 		}
-		return m, m.refreshSecurityGroup(), true
+		return *m, sm.refreshSecurityGroup(*m), true
 
 	case sgRuleDeletedMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			m.screen = screenError
-			return m, nil, true
+			return *m, nil, true
 		}
-		return m, m.refreshSecurityGroup(), true
+		return *m, sm.refreshSecurityGroup(*m), true
 
 	case sgRefreshedMsg:
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			m.screen = screenError
-			return m, nil, true
+			return *m, nil, true
 		}
-		m.selectedSecurityGroup = msg.sg
-		for i, sg := range m.securityGroups {
+		sm.selectedSecurityGroup = msg.sg
+		for i, sg := range sm.securityGroups {
 			if sg.GroupID == msg.sg.GroupID {
-				m.securityGroups[i] = *msg.sg
+				sm.securityGroups[i] = *msg.sg
 				break
 			}
 		}
-		m.filteredSecurityGroups = applyFilter(m.securityGroups, m.filterValue(filterSecurityGroups))
-		m.sgIdx = 0
-		m.sgRuleIdx = 0
+		sm.filteredSecurityGroups = applyFilter(sm.securityGroups, m.filterValue(filterSecurityGroups))
+		sm.sgIdx = 0
+		sm.sgRuleIdx = 0
 		m.screen = screenSecurityGroupDetail
-		return m, nil, true
+		return *m, nil, true
 	}
-	return m, nil, false
+	return *m, nil, false
+}
+
+func (sm *securityGroupModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenSecurityGroupList:
+		newM, cmd := sm.updateSecurityGroupList(m, msg)
+		return newM, cmd, true
+	case screenSecurityGroupDetail:
+		newM, cmd := sm.updateSecurityGroupDetail(m, msg)
+		return newM, cmd, true
+	case screenSecurityGroupAddRule:
+		newM, cmd := sm.updateSecurityGroupAddRule(m, msg)
+		return newM, cmd, true
+	case screenSecurityGroupDeleteConfirm:
+		newM, cmd := sm.updateSecurityGroupDeleteConfirm(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (sm securityGroupModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenSecurityGroupList:
+		return sm.viewSecurityGroupList(m), true
+	case screenSecurityGroupDetail:
+		return sm.viewSecurityGroupDetail(m), true
+	case screenSecurityGroupAddRule:
+		return sm.viewSecurityGroupAddRule(m), true
+	case screenSecurityGroupDeleteConfirm:
+		return sm.viewSecurityGroupDeleteConfirm(m), true
+	default:
+		return "", false
+	}
+}
+
+func (sm *securityGroupModel) ApplyFilter(m *Model, target filterTarget) bool {
+	if target != filterSecurityGroups {
+		return false
+	}
+	sm.filteredSecurityGroups = applyFilter(sm.securityGroups, m.filterValue(target))
+	sm.sgIdx = 0
+	return true
 }
 
 // --- Commands ---
 
-func (m Model) loadSecurityGroups() tea.Cmd {
+func (sm *securityGroupModel) loadSecurityGroups(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -89,7 +155,7 @@ func (m Model) loadSecurityGroups() tea.Cmd {
 	}
 }
 
-func (m Model) executeSGAddRule() tea.Cmd {
+func (sm *securityGroupModel) executeSGAddRule(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -101,18 +167,18 @@ func (m Model) executeSGAddRule() tea.Cmd {
 			}
 		}
 
-		direction := m.sgAddValues["direction"]
-		protocol := m.sgAddValues["protocol"]
+		direction := sm.sgAddValues["direction"]
+		protocol := sm.sgAddValues["protocol"]
 		rule := awsservice.SecurityGroupRule{
 			Protocol:    protocol,
-			Description: m.sgAddValues["description"],
+			Description: sm.sgAddValues["description"],
 		}
 		if protocol != "-1" {
-			fmt.Sscanf(m.sgAddValues["fromPort"], "%d", &rule.FromPort)
-			fmt.Sscanf(m.sgAddValues["toPort"], "%d", &rule.ToPort)
+			fmt.Sscanf(sm.sgAddValues["fromPort"], "%d", &rule.FromPort)
+			fmt.Sscanf(sm.sgAddValues["toPort"], "%d", &rule.ToPort)
 		}
 
-		source := m.sgAddValues["source"]
+		source := sm.sgAddValues["source"]
 		if strings.HasPrefix(source, "sg-") {
 			rule.ReferencedSGID = source
 		} else if strings.Contains(source, ":") {
@@ -121,12 +187,12 @@ func (m Model) executeSGAddRule() tea.Cmd {
 			rule.CIDRV4 = source
 		}
 
-		err := repo.AddSecurityGroupRule(ctx, m.selectedSecurityGroup.GroupID, direction, rule)
+		err := repo.AddSecurityGroupRule(ctx, sm.selectedSecurityGroup.GroupID, direction, rule)
 		return sgRuleAddedMsg{err: err}
 	}
 }
 
-func (m Model) executeSGDeleteRule() tea.Cmd {
+func (sm *securityGroupModel) executeSGDeleteRule(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -138,12 +204,12 @@ func (m Model) executeSGDeleteRule() tea.Cmd {
 			}
 		}
 
-		err := repo.DeleteSecurityGroupRule(ctx, m.selectedSecurityGroup.GroupID, m.sgRuleSection, *m.sgDeleteRule)
+		err := repo.DeleteSecurityGroupRule(ctx, sm.selectedSecurityGroup.GroupID, sm.sgRuleSection, *sm.sgDeleteRule)
 		return sgRuleDeletedMsg{err: err}
 	}
 }
 
-func (m Model) refreshSecurityGroup() tea.Cmd {
+func (sm *securityGroupModel) refreshSecurityGroup(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo := m.awsRepo
@@ -155,18 +221,18 @@ func (m Model) refreshSecurityGroup() tea.Cmd {
 			}
 		}
 
-		sg, err := repo.RefreshSecurityGroup(ctx, m.selectedSecurityGroup.GroupID)
+		sg, err := repo.RefreshSecurityGroup(ctx, sm.selectedSecurityGroup.GroupID)
 		return sgRefreshedMsg{sg: sg, err: err}
 	}
 }
 
 // --- List screen ---
 
-func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (sm *securityGroupModel) updateSecurityGroupList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if cmd, handled := m.updateSharedFilter(msg, filterSecurityGroups); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch key {
@@ -174,27 +240,27 @@ func (m Model) updateSecurityGroupList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenFeatureList
 		m.resetFilter(filterSecurityGroups)
 	case "up", "k":
-		m.sgIdx = previousListIndex(m.sgIdx, len(m.filteredSecurityGroups))
+		sm.sgIdx = previousListIndex(sm.sgIdx, len(sm.filteredSecurityGroups))
 	case "down", "j":
-		m.sgIdx = nextListIndex(m.sgIdx, len(m.filteredSecurityGroups))
+		sm.sgIdx = nextListIndex(sm.sgIdx, len(sm.filteredSecurityGroups))
 	case "/":
-		return m, m.activateFilter(filterSecurityGroups)
+		return *m, m.activateFilter(filterSecurityGroups)
 	case "r":
 		m.resetFilter(filterSecurityGroups)
-		return m.startLoading(m.loadSecurityGroups())
+		return m.startLoading(sm.loadSecurityGroups(*m))
 	case "enter":
-		if len(m.filteredSecurityGroups) > 0 && m.sgIdx < len(m.filteredSecurityGroups) {
-			selected := m.filteredSecurityGroups[m.sgIdx]
-			m.selectedSecurityGroup = &selected
-			m.sgRuleSection = "ingress"
-			m.sgRuleIdx = 0
+		if len(sm.filteredSecurityGroups) > 0 && sm.sgIdx < len(sm.filteredSecurityGroups) {
+			selected := sm.filteredSecurityGroups[sm.sgIdx]
+			sm.selectedSecurityGroup = &selected
+			sm.sgRuleSection = "ingress"
+			sm.sgRuleIdx = 0
 			m.screen = screenSecurityGroupDetail
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewSecurityGroupList() string {
+func (sm securityGroupModel) viewSecurityGroupList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -204,22 +270,22 @@ func (m Model) viewSecurityGroupList() string {
 	b.WriteString(m.renderFilterValue(filterSecurityGroups))
 	b.WriteString("\n\n")
 
-	if len(m.filteredSecurityGroups) == 0 {
+	if len(sm.filteredSecurityGroups) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching security groups"))
 		panel.WriteString("\n")
 	} else {
 		visibleLines := max(m.height-10, 5)
 		start := 0
-		if m.sgIdx >= visibleLines {
-			start = m.sgIdx - visibleLines + 1
+		if sm.sgIdx >= visibleLines {
+			start = sm.sgIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredSecurityGroups))
+		end := min(start+visibleLines, len(sm.filteredSecurityGroups))
 
 		for i := start; i < end; i++ {
-			sg := m.filteredSecurityGroups[i]
+			sg := sm.filteredSecurityGroups[i]
 			cursor := "  "
 			style := normalStyle
-			if i == m.sgIdx {
+			if i == sm.sgIdx {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -228,7 +294,7 @@ func (m Model) viewSecurityGroupList() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d security groups", len(m.filteredSecurityGroups), len(m.securityGroups))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d security groups", len(sm.filteredSecurityGroups), len(sm.securityGroups))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -239,54 +305,54 @@ func (m Model) viewSecurityGroupList() string {
 
 // --- Detail screen with rule navigation ---
 
-func (m Model) activeRules() []awsservice.SecurityGroupRule {
-	if m.selectedSecurityGroup == nil {
+func (sm securityGroupModel) activeRules() []awsservice.SecurityGroupRule {
+	if sm.selectedSecurityGroup == nil {
 		return nil
 	}
-	if m.sgRuleSection == "egress" {
-		return m.selectedSecurityGroup.EgressRules
+	if sm.sgRuleSection == "egress" {
+		return sm.selectedSecurityGroup.EgressRules
 	}
-	return m.selectedSecurityGroup.IngressRules
+	return sm.selectedSecurityGroup.IngressRules
 }
 
-func (m Model) updateSecurityGroupDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (sm *securityGroupModel) updateSecurityGroupDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenSecurityGroupList
 	case "tab":
-		if m.sgRuleSection == "ingress" {
-			m.sgRuleSection = "egress"
+		if sm.sgRuleSection == "ingress" {
+			sm.sgRuleSection = "egress"
 		} else {
-			m.sgRuleSection = "ingress"
+			sm.sgRuleSection = "ingress"
 		}
-		m.sgRuleIdx = 0
+		sm.sgRuleIdx = 0
 	case "up", "k":
-		m.sgRuleIdx = previousListIndex(m.sgRuleIdx, len(m.activeRules()))
+		sm.sgRuleIdx = previousListIndex(sm.sgRuleIdx, len(sm.activeRules()))
 	case "down", "j":
-		m.sgRuleIdx = nextListIndex(m.sgRuleIdx, len(m.activeRules()))
+		sm.sgRuleIdx = nextListIndex(sm.sgRuleIdx, len(sm.activeRules()))
 	case "a":
-		m.sgAddField = 0
-		m.sgAddValues = map[string]string{}
-		m.sgAddInput = ""
-		m.sgAddSelectIdx = 0
+		sm.sgAddField = 0
+		sm.sgAddValues = map[string]string{}
+		sm.sgAddInput = ""
+		sm.sgAddSelectIdx = 0
 		m.screen = screenSecurityGroupAddRule
 	case "d":
-		rules := m.activeRules()
-		if len(rules) > 0 && m.sgRuleIdx < len(rules) {
-			rule := rules[m.sgRuleIdx]
-			m.sgDeleteRule = &rule
-			m.sgDeleteConfirm = ""
+		rules := sm.activeRules()
+		if len(rules) > 0 && sm.sgRuleIdx < len(rules) {
+			rule := rules[sm.sgRuleIdx]
+			sm.sgDeleteRule = &rule
+			sm.sgDeleteConfirm = ""
 			m.screen = screenSecurityGroupDeleteConfirm
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewSecurityGroupDetail() string {
-	if m.selectedSecurityGroup == nil {
+func (sm securityGroupModel) viewSecurityGroupDetail(m Model) string {
+	if sm.selectedSecurityGroup == nil {
 		return ""
 	}
-	sg := m.selectedSecurityGroup
+	sg := sm.selectedSecurityGroup
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Security Group Detail"))
@@ -304,29 +370,29 @@ func (m Model) viewSecurityGroupDetail() string {
 	// Inbound rules
 	b.WriteString("\n")
 	ingressHeader := "Inbound Rules"
-	if m.sgRuleSection == "ingress" {
+	if sm.sgRuleSection == "ingress" {
 		ingressHeader = "▸ Inbound Rules"
 	}
 	b.WriteString(titleStyle.Render(ingressHeader))
 	b.WriteString("\n")
-	m.renderRuleTable(&b, sg.IngressRules, "SOURCE", m.sgRuleSection == "ingress")
+	sm.renderRuleTable(&b, sg.IngressRules, "SOURCE", sm.sgRuleSection == "ingress")
 
 	// Outbound rules
 	b.WriteString("\n")
 	egressHeader := "Outbound Rules"
-	if m.sgRuleSection == "egress" {
+	if sm.sgRuleSection == "egress" {
 		egressHeader = "▸ Outbound Rules"
 	}
 	b.WriteString(titleStyle.Render(egressHeader))
 	b.WriteString("\n")
-	m.renderRuleTable(&b, sg.EgressRules, "DESTINATION", m.sgRuleSection == "egress")
+	sm.renderRuleTable(&b, sg.EgressRules, "DESTINATION", sm.sgRuleSection == "egress")
 
 	b.WriteString("\n")
 	b.WriteString(m.renderHelpBar("↑/↓: select rule • tab: switch section • a: add rule • d: delete rule • esc: back • H: home"))
 	return b.String()
 }
 
-func (m Model) renderRuleTable(b *strings.Builder, rules []awsservice.SecurityGroupRule, sourceLabel string, isActive bool) {
+func (sm securityGroupModel) renderRuleTable(b *strings.Builder, rules []awsservice.SecurityGroupRule, sourceLabel string, isActive bool) {
 	if len(rules) == 0 {
 		b.WriteString(dimStyle.Render("  No rules"))
 		b.WriteString("\n")
@@ -366,7 +432,7 @@ func (m Model) renderRuleTable(b *strings.Builder, rules []awsservice.SecurityGr
 			row += dimStyle.Render("  " + rule.Description)
 		}
 
-		if isActive && i == m.sgRuleIdx {
+		if isActive && i == sm.sgRuleIdx {
 			b.WriteString(selectedStyle.Render("> " + row[2:]))
 		} else {
 			b.WriteString(normalStyle.Render(row))
@@ -382,110 +448,110 @@ var sgDirectionOptions = []string{"ingress", "egress"}
 var sgProtocolOptions = []string{"tcp", "udp", "-1"}
 var sgProtocolLabels = []string{"TCP", "UDP", "All Traffic"}
 
-func (m Model) updateSecurityGroupAddRule(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (sm *securityGroupModel) updateSecurityGroupAddRule(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	switch m.sgAddField {
+	switch sm.sgAddField {
 	case 0: // direction select
-		return m.updateSGAddSelect(key, sgDirectionOptions)
+		return sm.updateSGAddSelect(m, key, sgDirectionOptions)
 	case 1: // protocol select
-		return m.updateSGAddSelect(key, sgProtocolOptions)
+		return sm.updateSGAddSelect(m, key, sgProtocolOptions)
 	case 2, 3: // fromPort, toPort (text input)
-		return m.updateSGAddTextInput(key)
+		return sm.updateSGAddTextInput(m, key)
 	case 4: // source/dest (text input)
-		return m.updateSGAddTextInput(key)
+		return sm.updateSGAddTextInput(m, key)
 	case 5: // description (text input, optional)
-		return m.updateSGAddTextInput(key)
+		return sm.updateSGAddTextInput(m, key)
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateSGAddSelect(key string, options []string) (tea.Model, tea.Cmd) {
+func (sm *securityGroupModel) updateSGAddSelect(m *Model, key string, options []string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "esc":
 		m.screen = screenSecurityGroupDetail
 	case "up", "k":
-		m.sgAddSelectIdx = previousListIndex(m.sgAddSelectIdx, len(options))
+		sm.sgAddSelectIdx = previousListIndex(sm.sgAddSelectIdx, len(options))
 	case "down", "j":
-		m.sgAddSelectIdx = nextListIndex(m.sgAddSelectIdx, len(options))
+		sm.sgAddSelectIdx = nextListIndex(sm.sgAddSelectIdx, len(options))
 	case "enter":
-		fieldKey := strings.ToLower(sgAddFieldLabels[m.sgAddField])
-		if m.sgAddField == 0 {
-			m.sgAddValues["direction"] = options[m.sgAddSelectIdx]
+		fieldKey := strings.ToLower(sgAddFieldLabels[sm.sgAddField])
+		if sm.sgAddField == 0 {
+			sm.sgAddValues["direction"] = options[sm.sgAddSelectIdx]
 		} else {
-			m.sgAddValues["protocol"] = options[m.sgAddSelectIdx]
+			sm.sgAddValues["protocol"] = options[sm.sgAddSelectIdx]
 		}
 		_ = fieldKey
-		m.sgAddField++
-		m.sgAddSelectIdx = 0
-		m.sgAddInput = ""
+		sm.sgAddField++
+		sm.sgAddSelectIdx = 0
+		sm.sgAddInput = ""
 		// If protocol is "all", skip port fields
-		if m.sgAddField == 2 && m.sgAddValues["protocol"] == "-1" {
-			m.sgAddField = 4
+		if sm.sgAddField == 2 && sm.sgAddValues["protocol"] == "-1" {
+			sm.sgAddField = 4
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateSGAddTextInput(key string) (tea.Model, tea.Cmd) {
+func (sm *securityGroupModel) updateSGAddTextInput(m *Model, key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "esc":
 		m.screen = screenSecurityGroupDetail
 	case "enter":
-		switch m.sgAddField {
+		switch sm.sgAddField {
 		case 2:
-			m.sgAddValues["fromPort"] = m.sgAddInput
+			sm.sgAddValues["fromPort"] = sm.sgAddInput
 		case 3:
-			m.sgAddValues["toPort"] = m.sgAddInput
+			sm.sgAddValues["toPort"] = sm.sgAddInput
 		case 4:
-			if m.sgAddInput == "" {
-				return m, nil // source is required
+			if sm.sgAddInput == "" {
+				return *m, nil // source is required
 			}
-			m.sgAddValues["source"] = m.sgAddInput
+			sm.sgAddValues["source"] = sm.sgAddInput
 		case 5:
-			m.sgAddValues["description"] = m.sgAddInput
+			sm.sgAddValues["description"] = sm.sgAddInput
 			// Last field — execute the add
-			m.sgAddInput = ""
-			return m.startLoading(m.executeSGAddRule())
+			sm.sgAddInput = ""
+			return m.startLoading(sm.executeSGAddRule(*m))
 		}
-		m.sgAddField++
-		m.sgAddInput = ""
+		sm.sgAddField++
+		sm.sgAddInput = ""
 		// If protocol is "all", skip port fields
-		if m.sgAddField == 2 && m.sgAddValues["protocol"] == "-1" {
-			m.sgAddField = 4
+		if sm.sgAddField == 2 && sm.sgAddValues["protocol"] == "-1" {
+			sm.sgAddField = 4
 		}
 	case "backspace":
-		if len(m.sgAddInput) > 0 {
-			m.sgAddInput = m.sgAddInput[:len(m.sgAddInput)-1]
+		if len(sm.sgAddInput) > 0 {
+			sm.sgAddInput = sm.sgAddInput[:len(sm.sgAddInput)-1]
 		}
 	default:
 		if len(key) == 1 {
-			m.sgAddInput += key
+			sm.sgAddInput += key
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewSecurityGroupAddRule() string {
+func (sm securityGroupModel) viewSecurityGroupAddRule(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Add Security Group Rule"))
 	b.WriteString("\n\n")
 
-	if m.selectedSecurityGroup != nil {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  Security Group: %s (%s)", m.selectedSecurityGroup.Name, m.selectedSecurityGroup.GroupID)))
+	if sm.selectedSecurityGroup != nil {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  Security Group: %s (%s)", sm.selectedSecurityGroup.Name, sm.selectedSecurityGroup.GroupID)))
 		b.WriteString("\n\n")
 	}
 
 	// Show completed fields
-	for i := 0; i < m.sgAddField; i++ {
+	for i := 0; i < sm.sgAddField; i++ {
 		label := sgAddFieldLabels[i]
 		val := ""
 		switch i {
 		case 0:
-			val = m.sgAddValues["direction"]
+			val = sm.sgAddValues["direction"]
 		case 1:
-			proto := m.sgAddValues["protocol"]
+			proto := sm.sgAddValues["protocol"]
 			for j, p := range sgProtocolOptions {
 				if p == proto {
 					val = sgProtocolLabels[j]
@@ -493,31 +559,31 @@ func (m Model) viewSecurityGroupAddRule() string {
 				}
 			}
 		case 2:
-			val = m.sgAddValues["fromPort"]
+			val = sm.sgAddValues["fromPort"]
 		case 3:
-			val = m.sgAddValues["toPort"]
+			val = sm.sgAddValues["toPort"]
 		case 4:
-			val = m.sgAddValues["source"]
+			val = sm.sgAddValues["source"]
 		case 5:
-			val = m.sgAddValues["description"]
+			val = sm.sgAddValues["description"]
 		}
 		b.WriteString(dimStyle.Render(fmt.Sprintf("  %s: %s", label, val)))
 		b.WriteString("\n")
 	}
 
 	// Show current field
-	if m.sgAddField < len(sgAddFieldLabels) {
-		label := sgAddFieldLabels[m.sgAddField]
+	if sm.sgAddField < len(sgAddFieldLabels) {
+		label := sgAddFieldLabels[sm.sgAddField]
 		b.WriteString("\n")
 		b.WriteString(normalStyle.Render(fmt.Sprintf("  %s:", label)))
 		b.WriteString("\n")
 
-		switch m.sgAddField {
+		switch sm.sgAddField {
 		case 0: // direction select
 			for i, opt := range []string{"Ingress (inbound)", "Egress (outbound)"} {
 				cursor := "  "
 				style := normalStyle
-				if i == m.sgAddSelectIdx {
+				if i == sm.sgAddSelectIdx {
 					cursor = "> "
 					style = selectedStyle
 				}
@@ -528,7 +594,7 @@ func (m Model) viewSecurityGroupAddRule() string {
 			for i, label := range sgProtocolLabels {
 				cursor := "  "
 				style := normalStyle
-				if i == m.sgAddSelectIdx {
+				if i == sm.sgAddSelectIdx {
 					cursor = "> "
 					style = selectedStyle
 				}
@@ -537,7 +603,7 @@ func (m Model) viewSecurityGroupAddRule() string {
 			}
 		default: // text input
 			hint := ""
-			switch m.sgAddField {
+			switch sm.sgAddField {
 			case 2:
 				hint = " (e.g. 443)"
 			case 3:
@@ -547,7 +613,7 @@ func (m Model) viewSecurityGroupAddRule() string {
 			case 5:
 				hint = " (optional, press enter to skip)"
 			}
-			b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.sgAddInput)))
+			b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", sm.sgAddInput)))
 			if hint != "" {
 				b.WriteString(dimStyle.Render(hint))
 			}
@@ -556,7 +622,7 @@ func (m Model) viewSecurityGroupAddRule() string {
 	}
 
 	b.WriteString("\n")
-	if m.sgAddField == 0 || m.sgAddField == 1 {
+	if sm.sgAddField == 0 || sm.sgAddField == 1 {
 		b.WriteString(m.renderHelpBar("↑/↓: select • enter: confirm • esc: cancel"))
 	} else {
 		b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
@@ -566,46 +632,46 @@ func (m Model) viewSecurityGroupAddRule() string {
 
 // --- Delete Confirm screen ---
 
-func (m Model) updateSecurityGroupDeleteConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.selectedSecurityGroup == nil || m.sgDeleteRule == nil {
+func (sm *securityGroupModel) updateSecurityGroupDeleteConfirm(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if sm.selectedSecurityGroup == nil || sm.sgDeleteRule == nil {
 		m.screen = screenSecurityGroupDetail
-		return m, nil
+		return *m, nil
 	}
 
-	confirmTarget := m.selectedSecurityGroup.GroupID
+	confirmTarget := sm.selectedSecurityGroup.GroupID
 
 	switch msg.String() {
 	case "esc":
 		m.screen = screenSecurityGroupDetail
 	case "enter":
-		if m.sgDeleteConfirm == confirmTarget {
-			return m.startLoading(m.executeSGDeleteRule())
+		if sm.sgDeleteConfirm == confirmTarget {
+			return m.startLoading(sm.executeSGDeleteRule(*m))
 		}
 	case "backspace":
-		if len(m.sgDeleteConfirm) > 0 {
-			m.sgDeleteConfirm = m.sgDeleteConfirm[:len(m.sgDeleteConfirm)-1]
+		if len(sm.sgDeleteConfirm) > 0 {
+			sm.sgDeleteConfirm = sm.sgDeleteConfirm[:len(sm.sgDeleteConfirm)-1]
 		}
 	default:
 		if runes := msg.Runes; len(runes) > 0 {
-			m.sgDeleteConfirm += string(runes)
+			sm.sgDeleteConfirm += string(runes)
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) viewSecurityGroupDeleteConfirm() string {
-	if m.selectedSecurityGroup == nil || m.sgDeleteRule == nil {
+func (sm securityGroupModel) viewSecurityGroupDeleteConfirm(m Model) string {
+	if sm.selectedSecurityGroup == nil || sm.sgDeleteRule == nil {
 		return ""
 	}
-	sg := m.selectedSecurityGroup
-	rule := m.sgDeleteRule
+	sg := sm.selectedSecurityGroup
+	rule := sm.sgDeleteRule
 
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(errorStyle.Render("Confirm Rule Deletion"))
 	b.WriteString("\n\n")
 
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  You are about to delete a %s rule from:", m.sgRuleSection)))
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  You are about to delete a %s rule from:", sm.sgRuleSection)))
 	b.WriteString("\n")
 	b.WriteString(selectedStyle.Render(fmt.Sprintf("  %s (%s)", sg.Name, sg.GroupID)))
 	b.WriteString("\n\n")
@@ -638,7 +704,7 @@ func (m Model) viewSecurityGroupDeleteConfirm() string {
 		source = "-"
 	}
 	sourceLabel := "Source"
-	if m.sgRuleSection == "egress" {
+	if sm.sgRuleSection == "egress" {
 		sourceLabel = "Destination"
 	}
 	b.WriteString(normalStyle.Render(fmt.Sprintf("    %s: %s", sourceLabel, source)))
@@ -646,7 +712,7 @@ func (m Model) viewSecurityGroupDeleteConfirm() string {
 
 	b.WriteString(normalStyle.Render("  Type the security group ID to confirm:"))
 	b.WriteString("\n")
-	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", m.sgDeleteConfirm)))
+	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", sm.sgDeleteConfirm)))
 	b.WriteString("\n\n")
 
 	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))

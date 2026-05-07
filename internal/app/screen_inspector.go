@@ -32,6 +32,32 @@ var inspectorSeverityFilters = []inspector.RuleSeverity{
 	inspector.RuleSeverityLow,
 }
 
+type inspectorModel struct {
+	workflows               []inspector.Workflow
+	workflowIdx             int
+	checklistPath           string
+	checklistDir            string
+	checklistFiles          []checklistPickerEntry
+	filteredChecklistFiles  []checklistPickerEntry
+	checklistFileIdx        int
+	checklistError          string
+	report                  *inspector.SecurityScanReport
+	findings                []inspector.SecurityFinding
+	idx                     int
+	severityFilter          inspector.RuleSeverity
+	selectedFinding         *inspector.SecurityFinding
+	checklistReport         *inspector.ChecklistReport
+	checklistIdx            int
+	selectedChecklistResult *inspector.ChecklistResult
+}
+
+func newInspectorModel(checklistPath string) inspectorModel {
+	return inspectorModel{
+		checklistPath: checklistPath,
+		workflows:     inspector.Workflows(checklistPath),
+	}
+}
+
 type checklistPickerEntry struct {
 	Name     string
 	Path     string
@@ -43,42 +69,42 @@ func (e checklistPickerEntry) FilterText() string {
 	return strings.ToLower(fmt.Sprintf("%s %s", e.Name, e.Path))
 }
 
-func (m *Model) refreshInspectorWorkflows() {
-	m.inspectorWorkflows = inspector.Workflows(m.inspectorChecklistPath)
-	if m.inspectorWorkflowIdx >= len(m.inspectorWorkflows) {
-		m.inspectorWorkflowIdx = 0
+func (im *inspectorModel) refreshWorkflows() {
+	im.workflows = inspector.Workflows(im.checklistPath)
+	if im.workflowIdx >= len(im.workflows) {
+		im.workflowIdx = 0
 	}
 }
 
-func (m *Model) ensureInspectorWorkflows() {
-	if len(m.inspectorWorkflows) == 0 {
-		m.refreshInspectorWorkflows()
+func (im *inspectorModel) ensureWorkflows() {
+	if len(im.workflows) == 0 {
+		im.refreshWorkflows()
 		return
 	}
-	m.refreshInspectorWorkflows()
+	im.refreshWorkflows()
 }
 
-func (m *Model) enterInspectorMode() {
-	m.ensureInspectorWorkflows()
+func (im *inspectorModel) Enter(m *Model) {
+	im.ensureWorkflows()
 	m.screen = screenInspectorHome
-	m.selectedInspectorFinding = nil
-	m.selectedChecklistResult = nil
-	m.inspectorIdx = 0
-	m.inspectorChecklistIdx = 0
+	im.selectedFinding = nil
+	im.selectedChecklistResult = nil
+	im.idx = 0
+	im.checklistIdx = 0
 }
 
-func (m Model) currentInspectorWorkflow() inspector.Workflow {
-	if len(m.inspectorWorkflows) == 0 {
+func (im inspectorModel) currentWorkflow() inspector.Workflow {
+	if len(im.workflows) == 0 {
 		return inspector.Workflow{}
 	}
-	if m.inspectorWorkflowIdx < 0 || m.inspectorWorkflowIdx >= len(m.inspectorWorkflows) {
-		return m.inspectorWorkflows[0]
+	if im.workflowIdx < 0 || im.workflowIdx >= len(im.workflows) {
+		return im.workflows[0]
 	}
-	return m.inspectorWorkflows[m.inspectorWorkflowIdx]
+	return im.workflows[im.workflowIdx]
 }
 
-func (m Model) checklistWorkflowIndex() int {
-	for i, workflow := range m.inspectorWorkflows {
+func (im inspectorModel) checklistWorkflowIndex() int {
+	for i, workflow := range im.workflows {
 		if workflow.Kind == inspector.WorkflowChecklist {
 			return i
 		}
@@ -86,12 +112,12 @@ func (m Model) checklistWorkflowIndex() int {
 	return 0
 }
 
-func (m Model) initialChecklistPickerDir() string {
-	if dir := strings.TrimSpace(m.inspectorChecklistDir); dir != "" && checklistPickerDirExists(dir) {
+func (im inspectorModel) initialChecklistPickerDir() string {
+	if dir := strings.TrimSpace(im.checklistDir); dir != "" && checklistPickerDirExists(dir) {
 		return dir
 	}
 
-	checklistPath := strings.TrimSpace(m.inspectorChecklistPath)
+	checklistPath := strings.TrimSpace(im.checklistPath)
 	if checklistPath != "" {
 		dir := filepath.Dir(checklistPath)
 		if checklistPickerDirExists(dir) {
@@ -118,7 +144,7 @@ func checklistPickerDirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func (m *Model) loadChecklistPickerEntries(dir string) error {
+func (im *inspectorModel) loadChecklistPickerEntries(m *Model, dir string) error {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return fmt.Errorf("failed to resolve checklist directory %s: %w", dir, err)
@@ -179,10 +205,10 @@ func (m *Model) loadChecklistPickerEntries(dir string) error {
 		}
 	})
 
-	m.inspectorChecklistDir = absDir
-	m.inspectorChecklistFiles = items
-	m.inspectorChecklistError = ""
-	m.inspectorChecklistFileIdx = 0
+	im.checklistDir = absDir
+	im.checklistFiles = items
+	im.checklistError = ""
+	im.checklistFileIdx = 0
 	m.storeFilterValue(filterInspectorChecklistFiles, "")
 	if m.activeFilter == filterInspectorChecklistFiles {
 		m.filterTI.Reset()
@@ -192,250 +218,310 @@ func (m *Model) loadChecklistPickerEntries(dir string) error {
 	return nil
 }
 
-func (m Model) openChecklistPicker() (Model, tea.Cmd) {
-	if err := m.loadChecklistPickerEntries(m.initialChecklistPickerDir()); err != nil {
+func (im *inspectorModel) openChecklistPicker(m *Model) (tea.Model, tea.Cmd) {
+	if err := im.loadChecklistPickerEntries(m, im.initialChecklistPickerDir()); err != nil {
 		m.errMsg = err.Error()
 		m.screen = screenError
-		return m, nil
+		return *m, nil
 	}
 
-	m.inspectorWorkflowIdx = m.checklistWorkflowIndex()
+	im.workflowIdx = im.checklistWorkflowIndex()
 	m.screen = screenInspectorChecklistPicker
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) handleInspectorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+func (im *inspectorModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case inspectorScanLoadedMsg:
-		m.inspectorReport = msg.report
-		m.selectedInspectorFinding = nil
-		m.applyInspectorSeverityFilter()
+		im.report = msg.report
+		im.selectedFinding = nil
+		im.applySeverityFilter()
 		m.screen = screenInspectorResults
-		return m, nil, true
+		return *m, nil, true
 	case inspectorChecklistLoadedMsg:
-		m.inspectorChecklistReport = msg.report
-		m.selectedChecklistResult = nil
-		m.inspectorChecklistIdx = 0
+		im.checklistReport = msg.report
+		im.selectedChecklistResult = nil
+		im.checklistIdx = 0
 		m.screen = screenInspectorChecklistResults
-		return m, nil, true
+		return *m, nil, true
 	}
-	return m, nil, false
+	return *m, nil, false
 }
 
-func (m Model) updateInspectorHome(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *inspectorModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.screen {
+	case screenInspectorHome:
+		newM, cmd := im.updateHome(m, msg)
+		return newM, cmd, true
+	case screenInspectorWorkflowPlaceholder:
+		newM, cmd := im.updateWorkflowPlaceholder(m, msg)
+		return newM, cmd, true
+	case screenInspectorChecklistPicker:
+		newM, cmd := im.updateChecklistPicker(m, msg)
+		return newM, cmd, true
+	case screenInspectorResults:
+		newM, cmd := im.updateResults(m, msg)
+		return newM, cmd, true
+	case screenInspectorFindingDetail:
+		newM, cmd := im.updateFindingDetail(m, msg)
+		return newM, cmd, true
+	case screenInspectorChecklistResults:
+		newM, cmd := im.updateChecklistResults(m, msg)
+		return newM, cmd, true
+	case screenInspectorChecklistDetail:
+		newM, cmd := im.updateChecklistDetail(m, msg)
+		return newM, cmd, true
+	default:
+		return *m, nil, false
+	}
+}
+
+func (im inspectorModel) View(m Model) (string, bool) {
+	switch m.screen {
+	case screenInspectorHome:
+		return im.viewHome(m), true
+	case screenInspectorWorkflowPlaceholder:
+		return im.viewWorkflowPlaceholder(m), true
+	case screenInspectorChecklistPicker:
+		return im.viewChecklistPicker(m), true
+	case screenInspectorScanning:
+		return im.viewScanning(m), true
+	case screenInspectorResults:
+		return im.viewResults(m), true
+	case screenInspectorFindingDetail:
+		return im.viewFindingDetail(m), true
+	case screenInspectorChecklistResults:
+		return im.viewChecklistResults(m), true
+	case screenInspectorChecklistDetail:
+		return im.viewChecklistDetail(m), true
+	default:
+		return "", false
+	}
+}
+
+func (im *inspectorModel) ApplyFilter(m *Model, target filterTarget) bool {
+	if target != filterInspectorChecklistFiles {
+		return false
+	}
+	im.filteredChecklistFiles = applyFilter(im.checklistFiles, m.filterValue(target))
+	im.checklistFileIdx = 0
+	return true
+}
+
+func (im *inspectorModel) updateHome(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenServiceList
 	case "up", "k":
-		m.inspectorWorkflowIdx = previousListIndex(m.inspectorWorkflowIdx, len(m.inspectorWorkflows))
+		im.workflowIdx = previousListIndex(im.workflowIdx, len(im.workflows))
 	case "down", "j":
-		m.inspectorWorkflowIdx = nextListIndex(m.inspectorWorkflowIdx, len(m.inspectorWorkflows))
+		im.workflowIdx = nextListIndex(im.workflowIdx, len(im.workflows))
 	case "r":
-		if m.currentInspectorWorkflow().Available {
-			return m.startInspectorWorkflow(m.currentInspectorWorkflow().Kind)
+		if im.currentWorkflow().Available {
+			return im.startWorkflow(m, im.currentWorkflow().Kind)
 		}
 	case "l":
-		if m.currentInspectorWorkflow().Kind == inspector.WorkflowChecklist {
-			return m.openChecklistPicker()
+		if im.currentWorkflow().Kind == inspector.WorkflowChecklist {
+			return im.openChecklistPicker(m)
 		}
 	case "enter":
-		return m.openInspectorWorkflow()
+		return im.openWorkflow(m)
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) openInspectorWorkflow() (tea.Model, tea.Cmd) {
-	workflow := m.currentInspectorWorkflow()
+func (im *inspectorModel) openWorkflow(m *Model) (tea.Model, tea.Cmd) {
+	workflow := im.currentWorkflow()
 	if workflow.Kind == inspector.WorkflowChecklist && !workflow.Available {
-		return m.openChecklistPicker()
+		return im.openChecklistPicker(m)
 	}
 	if !workflow.Available {
 		m.screen = screenInspectorWorkflowPlaceholder
-		return m, nil
+		return *m, nil
 	}
 
 	switch workflow.Kind {
 	case inspector.WorkflowSecurity:
-		if m.inspectorReport != nil {
-			m.applyInspectorSeverityFilter()
+		if im.report != nil {
+			im.applySeverityFilter()
 			m.screen = screenInspectorResults
-			return m, nil
+			return *m, nil
 		}
 	case inspector.WorkflowChecklist:
-		if m.inspectorChecklistReport != nil {
-			m.inspectorChecklistIdx = 0
+		if im.checklistReport != nil {
+			im.checklistIdx = 0
 			m.screen = screenInspectorChecklistResults
-			return m, nil
+			return *m, nil
 		}
 	}
-	return m.startInspectorWorkflow(workflow.Kind)
+	return im.startWorkflow(m, workflow.Kind)
 }
 
-func (m Model) updateInspectorWorkflowPlaceholder(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *inspectorModel) updateWorkflowPlaceholder(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "l":
-		if m.currentInspectorWorkflow().Kind == inspector.WorkflowChecklist {
-			return m.openChecklistPicker()
+		if im.currentWorkflow().Kind == inspector.WorkflowChecklist {
+			return im.openChecklistPicker(m)
 		}
 	case "enter":
-		if m.currentInspectorWorkflow().Kind == inspector.WorkflowChecklist {
-			return m.openChecklistPicker()
+		if im.currentWorkflow().Kind == inspector.WorkflowChecklist {
+			return im.openChecklistPicker(m)
 		}
 		m.screen = screenInspectorHome
 	case "q", "esc":
 		m.screen = screenInspectorHome
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateInspectorResults(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *inspectorModel) updateResults(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
-		m.selectedInspectorFinding = nil
+		im.selectedFinding = nil
 		m.screen = screenInspectorHome
 	case "up", "k":
-		m.inspectorIdx = previousListIndex(m.inspectorIdx, len(m.inspectorFindings))
+		im.idx = previousListIndex(im.idx, len(im.findings))
 	case "down", "j":
-		m.inspectorIdx = nextListIndex(m.inspectorIdx, len(m.inspectorFindings))
+		im.idx = nextListIndex(im.idx, len(im.findings))
 	case "enter":
-		if len(m.inspectorFindings) > 0 && m.inspectorIdx < len(m.inspectorFindings) {
-			selected := m.inspectorFindings[m.inspectorIdx]
-			m.selectedInspectorFinding = &selected
+		if len(im.findings) > 0 && im.idx < len(im.findings) {
+			selected := im.findings[im.idx]
+			im.selectedFinding = &selected
 			m.screen = screenInspectorFindingDetail
 		}
 	case "r":
-		return m.startInspectorWorkflow(inspector.WorkflowSecurity)
+		return im.startWorkflow(m, inspector.WorkflowSecurity)
 	case "1", "2", "3", "4", "5":
 		idx := int(msg.String()[0] - '1')
 		if idx >= 0 && idx < len(inspectorSeverityFilters) {
-			m.inspectorSeverityFilter = inspectorSeverityFilters[idx]
-			m.applyInspectorSeverityFilter()
+			im.severityFilter = inspectorSeverityFilters[idx]
+			im.applySeverityFilter()
 		}
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateInspectorFindingDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *inspectorModel) updateFindingDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenInspectorResults
 	case "r":
-		return m.startInspectorWorkflow(inspector.WorkflowSecurity)
+		return im.startWorkflow(m, inspector.WorkflowSecurity)
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateInspectorChecklistResults(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *inspectorModel) updateChecklistResults(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
-		m.selectedChecklistResult = nil
+		im.selectedChecklistResult = nil
 		m.screen = screenInspectorHome
 	case "l":
-		return m.openChecklistPicker()
+		return im.openChecklistPicker(m)
 	case "up", "k":
-		if m.inspectorChecklistReport != nil {
-			m.inspectorChecklistIdx = previousListIndex(m.inspectorChecklistIdx, len(m.inspectorChecklistReport.Results))
+		if im.checklistReport != nil {
+			im.checklistIdx = previousListIndex(im.checklistIdx, len(im.checklistReport.Results))
 		}
 	case "down", "j":
-		if m.inspectorChecklistReport != nil {
-			m.inspectorChecklistIdx = nextListIndex(m.inspectorChecklistIdx, len(m.inspectorChecklistReport.Results))
+		if im.checklistReport != nil {
+			im.checklistIdx = nextListIndex(im.checklistIdx, len(im.checklistReport.Results))
 		}
 	case "enter":
-		if m.inspectorChecklistReport != nil && len(m.inspectorChecklistReport.Results) > 0 && m.inspectorChecklistIdx < len(m.inspectorChecklistReport.Results) {
-			selected := m.inspectorChecklistReport.Results[m.inspectorChecklistIdx]
-			m.selectedChecklistResult = &selected
+		if im.checklistReport != nil && len(im.checklistReport.Results) > 0 && im.checklistIdx < len(im.checklistReport.Results) {
+			selected := im.checklistReport.Results[im.checklistIdx]
+			im.selectedChecklistResult = &selected
 			m.screen = screenInspectorChecklistDetail
 		}
 	case "r":
-		return m.startInspectorWorkflow(inspector.WorkflowChecklist)
+		return im.startWorkflow(m, inspector.WorkflowChecklist)
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateInspectorChecklistDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *inspectorModel) updateChecklistDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenInspectorChecklistResults
 	case "l":
-		return m.openChecklistPicker()
+		return im.openChecklistPicker(m)
 	case "r":
-		return m.startInspectorWorkflow(inspector.WorkflowChecklist)
+		return im.startWorkflow(m, inspector.WorkflowChecklist)
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) updateInspectorChecklistPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (im *inspectorModel) updateChecklistPicker(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if cmd, handled := m.updateSharedFilter(msg, filterInspectorChecklistFiles); handled {
-		return m, cmd
+		return *m, cmd
 	}
 
 	switch msg.String() {
 	case "q", "esc":
 		m.screen = screenInspectorHome
 	case "up", "k":
-		m.inspectorChecklistFileIdx = previousListIndex(m.inspectorChecklistFileIdx, len(m.filteredChecklistFiles))
+		im.checklistFileIdx = previousListIndex(im.checklistFileIdx, len(im.filteredChecklistFiles))
 	case "down", "j":
-		m.inspectorChecklistFileIdx = nextListIndex(m.inspectorChecklistFileIdx, len(m.filteredChecklistFiles))
+		im.checklistFileIdx = nextListIndex(im.checklistFileIdx, len(im.filteredChecklistFiles))
 	case "/":
-		return m, m.activateFilter(filterInspectorChecklistFiles)
+		return *m, m.activateFilter(filterInspectorChecklistFiles)
 	case "enter":
-		if len(m.filteredChecklistFiles) == 0 || m.inspectorChecklistFileIdx >= len(m.filteredChecklistFiles) {
-			return m, nil
+		if len(im.filteredChecklistFiles) == 0 || im.checklistFileIdx >= len(im.filteredChecklistFiles) {
+			return *m, nil
 		}
 
-		selected := m.filteredChecklistFiles[m.inspectorChecklistFileIdx]
+		selected := im.filteredChecklistFiles[im.checklistFileIdx]
 		if selected.IsDir {
-			if err := m.loadChecklistPickerEntries(selected.Path); err != nil {
-				m.inspectorChecklistError = err.Error()
+			if err := im.loadChecklistPickerEntries(m, selected.Path); err != nil {
+				im.checklistError = err.Error()
 			}
-			return m, nil
+			return *m, nil
 		}
 
 		if _, err := inspector.LoadChecklist(selected.Path); err != nil {
-			m.inspectorChecklistError = err.Error()
-			return m, nil
+			im.checklistError = err.Error()
+			return *m, nil
 		}
 
-		m.inspectorChecklistPath = selected.Path
-		m.inspectorChecklistDir = filepath.Dir(selected.Path)
-		m.inspectorChecklistReport = nil
-		m.selectedChecklistResult = nil
-		m.inspectorChecklistIdx = 0
-		m.inspectorChecklistError = ""
-		m.refreshInspectorWorkflows()
-		m.inspectorWorkflowIdx = m.checklistWorkflowIndex()
-		return m.startChecklistScan()
+		im.checklistPath = selected.Path
+		im.checklistDir = filepath.Dir(selected.Path)
+		im.checklistReport = nil
+		im.selectedChecklistResult = nil
+		im.checklistIdx = 0
+		im.checklistError = ""
+		im.refreshWorkflows()
+		im.workflowIdx = im.checklistWorkflowIndex()
+		return im.startChecklistScan(m)
 	}
 
-	return m, nil
+	return *m, nil
 }
 
-func (m Model) startInspectorWorkflow(kind inspector.WorkflowKind) (tea.Model, tea.Cmd) {
+func (im *inspectorModel) startWorkflow(m *Model, kind inspector.WorkflowKind) (tea.Model, tea.Cmd) {
 	switch kind {
 	case inspector.WorkflowChecklist:
-		return m.startChecklistScan()
+		return im.startChecklistScan(m)
 	case inspector.WorkflowSecurity:
 		fallthrough
 	default:
-		return m.startInspectorScan()
+		return im.startScan(m)
 	}
 }
 
-func (m Model) startInspectorScan() (tea.Model, tea.Cmd) {
-	m.selectedInspectorFinding = nil
+func (im *inspectorModel) startScan(m *Model) (tea.Model, tea.Cmd) {
+	im.selectedFinding = nil
 	m.screen = screenInspectorScanning
 	m.loadingSpinner = newLoadingSpinner()
-	return m, tea.Batch(m.loadingSpinner.Tick, m.loadSecurityScan())
+	return *m, tea.Batch(m.loadingSpinner.Tick, im.loadSecurityScan(*m))
 }
 
-func (m Model) startChecklistScan() (tea.Model, tea.Cmd) {
-	m.selectedChecklistResult = nil
+func (im *inspectorModel) startChecklistScan(m *Model) (tea.Model, tea.Cmd) {
+	im.selectedChecklistResult = nil
 	m.screen = screenInspectorScanning
 	m.loadingSpinner = newLoadingSpinner()
-	return m, tea.Batch(m.loadingSpinner.Tick, m.loadChecklistScan())
+	return *m, tea.Batch(m.loadingSpinner.Tick, im.loadChecklistScan(*m))
 }
 
-func (m Model) loadSecurityScan() tea.Cmd {
+func (im *inspectorModel) loadSecurityScan(m Model) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -451,9 +537,9 @@ func (m Model) loadSecurityScan() tea.Cmd {
 	}
 }
 
-func (m Model) loadChecklistScan() tea.Cmd {
+func (im *inspectorModel) loadChecklistScan(m Model) tea.Cmd {
 	return func() tea.Msg {
-		checklistPath := strings.TrimSpace(m.inspectorChecklistPath)
+		checklistPath := strings.TrimSpace(im.checklistPath)
 		if checklistPath == "" {
 			return errMsg{err: fmt.Errorf("Checklist Inspector requires a loaded checklist file")}
 		}
@@ -477,24 +563,24 @@ func (m Model) loadChecklistScan() tea.Cmd {
 	}
 }
 
-func (m *Model) applyInspectorSeverityFilter() {
-	m.inspectorIdx = 0
-	if m.inspectorReport == nil {
-		m.inspectorFindings = nil
+func (im *inspectorModel) applySeverityFilter() {
+	im.idx = 0
+	if im.report == nil {
+		im.findings = nil
 		return
 	}
 
 	var filtered []inspector.SecurityFinding
-	for _, finding := range m.inspectorReport.Findings {
-		if finding.MatchesSeverity(m.inspectorSeverityFilter) {
+	for _, finding := range im.report.Findings {
+		if finding.MatchesSeverity(im.severityFilter) {
 			filtered = append(filtered, finding)
 		}
 	}
-	m.inspectorFindings = filtered
+	im.findings = filtered
 }
 
-func (m Model) viewInspectorHome() string {
-	selected := m.currentInspectorWorkflow()
+func (im inspectorModel) viewHome(m Model) string {
+	selected := im.currentWorkflow()
 
 	var b strings.Builder
 	var panel strings.Builder
@@ -504,14 +590,14 @@ func (m Model) viewInspectorHome() string {
 	b.WriteString(dimStyle.Render("Cross-service workflows with inspection-focused chrome and shared AWS context."))
 	b.WriteString("\n\n")
 
-	for i, workflow := range m.inspectorWorkflows {
+	for i, workflow := range im.workflows {
 		cursor := "  "
 		nameStyle := normalStyle
 		badgeStyle := inspectorReadyStyle
 		if !workflow.Available {
 			badgeStyle = inspectorPlannedStyle
 		}
-		if i == m.inspectorWorkflowIdx {
+		if i == im.workflowIdx {
 			cursor = "> "
 			nameStyle = inspectorSelectedStyle
 		}
@@ -519,7 +605,7 @@ func (m Model) viewInspectorHome() string {
 		row := fmt.Sprintf("%s%-22s %s", cursor, workflow.Title, badgeStyle.Render("["+workflow.StatusLabel()+"]"))
 		panel.WriteString(nameStyle.Render(row))
 		panel.WriteString("\n")
-		if i == m.inspectorWorkflowIdx {
+		if i == im.workflowIdx {
 			panel.WriteString(dimStyle.Render("    " + workflow.Description))
 			panel.WriteString("\n")
 		}
@@ -534,12 +620,12 @@ func (m Model) viewInspectorHome() string {
 		panel.WriteString("\n")
 		panel.WriteString(dimStyle.Render(fmt.Sprintf("  Registered rule packs: %d", inspector.RegisteredSecurityInspectorScannerCount())))
 		panel.WriteString("\n")
-		if m.inspectorReport != nil {
+		if im.report != nil {
 			panel.WriteString(dimStyle.Render(fmt.Sprintf(
 				"  Last scan: %s • findings:%d • warnings:%d",
-				m.inspectorReport.ScannedAt.Local().Format("2006-01-02 15:04:05"),
-				len(m.inspectorReport.Findings),
-				len(m.inspectorReport.Warnings),
+				im.report.ScannedAt.Local().Format("2006-01-02 15:04:05"),
+				len(im.report.Findings),
+				len(im.report.Warnings),
 			)))
 			panel.WriteString("\n")
 		}
@@ -548,14 +634,14 @@ func (m Model) viewInspectorHome() string {
 		if selected.Available {
 			panel.WriteString(normalStyle.Render("  Run the configured YAML checklist against the current AWS context."))
 			panel.WriteString("\n")
-			panel.WriteString(dimStyle.Render(fmt.Sprintf("  Checklist file: %s", m.inspectorChecklistPath)))
+			panel.WriteString(dimStyle.Render(fmt.Sprintf("  Checklist file: %s", im.checklistPath)))
 			panel.WriteString("\n")
-			if m.inspectorChecklistReport != nil {
+			if im.checklistReport != nil {
 				panel.WriteString(dimStyle.Render(fmt.Sprintf(
 					"  Last run: %s • pass:%d • fail:%d",
-					m.inspectorChecklistReport.ScannedAt.Local().Format("2006-01-02 15:04:05"),
-					m.inspectorChecklistReport.PassedCount,
-					m.inspectorChecklistReport.FailedCount,
+					im.checklistReport.ScannedAt.Local().Format("2006-01-02 15:04:05"),
+					im.checklistReport.PassedCount,
+					im.checklistReport.FailedCount,
 				)))
 				panel.WriteString("\n")
 			}
@@ -575,8 +661,8 @@ func (m Model) viewInspectorHome() string {
 	return b.String()
 }
 
-func (m Model) viewInspectorWorkflowPlaceholder() string {
-	workflow := m.currentInspectorWorkflow()
+func (im inspectorModel) viewWorkflowPlaceholder(m Model) string {
+	workflow := im.currentWorkflow()
 
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -604,7 +690,7 @@ func (m Model) viewInspectorWorkflowPlaceholder() string {
 	return b.String()
 }
 
-func (m Model) viewInspectorChecklistPicker() string {
+func (im inspectorModel) viewChecklistPicker(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
@@ -612,22 +698,22 @@ func (m Model) viewInspectorChecklistPicker() string {
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("Browse folders and choose a .yaml or .yml file to load into Checklist Inspector."))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("Directory: " + m.inspectorChecklistDir))
-	if strings.TrimSpace(m.inspectorChecklistPath) != "" {
+	b.WriteString(dimStyle.Render("Directory: " + im.checklistDir))
+	if strings.TrimSpace(im.checklistPath) != "" {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("Loaded: " + m.inspectorChecklistPath))
+		b.WriteString(dimStyle.Render("Loaded: " + im.checklistPath))
 	}
 	b.WriteString("\n")
 
 	b.WriteString(m.renderFilterValue(filterInspectorChecklistFiles))
 	b.WriteString("\n\n")
 
-	if m.inspectorChecklistError != "" {
-		panel.WriteString(errorStyle.Render("  " + m.inspectorChecklistError))
+	if im.checklistError != "" {
+		panel.WriteString(errorStyle.Render("  " + im.checklistError))
 		panel.WriteString("\n\n")
 	}
 
-	if len(m.filteredChecklistFiles) == 0 {
+	if len(im.filteredChecklistFiles) == 0 {
 		panel.WriteString(dimStyle.Render("  No checklist files or folders match the current filter"))
 		panel.WriteString("\n")
 	} else {
@@ -637,16 +723,16 @@ func (m Model) viewInspectorChecklistPicker() string {
 
 		visibleLines := max(m.height-14, 5)
 		start := 0
-		if m.inspectorChecklistFileIdx >= visibleLines {
-			start = m.inspectorChecklistFileIdx - visibleLines + 1
+		if im.checklistFileIdx >= visibleLines {
+			start = im.checklistFileIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.filteredChecklistFiles))
+		end := min(start+visibleLines, len(im.filteredChecklistFiles))
 
 		for i := start; i < end; i++ {
-			entry := m.filteredChecklistFiles[i]
+			entry := im.filteredChecklistFiles[i]
 			cursor := "  "
 			textStyle := normalStyle
-			if i == m.inspectorChecklistFileIdx {
+			if i == im.checklistFileIdx {
 				cursor = "> "
 				textStyle = inspectorSelectedStyle
 			}
@@ -660,7 +746,7 @@ func (m Model) viewInspectorChecklistPicker() string {
 			if entry.IsDir && !entry.IsParent {
 				name += "/"
 			}
-			if entry.Path == m.inspectorChecklistPath {
+			if entry.Path == im.checklistPath {
 				name += " [loaded]"
 			}
 
@@ -672,7 +758,7 @@ func (m Model) viewInspectorChecklistPicker() string {
 		}
 
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d entries", len(m.filteredChecklistFiles), len(m.inspectorChecklistFiles))))
+		panel.WriteString(dimStyle.Render(fmt.Sprintf("  %d/%d entries", len(im.filteredChecklistFiles), len(im.checklistFiles))))
 	}
 
 	b.WriteString(m.renderListPanel(panel.String()))
@@ -681,11 +767,11 @@ func (m Model) viewInspectorChecklistPicker() string {
 	return b.String()
 }
 
-func (m Model) viewInspectorScanning() string {
+func (im inspectorModel) viewScanning(m Model) string {
 	var title string
 	var description string
 
-	switch m.currentInspectorWorkflow().Kind {
+	switch im.currentWorkflow().Kind {
 	case inspector.WorkflowChecklist:
 		title = "Inspector Mode — Checklist Scan"
 		description = "  Verifying RDS instances, security groups, and secrets against the supplied checklist YAML."
@@ -698,7 +784,7 @@ func (m Model) viewInspectorScanning() string {
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(m.renderModeTitle(title))
 	b.WriteString("\n\n")
-	switch m.currentInspectorWorkflow().Kind {
+	switch im.currentWorkflow().Kind {
 	case inspector.WorkflowChecklist:
 		b.WriteString(inspectorTitleStyle.Render(fmt.Sprintf("%s Running checklist expectations...", m.loadingSpinner.View())))
 	default:
@@ -709,43 +795,43 @@ func (m Model) viewInspectorScanning() string {
 	return b.String()
 }
 
-func (m Model) viewInspectorResults() string {
+func (im inspectorModel) viewResults(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(m.renderModeTitle("Security Inspector Findings"))
 	b.WriteString("\n")
 
-	if m.inspectorReport != nil {
+	if im.report != nil {
 		b.WriteString(dimStyle.Render(fmt.Sprintf(
 			"Scanned: %s  Rule Packs: %d  Findings: %d",
-			m.inspectorReport.ScannedAt.Local().Format("2006-01-02 15:04:05"),
-			m.inspectorReport.ScannerCount,
-			len(m.inspectorReport.Findings),
+			im.report.ScannedAt.Local().Format("2006-01-02 15:04:05"),
+			im.report.ScannerCount,
+			len(im.report.Findings),
 		)))
 		b.WriteString("\n")
 	}
 
-	b.WriteString(m.renderInspectorSeveritySelector())
+	b.WriteString(im.renderSeveritySelector())
 	b.WriteString("\n\n")
 
-	if m.inspectorReport != nil && len(m.inspectorReport.Warnings) > 0 {
-		panel.WriteString(errorStyle.Render(fmt.Sprintf("Warnings: %d rule pack(s) reported errors", len(m.inspectorReport.Warnings))))
+	if im.report != nil && len(im.report.Warnings) > 0 {
+		panel.WriteString(errorStyle.Render(fmt.Sprintf("Warnings: %d rule pack(s) reported errors", len(im.report.Warnings))))
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render("  " + m.inspectorReport.Warnings[0]))
+		panel.WriteString(dimStyle.Render("  " + im.report.Warnings[0]))
 		panel.WriteString("\n\n")
 	}
 
-	if len(m.inspectorFindings) == 0 {
+	if len(im.findings) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching findings"))
-		if m.inspectorReport != nil && len(m.inspectorReport.Findings) == 0 && m.inspectorReport.ScannerCount == 0 {
+		if im.report != nil && len(im.report.Findings) == 0 && im.report.ScannerCount == 0 {
 			panel.WriteString("\n")
 			panel.WriteString(dimStyle.Render("  No built-in rule packs are registered yet."))
 		}
 		panel.WriteString("\n")
 	} else {
 		resourceWidth := 24
-		for _, finding := range m.inspectorFindings {
+		for _, finding := range im.findings {
 			resourceWidth = max(resourceWidth, len(inspectorFindingResource(finding)))
 		}
 		if resourceWidth > 36 {
@@ -758,16 +844,16 @@ func (m Model) viewInspectorResults() string {
 
 		visibleLines := max(m.height-13, 5)
 		start := 0
-		if m.inspectorIdx >= visibleLines {
-			start = m.inspectorIdx - visibleLines + 1
+		if im.idx >= visibleLines {
+			start = im.idx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.inspectorFindings))
+		end := min(start+visibleLines, len(im.findings))
 
 		for i := start; i < end; i++ {
-			finding := m.inspectorFindings[i]
+			finding := im.findings[i]
 			cursor := "  "
 			textStyle := normalStyle
-			if i == m.inspectorIdx {
+			if i == im.idx {
 				cursor = "> "
 				textStyle = inspectorSelectedStyle
 			}
@@ -789,12 +875,12 @@ func (m Model) viewInspectorResults() string {
 	return b.String()
 }
 
-func (m Model) viewInspectorFindingDetail() string {
-	if m.selectedInspectorFinding == nil {
+func (im inspectorModel) viewFindingDetail(m Model) string {
+	if im.selectedFinding == nil {
 		return ""
 	}
 
-	finding := m.selectedInspectorFinding
+	finding := im.selectedFinding
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(m.renderModeTitle("Security Inspector Finding"))
@@ -835,36 +921,36 @@ func (m Model) viewInspectorFindingDetail() string {
 	return b.String()
 }
 
-func (m Model) viewInspectorChecklistResults() string {
+func (im inspectorModel) viewChecklistResults(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(m.renderModeTitle("Checklist Inspector Results"))
 	b.WriteString("\n")
 
-	if m.inspectorChecklistReport != nil {
+	if im.checklistReport != nil {
 		b.WriteString(dimStyle.Render(fmt.Sprintf(
 			"Checklist: %s  Scanned: %s  Pass: %d  Fail: %d",
-			m.inspectorChecklistReport.ChecklistName,
-			m.inspectorChecklistReport.ScannedAt.Local().Format("2006-01-02 15:04:05"),
-			m.inspectorChecklistReport.PassedCount,
-			m.inspectorChecklistReport.FailedCount,
+			im.checklistReport.ChecklistName,
+			im.checklistReport.ScannedAt.Local().Format("2006-01-02 15:04:05"),
+			im.checklistReport.PassedCount,
+			im.checklistReport.FailedCount,
 		)))
 		b.WriteString("\n")
-		if m.inspectorChecklistReport.SourcePath != "" {
-			b.WriteString(dimStyle.Render("Source: " + m.inspectorChecklistReport.SourcePath))
+		if im.checklistReport.SourcePath != "" {
+			b.WriteString(dimStyle.Render("Source: " + im.checklistReport.SourcePath))
 			b.WriteString("\n")
 		}
 	}
 	b.WriteString("\n")
 
-	if m.inspectorChecklistReport == nil || len(m.inspectorChecklistReport.Results) == 0 {
+	if im.checklistReport == nil || len(im.checklistReport.Results) == 0 {
 		panel.WriteString(dimStyle.Render("  No checklist results"))
 		panel.WriteString("\n")
 	} else {
 		typeWidth := 16
 		resourceWidth := 24
-		for _, result := range m.inspectorChecklistReport.Results {
+		for _, result := range im.checklistReport.Results {
 			resourceWidth = max(resourceWidth, len(checklistResultResource(result)))
 		}
 		if resourceWidth > 34 {
@@ -878,16 +964,16 @@ func (m Model) viewInspectorChecklistResults() string {
 
 		visibleLines := max(m.height-14, 5)
 		start := 0
-		if m.inspectorChecklistIdx >= visibleLines {
-			start = m.inspectorChecklistIdx - visibleLines + 1
+		if im.checklistIdx >= visibleLines {
+			start = im.checklistIdx - visibleLines + 1
 		}
-		end := min(start+visibleLines, len(m.inspectorChecklistReport.Results))
+		end := min(start+visibleLines, len(im.checklistReport.Results))
 
 		for i := start; i < end; i++ {
-			result := m.inspectorChecklistReport.Results[i]
+			result := im.checklistReport.Results[i]
 			cursor := "  "
 			textStyle := normalStyle
-			if i == m.inspectorChecklistIdx {
+			if i == im.checklistIdx {
 				cursor = "> "
 				textStyle = inspectorSelectedStyle
 			}
@@ -909,12 +995,12 @@ func (m Model) viewInspectorChecklistResults() string {
 	return b.String()
 }
 
-func (m Model) viewInspectorChecklistDetail() string {
-	if m.selectedChecklistResult == nil {
+func (im inspectorModel) viewChecklistDetail(m Model) string {
+	if im.selectedChecklistResult == nil {
 		return ""
 	}
 
-	result := m.selectedChecklistResult
+	result := im.selectedChecklistResult
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(m.renderModeTitle("Checklist Inspector Detail"))
@@ -963,11 +1049,11 @@ func (m Model) viewInspectorChecklistDetail() string {
 	return b.String()
 }
 
-func (m Model) renderInspectorSeveritySelector() string {
+func (im inspectorModel) renderSeveritySelector() string {
 	parts := make([]string, 0, len(inspectorSeverityFilters))
 	for idx, severity := range inspectorSeverityFilters {
 		label := fmt.Sprintf("%d:%s", idx+1, severity.Label())
-		if severity == m.inspectorSeverityFilter {
+		if severity == im.severityFilter {
 			parts = append(parts, inspectorSelectedStyle.Render("["+label+"]"))
 		} else {
 			parts = append(parts, dimStyle.Render(" "+label+" "))

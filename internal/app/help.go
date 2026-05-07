@@ -295,7 +295,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q / esc", "Go back to the security group list"},
 		}
 	case screenSecurityGroupAddRule:
-		if m.sgAddField == 0 || m.sgAddField == 1 {
+		if m.security.sgAddField == 0 || m.security.sgAddField == 1 {
 			return []helpShortcut{
 				{"↑/↓, j/k", "Move between the available options"},
 				{"enter", "Confirm the selected option and continue"},

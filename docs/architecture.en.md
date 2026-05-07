@@ -118,17 +118,18 @@ Pattern:
 ### `internal/app/`
 
 Bubble Tea application state, navigation, and rendering.
-The app remains centered on a root model, but feature-specific behavior is gradually moving behind submodel contracts so the root model can stay focused on boot, global navigation, shared chrome, and screen switching.
+The app remains centered on a root model, but AWS feature browsers now sit behind submodel contracts so the root model can stay focused on boot, global navigation, shared chrome, and screen switching.
 
 Current direction:
 
 - `app.go` keeps the root model and global event loop
 - feature submodels handle feature-local state, message handling, key handling, and view rendering
-- CloudWatch Logs is the first representative flow extracted into this pattern
+- app-shell flows such as service selection, feature selection, context selection, SSM session picking, loading, and error handling remain root-owned until a separate shell-flow abstraction is chosen
 
 Screen-specific rendering still lives in dedicated files such as:
 
 - `screen_ec2.go`
+- `screen_ec2_browser.go`
 - `screen_vpc.go`
 - `screen_rds.go`
 - `screen_route53.go`
@@ -137,7 +138,12 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_cloudwatchmetrics.go`
 - `screen_cloudwatchlogs.go`
 - `screen_ecs.go`
+- `screen_eks.go`
+- `screen_ecr.go`
 - `screen_s3.go`
+- `screen_lambda.go`
+- `screen_bedrock.go`
+- `screen_secrets.go`
 - `screen_inspector.go`
 - `screen_context.go`
 
