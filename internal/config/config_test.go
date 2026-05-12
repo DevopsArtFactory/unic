@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func writeUnicConfig(t *testing.T, dir, content string) string {
@@ -579,6 +581,23 @@ contexts:
 	}
 	if cfg.Region != "ap-northeast-2" {
 		t.Fatalf("expected defaults region to remain, got %q", cfg.Region)
+	}
+}
+
+func TestUnsetCurrentRejectsMalformedMappingNode(t *testing.T) {
+	mapping := &yaml.Node{
+		Kind: yaml.MappingNode,
+		Content: []*yaml.Node{
+			{Kind: yaml.ScalarNode, Value: "current"},
+		},
+	}
+
+	err := unsetCurrentFromMapping(mapping)
+	if err == nil {
+		t.Fatal("expected malformed mapping error")
+	}
+	if err.Error() != "malformed config: YAML mapping has odd number of content nodes" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

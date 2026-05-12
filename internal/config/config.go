@@ -384,11 +384,8 @@ func UnsetCurrent(configPath string) error {
 	}
 	mapping := doc.Content[0]
 
-	for i := 0; i < len(mapping.Content)-1; i += 2 {
-		if mapping.Content[i].Value == "current" {
-			mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
-			break
-		}
+	if err := unsetCurrentFromMapping(mapping); err != nil {
+		return err
 	}
 
 	out, err := yaml.Marshal(&doc)
@@ -398,6 +395,21 @@ func UnsetCurrent(configPath string) error {
 	if err := os.WriteFile(configPath, out, 0644); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
+	return nil
+}
+
+func unsetCurrentFromMapping(mapping *yaml.Node) error {
+	if len(mapping.Content)%2 != 0 {
+		return fmt.Errorf("malformed config: YAML mapping has odd number of content nodes")
+	}
+
+	for i := 0; i < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == "current" {
+			mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
+			break
+		}
+	}
+
 	return nil
 }
 
