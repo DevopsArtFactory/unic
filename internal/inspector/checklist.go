@@ -427,9 +427,7 @@ func (r *checklistRunner) runCheck(ctx context.Context, check ChecklistCheck) Ch
 	case ChecklistCheckElastiCacheValkeyBaseline:
 		return r.runBaselineCheck(ctx, check, "ElastiCache for Valkey baseline", runElastiCacheValkeySecurityScan)
 	default:
-		return failedChecklistResult(check, "", "Unsupported checklist type.", []string{
-			fmt.Sprintf("type %q is not supported", check.Type),
-		})
+		panic(fmt.Sprintf("unhandled ChecklistCheckType: %v", check.Type))
 	}
 }
 
