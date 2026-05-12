@@ -220,6 +220,28 @@ func TestRunChecklistReportsPassAndFailPerCheck(t *testing.T) {
 	}
 }
 
+func TestRunChecklistPanicsForUnhandledCheckType(t *testing.T) {
+	runner := &checklistRunner{}
+
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected panic for unhandled checklist type")
+		}
+		message, ok := recovered.(string)
+		if !ok {
+			t.Fatalf("expected string panic, got %T", recovered)
+		}
+		if !strings.Contains(message, "unhandled ChecklistCheckType: unsupported") {
+			t.Fatalf("unexpected panic: %v", recovered)
+		}
+	}()
+
+	runner.runCheck(context.Background(), ChecklistCheck{
+		Type: ChecklistCheckType("unsupported"),
+	})
+}
+
 func TestRunChecklistRoute53Checks(t *testing.T) {
 	checklistPath := filepath.Join(t.TempDir(), "route53.yaml")
 	content := strings.Join([]string{
