@@ -190,3 +190,33 @@ func TestContextPickerPanelDoesNotOverflowHelpBar(t *testing.T) {
 		t.Fatalf("expected help bar below panel border, got border line %d help line %d in %q", borderLine, helpLine, view)
 	}
 }
+
+func TestContextPickerKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 14
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: styleTestContexts()})
+	m = updated.(Model)
+	view := stripANSI(m.View())
+
+	for _, want := range []string{"Select Context", "prod", "q: quit"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected compact context picker to keep %q visible, got %q", want, view)
+		}
+	}
+	if strings.Contains(view, "...") {
+		t.Fatalf("expected compact context picker to fit without middle truncation, got %q", view)
+	}
+}
+
+func TestContextTableSelectedStyleUsesHighContrast(t *testing.T) {
+	base := selectedStyle
+	want := base.
+		Bold(true).
+		Foreground(lipgloss.Color("255")).
+		Background(lipgloss.Color("57"))
+	if !reflect.DeepEqual(contextTableSelectedStyle(), want) {
+		t.Fatal("expected context table selected style to use high-contrast foreground/background")
+	}
+}

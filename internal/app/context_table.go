@@ -35,9 +35,7 @@ func newContextTable() table.Model {
 	styles := table.DefaultStyles()
 	styles.Header = dimStyle.Copy().Bold(true).Padding(0, 1)
 	styles.Cell = table.DefaultStyles().Cell.Copy()
-	styles.Selected = selectedStyle.Copy().
-		Bold(true).
-		Background(lipgloss.Color("236"))
+	styles.Selected = contextTableSelectedStyle()
 
 	t := table.New(
 		table.WithColumns(contextTableColumns(0)),
@@ -49,6 +47,14 @@ func newContextTable() table.Model {
 	)
 	t.Focus()
 	return t
+}
+
+func contextTableSelectedStyle() lipgloss.Style {
+	base := selectedStyle
+	return base.
+		Bold(true).
+		Foreground(lipgloss.Color("255")).
+		Background(lipgloss.Color("57"))
 }
 
 func (m *Model) syncContextTable() {
