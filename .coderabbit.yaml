@@ -1,0 +1,101 @@
+# yamllint disable rule:line-length
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+---
+
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  review_details: true
+  collapse_walkthrough: false
+  in_progress_fortune: false
+  poem: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - "main"
+    ignore_title_keywords:
+      - "wip"
+      - "draft"
+  path_filters:
+    - "!dist/**"
+    - "!tmp/**"
+    - "!unic/**"
+  path_instructions:
+    - path: "**/*.go"
+      instructions: |
+        For Go reviews, look beyond compilation and prioritize nil pointer risks,
+        context propagation, AWS SDK pagination, error wrapping, deterministic
+        sorting, and stable table/detail rendering. For new AWS service work,
+        verify that repository interfaces, model mapping, app integration, and
+        tests are updated together.
+    - path: "internal/app/**"
+      instructions: |
+        For Bubble Tea screen changes, verify message routing, key handling,
+        filter target resets, height-based windowing, help text, and back/home
+        navigation against the existing screen patterns.
+    - path: "internal/services/aws/**"
+      instructions: |
+        For AWS integration code, focus on SDK client interface mockability,
+        paginator usage, nil/empty response handling, AWS pointer conversion,
+        stable list ordering, and user-facing error messages.
+    - path: "**/*_test.go"
+      instructions: |
+        Check that tests cover API errors, mapping edge cases, and navigation
+        state transitions, not only happy paths. Prefer mock-based tests that do
+        not depend on external AWS calls.
+    - path: "README.md"
+      instructions: |
+        Verify that README changes match actual CLI/TUI behavior and that
+        Currently Implemented Features, TUI Key Bindings, Usage, and
+        Configuration content stay aligned with code changes.
+    - path: "docs/**"
+      instructions: |
+        Documentation must match implemented behavior. When both English and
+        Korean docs are updated, verify that they preserve the same meaning.
+  pre_merge_checks:
+    title:
+      mode: "warning"
+      requirements: "PR title should use a conventional prefix such as feat:, fix:, docs:, chore:, refactor:, or test:."
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "warning"
+  tools:
+    golangci-lint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    actionlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    checkmake:
+      enabled: true
+    gitleaks:
+      enabled: true
+    osvScanner:
+      enabled: true
+
+chat:
+  art: false
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "docs/documentation-harness.md"
+      - "docs/branch-naming-harness.md"
