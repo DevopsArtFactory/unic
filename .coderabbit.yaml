@@ -1,0 +1,95 @@
+# yamllint disable rule:line-length
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+---
+
+language: "ko-KR"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  review_details: true
+  collapse_walkthrough: false
+  in_progress_fortune: false
+  poem: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - "main"
+    ignore_title_keywords:
+      - "wip"
+      - "draft"
+  path_filters:
+    - "!dist/**"
+    - "!tmp/**"
+    - "!unic"
+  path_instructions:
+    - path: "**/*.go"
+      instructions: |
+        Go 리뷰에서는 컴파일 가능성만 보지 말고 nil pointer, context 전달, AWS SDK pagination,
+        error wrapping, deterministic sorting, table/detail rendering 안정성을 우선 확인한다.
+        새 AWS 서비스 작업은 repository interface, model mapping, app integration, tests가 함께
+        갱신됐는지 확인한다.
+    - path: "internal/app/**"
+      instructions: |
+        Bubble Tea 화면 변경은 message routing, key handling, filter target reset, height-based
+        windowing, help text, back/home navigation이 기존 화면 패턴과 일관적인지 확인한다.
+    - path: "internal/services/aws/**"
+      instructions: |
+        AWS 연동 코드는 SDK client interface mockability, paginator 사용, nil/empty response 처리,
+        AWS pointer conversion, stable list ordering, 사용자에게 전달되는 오류 메시지를 중점 검토한다.
+    - path: "**/*_test.go"
+      instructions: |
+        테스트는 happy path뿐 아니라 API error, mapping edge case, navigation state transition을
+        검증하는지 확인한다. 외부 AWS 호출에 의존하지 않는 mock 기반 테스트를 선호한다.
+    - path: "README.md"
+      instructions: |
+        README 변경은 실제 CLI/TUI 동작과 맞는지, Currently Implemented Features, TUI Key Bindings,
+        Usage, Configuration 관련 설명이 코드 변경과 함께 갱신됐는지 확인한다.
+    - path: "docs/**"
+      instructions: |
+        문서는 구현된 동작과 일치해야 하며, 영어/한국어 문서가 같은 의미를 유지하는지 확인한다.
+  pre_merge_checks:
+    title:
+      mode: "warning"
+      requirements: "PR title should use a conventional prefix such as feat:, fix:, docs:, chore:, refactor:, or test:."
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "warning"
+  tools:
+    golangci-lint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    actionlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    checkmake:
+      enabled: true
+    gitleaks:
+      enabled: true
+    osvScanner:
+      enabled: true
+
+chat:
+  art: false
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "docs/documentation-harness.md"
+      - "docs/branch-naming-harness.md"
