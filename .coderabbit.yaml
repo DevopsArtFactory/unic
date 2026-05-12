@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 ---
 
-language: "ko-KR"
+language: "en-US"
 early_access: false
 
 reviews:
@@ -30,29 +30,35 @@ reviews:
   path_instructions:
     - path: "**/*.go"
       instructions: |
-        Go 리뷰에서는 컴파일 가능성만 보지 말고 nil pointer, context 전달, AWS SDK pagination,
-        error wrapping, deterministic sorting, table/detail rendering 안정성을 우선 확인한다.
-        새 AWS 서비스 작업은 repository interface, model mapping, app integration, tests가 함께
-        갱신됐는지 확인한다.
+        For Go reviews, look beyond compilation and prioritize nil pointer risks,
+        context propagation, AWS SDK pagination, error wrapping, deterministic
+        sorting, and stable table/detail rendering. For new AWS service work,
+        verify that repository interfaces, model mapping, app integration, and
+        tests are updated together.
     - path: "internal/app/**"
       instructions: |
-        Bubble Tea 화면 변경은 message routing, key handling, filter target reset, height-based
-        windowing, help text, back/home navigation이 기존 화면 패턴과 일관적인지 확인한다.
+        For Bubble Tea screen changes, verify message routing, key handling,
+        filter target resets, height-based windowing, help text, and back/home
+        navigation against the existing screen patterns.
     - path: "internal/services/aws/**"
       instructions: |
-        AWS 연동 코드는 SDK client interface mockability, paginator 사용, nil/empty response 처리,
-        AWS pointer conversion, stable list ordering, 사용자에게 전달되는 오류 메시지를 중점 검토한다.
+        For AWS integration code, focus on SDK client interface mockability,
+        paginator usage, nil/empty response handling, AWS pointer conversion,
+        stable list ordering, and user-facing error messages.
     - path: "**/*_test.go"
       instructions: |
-        테스트는 happy path뿐 아니라 API error, mapping edge case, navigation state transition을
-        검증하는지 확인한다. 외부 AWS 호출에 의존하지 않는 mock 기반 테스트를 선호한다.
+        Check that tests cover API errors, mapping edge cases, and navigation
+        state transitions, not only happy paths. Prefer mock-based tests that do
+        not depend on external AWS calls.
     - path: "README.md"
       instructions: |
-        README 변경은 실제 CLI/TUI 동작과 맞는지, Currently Implemented Features, TUI Key Bindings,
-        Usage, Configuration 관련 설명이 코드 변경과 함께 갱신됐는지 확인한다.
+        Verify that README changes match actual CLI/TUI behavior and that
+        Currently Implemented Features, TUI Key Bindings, Usage, and
+        Configuration content stay aligned with code changes.
     - path: "docs/**"
       instructions: |
-        문서는 구현된 동작과 일치해야 하며, 영어/한국어 문서가 같은 의미를 유지하는지 확인한다.
+        Documentation must match implemented behavior. When both English and
+        Korean docs are updated, verify that they preserve the same meaning.
   pre_merge_checks:
     title:
       mode: "warning"
