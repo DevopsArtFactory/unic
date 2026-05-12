@@ -255,8 +255,10 @@ func (m Model) viewContextPicker() string {
 	b.WriteString(renderDetailLine("Shell env", m.displayShellEnvContext()))
 	b.WriteString("\n\n")
 
-	b.WriteString(m.renderFilterValue(filterContexts))
-	b.WriteString("\n\n")
+	if filter := m.renderFilterValue(filterContexts); filter != "" {
+		b.WriteString(filter)
+		b.WriteString("\n\n")
+	}
 
 	if len(m.ctxList) == 0 {
 		panel.WriteString(normalStyle.Render("  No contexts defined."))
