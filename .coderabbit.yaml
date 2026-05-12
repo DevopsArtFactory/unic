@@ -26,7 +26,7 @@ reviews:
   path_filters:
     - "!dist/**"
     - "!tmp/**"
-    - "!unic"
+    - "!unic/**"
   path_instructions:
     - path: "**/*.go"
       instructions: |
