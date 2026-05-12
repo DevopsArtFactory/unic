@@ -211,7 +211,8 @@ func TestContextPickerKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
 }
 
 func TestContextTableSelectedStyleUsesHighContrast(t *testing.T) {
-	want := selectedStyle.Copy().
+	base := selectedStyle
+	want := base.
 		Bold(true).
 		Foreground(lipgloss.Color("255")).
 		Background(lipgloss.Color("57"))

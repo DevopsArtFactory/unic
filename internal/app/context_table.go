@@ -50,7 +50,8 @@ func newContextTable() table.Model {
 }
 
 func contextTableSelectedStyle() lipgloss.Style {
-	return selectedStyle.Copy().
+	base := selectedStyle
+	return base.
 		Bold(true).
 		Foreground(lipgloss.Color("255")).
 		Background(lipgloss.Color("57"))
