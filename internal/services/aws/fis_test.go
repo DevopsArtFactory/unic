@@ -230,6 +230,22 @@ func TestFISExperimentTemplateSafeRunPreviewFlagsUnsafeState(t *testing.T) {
 	}
 }
 
+func TestFISTemplateStopConditionIsNoneTreatsBlankSourceAsInactive(t *testing.T) {
+	for _, condition := range []FISTemplateStopCondition{
+		{},
+		{Source: "   "},
+		{Source: "none"},
+		{Source: "NONE"},
+	} {
+		if !condition.IsNone() {
+			t.Fatalf("expected %#v to be inactive", condition)
+		}
+	}
+	if (FISTemplateStopCondition{Source: "aws:cloudwatch:alarm"}).IsNone() {
+		t.Fatal("expected CloudWatch alarm stop condition to be active")
+	}
+}
+
 func TestListFISExperimentTemplatesError(t *testing.T) {
 	mock := &mockFISClient{
 		listExperimentTemplatesFunc: func(_ context.Context, _ *fis.ListExperimentTemplatesInput, _ ...func(*fis.Options)) (*fis.ListExperimentTemplatesOutput, error) {

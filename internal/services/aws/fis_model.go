@@ -341,7 +341,8 @@ func (s FISTemplateStopCondition) Summary() string {
 }
 
 func (s FISTemplateStopCondition) IsNone() bool {
-	return strings.EqualFold(strings.TrimSpace(s.Source), "none")
+	source := strings.TrimSpace(s.Source)
+	return source == "" || strings.EqualFold(source, "none")
 }
 
 func (s FISTemplateStopCondition) FilterText() string {
