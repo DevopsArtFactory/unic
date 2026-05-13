@@ -485,7 +485,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		}, shortcuts[3:]...)...)
 	case screenFISTemplateDetail:
 		return []helpShortcut{
-			{"↑/↓, j/k", "Scroll template targets, actions, and stop conditions"},
+			{"↑/↓, j/k", "Scroll safe-run preview, targets, actions, and stop conditions"},
 			{"pgup / pgdn", "Scroll by one page"},
 			{"h", "Open experiment history for this template"},
 			{"r", "Refresh template detail"},

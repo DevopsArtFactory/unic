@@ -1150,7 +1150,7 @@ func TestFISTemplateDetailViewShowsTargetsActionsAndStops(t *testing.T) {
 		Description: "Terminate application targets",
 		RoleARN:     "arn:aws:iam::123456789012:role/fis-role",
 		Targets: []awsservice.FISTemplateTarget{
-			{Name: "instances", ResourceType: "aws:ec2:instance", SelectionMode: "COUNT(1)"},
+			{Name: "instances", ResourceType: "aws:ec2:instance", SelectionMode: "COUNT(1)", ResourceTags: map[string]string{"env": "dev"}},
 		},
 		Actions: []awsservice.FISTemplateAction{
 			{Name: "stop", ActionID: "aws:ec2:stop-instances"},
@@ -1161,7 +1161,32 @@ func TestFISTemplateDetailViewShowsTargetsActionsAndStops(t *testing.T) {
 	}
 
 	view := stripANSI(m.View())
-	for _, want := range []string{"FIS Experiment Template Detail", "Role ARN", "Targets", "aws:ec2:instance", "Actions", "aws:ec2:stop-instances", "Stop Conditions", "fis-stop"} {
+	for _, want := range []string{"FIS Experiment Template Detail", "Role ARN", "Safe Run Preview", "Risk", "guarded", "Blast radius", "Future execution must type", "Targets", "aws:ec2:instance", "Actions", "aws:ec2:stop-instances", "Stop Conditions", "fis-stop"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected view to contain %q, got %q", want, view)
+		}
+	}
+}
+
+func TestFISTemplateDetailViewShowsSafetyWarnings(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFISTemplateDetail
+	m.height = 40
+	m.fis.selectedTemplate = &awsservice.FISExperimentTemplate{
+		ID: "broad-outage",
+		Targets: []awsservice.FISTemplateTarget{
+			{Name: "instances", ResourceType: "aws:ec2:instance", SelectionMode: "ALL"},
+		},
+		Actions: []awsservice.FISTemplateAction{
+			{Name: "terminate", ActionID: "aws:ec2:terminate-instances"},
+		},
+		StopConditions: []awsservice.FISTemplateStopCondition{
+			{Source: "none"},
+		},
+	}
+
+	view := stripANSI(m.View())
+	for _, want := range []string{"Safe Run Preview", "review required", "Missing IAM role ARN", "No active stop conditions configured", "Broad target selection", "Unbounded target selector", "Future execution must type \"broad-outage\""} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected view to contain %q, got %q", want, view)
 		}

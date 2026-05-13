@@ -20,6 +20,21 @@ type FISExperimentTemplate struct {
 	StopConditions []FISTemplateStopCondition
 }
 
+type FISSafeRunPreview struct {
+	RiskLevel          string
+	TargetCount        int
+	ActionCount        int
+	StopConditionCount int
+	TargetModes        []string
+	TargetSummaries    []string
+	Warnings           []string
+	ConfirmationToken  string
+}
+
+func (p FISSafeRunPreview) HasWarnings() bool {
+	return len(p.Warnings) > 0
+}
+
 type FISExperiment struct {
 	ID             string
 	ARN            string
@@ -146,6 +161,56 @@ func (t FISExperimentTemplate) DisplayTitle() string {
 	return fmt.Sprintf("%s  %s", t.ID, description)
 }
 
+func (t FISExperimentTemplate) SafeRunPreview() FISSafeRunPreview {
+	preview := FISSafeRunPreview{
+		RiskLevel:         "guarded",
+		TargetCount:       len(t.Targets),
+		ActionCount:       len(t.Actions),
+		ConfirmationToken: t.ID,
+	}
+
+	stopConditionCount := 0
+	for _, condition := range t.StopConditions {
+		if !condition.IsNone() {
+			stopConditionCount++
+		}
+	}
+	preview.StopConditionCount = stopConditionCount
+
+	if strings.TrimSpace(t.RoleARN) == "" {
+		preview.Warnings = append(preview.Warnings, "Missing IAM role ARN")
+	}
+	if preview.TargetCount == 0 {
+		preview.Warnings = append(preview.Warnings, "No experiment targets configured")
+	}
+	if preview.ActionCount == 0 {
+		preview.Warnings = append(preview.Warnings, "No experiment actions configured")
+	}
+	if preview.StopConditionCount == 0 {
+		preview.Warnings = append(preview.Warnings, "No active stop conditions configured")
+	}
+
+	for _, target := range t.Targets {
+		mode := defaultString(target.SelectionMode, "-")
+		preview.TargetModes = append(preview.TargetModes, fmt.Sprintf("%s:%s", defaultString(target.Name, "-"), mode))
+		preview.TargetSummaries = append(preview.TargetSummaries, target.BlastRadiusSummary())
+		if target.IsBroadSelection() {
+			preview.Warnings = append(preview.Warnings, fmt.Sprintf("Broad target selection: %s uses %s", defaultString(target.Name, "-"), mode))
+		}
+		if !target.HasTargetConstraint() {
+			preview.Warnings = append(preview.Warnings, fmt.Sprintf("Unbounded target selector: %s has no ARNs, tags, filters, or parameters", defaultString(target.Name, "-")))
+		}
+	}
+	sort.Strings(preview.TargetModes)
+	sort.Strings(preview.TargetSummaries)
+	sort.Strings(preview.Warnings)
+
+	if len(preview.Warnings) > 0 {
+		preview.RiskLevel = "review required"
+	}
+	return preview
+}
+
 func (t FISExperimentTemplate) FilterText() string {
 	parts := []string{t.ID, t.ARN, t.Description, t.RoleARN, formatStringMap(t.Tags)}
 	for _, target := range t.Targets {
@@ -179,6 +244,36 @@ func (t FISTemplateTarget) Summary() string {
 		parts = append(parts, fmt.Sprintf("tags:%s", formatStringMap(t.ResourceTags)))
 	}
 	return strings.Join(nonEmptyStrings(parts), "  ")
+}
+
+func (t FISTemplateTarget) BlastRadiusSummary() string {
+	parts := []string{
+		defaultString(t.Name, "-"),
+		defaultString(t.ResourceType, "-"),
+		"mode:" + defaultString(t.SelectionMode, "-"),
+	}
+	if len(t.ResourceARNs) > 0 {
+		parts = append(parts, fmt.Sprintf("arns:%d", len(t.ResourceARNs)))
+	}
+	if len(t.ResourceTags) > 0 {
+		parts = append(parts, fmt.Sprintf("tags:%d", len(t.ResourceTags)))
+	}
+	if len(t.Filters) > 0 {
+		parts = append(parts, fmt.Sprintf("filters:%d", len(t.Filters)))
+	}
+	if len(t.Parameters) > 0 {
+		parts = append(parts, fmt.Sprintf("parameters:%d", len(t.Parameters)))
+	}
+	return strings.Join(nonEmptyStrings(parts), "  ")
+}
+
+func (t FISTemplateTarget) HasTargetConstraint() bool {
+	return len(t.ResourceARNs) > 0 || len(t.ResourceTags) > 0 || len(t.Filters) > 0 || len(t.Parameters) > 0
+}
+
+func (t FISTemplateTarget) IsBroadSelection() bool {
+	mode := strings.ToUpper(strings.TrimSpace(t.SelectionMode))
+	return mode == "ALL" || mode == "PERCENT(100)" || mode == "COUNT(0)"
 }
 
 func (t FISTemplateTarget) FilterText() string {
@@ -243,6 +338,10 @@ func (s FISTemplateStopCondition) Summary() string {
 		return s.Source
 	}
 	return fmt.Sprintf("%s  %s", s.Source, s.Value)
+}
+
+func (s FISTemplateStopCondition) IsNone() bool {
+	return strings.EqualFold(strings.TrimSpace(s.Source), "none")
 }
 
 func (s FISTemplateStopCondition) FilterText() string {
