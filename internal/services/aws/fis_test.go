@@ -157,6 +157,95 @@ func TestGetFISExperimentTemplateMapsDetail(t *testing.T) {
 	}
 }
 
+func TestFISExperimentTemplateSafeRunPreviewGuarded(t *testing.T) {
+	template := FISExperimentTemplate{
+		ID:      "app-outage",
+		RoleARN: "arn:aws:iam::123456789012:role/fis-role",
+		Targets: []FISTemplateTarget{
+			{
+				Name:          "instances",
+				ResourceType:  "aws:ec2:instance",
+				SelectionMode: "COUNT(1)",
+				ResourceTags: map[string]string{
+					"env": "dev",
+				},
+			},
+		},
+		Actions: []FISTemplateAction{
+			{Name: "stop", ActionID: "aws:ec2:stop-instances"},
+		},
+		StopConditions: []FISTemplateStopCondition{
+			{Source: "aws:cloudwatch:alarm", Value: "arn:aws:cloudwatch:us-east-1:123456789012:alarm:fis-stop"},
+		},
+	}
+
+	preview := template.SafeRunPreview()
+	if preview.RiskLevel != "guarded" {
+		t.Fatalf("expected guarded risk, got %q with warnings %#v", preview.RiskLevel, preview.Warnings)
+	}
+	if preview.TargetCount != 1 || preview.ActionCount != 1 || preview.StopConditionCount != 1 {
+		t.Fatalf("unexpected preview counts: %#v", preview)
+	}
+	if preview.HasWarnings() {
+		t.Fatalf("expected no warnings, got %#v", preview.Warnings)
+	}
+}
+
+func TestFISExperimentTemplateSafeRunPreviewFlagsUnsafeState(t *testing.T) {
+	template := FISExperimentTemplate{
+		ID: "broad-outage",
+		Targets: []FISTemplateTarget{
+			{
+				Name:          "instances",
+				ResourceType:  "aws:ec2:instance",
+				SelectionMode: "ALL",
+			},
+		},
+		Actions: []FISTemplateAction{
+			{Name: "terminate", ActionID: "aws:ec2:terminate-instances"},
+		},
+		StopConditions: []FISTemplateStopCondition{
+			{Source: "none"},
+		},
+	}
+
+	preview := template.SafeRunPreview()
+	if preview.RiskLevel != "review required" {
+		t.Fatalf("expected review required risk, got %q", preview.RiskLevel)
+	}
+	for _, want := range []string{"Missing IAM role ARN", "No active stop conditions configured", "Broad target selection", "Unbounded target selector"} {
+		found := false
+		for _, warning := range preview.Warnings {
+			if strings.Contains(warning, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected warning containing %q, got %#v", want, preview.Warnings)
+		}
+	}
+	if preview.StopConditionCount != 0 {
+		t.Fatalf("expected none stop condition to be inactive, got %d", preview.StopConditionCount)
+	}
+}
+
+func TestFISTemplateStopConditionIsNoneTreatsBlankSourceAsInactive(t *testing.T) {
+	for _, condition := range []FISTemplateStopCondition{
+		{},
+		{Source: "   "},
+		{Source: "none"},
+		{Source: "NONE"},
+	} {
+		if !condition.IsNone() {
+			t.Fatalf("expected %#v to be inactive", condition)
+		}
+	}
+	if (FISTemplateStopCondition{Source: "aws:cloudwatch:alarm"}).IsNone() {
+		t.Fatal("expected CloudWatch alarm stop condition to be active")
+	}
+}
+
 func TestListFISExperimentTemplatesError(t *testing.T) {
 	mock := &mockFISClient{
 		listExperimentTemplatesFunc: func(_ context.Context, _ *fis.ListExperimentTemplatesInput, _ ...func(*fis.Options)) (*fis.ListExperimentTemplatesOutput, error) {

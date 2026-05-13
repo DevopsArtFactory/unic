@@ -491,6 +491,12 @@ func (fm fisModel) viewExperimentDetail(m Model) string {
 }
 
 func (fm fisModel) templateDetailLines(template awsservice.FISExperimentTemplate) []string {
+	preview := template.SafeRunPreview()
+	risk := successStyle.Render(preview.RiskLevel)
+	if preview.HasWarnings() {
+		risk = warningStyle.Render(preview.RiskLevel)
+	}
+
 	lines := []string{
 		renderDetailLine("ID", normalStyle.Render(template.ID)),
 		renderDetailLine("Description", normalStyle.Render(defaultDash(template.Description))),
@@ -504,6 +510,31 @@ func (fm fisModel) templateDetailLines(template awsservice.FISExperimentTemplate
 		lines = append(lines, renderDetailLine("Updated", normalStyle.Render(template.LastUpdatedAt.Format("2006-01-02 15:04:05 MST"))))
 	}
 	lines = append(lines, renderDetailLine("Tags", normalStyle.Render(defaultDash(formatDetailMap(template.Tags)))))
+
+	lines = append(lines, "", selectedStyle.Render("Safe Run Preview"))
+	lines = append(lines, renderDetailLine("Risk", risk))
+	lines = append(lines, renderDetailLine("Targets", normalStyle.Render(fmt.Sprintf("%d target group(s)", preview.TargetCount))))
+	lines = append(lines, renderDetailLine("Actions", normalStyle.Render(fmt.Sprintf("%d action(s)", preview.ActionCount))))
+	lines = append(lines, renderDetailLine("Stop Conditions", normalStyle.Render(fmt.Sprintf("%d active", preview.StopConditionCount))))
+	lines = append(lines, renderDetailLine("IAM Role", normalStyle.Render(defaultDash(template.RoleARN))))
+	if len(preview.TargetModes) > 0 {
+		lines = append(lines, renderDetailLine("Selection Modes", normalStyle.Render(strings.Join(preview.TargetModes, ", "))))
+	}
+	if len(preview.TargetSummaries) > 0 {
+		lines = append(lines, "  "+dimStyle.Render("Blast radius"))
+		for _, summary := range preview.TargetSummaries {
+			lines = append(lines, "    "+normalStyle.Render(summary))
+		}
+	}
+	if len(preview.Warnings) == 0 {
+		lines = append(lines, "  "+successStyle.Render("No obvious missing safeguards detected"))
+	} else {
+		lines = append(lines, "  "+warningStyle.Render("Review before any future run"))
+		for _, warning := range preview.Warnings {
+			lines = append(lines, "    "+warningStyle.Render(warning))
+		}
+	}
+	lines = append(lines, "  "+dimStyle.Render(fmt.Sprintf("Future execution must type %q to confirm.", preview.ConfirmationToken)))
 
 	lines = append(lines, "", selectedStyle.Render("Targets"))
 	if len(template.Targets) == 0 {
