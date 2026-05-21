@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
@@ -210,13 +211,87 @@ func TestContextPickerKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
 	}
 }
 
+func TestServiceListKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 10
+	m.screen = screenServiceList
+	services := m.serviceList()
+	if len(services) < 8 {
+		t.Fatalf("expected enough services for compact selection test, got %d", len(services))
+	}
+	m.svcIdx = 7
+	selected := string(services[m.svcIdx].Name)
+
+	view := stripANSI(m.View())
+	lines := strings.Split(view, "\n")
+	if len(lines) != m.height {
+		t.Fatalf("expected fitted view height %d, got %d lines", m.height, len(lines))
+	}
+	if !strings.Contains(view, ">") || !strings.Contains(view, selected) {
+		t.Fatalf("expected compact service list to keep selected service %q visible, got %q", selected, view)
+	}
+}
+
+func TestResourceListKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 10
+	m.screen = screenRDSList
+	for i := 0; i < 10; i++ {
+		m.rds.instances = append(m.rds.instances, awsservice.RDSInstance{
+			DBInstanceID: fmt.Sprintf("db-%02d", i),
+			Status:       "available",
+		})
+	}
+	m.rds.filtered = m.rds.instances
+	m.rds.idx = 8
+
+	view := stripANSI(m.View())
+	lines := strings.Split(view, "\n")
+	if len(lines) != m.height {
+		t.Fatalf("expected fitted view height %d, got %d lines", m.height, len(lines))
+	}
+	if !strings.Contains(view, ">") || !strings.Contains(view, "db-08") {
+		t.Fatalf("expected compact resource list to keep selected instance visible, got %q", view)
+	}
+}
+
+func TestFeatureListKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 8
+	m.screen = screenFeatureList
+	services := m.serviceList()
+	for i, service := range services {
+		if len(service.Features) >= 3 {
+			m.svcIdx = i
+			m.features = service.Features
+			break
+		}
+	}
+	if len(m.features) < 3 {
+		t.Fatalf("expected enough features for compact selection test, got %d", len(m.features))
+	}
+	m.featIdx = 2
+	selected := string(m.features[m.featIdx].Kind)
+
+	view := stripANSI(m.View())
+	lines := strings.Split(view, "\n")
+	if len(lines) != m.height {
+		t.Fatalf("expected fitted view height %d, got %d lines", m.height, len(lines))
+	}
+	if !strings.Contains(view, "> "+selected) {
+		t.Fatalf("expected compact feature list to keep selected feature %q visible, got %q", selected, view)
+	}
+}
+
 func TestContextTableSelectedStyleUsesHighContrast(t *testing.T) {
-	base := selectedStyle
-	want := base.
+	want := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("255")).
-		Background(lipgloss.Color("57"))
+		Foreground(lipgloss.Color("16")).
+		Background(lipgloss.Color("220"))
 	if !reflect.DeepEqual(contextTableSelectedStyle(), want) {
-		t.Fatal("expected context table selected style to use high-contrast foreground/background")
+		t.Fatal("expected context table selected style to use amber high-contrast foreground/background")
 	}
 }

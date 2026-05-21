@@ -24,6 +24,18 @@ func testContexts() []config.ContextInfo {
 	}
 }
 
+func manyTestContexts(total int) []config.ContextInfo {
+	contexts := make([]config.ContextInfo, 0, total)
+	for i := 0; i < total; i++ {
+		contexts = append(contexts, config.ContextInfo{
+			Name:     fmt.Sprintf("ctx-%02d", i),
+			Region:   "us-east-1",
+			AuthType: "credential",
+		})
+	}
+	return contexts
+}
+
 func writeContextConfig(t *testing.T, contents string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -112,6 +124,89 @@ func TestContextPickerNavigationWraps(t *testing.T) {
 	}
 	if model.contextTable.Cursor() != 0 {
 		t.Fatalf("expected table cursor to wrap to first, got %d", model.contextTable.Cursor())
+	}
+}
+
+func TestContextPickerKeepsSelectedTableRowVisibleInSmallWindow(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 10
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: manyTestContexts(12)})
+	model := updated.(Model)
+	for i := 0; i < 8; i++ {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+		model = updated.(Model)
+	}
+
+	view := stripANSI(model.View())
+	lines := strings.Split(view, "\n")
+	if len(lines) != model.height {
+		t.Fatalf("expected fitted view height %d, got %d lines", model.height, len(lines))
+	}
+	if !strings.Contains(view, "ctx-08") {
+		t.Fatalf("expected compact context picker to keep selected row visible, got %q", view)
+	}
+	if strings.Contains(view, "...") {
+		t.Fatalf("expected compact context picker to fit without middle truncation, got %q", view)
+	}
+}
+
+func TestContextPickerMoveUpFromBottomVisibleRowDoesNotScroll(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 10
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: manyTestContexts(12)})
+	model := updated.(Model)
+	for i := 0; i < 8; i++ {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+		model = updated.(Model)
+	}
+	before := stripANSI(model.View())
+	if !strings.Contains(before, "ctx-08") {
+		t.Fatalf("expected ctx-08 visible before moving up, got %q", before)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model = updated.(Model)
+	after := stripANSI(model.View())
+	if model.ctxIdx != 7 {
+		t.Fatalf("expected selected index 7 after moving up once, got %d", model.ctxIdx)
+	}
+	if !strings.Contains(after, "ctx-08") {
+		t.Fatalf("expected bottom visible row to remain visible after moving up once, got %q", after)
+	}
+}
+
+func TestContextPickerKeepsFilteredSelectedTableRowVisibleInSmallWindow(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 10
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: manyTestContexts(12)})
+	model := updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model = updated.(Model)
+	for _, ch := range []rune("ctx") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+	for i := 0; i < 8; i++ {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+		model = updated.(Model)
+	}
+
+	view := stripANSI(model.View())
+	lines := strings.Split(view, "\n")
+	if len(lines) != model.height {
+		t.Fatalf("expected fitted view height %d, got %d lines", model.height, len(lines))
+	}
+	if !strings.Contains(view, "ctx-08") {
+		t.Fatalf("expected filtered compact context picker to keep selected row visible, got %q", view)
+	}
+	if strings.Contains(view, "...") {
+		t.Fatalf("expected filtered compact context picker to fit without middle truncation, got %q", view)
 	}
 }
 

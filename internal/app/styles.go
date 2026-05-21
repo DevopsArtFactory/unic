@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -9,9 +10,11 @@ import (
 	"unic/internal/update"
 )
 
+var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
 var (
 	titleStyle              = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	selectedStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
+	selectedStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Bold(true)
 	normalStyle             = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	dimStyle                = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	errorStyle              = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
@@ -197,6 +200,9 @@ func (m Model) fitToHeight(s string) string {
 		}
 		return strings.Join(lines, "\n")
 	}
+	if selectedLine := selectedRenderedLine(lines); selectedLine >= 0 {
+		return strings.Join(trimLinesAroundAnchor(lines, m.height, selectedLine), "\n")
+	}
 	// Content overflows: keep first (height-2) lines + last 1 line (footer)
 	// with a "..." indicator
 	footerLines := 1
@@ -209,6 +215,85 @@ func (m Model) fitToHeight(s string) string {
 	result = append(result, dimStyle.Render("  ..."))
 	result = append(result, lines[len(lines)-footerLines:]...)
 	return strings.Join(result, "\n")
+}
+
+func selectedRenderedLine(lines []string) int {
+	for i, line := range lines {
+		line = strings.TrimSpace(ansiEscapePattern.ReplaceAllString(line, ""))
+		line = strings.TrimPrefix(line, "│")
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "> ") {
+			return i
+		}
+	}
+	return -1
+}
+
+func trimLinesAroundAnchor(lines []string, height, anchor int) []string {
+	if height <= 0 || len(lines) <= height {
+		return lines
+	}
+	if height <= 3 || anchor <= 0 || anchor >= len(lines)-1 {
+		footerLines := 1
+		headerLines := height - footerLines - 1
+		if headerLines < 1 {
+			headerLines = 1
+		}
+		result := make([]string, 0, height)
+		result = append(result, lines[:headerLines]...)
+		result = append(result, dimStyle.Render("  ..."))
+		result = append(result, lines[len(lines)-footerLines:]...)
+		return result
+	}
+	if height == 4 {
+		return []string{
+			lines[0],
+			lines[anchor],
+			dimStyle.Render("  ..."),
+			lines[len(lines)-1],
+		}
+	}
+
+	result := []string{lines[0]}
+	remaining := height - 2 // first line + footer
+	beforeEllipsis := anchor > 1
+	afterEllipsis := anchor < len(lines)-2
+	if beforeEllipsis {
+		remaining--
+	}
+	if afterEllipsis {
+		remaining--
+	}
+	if remaining < 1 {
+		remaining = 1
+	}
+
+	contextBefore := remaining / 2
+	contextAfter := remaining - contextBefore - 1
+	start := anchor - contextBefore
+	end := anchor + contextAfter + 1
+
+	if start < 1 {
+		end += 1 - start
+		start = 1
+	}
+	if end > len(lines)-1 {
+		start -= end - (len(lines) - 1)
+		end = len(lines) - 1
+	}
+	if start < 1 {
+		start = 1
+	}
+
+	if start > 1 {
+		result = append(result, dimStyle.Render("  ..."))
+	}
+	result = append(result, lines[start:end]...)
+	if end < len(lines)-1 {
+		result = append(result, dimStyle.Render("  ..."))
+	}
+	result = append(result, lines[len(lines)-1])
+	return result
 }
 
 func (m Model) viewLoading() string {
