@@ -89,6 +89,12 @@ func (m Model) helpModeShortcuts() []helpShortcut {
 			{"backspace", "Delete the previous character"},
 			{"↑/↓", "Move through filtered results"},
 		}
+		if m.screen == screenContextPicker {
+			shortcuts = append(shortcuts,
+				helpShortcut{"ctrl+y", "Copy shell exports for the selected filtered context and quit"},
+				helpShortcut{"ctrl+s", "Set up the selected filtered context for the shell and quit"},
+			)
+		}
 		if m.screen == screenCWLogViewer {
 			shortcuts = append(shortcuts, helpShortcut{"enter", "Apply the log filter and reload events"})
 		} else {
