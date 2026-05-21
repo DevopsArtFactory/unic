@@ -102,6 +102,23 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.isFiltering(filterContexts) {
+		switch key {
+		case "ctrl+s":
+			selected, ok := m.selectedContextInfo()
+			if !ok {
+				return m, nil
+			}
+			return m.beginContextSetup(selected)
+		case "ctrl+y":
+			selected, ok := m.selectedContextInfo()
+			if !ok {
+				return m, nil
+			}
+			return m.beginContextExport(selected)
+		}
+	}
+
 	if cmd, handled := m.updateSharedFilter(msg, filterContexts); handled {
 		m.syncContextTable()
 		return m, cmd
@@ -275,6 +292,10 @@ func (m Model) viewContextPicker() string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
+	if m.isFiltering(filterContexts) {
+		b.WriteString(m.renderHelpBar("filtering: type search • ↑/↓ choose • enter finish • esc clear • ctrl+y copy env • ctrl+s setup"))
+		return b.String()
+	}
 	if m.cfg.ContextName != "" {
 		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • esc: clear/back • q: quit"))
 	} else {

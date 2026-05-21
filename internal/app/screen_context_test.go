@@ -141,6 +141,51 @@ func TestContextPickerFilterUpdatesTableRows(t *testing.T) {
 	}
 }
 
+func TestContextPickerFilterModePlainYAndSAppendToFilter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model = updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	model = updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	model = updated.(Model)
+
+	if !model.isFiltering(filterContexts) {
+		t.Fatal("expected context filter to remain active")
+	}
+	if got := model.filterValue(filterContexts); got != "ys" {
+		t.Fatalf("expected plain y/s to append to filter, got %q", got)
+	}
+	if model.screen != screenContextPicker {
+		t.Fatalf("expected to remain on context picker, got %v", model.screen)
+	}
+}
+
+func TestContextPickerFilterModeHelpShowsModifierActions(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model = updated.(Model)
+
+	view := model.viewContextPicker()
+	for _, want := range []string{"filtering: type search", "ctrl+y copy", "env", "ctrl+s setup"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected filter-mode help to contain %q, got %q", want, view)
+		}
+	}
+}
+
 func TestContextPickerIncrementalFilterStartsOnTyping(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 80
@@ -407,6 +452,162 @@ contexts:
 	}
 	if cfg.ContextName != "prod" {
 		t.Fatalf("expected current context to remain prod, got %q", cfg.ContextName)
+	}
+}
+
+func TestContextPickerFilterModeCtrlYCopiesSelectedFilteredContext(t *testing.T) {
+	path := writeContextConfig(t, `
+current: prod
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev
+    auth_type: credential
+    profile: dev-profile
+    region: us-east-1
+  - name: prod
+    auth_type: credential
+    profile: prod-profile
+    region: us-west-2
+`)
+
+	origBuildEnv := contextBuildEnvExportsFn
+	origCopy := contextCopyClipboardFn
+	defer func() {
+		contextBuildEnvExportsFn = origBuildEnv
+		contextCopyClipboardFn = origCopy
+	}()
+
+	var copied string
+	contextBuildEnvExportsFn = func(_ context.Context, cfg *config.Config) (string, error) {
+		return "exports-for-" + cfg.ContextName, nil
+	}
+	contextCopyClipboardFn = func(text string) error {
+		copied = text
+		return nil
+	}
+
+	m := New(testConfig(), path, "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{
+		{Name: "dev", Region: "us-east-1", AuthType: "credential"},
+		{Name: "prod", Region: "us-west-2", AuthType: "credential", Current: true},
+	}})
+	model := updated.(Model)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model = updated.(Model)
+	for _, ch := range []rune("dev") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyCtrlY})
+	model = updated.(Model)
+	if model.screen != screenLoading || cmd == nil {
+		t.Fatalf("expected loading command for filter-mode ctrl+y, got screen=%v cmd=%v", model.screen, cmd)
+	}
+
+	for _, batchedCmd := range cmd().(tea.BatchMsg) {
+		msg := batchedCmd()
+		if msg == nil {
+			continue
+		}
+		updated, _ = model.Update(msg)
+		model = updated.(Model)
+	}
+	if model.screen != screenExitNotice {
+		t.Fatalf("expected copy exports to open exit notice, got %v", model.screen)
+	}
+	if copied != "exports-for-dev" {
+		t.Fatalf("unexpected clipboard exports: %q", copied)
+	}
+
+	cfg, err := config.Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ContextName != "prod" {
+		t.Fatalf("expected current context to remain prod, got %q", cfg.ContextName)
+	}
+}
+
+func TestContextPickerFilterModeCtrlSSetupsSelectedFilteredContext(t *testing.T) {
+	path := writeContextConfig(t, `
+current: prod
+defaults:
+  region: us-east-1
+contexts:
+  - name: dev
+    auth_type: credential
+    profile: dev-profile
+    region: us-east-1
+  - name: prod
+    auth_type: credential
+    profile: prod-profile
+    region: us-west-2
+`)
+
+	origBuildEnv := contextBuildEnvExportsFn
+	origCopy := contextCopyClipboardFn
+	defer func() {
+		contextBuildEnvExportsFn = origBuildEnv
+		contextCopyClipboardFn = origCopy
+	}()
+
+	var copied string
+	contextBuildEnvExportsFn = func(_ context.Context, cfg *config.Config) (string, error) {
+		return fmt.Sprintf("export %s='%s'", auth.ContextEnvVar, cfg.ContextName), nil
+	}
+	contextCopyClipboardFn = func(text string) error {
+		copied = text
+		return nil
+	}
+
+	m := New(testConfig(), path, "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{
+		{Name: "dev", Region: "us-east-1", AuthType: "credential"},
+		{Name: "prod", Region: "us-west-2", AuthType: "credential", Current: true},
+	}})
+	model := updated.(Model)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model = updated.(Model)
+	for _, ch := range []rune("dev") {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(Model)
+	}
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	model = updated.(Model)
+	if model.screen != screenLoading || cmd == nil {
+		t.Fatalf("expected loading command for filter-mode ctrl+s, got screen=%v cmd=%v", model.screen, cmd)
+	}
+
+	for _, batchedCmd := range cmd().(tea.BatchMsg) {
+		msg := batchedCmd()
+		if msg == nil {
+			continue
+		}
+		updated, _ = model.Update(msg)
+		model = updated.(Model)
+	}
+	if model.screen != screenExitNotice {
+		t.Fatalf("expected setup to open exit notice, got %v", model.screen)
+	}
+	if copied != "export UNIC_CONTEXT='dev'" {
+		t.Fatalf("unexpected clipboard exports: %q", copied)
+	}
+
+	cfg, err := config.Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ContextName != "dev" {
+		t.Fatalf("expected current context to switch to dev, got %q", cfg.ContextName)
 	}
 }
 
