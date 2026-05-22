@@ -233,43 +233,31 @@ func trimLinesAroundAnchor(lines []string, height, anchor int) []string {
 	if height <= 0 || len(lines) <= height {
 		return lines
 	}
-	if height <= 3 || anchor <= 0 || anchor >= len(lines)-1 {
-		footerLines := 1
-		headerLines := height - footerLines - 1
-		if headerLines < 1 {
-			headerLines = 1
-		}
-		result := make([]string, 0, height)
-		result = append(result, lines[:headerLines]...)
-		result = append(result, dimStyle.Render("  ..."))
-		result = append(result, lines[len(lines)-footerLines:]...)
-		return result
+
+	if height == 1 {
+		return []string{lines[anchor]}
 	}
-	if height == 4 {
-		return []string{
-			lines[0],
-			lines[anchor],
-			dimStyle.Render("  ..."),
-			lines[len(lines)-1],
-		}
+	if height == 2 {
+		return []string{lines[anchor], lines[len(lines)-1]}
+	}
+	if height == 3 {
+		return []string{lines[0], lines[anchor], lines[len(lines)-1]}
 	}
 
-	result := []string{lines[0]}
-	remaining := height - 2 // first line + footer
-	beforeEllipsis := anchor > 1
-	afterEllipsis := anchor < len(lines)-2
-	if beforeEllipsis {
-		remaining--
-	}
-	if afterEllipsis {
-		remaining--
-	}
-	if remaining < 1 {
-		remaining = 1
+	if anchor <= 0 || anchor >= len(lines)-1 {
+		return trimLinesWithFixedEdges(lines, height)
 	}
 
-	contextBefore := remaining / 2
-	contextAfter := remaining - contextBefore - 1
+	windowSize := height - 2 // first line + footer
+	if anchor > 1 {
+		windowSize--
+	}
+	if anchor < len(lines)-2 {
+		windowSize--
+	}
+
+	contextBefore := windowSize / 2
+	contextAfter := windowSize - contextBefore - 1
 	start := anchor - contextBefore
 	end := anchor + contextAfter + 1
 
@@ -285,6 +273,54 @@ func trimLinesAroundAnchor(lines []string, height, anchor int) []string {
 		start = 1
 	}
 
+	for {
+		resultLen := 2 + (end - start)
+		if start > 1 {
+			resultLen++
+		}
+		if end < len(lines)-1 {
+			resultLen++
+		}
+		if resultLen >= height {
+			break
+		}
+		switch {
+		case end < len(lines)-1:
+			end++
+		case start > 1:
+			start--
+		default:
+			break
+		}
+	}
+
+	return buildAnchoredLines(lines, height, start, end)
+}
+
+func trimLinesWithFixedEdges(lines []string, height int) []string {
+	result := make([]string, 0, height)
+	headerLines := height - 2
+	if headerLines < 1 {
+		headerLines = 1
+	}
+	if headerLines > len(lines)-1 {
+		headerLines = len(lines) - 1
+	}
+	result = append(result, lines[:headerLines]...)
+	result = append(result, dimStyle.Render("  ..."))
+	result = append(result, lines[len(lines)-1])
+	if len(result) > height {
+		return result[:height]
+	}
+	for len(result) < height {
+		result = append(result, "")
+	}
+	return result
+}
+
+func buildAnchoredLines(lines []string, height, start, end int) []string {
+	result := make([]string, 0, height)
+	result = append(result, lines[0])
 	if start > 1 {
 		result = append(result, dimStyle.Render("  ..."))
 	}
@@ -293,6 +329,12 @@ func trimLinesAroundAnchor(lines []string, height, anchor int) []string {
 		result = append(result, dimStyle.Render("  ..."))
 	}
 	result = append(result, lines[len(lines)-1])
+	if len(result) > height {
+		result = result[:height]
+	}
+	for len(result) < height {
+		result = append(result, "")
+	}
 	return result
 }
 

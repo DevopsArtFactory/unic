@@ -27,6 +27,15 @@ func styleTestContexts() []config.ContextInfo {
 	}
 }
 
+func containsSelectedRow(view, label string) bool {
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, ">") && strings.Contains(line, label) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestRenderStatusBarUsesFullWidthAndUpdateHint(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 120
@@ -228,7 +237,7 @@ func TestServiceListKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
 	if len(lines) != m.height {
 		t.Fatalf("expected fitted view height %d, got %d lines", m.height, len(lines))
 	}
-	if !strings.Contains(view, ">") || !strings.Contains(view, selected) {
+	if !containsSelectedRow(view, selected) {
 		t.Fatalf("expected compact service list to keep selected service %q visible, got %q", selected, view)
 	}
 }
@@ -252,7 +261,7 @@ func TestResourceListKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
 	if len(lines) != m.height {
 		t.Fatalf("expected fitted view height %d, got %d lines", m.height, len(lines))
 	}
-	if !strings.Contains(view, ">") || !strings.Contains(view, "db-08") {
+	if !containsSelectedRow(view, "db-08") {
 		t.Fatalf("expected compact resource list to keep selected instance visible, got %q", view)
 	}
 }
@@ -283,6 +292,44 @@ func TestFeatureListKeepsSelectionVisibleInCompactTerminal(t *testing.T) {
 	}
 	if !strings.Contains(view, "> "+selected) {
 		t.Fatalf("expected compact feature list to keep selected feature %q visible, got %q", selected, view)
+	}
+}
+
+func TestTrimLinesAroundAnchorReturnsExactHeightNearEdges(t *testing.T) {
+	lines := []string{
+		"line 0",
+		"> line 1",
+		"line 2",
+		"line 3",
+		"line 4",
+		"line 5",
+		"line 6",
+		"line 7",
+		"line 8",
+		"footer",
+	}
+
+	for _, tc := range []struct {
+		name   string
+		height int
+		anchor int
+	}{
+		{name: "near top", height: 8, anchor: 1},
+		{name: "middle", height: 8, anchor: 5},
+		{name: "near bottom", height: 8, anchor: 8},
+		{name: "tiny", height: 3, anchor: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := trimLinesAroundAnchor(lines, tc.height, tc.anchor)
+			if len(got) != tc.height {
+				t.Fatalf("expected %d lines, got %d: %#v", tc.height, len(got), got)
+			}
+			plain := stripANSI(strings.Join(got, "\n"))
+			if !strings.Contains(plain, lines[tc.anchor]) &&
+				!strings.Contains(plain, strings.TrimPrefix(lines[tc.anchor], "> ")) {
+				t.Fatalf("expected anchor line %q to stay visible, got %#v", lines[tc.anchor], got)
+			}
+		})
 	}
 }
 
