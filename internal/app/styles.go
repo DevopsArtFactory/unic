@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -9,9 +10,11 @@ import (
 	"unic/internal/update"
 )
 
+var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
 var (
 	titleStyle              = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	selectedStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
+	selectedStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Bold(true)
 	normalStyle             = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	dimStyle                = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	errorStyle              = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
@@ -197,6 +200,9 @@ func (m Model) fitToHeight(s string) string {
 		}
 		return strings.Join(lines, "\n")
 	}
+	if selectedLine := selectedRenderedLine(lines); selectedLine >= 0 {
+		return strings.Join(trimLinesAroundAnchor(lines, m.height, selectedLine), "\n")
+	}
 	// Content overflows: keep first (height-2) lines + last 1 line (footer)
 	// with a "..." indicator
 	footerLines := 1
@@ -209,6 +215,127 @@ func (m Model) fitToHeight(s string) string {
 	result = append(result, dimStyle.Render("  ..."))
 	result = append(result, lines[len(lines)-footerLines:]...)
 	return strings.Join(result, "\n")
+}
+
+func selectedRenderedLine(lines []string) int {
+	for i, line := range lines {
+		line = strings.TrimSpace(ansiEscapePattern.ReplaceAllString(line, ""))
+		line = strings.TrimPrefix(line, "│")
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "> ") {
+			return i
+		}
+	}
+	return -1
+}
+
+func trimLinesAroundAnchor(lines []string, height, anchor int) []string {
+	if height <= 0 || len(lines) <= height {
+		return lines
+	}
+
+	if height == 1 {
+		return []string{lines[anchor]}
+	}
+	if height == 2 {
+		return []string{lines[anchor], lines[len(lines)-1]}
+	}
+	if height == 3 {
+		return []string{lines[0], lines[anchor], lines[len(lines)-1]}
+	}
+
+	if anchor <= 0 || anchor >= len(lines)-1 {
+		return trimLinesWithFixedEdges(lines, height)
+	}
+
+	windowSize := height - 2 // first line + footer
+	if anchor > 1 {
+		windowSize--
+	}
+	if anchor < len(lines)-2 {
+		windowSize--
+	}
+
+	contextBefore := windowSize / 2
+	contextAfter := windowSize - contextBefore - 1
+	start := anchor - contextBefore
+	end := anchor + contextAfter + 1
+
+	if start < 1 {
+		end += 1 - start
+		start = 1
+	}
+	if end > len(lines)-1 {
+		start -= end - (len(lines) - 1)
+		end = len(lines) - 1
+	}
+	if start < 1 {
+		start = 1
+	}
+
+	for {
+		resultLen := 2 + (end - start)
+		if start > 1 {
+			resultLen++
+		}
+		if end < len(lines)-1 {
+			resultLen++
+		}
+		if resultLen >= height {
+			break
+		}
+		switch {
+		case end < len(lines)-1:
+			end++
+		case start > 1:
+			start--
+		default:
+			break
+		}
+	}
+
+	return buildAnchoredLines(lines, height, start, end)
+}
+
+func trimLinesWithFixedEdges(lines []string, height int) []string {
+	result := make([]string, 0, height)
+	headerLines := height - 2
+	if headerLines < 1 {
+		headerLines = 1
+	}
+	if headerLines > len(lines)-1 {
+		headerLines = len(lines) - 1
+	}
+	result = append(result, lines[:headerLines]...)
+	result = append(result, dimStyle.Render("  ..."))
+	result = append(result, lines[len(lines)-1])
+	if len(result) > height {
+		return result[:height]
+	}
+	for len(result) < height {
+		result = append(result, "")
+	}
+	return result
+}
+
+func buildAnchoredLines(lines []string, height, start, end int) []string {
+	result := make([]string, 0, height)
+	result = append(result, lines[0])
+	if start > 1 {
+		result = append(result, dimStyle.Render("  ..."))
+	}
+	result = append(result, lines[start:end]...)
+	if end < len(lines)-1 {
+		result = append(result, dimStyle.Render("  ..."))
+	}
+	result = append(result, lines[len(lines)-1])
+	if len(result) > height {
+		result = result[:height]
+	}
+	for len(result) < height {
+		result = append(result, "")
+	}
+	return result
 }
 
 func (m Model) viewLoading() string {

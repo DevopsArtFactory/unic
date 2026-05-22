@@ -50,23 +50,54 @@ func newContextTable() table.Model {
 }
 
 func contextTableSelectedStyle() lipgloss.Style {
-	base := selectedStyle
-	return base.
+	return lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("255")).
-		Background(lipgloss.Color("57"))
+		Foreground(lipgloss.Color("16")).
+		Background(lipgloss.Color("220"))
 }
 
 func (m *Model) syncContextTable() {
 	m.contextTable.SetColumns(contextTableColumns(m.width))
 	m.contextTable.SetWidth(contextTableWidth(m.width))
-	m.contextTable.SetHeight(contextTableHeight(m.height))
+	m.contextTable.SetHeight(m.contextPickerTableHeight())
 	m.contextTable.SetRows(contextTableRows(m.filteredCtxList))
 	m.contextTable.Focus()
-	m.contextTable.SetCursor(m.ctxIdx)
+	m.setContextTableCursor(m.ctxIdx)
 	if cursor := m.contextTable.Cursor(); cursor >= 0 {
 		m.ctxIdx = cursor
 	}
+}
+
+func (m *Model) setContextTableCursor(index int) {
+	m.ctxIdx = clampListIndex(index, len(m.filteredCtxList))
+	m.contextTable.GotoTop()
+	if m.ctxIdx > 0 {
+		m.contextTable.MoveDown(m.ctxIdx)
+	}
+}
+
+func (m *Model) moveContextTableUp() {
+	if len(m.filteredCtxList) == 0 {
+		return
+	}
+	if m.ctxIdx <= 0 {
+		m.setContextTableCursor(len(m.filteredCtxList) - 1)
+		return
+	}
+	m.contextTable.MoveUp(1)
+	m.ctxIdx = m.contextTable.Cursor()
+}
+
+func (m *Model) moveContextTableDown() {
+	if len(m.filteredCtxList) == 0 {
+		return
+	}
+	if m.ctxIdx >= len(m.filteredCtxList)-1 {
+		m.setContextTableCursor(0)
+		return
+	}
+	m.contextTable.MoveDown(1)
+	m.ctxIdx = m.contextTable.Cursor()
 }
 
 func contextTableRows(contexts []config.ContextInfo) []table.Row {
@@ -101,10 +132,34 @@ func contextTableHeight(terminalHeight int) int {
 	if terminalHeight <= 0 {
 		return defaultContextTableHeight
 	}
-	// Context picker layout overhead:
-	// title/current/env/filter block (6) + panel border (2) + separator/help bar (2) = 10.
-	// The table height itself must fit inside the remaining rows.
-	return max(terminalHeight-10, 3)
+	return max(terminalHeight-10, 2)
+}
+
+func (m Model) contextPickerTableHeight() int {
+	if m.contextPickerCompact() {
+		height := max(m.height-6, 2)
+		if m.contextPickerFilterVisible() {
+			height -= 2
+		}
+		return max(height, 2)
+	}
+
+	height := contextTableHeight(m.height)
+	if m.contextPickerFilterVisible() {
+		height -= 2
+	}
+	return max(height, 2)
+}
+
+func (m Model) contextPickerCompact() bool {
+	return m.height > 0 && m.height <= 14
+}
+
+func (m Model) contextPickerFilterVisible() bool {
+	if m.isFiltering(filterContexts) && m.renderFilterValue(filterContexts) != "" {
+		return true
+	}
+	return false
 }
 
 func contextTableColumns(terminalWidth int) []table.Column {

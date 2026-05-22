@@ -145,11 +145,9 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		return m, m.activateFilter(filterContexts)
 	case "up", "k":
-		m.ctxIdx = previousListIndex(m.ctxIdx, len(m.filteredCtxList))
-		m.contextTable.SetCursor(m.ctxIdx)
+		m.moveContextTableUp()
 	case "down", "j":
-		m.ctxIdx = nextListIndex(m.ctxIdx, len(m.filteredCtxList))
-		m.contextTable.SetCursor(m.ctxIdx)
+		m.moveContextTableDown()
 	case "enter":
 		cursor := m.contextTable.Cursor()
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
@@ -265,12 +263,17 @@ func (m Model) doFinalizeContextSwitch() tea.Cmd {
 func (m Model) viewContextPicker() string {
 	var b strings.Builder
 	var panel strings.Builder
+	compact := m.contextPickerCompact()
 	b.WriteString(titleStyle.Render("Select Context"))
 	b.WriteString("\n")
-	b.WriteString(renderDetailLine("UNIC current", displayContextName(m.cfg.ContextName)))
-	b.WriteString("\n")
-	b.WriteString(renderDetailLine("Shell env", m.displayShellEnvContext()))
-	b.WriteString("\n\n")
+	if compact {
+		b.WriteString("\n")
+	} else {
+		b.WriteString(renderDetailLine("UNIC current", displayContextName(m.cfg.ContextName)))
+		b.WriteString("\n")
+		b.WriteString(renderDetailLine("Shell env", m.displayShellEnvContext()))
+		b.WriteString("\n\n")
+	}
 
 	if filter := m.renderFilterValue(filterContexts); filter != "" {
 		b.WriteString(filter)
@@ -293,7 +296,15 @@ func (m Model) viewContextPicker() string {
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
 	if m.isFiltering(filterContexts) {
-		b.WriteString(m.renderHelpBar("filtering: type search • ↑/↓ choose • enter finish • esc clear • ctrl+y copy env • ctrl+s setup"))
+		if compact {
+			b.WriteString(m.renderHelpBar("filter • ↑/↓ choose • enter finish • esc clear"))
+		} else {
+			b.WriteString(m.renderHelpBar("filtering: type search • ↑/↓ choose • enter finish • esc clear • ctrl+y copy env • ctrl+s setup"))
+		}
+		return b.String()
+	}
+	if compact {
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: switch • /: filter • a: add • q: quit"))
 		return b.String()
 	}
 	if m.cfg.ContextName != "" {
