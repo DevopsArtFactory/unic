@@ -271,6 +271,10 @@ type updateAvailableMsg struct {
 	method  update.InstallMethod
 }
 
+var appLoadCallerIdentityFn = func(m Model) tea.Cmd {
+	return m.loadCallerIdentity()
+}
+
 func (m Model) checkForUpdate() tea.Cmd {
 	return func() tea.Msg {
 		method := update.DetectInstallMethod()
@@ -280,7 +284,22 @@ func (m Model) checkForUpdate() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.loadContexts(), m.checkForUpdate(), m.loadCallerIdentity())
+	return tea.Batch(m.loadContexts(), m.checkForUpdate(), m.loadStartupCallerIdentity())
+}
+
+func (m Model) loadStartupCallerIdentity() tea.Cmd {
+	return func() tea.Msg {
+		if m.cfg == nil {
+			return callerIdentityMsg{}
+		}
+		if m.cfg.AuthType == config.AuthTypeSSO {
+			check, err := contextCheckSSOSessionFn(m.cfg)
+			if err != nil || check.LoginRequired {
+				return callerIdentityMsg{}
+			}
+		}
+		return appLoadCallerIdentityFn(m)()
+	}
 }
 
 func (m Model) loadCallerIdentity() tea.Cmd {
