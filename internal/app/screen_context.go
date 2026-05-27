@@ -37,7 +37,9 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			}
 		}
 		m.syncContextTable()
-		m.screen = screenContextPicker
+		if m.screen != screenBootup {
+			m.screen = screenContextPicker
+		}
 		return m, nil, true
 
 	case ssoLoginDoneMsg:
@@ -304,13 +306,13 @@ func (m Model) viewContextPicker() string {
 		return b.String()
 	}
 	if compact {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: switch • /: filter • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: switch • /: filter • a: add • S: settings • q: quit"))
 		return b.String()
 	}
 	if m.cfg.ContextName != "" {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • esc: clear/back • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • S: settings • esc: clear/back • q: quit"))
 	} else {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • S: settings • q: quit"))
 	}
 	return b.String()
 }
@@ -320,7 +322,7 @@ func shouldStartContextIncrementalFilter(msg tea.KeyMsg) bool {
 		return false
 	}
 	switch msg.String() {
-	case "/", "q", "s", "y", "u", "a", "j", "k":
+	case "/", "q", "s", "y", "u", "a", "S", "j", "k":
 		return false
 	}
 	r := msg.Runes[0]

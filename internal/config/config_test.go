@@ -157,6 +157,65 @@ favorites:
 	}
 }
 
+func TestLoadReadsBootSplashSettings(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+ui:
+  boot_splash: true
+  last_boot_splash_version: 0.1.2
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.BootSplash {
+		t.Fatal("expected boot splash setting to load")
+	}
+	if cfg.BootSplashSeen != "0.1.2" {
+		t.Fatalf("expected boot splash seen version 0.1.2, got %q", cfg.BootSplashSeen)
+	}
+}
+
+func TestSetBootSplashEnabledWritesConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+default_region: ap-northeast-2
+`)
+	if err := SetBootSplashEnabled(path, true); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.BootSplash {
+		t.Fatal("expected boot splash setting to be enabled")
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected existing region to be preserved, got %q", cfg.Region)
+	}
+}
+
+func TestSetBootSplashSeenVersionWritesConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+default_region: ap-northeast-2
+`)
+	if err := SetBootSplashSeenVersion(path, "0.1.3"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BootSplashSeen != "0.1.3" {
+		t.Fatalf("expected boot splash seen version 0.1.3, got %q", cfg.BootSplashSeen)
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected existing region to be preserved, got %q", cfg.Region)
+	}
+}
+
 func TestCreatesDefaultConfigFileWhenMissing(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "unic", "config.yaml")

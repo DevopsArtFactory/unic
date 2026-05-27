@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
@@ -19,7 +20,8 @@ import (
 type screen int
 
 const (
-	screenServiceList screen = iota
+	screenBootup screen = iota
+	screenServiceList
 	screenFeatureList
 	screenInstanceList
 	screenEC2InstanceBrowserList
@@ -104,6 +106,7 @@ const (
 	screenContextAdd
 	screenContextSSOAccountList
 	screenContextSSORoleList
+	screenSettings
 	screenLoading
 	screenError
 	screenExitNotice
@@ -111,12 +114,15 @@ const (
 
 // Model is the root Bubbletea model.
 type Model struct {
-	cfg         *config.Config
-	awsRepo     *awsservice.AwsRepository
-	screen      screen
-	quitting    bool
-	exitMessage string
-	exitTitle   string
+	cfg                *config.Config
+	awsRepo            *awsservice.AwsRepository
+	screen             screen
+	quitting           bool
+	exitMessage        string
+	exitTitle          string
+	bootFrame          int
+	settingsIdx        int
+	settingsPrevScreen screen
 
 	// App-shell state stays root-owned because it coordinates global navigation,
 	// context/session setup, shared chrome, and cross-feature transitions.
@@ -193,6 +199,7 @@ type Model struct {
 	currentVersion  string
 	updateAvailable string // non-empty = new version available
 	installMethod   update.InstallMethod
+	bootSplash      bool
 
 	// Error display
 	errMsg string
@@ -231,6 +238,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		ctxPrevScreen:    screenServiceList,
 		services:         services,
 		favoriteServices: favoriteServiceSet(favoriteServiceNames),
+		bootSplash:       cfg != nil && cfg.BootSplash,
 		loadingSpinner:   newLoadingSpinner(),
 		filterTI:         filterTI,
 		filters:          make(map[filterTarget]string),
@@ -280,7 +288,49 @@ func (m Model) checkForUpdate() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.loadContexts(), m.checkForUpdate(), m.loadCallerIdentity())
+	cmds := []tea.Cmd{m.loadContexts(), m.checkForUpdate(), m.loadCallerIdentity()}
+	if m.shouldShowBootup() {
+		cmds = append(cmds, bootupTickCmd(), m.markBootupSeen())
+		return tea.Sequence(
+			func() tea.Msg { return bootupStartMsg{} },
+			tea.Batch(cmds...),
+		)
+	}
+	return tea.Sequence(
+		func() tea.Msg { return screenReadyMsg{} },
+		tea.Batch(cmds...),
+	)
+}
+
+func (m Model) shouldShowBootup() bool {
+	if m.bootSplash {
+		return true
+	}
+	if m.cfg == nil {
+		return false
+	}
+	return strings.TrimSpace(m.currentVersion) != "" && m.cfg.BootSplashSeen != m.currentVersion
+}
+
+func bootupTickCmd() tea.Cmd {
+	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg {
+		return bootupTickMsg{}
+	})
+}
+
+func (m Model) markBootupSeen() tea.Cmd {
+	return func() tea.Msg {
+		if m.configPath == "" || strings.TrimSpace(m.currentVersion) == "" {
+			return nil
+		}
+		if err := configSetBootSplashSeenVersionFn(m.configPath, m.currentVersion); err != nil {
+			return nil
+		}
+		if m.cfg != nil {
+			m.cfg.BootSplashSeen = m.currentVersion
+		}
+		return nil
+	}
 }
 
 func (m Model) loadCallerIdentity() tea.Cmd {
@@ -326,6 +376,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case callerIdentityMsg:
 		m.callerIdentity = msg.identity
 		return m, nil
+	case screenReadyMsg:
+		m.screen = screenContextPicker
+		return m, nil
+	case bootupStartMsg:
+		m.screen = screenBootup
+		m.bootFrame = 0
+		return m, nil
+	case bootupTickMsg:
+		if m.screen != screenBootup {
+			return m, nil
+		}
+		m.bootFrame++
+		if m.bootFrame >= bootupFrameCount {
+			m.screen = screenContextPicker
+			return m, nil
+		}
+		return m, bootupTickCmd()
 	case updateAvailableMsg:
 		m.installMethod = msg.method
 		if msg.version != "" {
@@ -369,6 +436,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		}
+		if m.screen == screenBootup {
+			switch msg.String() {
+			case "q":
+				m.quitting = true
+				return m, tea.Quit
+			case "enter", "esc", " ":
+				m.screen = screenContextPicker
+			}
+			return m, nil
+		}
 		if m.screen == screenExitNotice {
 			m.quitting = true
 			return m, tea.Quit
@@ -402,6 +479,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
 		}
+		if msg.String() == "S" && !m.filterTI.Focused() && m.screen != screenSettings &&
+			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
+			m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+			m.screen != screenBedrockKeyConfirm {
+			m.deactivateFilter()
+			m.settingsPrevScreen = m.screen
+			m.screen = screenSettings
+			return m, nil
+		}
 
 		for _, submodel := range m.featureSubmodels() {
 			if newM, cmd, handled := submodel.HandleKey(&m, msg); handled {
@@ -424,6 +510,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateContextSSOAccountList(msg)
 		case screenContextSSORoleList:
 			return m.updateContextSSORoleList(msg)
+		case screenSettings:
+			return m.updateSettings(msg)
 		case screenError:
 			return m.updateError(msg)
 		}
@@ -564,6 +652,8 @@ func (m Model) View() string {
 		}
 	}
 	switch m.screen {
+	case screenBootup:
+		v = m.viewBootup()
 	case screenServiceList:
 		v = m.viewServiceList()
 	case screenFeatureList:
@@ -578,6 +668,8 @@ func (m Model) View() string {
 		v = m.viewContextSSOAccountList()
 	case screenContextSSORoleList:
 		v = m.viewContextSSORoleList()
+	case screenSettings:
+		v = m.viewSettings()
 	case screenLoading:
 		v = m.viewLoading()
 	case screenError:

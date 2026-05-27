@@ -151,6 +151,170 @@ func TestLoadingSpinnerTickUpdatesOnlyOnLoadingScreen(t *testing.T) {
 	}
 }
 
+func TestBootupStartShowsAnimatedSplash(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+
+	updated, cmd := m.Update(bootupStartMsg{})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected bootup start to only update model state")
+	}
+	if model.screen != screenBootup {
+		t.Fatalf("expected bootup screen, got %v", model.screen)
+	}
+
+	view := stripANSI(model.View())
+	for _, want := range []string{"UNIC BIOS", "UNIC", "enter/esc/space: skip"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected bootup view to contain %q, got %q", want, view)
+		}
+	}
+}
+
+func TestBootupContextsLoadWithoutInterruptingSplash(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBootup
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+	if model.screen != screenBootup {
+		t.Fatalf("expected context load to keep bootup screen active, got %v", model.screen)
+	}
+	if got := len(model.contextTable.Rows()); got != len(testContexts()) {
+		t.Fatalf("expected contexts to load behind bootup, got %d rows", got)
+	}
+}
+
+func TestBootupTickTransitionsToContextPicker(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBootup
+	m.bootFrame = bootupFrameCount - 1
+
+	updated, cmd := m.Update(bootupTickMsg{})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected final bootup tick to stop scheduling ticks")
+	}
+	if model.screen != screenContextPicker {
+		t.Fatalf("expected bootup to finish at context picker, got %v", model.screen)
+	}
+}
+
+func TestBootupCanBeSkipped(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBootup
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected skip key to only update model state")
+	}
+	if model.screen != screenContextPicker {
+		t.Fatalf("expected skip to open context picker, got %v", model.screen)
+	}
+}
+
+func TestBootupShowsForNewVersionOnlyWhenPreferenceDisabled(t *testing.T) {
+	m := New(&config.Config{BootSplashSeen: "0.1.2"}, "", "0.1.3")
+	if !m.shouldShowBootup() {
+		t.Fatal("expected bootup to show after update")
+	}
+
+	m = New(&config.Config{BootSplashSeen: "0.1.3"}, "", "0.1.3")
+	if m.shouldShowBootup() {
+		t.Fatal("expected bootup to stay off after version has been seen")
+	}
+}
+
+func TestBootupPreferenceAlwaysShowsSplash(t *testing.T) {
+	m := New(&config.Config{BootSplash: true, BootSplashSeen: "0.1.3"}, "", "0.1.3")
+	if !m.shouldShowBootup() {
+		t.Fatal("expected bootup preference to force splash")
+	}
+}
+
+func TestSettingsTogglesBootSplashPreference(t *testing.T) {
+	origSetBootSplashEnabledFn := configSetBootSplashEnabledFn
+	defer func() {
+		configSetBootSplashEnabledFn = origSetBootSplashEnabledFn
+	}()
+
+	var gotEnabled bool
+	configSetBootSplashEnabledFn = func(path string, enabled bool) error {
+		if path != "config.yaml" {
+			t.Fatalf("expected config path, got %q", path)
+		}
+		gotEnabled = enabled
+		return nil
+	}
+
+	cfg := testConfig()
+	m := New(cfg, "config.yaml", "dev")
+	m.screen = screenSettings
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected boot splash toggle to be synchronous")
+	}
+	if !model.bootSplash || !cfg.BootSplash || !gotEnabled {
+		t.Fatalf("expected boot splash preference enabled, model=%v cfg=%v persisted=%v", model.bootSplash, cfg.BootSplash, gotEnabled)
+	}
+}
+
+func TestGlobalSettingsShortcutOpensSettings(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenContextPicker
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected settings shortcut to be synchronous")
+	}
+	if model.screen != screenSettings {
+		t.Fatalf("expected settings screen, got %v", model.screen)
+	}
+	if model.settingsPrevScreen != screenContextPicker {
+		t.Fatalf("expected previous screen to be context picker, got %v", model.settingsPrevScreen)
+	}
+}
+
+func TestSettingsViewShowsBootSplashSetting(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenSettings
+
+	view := stripANSI(m.View())
+	for _, want := range []string{"Settings", "Boot splash", "enter/space: toggle"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected settings view to contain %q, got %q", want, view)
+		}
+	}
+}
+
+func TestBootupViewCentersVertically(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBootup
+	m.width = 80
+	m.height = 30
+
+	view := stripANSI(m.View())
+	lines := strings.Split(view, "\n")
+	firstContent := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			firstContent = i
+			break
+		}
+	}
+
+	if firstContent < 4 {
+		t.Fatalf("expected bootup content to be vertically centered, first content line %d in %q", firstContent, view)
+	}
+	if !strings.Contains(view, "UNIC BIOS") {
+		t.Fatalf("expected centered bootup view to keep boot text, got %q", view)
+	}
+}
+
 func TestListIndexHelpersWrapAndClamp(t *testing.T) {
 	if got := previousListIndex(0, 3); got != 2 {
 		t.Fatalf("expected previous from first to wrap to 2, got %d", got)

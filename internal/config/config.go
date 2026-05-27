@@ -26,6 +26,7 @@ type fileConfig struct {
 	Current   string         `yaml:"current"`
 	Defaults  fileDefaults   `yaml:"defaults"`
 	Favorites fileFavorites  `yaml:"favorites,omitempty"`
+	UI        fileUI         `yaml:"ui,omitempty"`
 	Contexts  []contextEntry `yaml:"contexts"`
 }
 
@@ -35,6 +36,11 @@ type fileDefaults struct {
 
 type fileFavorites struct {
 	Services []string `yaml:"services,omitempty"`
+}
+
+type fileUI struct {
+	BootSplash            bool   `yaml:"boot_splash,omitempty"`
+	LastBootSplashVersion string `yaml:"last_boot_splash_version,omitempty"`
 }
 
 // AuthType represents the authentication method for a context.
@@ -76,6 +82,8 @@ type Config struct {
 	SSOAccountID     string
 	SSORoleName      string
 	FavoriteServices []string
+	BootSplash       bool
+	BootSplashSeen   string
 }
 
 func normalizeAuthType(value string) AuthType {
@@ -193,6 +201,8 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		SSOAccountID:     ssoAccountID,
 		SSORoleName:      ssoRoleName,
 		FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
+		BootSplash:       fc.UI.BootSplash,
+		BootSplashSeen:   fc.UI.LastBootSplashVersion,
 	}, nil
 }
 
@@ -237,6 +247,8 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			SSOAccountID:     ctx.SSOAccountID,
 			SSORoleName:      ctx.SSORoleName,
 			FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
+			BootSplash:       fc.UI.BootSplash,
+			BootSplashSeen:   fc.UI.LastBootSplashVersion,
 		}, nil
 	}
 
@@ -611,6 +623,56 @@ func SetFavoriteServices(configPath string, services []string) error {
 	fc.Favorites.Services = normalizeFavoriteServices(services)
 
 	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	return nil
+}
+
+// SetBootSplashEnabled updates whether the startup splash should run on every launch.
+func SetBootSplashEnabled(configPath string, enabled bool) error {
+	fc, err := readFileConfigOrDefault(configPath)
+	if err != nil {
+		return err
+	}
+	fc.UI.BootSplash = enabled
+	return writeFileConfig(configPath, fc)
+}
+
+// SetBootSplashSeenVersion records the app version that has already shown the one-time splash.
+func SetBootSplashSeenVersion(configPath, version string) error {
+	fc, err := readFileConfigOrDefault(configPath)
+	if err != nil {
+		return err
+	}
+	fc.UI.LastBootSplashVersion = strings.TrimSpace(version)
+	return writeFileConfig(configPath, fc)
+}
+
+func readFileConfigOrDefault(configPath string) (*fileConfig, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to read config: %w", err)
+		}
+		data = []byte(defaultContent())
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+	return &fc, nil
+}
+
+func writeFileConfig(configPath string, fc *fileConfig) error {
+	out, err := yaml.Marshal(fc)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}

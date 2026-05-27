@@ -10,6 +10,8 @@ import (
 )
 
 var configSetFavoriteServicesFn = config.SetFavoriteServices
+var configSetBootSplashEnabledFn = config.SetBootSplashEnabled
+var configSetBootSplashSeenVersionFn = config.SetBootSplashSeenVersion
 
 func (m Model) serviceList() []domain.Service {
 	if m.filteredServices != nil {
@@ -81,6 +83,19 @@ func (m *Model) toggleFavoriteService(name domain.AwsService) error {
 	}
 	m.applyServiceListFilter()
 	m.selectServiceByName(name)
+	return nil
+}
+
+func (m *Model) toggleBootSplash() error {
+	m.bootSplash = !m.bootSplash
+	if m.cfg != nil {
+		m.cfg.BootSplash = m.bootSplash
+	}
+	if strings.TrimSpace(m.configPath) != "" {
+		if err := configSetBootSplashEnabledFn(m.configPath, m.bootSplash); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

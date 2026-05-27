@@ -45,6 +45,12 @@ type callerIdentityMsg struct {
 	identity *awsservice.CallerIdentity
 }
 
+type screenReadyMsg struct{}
+
+type bootupStartMsg struct{}
+
+type bootupTickMsg struct{}
+
 type contextsLoadedMsg struct {
 	contexts []config.ContextInfo
 }
