@@ -193,6 +193,45 @@ func TestStartupCallerIdentitySkipsInteractiveSSOLoginWhenCacheMissing(t *testin
 	}
 }
 
+func TestStartupCallerIdentitySkipsInteractiveSSOLoginWhenSessionCheckFails(t *testing.T) {
+	origCheck := contextCheckSSOSessionFn
+	origLoad := appLoadCallerIdentityFn
+	defer func() {
+		contextCheckSSOSessionFn = origCheck
+		appLoadCallerIdentityFn = origLoad
+	}()
+
+	checkCalled := false
+	loadCalled := false
+	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
+		checkCalled = true
+		return awsservice.SSOSessionCheck{}, os.ErrNotExist
+	}
+	appLoadCallerIdentityFn = func(Model) tea.Cmd {
+		loadCalled = true
+		return func() tea.Msg {
+			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
+		}
+	}
+
+	m := New(&config.Config{
+		AuthType:    config.AuthTypeSSO,
+		SSOStartURL: "https://example.awsapps.com/start",
+		Region:      "us-east-1",
+	}, "", "dev")
+
+	msg := m.loadStartupCallerIdentity()()
+	if _, ok := msg.(callerIdentityMsg); !ok {
+		t.Fatalf("expected callerIdentityMsg, got %T", msg)
+	}
+	if !checkCalled {
+		t.Fatal("expected startup to check SSO cache")
+	}
+	if loadCalled {
+		t.Fatal("expected startup to skip identity loading when SSO session check fails")
+	}
+}
+
 func TestStartupCallerIdentityLoadsSSOIdentityWhenCacheValid(t *testing.T) {
 	origCheck := contextCheckSSOSessionFn
 	origLoad := appLoadCallerIdentityFn
