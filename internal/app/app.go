@@ -279,6 +279,10 @@ type updateAvailableMsg struct {
 	method  update.InstallMethod
 }
 
+var appLoadCallerIdentityFn = func(m Model) tea.Cmd {
+	return m.loadCallerIdentity()
+}
+
 func (m Model) checkForUpdate() tea.Cmd {
 	return func() tea.Msg {
 		method := update.DetectInstallMethod()
