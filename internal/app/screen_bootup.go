@@ -14,7 +14,7 @@ func (m Model) viewBootup() string {
 	logo := bootupLogo(frame)
 	lines := []string{
 		"",
-		dimStyle.Render("UNIC BIOS v0.1.3   COPYRIGHT 1986-2026 DEVOPS ART FACTORY"),
+		dimStyle.Render(bootupBanner(m.currentVersion)),
 		"",
 		logo,
 		"",
@@ -31,6 +31,19 @@ func (m Model) viewBootup() string {
 		content = lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).Render(content)
 	}
 	return m.centerBootupVertically(content)
+}
+
+// bootupBanner builds the BIOS header line, reflecting the running app version
+// instead of a hardcoded one. Empty/unknown versions fall back to "dev".
+func bootupBanner(version string) string {
+	v := strings.TrimSpace(version)
+	if v == "" {
+		v = "dev"
+	}
+	if v != "dev" && !strings.HasPrefix(v, "v") {
+		v = "v" + v
+	}
+	return fmt.Sprintf("UNIC BIOS %s   COPYRIGHT 1986-2026 DEVOPS ART FACTORY", v)
 }
 
 func (m Model) centerBootupVertically(content string) string {

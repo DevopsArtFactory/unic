@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -213,6 +214,37 @@ default_region: ap-northeast-2
 	}
 	if cfg.Region != "ap-northeast-2" {
 		t.Fatalf("expected existing region to be preserved, got %q", cfg.Region)
+	}
+}
+
+func TestSetBootSplashEnabledFalseSurvivesRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+default_region: ap-northeast-2
+`)
+	// Explicitly disabling the splash must persist as an explicit choice rather
+	// than collapsing into "unset" (the omitempty tri-state bug).
+	if err := SetBootSplashEnabled(path, false); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BootSplash {
+		t.Fatal("expected boot splash to remain disabled after round-trip")
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected existing region to be preserved, got %q", cfg.Region)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "boot_splash: false") {
+		t.Fatalf("expected explicit boot_splash: false in config, got:\n%s", data)
 	}
 }
 

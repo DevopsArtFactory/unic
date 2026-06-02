@@ -53,6 +53,11 @@ type bootupTickMsg struct{}
 
 type contextsLoadedMsg struct {
 	contexts []config.ContextInfo
+	// startup marks the initial background load triggered by Init. Startup
+	// loads must not steal navigation from a screen the user opened in the
+	// meantime (e.g. Settings); explicit loads (the C shortcut, post-add
+	// reloads) always surface the context picker.
+	startup bool
 }
 
 type contextSwitchedMsg struct {

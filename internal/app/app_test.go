@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -185,6 +186,58 @@ func TestBootupContextsLoadWithoutInterruptingSplash(t *testing.T) {
 	}
 }
 
+func TestStartupContextsLoadDoesNotOverrideSettings(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	// User has opened Settings while the startup context load is still in flight.
+	m.screen = screenSettings
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts(), startup: true})
+	model := updated.(Model)
+	if model.screen != screenSettings {
+		t.Fatalf("startup context load should not steal navigation from Settings, got %v", model.screen)
+	}
+	if got := len(model.contextTable.Rows()); got != len(testContexts()) {
+		t.Fatalf("expected contexts to load behind Settings, got %d rows", got)
+	}
+}
+
+func TestGlobalSettingsShortcutSkipsTextEntryScreens(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	// Put the model on the context-add screen in a free-form field-input step.
+	m.screen = screenContextAdd
+	m.addStep = 1
+	m.addFields = fieldsByAuthType["credential"]
+	m.addFieldIdx = 0
+	m.addInput = ""
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("S")})
+	model := updated.(Model)
+
+	if model.screen == screenSettings {
+		t.Fatal("uppercase S during text entry must not open Settings")
+	}
+	if model.screen != screenContextAdd {
+		t.Fatalf("expected to stay on context-add screen, got %v", model.screen)
+	}
+	if model.addInput != "S" {
+		t.Fatalf("expected S to be typed into the field, got %q", model.addInput)
+	}
+}
+
+func TestBootupBannerReflectsVersion(t *testing.T) {
+	cases := map[string]string{
+		"0.1.3":  "UNIC BIOS v0.1.3   COPYRIGHT 1986-2026 DEVOPS ART FACTORY",
+		"v2.0.0": "UNIC BIOS v2.0.0   COPYRIGHT 1986-2026 DEVOPS ART FACTORY",
+		"":       "UNIC BIOS dev   COPYRIGHT 1986-2026 DEVOPS ART FACTORY",
+		"dev":    "UNIC BIOS dev   COPYRIGHT 1986-2026 DEVOPS ART FACTORY",
+	}
+	for version, want := range cases {
+		if got := bootupBanner(version); got != want {
+			t.Errorf("bootupBanner(%q) = %q, want %q", version, got, want)
+		}
+	}
+}
+
 func TestBootupTickTransitionsToContextPicker(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenBootup
@@ -259,6 +312,39 @@ func TestSettingsTogglesBootSplashPreference(t *testing.T) {
 	}
 	if !model.bootSplash || !cfg.BootSplash || !gotEnabled {
 		t.Fatalf("expected boot splash preference enabled, model=%v cfg=%v persisted=%v", model.bootSplash, cfg.BootSplash, gotEnabled)
+	}
+}
+
+func TestSettingsTogglesBootSplashPreference_Error(t *testing.T) {
+	origSetBootSplashEnabledFn := configSetBootSplashEnabledFn
+	defer func() {
+		configSetBootSplashEnabledFn = origSetBootSplashEnabledFn
+	}()
+
+	configSetBootSplashEnabledFn = func(path string, enabled bool) error {
+		return errors.New("disk full")
+	}
+
+	cfg := testConfig()
+	cfg.BootSplash = false
+	m := New(cfg, "config.yaml", "dev")
+	m.screen = screenSettings
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.screen != screenError {
+		t.Fatalf("expected error screen after failed persist, got %v", model.screen)
+	}
+	if !strings.Contains(model.errMsg, "disk full") {
+		t.Fatalf("expected error message to surface persist failure, got %q", model.errMsg)
+	}
+	// In-memory state must not change when the config write fails.
+	if model.bootSplash {
+		t.Fatal("expected model.bootSplash to stay false when persist fails")
+	}
+	if cfg.BootSplash {
+		t.Fatal("expected cfg.BootSplash to stay false when persist fails")
 	}
 }
 

@@ -87,14 +87,15 @@ func (m *Model) toggleFavoriteService(name domain.AwsService) error {
 }
 
 func (m *Model) toggleBootSplash() error {
-	m.bootSplash = !m.bootSplash
-	if m.cfg != nil {
-		m.cfg.BootSplash = m.bootSplash
-	}
+	newVal := !m.bootSplash
 	if strings.TrimSpace(m.configPath) != "" {
-		if err := configSetBootSplashEnabledFn(m.configPath, m.bootSplash); err != nil {
+		if err := configSetBootSplashEnabledFn(m.configPath, newVal); err != nil {
 			return err
 		}
+	}
+	m.bootSplash = newVal
+	if m.cfg != nil {
+		m.cfg.BootSplash = newVal
 	}
 	return nil
 }

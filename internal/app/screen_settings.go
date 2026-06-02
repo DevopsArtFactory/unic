@@ -1,10 +1,10 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type settingsItem struct {
@@ -63,6 +63,8 @@ func (m Model) viewSettings() string {
 	b.WriteString(titleStyle.Render("Settings"))
 	b.WriteString("\n\n")
 
+	// Width-aware name column so styled (ANSI-wrapped) cells stay aligned.
+	nameCol := lipgloss.NewStyle().Width(18)
 	for i, item := range items {
 		prefix := "  "
 		nameStyle := normalStyle
@@ -72,7 +74,9 @@ func (m Model) viewSettings() string {
 			nameStyle = selectedStyle
 			valueStyle = selectedStyle
 		}
-		panel.WriteString(fmt.Sprintf("%s%-18s %s\n", prefix, nameStyle.Render(item.name), valueStyle.Render(item.value)))
+		nameCell := nameCol.Render(nameStyle.Render(item.name))
+		valueCell := valueStyle.Render(item.value)
+		panel.WriteString(prefix + nameCell + " " + valueCell + "\n")
 		panel.WriteString("  " + dimStyle.Render(item.description))
 		panel.WriteString("\n")
 	}

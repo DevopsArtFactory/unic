@@ -292,7 +292,7 @@ func (m Model) checkForUpdate() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadContexts(), m.checkForUpdate(), m.loadCallerIdentity()}
+	cmds := []tea.Cmd{m.loadStartupContexts(), m.checkForUpdate(), m.loadStartupCallerIdentity()}
 	if m.shouldShowBootup() {
 		cmds = append(cmds, bootupTickCmd(), m.markBootupSeen())
 		return tea.Sequence(
@@ -337,6 +337,25 @@ func (m Model) markBootupSeen() tea.Cmd {
 	}
 }
 
+// loadStartupCallerIdentity resolves the caller identity at startup without
+// triggering an interactive SSO login. If the active context uses SSO and its
+// session has expired (or the check fails), it skips identity display rather
+// than blocking startup on a browser-based login prompt.
+func (m Model) loadStartupCallerIdentity() tea.Cmd {
+	return func() tea.Msg {
+		if m.cfg == nil {
+			return callerIdentityMsg{}
+		}
+		if m.cfg.AuthType == config.AuthTypeSSO {
+			check, err := contextCheckSSOSessionFn(m.cfg)
+			if err != nil || check.LoginRequired {
+				return callerIdentityMsg{}
+			}
+		}
+		return appLoadCallerIdentityFn(m)()
+	}
+}
+
 func (m Model) loadCallerIdentity() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -366,6 +385,25 @@ func (m Model) startLoadingWithMessage(title string, details []string, cmd tea.C
 		return m, m.loadingSpinner.Tick
 	}
 	return m, tea.Batch(m.loadingSpinner.Tick, cmd)
+}
+
+// isTextEntryScreen reports whether the current screen captures free-form text
+// (or confirmation) input, so global single-letter shortcuts like S must not
+// fire and steal a keystroke from the active field.
+func (m Model) isTextEntryScreen() bool {
+	switch m.screen {
+	case screenContextAdd,
+		screenRoute53RecordCreate,
+		screenRoute53RecordEdit,
+		screenSecurityGroupAddRule,
+		screenSecurityGroupDeleteConfirm,
+		screenLambdaInvokeInput,
+		screenBedrockKeyCreate,
+		screenBedrockKeyConfirm:
+		return true
+	default:
+		return false
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -483,10 +521,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
 		}
+		// Global settings — S opens the settings screen (skip text-entry screens
+		// and the filter input so it never steals a typed character).
 		if msg.String() == "S" && !m.filterTI.Focused() && m.screen != screenSettings &&
-			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-			m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
-			m.screen != screenBedrockKeyConfirm {
+			!m.isTextEntryScreen() {
 			m.deactivateFilter()
 			m.settingsPrevScreen = m.screen
 			m.screen = screenSettings

@@ -39,7 +39,11 @@ type fileFavorites struct {
 }
 
 type fileUI struct {
-	BootSplash            bool   `yaml:"boot_splash,omitempty"`
+	// BootSplash is tri-state: nil means "unset" (use default behavior),
+	// while a non-nil value records an explicit user choice. This lets an
+	// explicit `boot_splash: false` survive a save/load round-trip instead of
+	// being collapsed into the zero value by `omitempty`.
+	BootSplash            *bool  `yaml:"boot_splash,omitempty"`
 	LastBootSplashVersion string `yaml:"last_boot_splash_version,omitempty"`
 }
 
@@ -201,7 +205,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		SSOAccountID:     ssoAccountID,
 		SSORoleName:      ssoRoleName,
 		FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
-		BootSplash:       fc.UI.BootSplash,
+		BootSplash:       boolValue(fc.UI.BootSplash, false),
 		BootSplashSeen:   fc.UI.LastBootSplashVersion,
 	}, nil
 }
@@ -247,12 +251,20 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			SSOAccountID:     ctx.SSOAccountID,
 			SSORoleName:      ctx.SSORoleName,
 			FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
-			BootSplash:       fc.UI.BootSplash,
+			BootSplash:       boolValue(fc.UI.BootSplash, false),
 			BootSplashSeen:   fc.UI.LastBootSplashVersion,
 		}, nil
 	}
 
 	return nil, fmt.Errorf("context %q not found in config", name)
+}
+
+// boolValue dereferences a tri-state *bool, returning fallback when unset (nil).
+func boolValue(v *bool, fallback bool) bool {
+	if v == nil {
+		return fallback
+	}
+	return *v
 }
 
 func normalizeFavoriteServices(services []string) []string {
@@ -641,7 +653,7 @@ func SetBootSplashEnabled(configPath string, enabled bool) error {
 	if err != nil {
 		return err
 	}
-	fc.UI.BootSplash = enabled
+	fc.UI.BootSplash = &enabled
 	return writeFileConfig(configPath, fc)
 }
 
