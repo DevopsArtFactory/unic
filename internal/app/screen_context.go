@@ -37,7 +37,14 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			}
 		}
 		m.syncContextTable()
-		m.screen = screenContextPicker
+		// Startup loads only populate the context list; screen transitions are
+		// owned by the Init sequence (screenReadyMsg / the boot splash flow), so
+		// a late background load never overrides a screen the user navigated to
+		// in the meantime (e.g. Settings). Explicit loads (C shortcut, post-add
+		// reloads) surface the picker directly, but never interrupt the splash.
+		if !msg.startup && m.screen != screenBootup {
+			m.screen = screenContextPicker
+		}
 		return m, nil, true
 
 	case ssoLoginDoneMsg:
@@ -80,12 +87,24 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) loadContexts() tea.Cmd {
+	return m.loadContextsCmd(false)
+}
+
+// loadStartupContexts loads contexts during the initial Init sequence. Unlike
+// loadContexts, the resulting message is flagged as a startup load so its
+// handler won't bounce the user away from a screen they navigated to while the
+// load was in flight.
+func (m Model) loadStartupContexts() tea.Cmd {
+	return m.loadContextsCmd(true)
+}
+
+func (m Model) loadContextsCmd(startup bool) tea.Cmd {
 	return func() tea.Msg {
 		contexts, err := config.Contexts(m.configPath)
 		if err != nil || len(contexts) == 0 {
-			return contextsLoadedMsg{}
+			return contextsLoadedMsg{startup: startup}
 		}
-		return contextsLoadedMsg{contexts: contexts}
+		return contextsLoadedMsg{contexts: contexts, startup: startup}
 	}
 }
 
@@ -304,13 +323,13 @@ func (m Model) viewContextPicker() string {
 		return b.String()
 	}
 	if compact {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: switch • /: filter • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: switch • /: filter • a: add • S: settings • q: quit"))
 		return b.String()
 	}
 	if m.cfg.ContextName != "" {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • esc: clear/back • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • S: settings • esc: clear/back • q: quit"))
 	} else {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • S: settings • q: quit"))
 	}
 	return b.String()
 }
@@ -320,7 +339,7 @@ func shouldStartContextIncrementalFilter(msg tea.KeyMsg) bool {
 		return false
 	}
 	switch msg.String() {
-	case "/", "q", "s", "y", "u", "a", "j", "k":
+	case "/", "q", "s", "y", "u", "a", "S", "j", "k":
 		return false
 	}
 	r := msg.Runes[0]

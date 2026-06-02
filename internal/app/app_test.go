@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,146 +152,252 @@ func TestLoadingSpinnerTickUpdatesOnlyOnLoadingScreen(t *testing.T) {
 	}
 }
 
-func TestStartupCallerIdentitySkipsInteractiveSSOLoginWhenCacheMissing(t *testing.T) {
-	origCheck := contextCheckSSOSessionFn
-	origLoad := appLoadCallerIdentityFn
-	defer func() {
-		contextCheckSSOSessionFn = origCheck
-		appLoadCallerIdentityFn = origLoad
-	}()
+func TestBootupStartShowsAnimatedSplash(t *testing.T) {
+	m := New(testConfig(), "", "dev")
 
-	checkCalled := false
-	loadCalled := false
-	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
-		checkCalled = true
-		return awsservice.SSOSessionCheck{
-			StartURL:      cfg.SSOStartURL,
-			LoginRequired: true,
-		}, nil
+	updated, cmd := m.Update(bootupStartMsg{})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected bootup start to only update model state")
 	}
-	appLoadCallerIdentityFn = func(Model) tea.Cmd {
-		loadCalled = true
-		return func() tea.Msg {
-			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
+	if model.screen != screenBootup {
+		t.Fatalf("expected bootup screen, got %v", model.screen)
+	}
+
+	view := stripANSI(model.View())
+	for _, want := range []string{"UNIC BIOS", "UNIC", "enter/esc/space: skip"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected bootup view to contain %q, got %q", want, view)
 		}
-	}
-
-	m := New(&config.Config{
-		AuthType:    config.AuthTypeSSO,
-		SSOStartURL: "https://example.awsapps.com/start",
-		Region:      "us-east-1",
-	}, "", "dev")
-
-	msg := m.loadStartupCallerIdentity()()
-	if _, ok := msg.(callerIdentityMsg); !ok {
-		t.Fatalf("expected callerIdentityMsg, got %T", msg)
-	}
-	if !checkCalled {
-		t.Fatal("expected startup to check SSO cache")
-	}
-	if loadCalled {
-		t.Fatal("expected startup to skip identity loading when SSO login is required")
 	}
 }
 
-func TestStartupCallerIdentitySkipsInteractiveSSOLoginWhenSessionCheckFails(t *testing.T) {
-	origCheck := contextCheckSSOSessionFn
-	origLoad := appLoadCallerIdentityFn
-	defer func() {
-		contextCheckSSOSessionFn = origCheck
-		appLoadCallerIdentityFn = origLoad
-	}()
+func TestBootupContextsLoadWithoutInterruptingSplash(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBootup
 
-	checkCalled := false
-	loadCalled := false
-	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
-		checkCalled = true
-		return awsservice.SSOSessionCheck{}, os.ErrNotExist
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+	if model.screen != screenBootup {
+		t.Fatalf("expected context load to keep bootup screen active, got %v", model.screen)
 	}
-	appLoadCallerIdentityFn = func(Model) tea.Cmd {
-		loadCalled = true
-		return func() tea.Msg {
-			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
-		}
-	}
-
-	m := New(&config.Config{
-		AuthType:    config.AuthTypeSSO,
-		SSOStartURL: "https://example.awsapps.com/start",
-		Region:      "us-east-1",
-	}, "", "dev")
-
-	msg := m.loadStartupCallerIdentity()()
-	if _, ok := msg.(callerIdentityMsg); !ok {
-		t.Fatalf("expected callerIdentityMsg, got %T", msg)
-	}
-	if !checkCalled {
-		t.Fatal("expected startup to check SSO cache")
-	}
-	if loadCalled {
-		t.Fatal("expected startup to skip identity loading when SSO session check fails")
+	if got := len(model.contextTable.Rows()); got != len(testContexts()) {
+		t.Fatalf("expected contexts to load behind bootup, got %d rows", got)
 	}
 }
 
-func TestStartupCallerIdentityLoadsSSOIdentityWhenCacheValid(t *testing.T) {
-	origCheck := contextCheckSSOSessionFn
-	origLoad := appLoadCallerIdentityFn
-	defer func() {
-		contextCheckSSOSessionFn = origCheck
-		appLoadCallerIdentityFn = origLoad
-	}()
+func TestStartupContextsLoadDoesNotOverrideSettings(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	// User has opened Settings while the startup context load is still in flight.
+	m.screen = screenSettings
 
-	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
-		return awsservice.SSOSessionCheck{StartURL: cfg.SSOStartURL}, nil
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts(), startup: true})
+	model := updated.(Model)
+	if model.screen != screenSettings {
+		t.Fatalf("startup context load should not steal navigation from Settings, got %v", model.screen)
 	}
-	appLoadCallerIdentityFn = func(Model) tea.Cmd {
-		return func() tea.Msg {
-			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
-		}
-	}
-
-	m := New(&config.Config{
-		AuthType:    config.AuthTypeSSO,
-		SSOStartURL: "https://example.awsapps.com/start",
-		Region:      "us-east-1",
-	}, "", "dev")
-
-	msg := m.loadStartupCallerIdentity()()
-	identityMsg, ok := msg.(callerIdentityMsg)
-	if !ok {
-		t.Fatalf("expected callerIdentityMsg, got %T", msg)
-	}
-	if identityMsg.identity == nil || identityMsg.identity.Account != "123456789012" {
-		t.Fatalf("expected loaded identity, got %#v", identityMsg.identity)
+	if got := len(model.contextTable.Rows()); got != len(testContexts()) {
+		t.Fatalf("expected contexts to load behind Settings, got %d rows", got)
 	}
 }
 
-func TestStartupCallerIdentityStillLoadsNonSSOIdentity(t *testing.T) {
-	origLoad := appLoadCallerIdentityFn
+func TestGlobalSettingsShortcutSkipsTextEntryScreens(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	// Put the model on the context-add screen in a free-form field-input step.
+	m.screen = screenContextAdd
+	m.addStep = 1
+	m.addFields = fieldsByAuthType["credential"]
+	m.addFieldIdx = 0
+	m.addInput = ""
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("S")})
+	model := updated.(Model)
+
+	if model.screen == screenSettings {
+		t.Fatal("uppercase S during text entry must not open Settings")
+	}
+	if model.screen != screenContextAdd {
+		t.Fatalf("expected to stay on context-add screen, got %v", model.screen)
+	}
+	if model.addInput != "S" {
+		t.Fatalf("expected S to be typed into the field, got %q", model.addInput)
+	}
+}
+
+func TestBootupBannerReflectsVersion(t *testing.T) {
+	cases := map[string]string{
+		"0.1.3":  "UNIC BIOS v0.1.3   COPYRIGHT 1986-2026 DEVOPS ART FACTORY",
+		"v2.0.0": "UNIC BIOS v2.0.0   COPYRIGHT 1986-2026 DEVOPS ART FACTORY",
+		"":       "UNIC BIOS dev   COPYRIGHT 1986-2026 DEVOPS ART FACTORY",
+		"dev":    "UNIC BIOS dev   COPYRIGHT 1986-2026 DEVOPS ART FACTORY",
+	}
+	for version, want := range cases {
+		if got := bootupBanner(version); got != want {
+			t.Errorf("bootupBanner(%q) = %q, want %q", version, got, want)
+		}
+	}
+}
+
+func TestBootupTickTransitionsToContextPicker(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBootup
+	m.bootFrame = bootupFrameCount - 1
+
+	updated, cmd := m.Update(bootupTickMsg{})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected final bootup tick to stop scheduling ticks")
+	}
+	if model.screen != screenContextPicker {
+		t.Fatalf("expected bootup to finish at context picker, got %v", model.screen)
+	}
+}
+
+func TestBootupCanBeSkipped(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBootup
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected skip key to only update model state")
+	}
+	if model.screen != screenContextPicker {
+		t.Fatalf("expected skip to open context picker, got %v", model.screen)
+	}
+}
+
+func TestBootupShowsForNewVersionOnlyWhenPreferenceDisabled(t *testing.T) {
+	m := New(&config.Config{BootSplashSeen: "0.1.2"}, "", "0.1.3")
+	if !m.shouldShowBootup() {
+		t.Fatal("expected bootup to show after update")
+	}
+
+	m = New(&config.Config{BootSplashSeen: "0.1.3"}, "", "0.1.3")
+	if m.shouldShowBootup() {
+		t.Fatal("expected bootup to stay off after version has been seen")
+	}
+}
+
+func TestBootupPreferenceAlwaysShowsSplash(t *testing.T) {
+	m := New(&config.Config{BootSplash: true, BootSplashSeen: "0.1.3"}, "", "0.1.3")
+	if !m.shouldShowBootup() {
+		t.Fatal("expected bootup preference to force splash")
+	}
+}
+
+func TestSettingsTogglesBootSplashPreference(t *testing.T) {
+	origSetBootSplashEnabledFn := configSetBootSplashEnabledFn
 	defer func() {
-		appLoadCallerIdentityFn = origLoad
+		configSetBootSplashEnabledFn = origSetBootSplashEnabledFn
 	}()
 
-	loadCalled := false
-	appLoadCallerIdentityFn = func(Model) tea.Cmd {
-		loadCalled = true
-		return func() tea.Msg {
-			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
+	var gotEnabled bool
+	configSetBootSplashEnabledFn = func(path string, enabled bool) error {
+		if path != "config.yaml" {
+			t.Fatalf("expected config path, got %q", path)
+		}
+		gotEnabled = enabled
+		return nil
+	}
+
+	cfg := testConfig()
+	m := New(cfg, "config.yaml", "dev")
+	m.screen = screenSettings
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected boot splash toggle to be synchronous")
+	}
+	if !model.bootSplash || !cfg.BootSplash || !gotEnabled {
+		t.Fatalf("expected boot splash preference enabled, model=%v cfg=%v persisted=%v", model.bootSplash, cfg.BootSplash, gotEnabled)
+	}
+}
+
+func TestSettingsTogglesBootSplashPreference_Error(t *testing.T) {
+	origSetBootSplashEnabledFn := configSetBootSplashEnabledFn
+	defer func() {
+		configSetBootSplashEnabledFn = origSetBootSplashEnabledFn
+	}()
+
+	configSetBootSplashEnabledFn = func(path string, enabled bool) error {
+		return errors.New("disk full")
+	}
+
+	cfg := testConfig()
+	cfg.BootSplash = false
+	m := New(cfg, "config.yaml", "dev")
+	m.screen = screenSettings
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.screen != screenError {
+		t.Fatalf("expected error screen after failed persist, got %v", model.screen)
+	}
+	if !strings.Contains(model.errMsg, "disk full") {
+		t.Fatalf("expected error message to surface persist failure, got %q", model.errMsg)
+	}
+	// In-memory state must not change when the config write fails.
+	if model.bootSplash {
+		t.Fatal("expected model.bootSplash to stay false when persist fails")
+	}
+	if cfg.BootSplash {
+		t.Fatal("expected cfg.BootSplash to stay false when persist fails")
+	}
+}
+
+func TestGlobalSettingsShortcutOpensSettings(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenContextPicker
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	model := updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected settings shortcut to be synchronous")
+	}
+	if model.screen != screenSettings {
+		t.Fatalf("expected settings screen, got %v", model.screen)
+	}
+	if model.settingsPrevScreen != screenContextPicker {
+		t.Fatalf("expected previous screen to be context picker, got %v", model.settingsPrevScreen)
+	}
+}
+
+func TestSettingsViewShowsBootSplashSetting(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenSettings
+
+	view := stripANSI(m.View())
+	for _, want := range []string{"Settings", "Boot splash", "enter/space: toggle"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected settings view to contain %q, got %q", want, view)
+		}
+	}
+}
+
+func TestBootupViewCentersVertically(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenBootup
+	m.width = 80
+	m.height = 30
+
+	view := stripANSI(m.View())
+	lines := strings.Split(view, "\n")
+	firstContent := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			firstContent = i
+			break
 		}
 	}
 
-	m := New(&config.Config{
-		AuthType: config.AuthTypeCredential,
-		Profile:  "default",
-		Region:   "us-east-1",
-	}, "", "dev")
-
-	msg := m.loadStartupCallerIdentity()()
-	if _, ok := msg.(callerIdentityMsg); !ok {
-		t.Fatalf("expected callerIdentityMsg, got %T", msg)
+	if firstContent < 4 {
+		t.Fatalf("expected bootup content to be vertically centered, first content line %d in %q", firstContent, view)
 	}
-	if !loadCalled {
-		t.Fatal("expected non-SSO startup identity loading to continue")
+	if !strings.Contains(view, "UNIC BIOS") {
+		t.Fatalf("expected centered bootup view to keep boot text, got %q", view)
 	}
 }
 

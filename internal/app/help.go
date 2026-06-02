@@ -78,6 +78,12 @@ func (m Model) globalHelpShortcuts() []helpShortcut {
 		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"C", "Open the context picker"})
 	}
+	if m.screen != screenSettings &&
+		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
+		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+		m.screen != screenBedrockKeyConfirm {
+		shortcuts = append(shortcuts, helpShortcut{"S", "Open settings"})
+	}
 	return shortcuts
 }
 
@@ -669,6 +675,12 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			shortcuts = append(shortcuts[:7], append([]helpShortcut{{"esc", "Return to the previous screen"}}, shortcuts[7:]...)...)
 		}
 		return shortcuts
+	case screenSettings:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between settings"},
+			{"enter / space", "Toggle the selected setting"},
+			{"q / esc", "Go back"},
+		}
 	case screenContextAdd:
 		if m.addStep == 0 {
 			return []helpShortcut{
@@ -948,6 +960,8 @@ func (m Model) helpScreenTitle() string {
 		return "Select SSO Account"
 	case screenContextSSORoleList:
 		return "Select SSO Role"
+	case screenSettings:
+		return "Settings"
 	case screenLoading:
 		return "Loading"
 	case screenError:

@@ -74,6 +74,8 @@ unic --checklist ./checklists/readiness.yaml   # optional: pre-load a checklist 
 unic --verbose
 ```
 
+The TUI shows a short retro bootup splash after a new install or version update, then records the version so later launches go straight to the context picker. Press `Enter`, `Esc`, or `Space` to skip it. Press `S` to open Settings, where the splash can be toggled on or off for every launch.
+
 ### Config/bootstrap
 
 ```bash
@@ -145,6 +147,10 @@ favorites:
   services:
     - Bedrock
     - ECS
+
+ui:
+  boot_splash: false
+  last_boot_splash_version: 0.1.3
 
 contexts:
   - name: dev-sso
@@ -323,6 +329,7 @@ checks:
 | `H` | Jump to service list |
 | `i` | Enter Inspector mode from the service list |
 | `C` | Open context picker |
+| `S` | Open settings |
 | `/` | Toggle filter mode on supported screens |
 | `f` | Favorite/unfavorite the selected service on the service list |
 | `?` | Toggle context-aware shortcut help |
@@ -350,6 +357,7 @@ checks:
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
+| Settings | `Enter`/`Space` toggle selected setting, `Esc`/`q` back |
 | Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
 | Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
