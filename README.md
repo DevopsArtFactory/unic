@@ -190,6 +190,8 @@ contexts:
 | `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
 
+TUI startup is passive for SSO contexts: it loads the context picker without launching `aws sso login`. SSO login is prompted when you explicitly select or set up an SSO context, or when an AWS-backed workflow needs credentials.
+
 Optional context fields:
 
 | Field | Meaning |

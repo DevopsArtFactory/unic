@@ -151,6 +151,149 @@ func TestLoadingSpinnerTickUpdatesOnlyOnLoadingScreen(t *testing.T) {
 	}
 }
 
+func TestStartupCallerIdentitySkipsInteractiveSSOLoginWhenCacheMissing(t *testing.T) {
+	origCheck := contextCheckSSOSessionFn
+	origLoad := appLoadCallerIdentityFn
+	defer func() {
+		contextCheckSSOSessionFn = origCheck
+		appLoadCallerIdentityFn = origLoad
+	}()
+
+	checkCalled := false
+	loadCalled := false
+	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
+		checkCalled = true
+		return awsservice.SSOSessionCheck{
+			StartURL:      cfg.SSOStartURL,
+			LoginRequired: true,
+		}, nil
+	}
+	appLoadCallerIdentityFn = func(Model) tea.Cmd {
+		loadCalled = true
+		return func() tea.Msg {
+			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
+		}
+	}
+
+	m := New(&config.Config{
+		AuthType:    config.AuthTypeSSO,
+		SSOStartURL: "https://example.awsapps.com/start",
+		Region:      "us-east-1",
+	}, "", "dev")
+
+	msg := m.loadStartupCallerIdentity()()
+	if _, ok := msg.(callerIdentityMsg); !ok {
+		t.Fatalf("expected callerIdentityMsg, got %T", msg)
+	}
+	if !checkCalled {
+		t.Fatal("expected startup to check SSO cache")
+	}
+	if loadCalled {
+		t.Fatal("expected startup to skip identity loading when SSO login is required")
+	}
+}
+
+func TestStartupCallerIdentitySkipsInteractiveSSOLoginWhenSessionCheckFails(t *testing.T) {
+	origCheck := contextCheckSSOSessionFn
+	origLoad := appLoadCallerIdentityFn
+	defer func() {
+		contextCheckSSOSessionFn = origCheck
+		appLoadCallerIdentityFn = origLoad
+	}()
+
+	checkCalled := false
+	loadCalled := false
+	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
+		checkCalled = true
+		return awsservice.SSOSessionCheck{}, os.ErrNotExist
+	}
+	appLoadCallerIdentityFn = func(Model) tea.Cmd {
+		loadCalled = true
+		return func() tea.Msg {
+			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
+		}
+	}
+
+	m := New(&config.Config{
+		AuthType:    config.AuthTypeSSO,
+		SSOStartURL: "https://example.awsapps.com/start",
+		Region:      "us-east-1",
+	}, "", "dev")
+
+	msg := m.loadStartupCallerIdentity()()
+	if _, ok := msg.(callerIdentityMsg); !ok {
+		t.Fatalf("expected callerIdentityMsg, got %T", msg)
+	}
+	if !checkCalled {
+		t.Fatal("expected startup to check SSO cache")
+	}
+	if loadCalled {
+		t.Fatal("expected startup to skip identity loading when SSO session check fails")
+	}
+}
+
+func TestStartupCallerIdentityLoadsSSOIdentityWhenCacheValid(t *testing.T) {
+	origCheck := contextCheckSSOSessionFn
+	origLoad := appLoadCallerIdentityFn
+	defer func() {
+		contextCheckSSOSessionFn = origCheck
+		appLoadCallerIdentityFn = origLoad
+	}()
+
+	contextCheckSSOSessionFn = func(cfg *config.Config) (awsservice.SSOSessionCheck, error) {
+		return awsservice.SSOSessionCheck{StartURL: cfg.SSOStartURL}, nil
+	}
+	appLoadCallerIdentityFn = func(Model) tea.Cmd {
+		return func() tea.Msg {
+			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
+		}
+	}
+
+	m := New(&config.Config{
+		AuthType:    config.AuthTypeSSO,
+		SSOStartURL: "https://example.awsapps.com/start",
+		Region:      "us-east-1",
+	}, "", "dev")
+
+	msg := m.loadStartupCallerIdentity()()
+	identityMsg, ok := msg.(callerIdentityMsg)
+	if !ok {
+		t.Fatalf("expected callerIdentityMsg, got %T", msg)
+	}
+	if identityMsg.identity == nil || identityMsg.identity.Account != "123456789012" {
+		t.Fatalf("expected loaded identity, got %#v", identityMsg.identity)
+	}
+}
+
+func TestStartupCallerIdentityStillLoadsNonSSOIdentity(t *testing.T) {
+	origLoad := appLoadCallerIdentityFn
+	defer func() {
+		appLoadCallerIdentityFn = origLoad
+	}()
+
+	loadCalled := false
+	appLoadCallerIdentityFn = func(Model) tea.Cmd {
+		loadCalled = true
+		return func() tea.Msg {
+			return callerIdentityMsg{identity: &awsservice.CallerIdentity{Account: "123456789012"}}
+		}
+	}
+
+	m := New(&config.Config{
+		AuthType: config.AuthTypeCredential,
+		Profile:  "default",
+		Region:   "us-east-1",
+	}, "", "dev")
+
+	msg := m.loadStartupCallerIdentity()()
+	if _, ok := msg.(callerIdentityMsg); !ok {
+		t.Fatalf("expected callerIdentityMsg, got %T", msg)
+	}
+	if !loadCalled {
+		t.Fatal("expected non-SSO startup identity loading to continue")
+	}
+}
+
 func TestListIndexHelpersWrapAndClamp(t *testing.T) {
 	if got := previousListIndex(0, 3); got != 2 {
 		t.Fatalf("expected previous from first to wrap to 2, got %d", got)
