@@ -9,7 +9,6 @@ import (
 
 func TestInspectorEnsureWorkflowsKeepsExistingWorkflows(t *testing.T) {
 	im := inspectorModel{
-		checklistPath: "new-checklist.yaml",
 		workflows: []inspector.Workflow{
 			{
 				Kind:        inspector.WorkflowSecurity,
@@ -35,8 +34,8 @@ func TestInspectorEnsureWorkflowsRefreshesEmptyWorkflows(t *testing.T) {
 
 	im.ensureWorkflows()
 
-	if len(im.workflows) == 0 {
-		t.Fatal("expected empty workflow list to be populated")
+	if len(im.workflows) != 2 {
+		t.Fatalf("expected empty workflow list to be populated with 2 workflows, got %d", len(im.workflows))
 	}
 }
 
