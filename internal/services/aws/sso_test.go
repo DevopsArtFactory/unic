@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -139,5 +140,35 @@ func TestEnsureSSOLoginRunsLoginWhenTokenExpired(t *testing.T) {
 	}
 	if !result.Refreshed {
 		t.Fatal("expected login result to report a refreshed session")
+	}
+}
+
+func TestBuildSSOLoginCmdCleansTempDirOnConfigWriteError(t *testing.T) {
+	tempRoot := t.TempDir()
+	t.Setenv("TMPDIR", tempRoot)
+
+	origWriteSSOConfigFile := writeSSOConfigFile
+	defer func() { writeSSOConfigFile = origWriteSSOConfigFile }()
+	writeSSOConfigFile = func(string, []byte, os.FileMode) error {
+		return errors.New("write failed")
+	}
+
+	cmd, cleanup, err := BuildSSOLoginCmd(testSSOConfig())
+	if err == nil {
+		t.Fatal("expected config write error")
+	}
+	if cmd != nil {
+		t.Fatalf("expected nil command on error, got %v", cmd)
+	}
+	if cleanup != nil {
+		t.Fatal("expected nil cleanup when setup fails")
+	}
+
+	matches, globErr := filepath.Glob(filepath.Join(tempRoot, "unic-sso-*"))
+	if globErr != nil {
+		t.Fatalf("failed to inspect temp dirs: %v", globErr)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("expected temp config directory to be removed, found %v", matches)
 	}
 }
