@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update unic dependencies"
+  short_description: "Refresh Go toolchain and dependencies for unic."
+  default_prompt: "Use $unic-update-dependencies to update the Go version and refresh safe dependencies."
