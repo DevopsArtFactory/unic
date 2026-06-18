@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -150,6 +151,50 @@ func TestContextPickerFavoriteTogglePersists(t *testing.T) {
 	}
 	if len(cfg.FavoriteContexts) != 1 || cfg.FavoriteContexts[0] != "staging" {
 		t.Fatalf("expected config favorite contexts to update, got %v", cfg.FavoriteContexts)
+	}
+}
+
+func TestContextPickerFavoriteTogglePersistenceErrorDoesNotCommitState(t *testing.T) {
+	originalSetFavoriteContextsFn := configSetFavoriteContextsFn
+	t.Cleanup(func() {
+		configSetFavoriteContextsFn = originalSetFavoriteContextsFn
+	})
+	configSetFavoriteContextsFn = func(string, []string) error {
+		return errors.New("write failed")
+	}
+
+	cfg := testConfig()
+	m := New(cfg, "/tmp/unic-test-config.yaml", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+	for i, ctx := range model.filteredCtxList {
+		if ctx.Name == "staging" {
+			model.ctxIdx = i
+			model.syncContextTable()
+			break
+		}
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	model = updated.(Model)
+
+	if model.screen != screenError {
+		t.Fatalf("expected persistence error to open error screen, got %v", model.screen)
+	}
+	if !strings.Contains(model.errMsg, "write failed") {
+		t.Fatalf("expected error message to include write failure, got %q", model.errMsg)
+	}
+	if model.isFavoriteContext("staging") {
+		t.Fatal("expected failed persistence to leave favorite context state unchanged")
+	}
+	if len(cfg.FavoriteContexts) != 0 {
+		t.Fatalf("expected config favorite contexts to remain unchanged, got %v", cfg.FavoriteContexts)
+	}
+	if model.filteredCtxList[0].Name == "staging" || model.filteredCtxList[2].Favorite {
+		t.Fatalf("expected filtered contexts to remain unchanged after failed favorite write: %#v", model.filteredCtxList)
 	}
 }
 

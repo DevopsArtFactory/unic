@@ -63,22 +63,24 @@ func (m *Model) toggleFavoriteContext(name string) error {
 	}
 	wasFavorite := m.isFavoriteContext(name)
 	neighborName := adjacentContextName(m.filteredCtxList, name)
+	nextFavorites := copyFavoriteContextSet(m.favoriteContexts)
 	if wasFavorite {
-		delete(m.favoriteContexts, name)
+		delete(nextFavorites, name)
 	} else {
-		m.favoriteContexts[name] = struct{}{}
+		nextFavorites[name] = struct{}{}
 	}
 
-	favorites := m.favoriteContextNames()
-	if m.cfg != nil {
-		m.cfg.FavoriteContexts = favorites
-	}
+	favorites := favoriteContextNames(nextFavorites)
 	if strings.TrimSpace(m.configPath) != "" {
 		if err := configSetFavoriteContextsFn(m.configPath, favorites); err != nil {
 			return err
 		}
 	}
 
+	m.favoriteContexts = nextFavorites
+	if m.cfg != nil {
+		m.cfg.FavoriteContexts = favorites
+	}
 	for i := range m.ctxList {
 		m.ctxList[i].Favorite = m.isFavoriteContext(m.ctxList[i].Name)
 	}
@@ -107,9 +109,21 @@ func adjacentContextName(contexts []config.ContextInfo, name string) string {
 	return ""
 }
 
+func copyFavoriteContextSet(favorites map[string]struct{}) map[string]struct{} {
+	copied := make(map[string]struct{}, len(favorites))
+	for name := range favorites {
+		copied[name] = struct{}{}
+	}
+	return copied
+}
+
 func (m Model) favoriteContextNames() []string {
-	names := make([]string, 0, len(m.favoriteContexts))
-	for name := range m.favoriteContexts {
+	return favoriteContextNames(m.favoriteContexts)
+}
+
+func favoriteContextNames(favorites map[string]struct{}) []string {
+	names := make([]string, 0, len(favorites))
+	for name := range favorites {
 		names = append(names, name)
 	}
 	sort.Strings(names)
