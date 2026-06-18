@@ -16,8 +16,9 @@ import (
 func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case contextsLoadedMsg:
-		m.ctxList = msg.contexts
-		m.filteredCtxList = msg.contexts
+		m.ctxList = m.contextsWithFavoriteState(msg.contexts)
+		m.filteredCtxList = append([]config.ContextInfo(nil), m.ctxList...)
+		m.sortFavoriteContextsFirst(m.filteredCtxList)
 		m.ctxIdx = 0
 		m.contextSSOBase = config.ContextInfo{}
 		m.contextSSOAccounts = nil
@@ -186,6 +187,15 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.beginContextExport(selected)
+	case "f":
+		selected, ok := m.selectedContextInfo()
+		if !ok {
+			return m, nil
+		}
+		if err := m.toggleFavoriteContext(selected.Name); err != nil {
+			m.errMsg = err.Error()
+			m.screen = screenError
+		}
 	case "u":
 		return m.beginContextUnset()
 	case "a":
@@ -323,13 +333,13 @@ func (m Model) viewContextPicker() string {
 		return b.String()
 	}
 	if compact {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: switch • /: filter • a: add • S: settings • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓ nav • enter switch • / filter • f fav • a add • q: quit"))
 		return b.String()
 	}
 	if m.cfg.ContextName != "" {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • S: settings • esc: clear/back • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • f: favorite • u: unset • a: add • S: settings • esc: clear/back • q: quit"))
 	} else {
-		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • u: unset • a: add • S: settings • q: quit"))
+		b.WriteString(m.renderHelpBar("↑/↓: navigate • type: filter • /: filter • enter: switch • s: setup • y: copy env • f: favorite • u: unset • a: add • S: settings • q: quit"))
 	}
 	return b.String()
 }
@@ -339,7 +349,7 @@ func shouldStartContextIncrementalFilter(msg tea.KeyMsg) bool {
 		return false
 	}
 	switch msg.String() {
-	case "/", "q", "s", "y", "u", "a", "S", "j", "k":
+	case "/", "q", "s", "y", "f", "u", "a", "S", "j", "k":
 		return false
 	}
 	r := msg.Runes[0]

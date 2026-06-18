@@ -79,6 +79,113 @@ func TestContextsLoadedSyncsContextTable(t *testing.T) {
 	}
 }
 
+func TestContextPickerFavoritesSortFirstAndRenderWithoutMarker(t *testing.T) {
+	cfg := testConfig()
+	cfg.FavoriteContexts = []string{"staging"}
+	m := New(cfg, "", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+
+	if got := model.filteredCtxList[0].Name; got != "staging" {
+		t.Fatalf("expected favorite context first, got %q", got)
+	}
+	if !model.filteredCtxList[0].Favorite {
+		t.Fatalf("expected first context to be marked favorite: %#v", model.filteredCtxList[0])
+	}
+	rowName := model.contextTable.Rows()[0][0]
+	if got := stripANSI(rowName); got != "staging" {
+		t.Fatalf("expected favorite context name without marker, got %q", got)
+	}
+	if model.ctxIdx != 2 || model.contextTable.Cursor() != 2 {
+		t.Fatalf("expected current context cursor to follow prod after sorting, got idx=%d cursor=%d", model.ctxIdx, model.contextTable.Cursor())
+	}
+}
+
+func TestContextPickerFavoriteTogglePersists(t *testing.T) {
+	originalSetFavoriteContextsFn := configSetFavoriteContextsFn
+	t.Cleanup(func() {
+		configSetFavoriteContextsFn = originalSetFavoriteContextsFn
+	})
+
+	var gotPath string
+	var gotFavorites []string
+	configSetFavoriteContextsFn = func(path string, contexts []string) error {
+		gotPath = path
+		gotFavorites = append([]string(nil), contexts...)
+		return nil
+	}
+
+	cfg := testConfig()
+	m := New(cfg, "/tmp/unic-test-config.yaml", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+	for i, ctx := range model.filteredCtxList {
+		if ctx.Name == "staging" {
+			model.ctxIdx = i
+			model.syncContextTable()
+			break
+		}
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	model = updated.(Model)
+
+	if gotPath != "/tmp/unic-test-config.yaml" {
+		t.Fatalf("expected favorite persistence path, got %q", gotPath)
+	}
+	if len(gotFavorites) != 1 || gotFavorites[0] != "staging" {
+		t.Fatalf("expected persisted staging favorite, got %v", gotFavorites)
+	}
+	if got := model.filteredCtxList[0].Name; got != "staging" {
+		t.Fatalf("expected toggled favorite to move first, got %q", got)
+	}
+	if got := stripANSI(model.contextTable.SelectedRow()[0]); got != "prod" {
+		t.Fatalf("expected selection to move to adjacent context after favoriting, got %q", got)
+	}
+	if len(cfg.FavoriteContexts) != 1 || cfg.FavoriteContexts[0] != "staging" {
+		t.Fatalf("expected config favorite contexts to update, got %v", cfg.FavoriteContexts)
+	}
+}
+
+func TestContextPickerFavoriteToggleSelectsNextContext(t *testing.T) {
+	originalSetFavoriteContextsFn := configSetFavoriteContextsFn
+	t.Cleanup(func() {
+		configSetFavoriteContextsFn = originalSetFavoriteContextsFn
+	})
+	configSetFavoriteContextsFn = func(string, []string) error { return nil }
+
+	cfg := testConfig()
+	m := New(cfg, "/tmp/unic-test-config.yaml", "dev")
+	m.width = 80
+	m.height = 20
+
+	updated, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	model := updated.(Model)
+	for i, ctx := range model.filteredCtxList {
+		if ctx.Name == "prod" {
+			model.ctxIdx = i
+			model.syncContextTable()
+			break
+		}
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	model = updated.(Model)
+
+	if got := model.filteredCtxList[0].Name; got != "prod" {
+		t.Fatalf("expected newly favorited prod to move first, got %q", got)
+	}
+	if got := stripANSI(model.contextTable.SelectedRow()[0]); got != "staging" {
+		t.Fatalf("expected selection to move to next context after favoriting, got %q", got)
+	}
+}
+
 func TestContextPickerNavigationUsesTableModel(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 80

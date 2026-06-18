@@ -111,6 +111,30 @@ favorites:
 	}
 }
 
+func TestLoadReadsFavoriteContexts(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+favorites:
+  contexts:
+    - prod
+    - staging
+    - prod
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"prod", "staging"}
+	if len(cfg.FavoriteContexts) != len(want) {
+		t.Fatalf("expected favorite contexts %v, got %v", want, cfg.FavoriteContexts)
+	}
+	for i := range want {
+		if cfg.FavoriteContexts[i] != want[i] {
+			t.Fatalf("expected favorite contexts %v, got %v", want, cfg.FavoriteContexts)
+		}
+	}
+}
+
 func TestCLIProfileWithConfigRegion(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `
@@ -152,6 +176,45 @@ favorites:
 		if cfg.FavoriteServices[i] != want[i] {
 			t.Fatalf("expected favorite services %v, got %v", want, cfg.FavoriteServices)
 		}
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected existing region to be preserved, got %q", cfg.Region)
+	}
+}
+
+func TestSetFavoriteContextsWritesConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+default_region: ap-northeast-2
+favorites:
+  services:
+    - EC2
+  contexts:
+    - dev
+contexts:
+  - name: dev
+    profile: dev-profile
+  - name: prod
+    profile: prod-profile
+`)
+	if err := SetFavoriteContexts(path, []string{"prod", "staging", "prod"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"prod", "staging"}
+	if len(cfg.FavoriteContexts) != len(want) {
+		t.Fatalf("expected favorite contexts %v, got %v", want, cfg.FavoriteContexts)
+	}
+	for i := range want {
+		if cfg.FavoriteContexts[i] != want[i] {
+			t.Fatalf("expected favorite contexts %v, got %v", want, cfg.FavoriteContexts)
+		}
+	}
+	if len(cfg.FavoriteServices) != 1 || cfg.FavoriteServices[0] != "EC2" {
+		t.Fatalf("expected favorite services to be preserved, got %v", cfg.FavoriteServices)
 	}
 	if cfg.Region != "ap-northeast-2" {
 		t.Fatalf("expected existing region to be preserved, got %q", cfg.Region)
@@ -407,6 +470,9 @@ func TestContextsRespectsExplicitOrderBeforeFallbackOrder(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `
 current: dev
+favorites:
+  contexts:
+    - prod
 contexts:
   - name: prod
     profile: prod-profile
@@ -430,6 +496,9 @@ contexts:
 	}
 	if infos[0].Order != 10 || infos[1].Order != 20 || infos[2].Order != 0 {
 		t.Fatalf("unexpected order values: %#v", infos)
+	}
+	if !infos[2].Favorite {
+		t.Fatalf("expected prod favorite flag without changing context order: %#v", infos)
 	}
 }
 
