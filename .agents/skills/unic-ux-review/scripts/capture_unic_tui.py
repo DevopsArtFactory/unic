@@ -74,6 +74,15 @@ def run(cmd: list[str], cwd: Path, *, capture: bool = False) -> subprocess.Compl
     )
 
 
+def describe_command_error(error: subprocess.CalledProcessError) -> str:
+    cmd = error.cmd if isinstance(error.cmd, list) else [str(error.cmd)]
+    lines = [f"command failed ({error.returncode}): {shlex.join(cmd)}"]
+    output = (error.stderr or error.stdout or "").strip()
+    if output:
+        lines.append(output)
+    return "\n".join(lines)
+
+
 def write_fixture_config(config_root: Path) -> None:
     unic_dir = config_root / "unic"
     unic_dir.mkdir(parents=True, exist_ok=True)
@@ -90,7 +99,7 @@ def wait_for_capture(session: str, repo_root: Path, expected: str, timeout: floa
         if expected in last:
             return last
         time.sleep(0.15)
-    return last
+    raise TimeoutError(f"expected {expected!r} was not found in tmux output after {timeout:.1f}s")
 
 
 def capture_pane(session: str, repo_root: Path) -> str:
@@ -101,7 +110,8 @@ def capture_pane(session: str, repo_root: Path) -> str:
 def render_png(src: Path, dest: Path, width: int, height: int) -> bool:
     try:
         from PIL import Image, ImageDraw, ImageFont
-    except Exception:
+    except ImportError as error:
+        print(f"Pillow is not available, skipping PNG render: {error}", file=sys.stderr)
         return False
 
     font_candidates = [
@@ -113,9 +123,14 @@ def render_png(src: Path, dest: Path, width: int, height: int) -> bool:
     ]
     font_path = next((p for p in font_candidates if Path(p).exists()), None)
     if font_path is None:
+        print("No supported monospace font found, skipping PNG render", file=sys.stderr)
         return False
 
-    font = ImageFont.truetype(font_path, 18)
+    try:
+        font = ImageFont.truetype(font_path, 18)
+    except OSError as error:
+        print(f"Failed to load font {font_path}: {error}", file=sys.stderr)
+        return False
     cell_w = int(round(font.getlength("M")))
     bbox = font.getbbox("Ag")
     line_h = int((bbox[3] - bbox[1]) * 1.45)
@@ -159,7 +174,11 @@ def render_png(src: Path, dest: Path, width: int, height: int) -> bool:
             draw.rectangle((0, y - 2, img.width, y + line_h - 2), fill=colors["bar"])
         draw.text((pad_x, y), line, font=font, fill=line_color(line, index))
 
-    img.save(dest)
+    try:
+        img.save(dest)
+    except OSError as error:
+        print(f"Failed to save PNG {dest}: {error}", file=sys.stderr)
+        return False
     return True
 
 
@@ -184,7 +203,11 @@ def main() -> int:
         return 2
 
     if not args.skip_build:
-        run(["make", "build"], repo_root)
+        try:
+            run(["make", "build"], repo_root)
+        except subprocess.CalledProcessError as error:
+            print(f"Build failed:\n{describe_command_error(error)}", file=sys.stderr)
+            return 1
 
     binary = repo_root / "unic"
     if not binary.exists():
@@ -204,19 +227,31 @@ def main() -> int:
     created = False
     outputs: list[Path] = []
     try:
-        run(
-            ["tmux", "new-session", "-d", "-s", session, "-x", str(args.width), "-y", str(args.height), command],
-            repo_root,
-        )
+        try:
+            run(
+                ["tmux", "new-session", "-d", "-s", session, "-x", str(args.width), "-y", str(args.height), command],
+                repo_root,
+            )
+        except subprocess.CalledProcessError as error:
+            print(f"Failed to create tmux session:\n{describe_command_error(error)}", file=sys.stderr)
+            return 1
         created = True
 
-        context_text = wait_for_capture(session, repo_root, "Select Context")
+        try:
+            context_text = wait_for_capture(session, repo_root, "Select Context")
+        except (subprocess.CalledProcessError, TimeoutError) as error:
+            print(f"Failed to capture context picker: {error}", file=sys.stderr)
+            return 1
         context_path = out_dir / "unic-context.txt"
         context_path.write_text(context_text, encoding="utf-8")
         outputs.append(context_path)
 
-        run(["tmux", "send-keys", "-t", session, "Escape"], repo_root)
-        service_text = wait_for_capture(session, repo_root, "Select AWS Service")
+        try:
+            run(["tmux", "send-keys", "-t", session, "Escape"], repo_root)
+            service_text = wait_for_capture(session, repo_root, "Select AWS Service")
+        except (subprocess.CalledProcessError, TimeoutError) as error:
+            print(f"Failed to capture service picker: {error}", file=sys.stderr)
+            return 1
         service_path = out_dir / "unic-service.txt"
         service_path.write_text(service_text, encoding="utf-8")
         outputs.append(service_path)
