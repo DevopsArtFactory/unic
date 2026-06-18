@@ -665,6 +665,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"↑/↓, j/k", "Move between contexts"},
 			{"/", "Start filtering contexts"},
 			{"enter", "Switch to the selected context"},
+			{"f", "Favorite or unfavorite the selected context"},
 			{"s", "Set up the selected context for the shell and quit"},
 			{"y", "Copy shell exports for the selected context and quit"},
 			{"u", "Clear shell exports and current context, then quit"},

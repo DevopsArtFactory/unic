@@ -171,6 +171,7 @@ type Model struct {
 	filteredCtxList    []config.ContextInfo
 	ctxIdx             int
 	contextTable       table.Model
+	favoriteContexts   map[string]struct{}
 	ctxPrevScreen      screen
 	pendingContextName string
 	envContextName     string
@@ -227,8 +228,10 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		configuredChecklistPath = checklistPath[0]
 	}
 	var favoriteServiceNames []string
+	var favoriteContextNames []string
 	if cfg != nil {
 		favoriteServiceNames = cfg.FavoriteServices
+		favoriteContextNames = cfg.FavoriteContexts
 	}
 	model := Model{
 		cfg:              cfg,
@@ -238,6 +241,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		ctxPrevScreen:    screenServiceList,
 		services:         services,
 		favoriteServices: favoriteServiceSet(favoriteServiceNames),
+		favoriteContexts: favoriteContextSet(favoriteContextNames),
 		bootSplash:       cfg != nil && cfg.BootSplash,
 		loadingSpinner:   newLoadingSpinner(),
 		filterTI:         filterTI,

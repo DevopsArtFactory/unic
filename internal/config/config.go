@@ -36,6 +36,7 @@ type fileDefaults struct {
 
 type fileFavorites struct {
 	Services []string `yaml:"services,omitempty"`
+	Contexts []string `yaml:"contexts,omitempty"`
 }
 
 type fileUI struct {
@@ -86,6 +87,7 @@ type Config struct {
 	SSOAccountID     string
 	SSORoleName      string
 	FavoriteServices []string
+	FavoriteContexts []string
 	BootSplash       bool
 	BootSplashSeen   string
 }
@@ -120,6 +122,7 @@ type ContextInfo struct {
 	SSOAccountID string
 	SSORoleName  string
 	Current      bool
+	Favorite     bool
 }
 
 // FilterText returns a lowercase string for keyword matching.
@@ -205,6 +208,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		SSOAccountID:     ssoAccountID,
 		SSORoleName:      ssoRoleName,
 		FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
+		FavoriteContexts: normalizeFavoriteContexts(fc.Favorites.Contexts),
 		BootSplash:       boolValue(fc.UI.BootSplash, false),
 		BootSplashSeen:   fc.UI.LastBootSplashVersion,
 	}, nil
@@ -251,6 +255,7 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			SSOAccountID:     ctx.SSOAccountID,
 			SSORoleName:      ctx.SSORoleName,
 			FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
+			FavoriteContexts: normalizeFavoriteContexts(fc.Favorites.Contexts),
 			BootSplash:       boolValue(fc.UI.BootSplash, false),
 			BootSplashSeen:   fc.UI.LastBootSplashVersion,
 		}, nil
@@ -268,18 +273,26 @@ func boolValue(v *bool, fallback bool) bool {
 }
 
 func normalizeFavoriteServices(services []string) []string {
-	seen := make(map[string]struct{}, len(services))
-	normalized := make([]string, 0, len(services))
-	for _, service := range services {
-		service = strings.TrimSpace(service)
-		if service == "" {
+	return normalizeFavoriteNames(services)
+}
+
+func normalizeFavoriteContexts(contexts []string) []string {
+	return normalizeFavoriteNames(contexts)
+}
+
+func normalizeFavoriteNames(names []string) []string {
+	seen := make(map[string]struct{}, len(names))
+	normalized := make([]string, 0, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
 			continue
 		}
-		if _, ok := seen[service]; ok {
+		if _, ok := seen[name]; ok {
 			continue
 		}
-		seen[service] = struct{}{}
-		normalized = append(normalized, service)
+		seen[name] = struct{}{}
+		normalized = append(normalized, name)
 	}
 	sort.Strings(normalized)
 	return normalized
@@ -297,8 +310,10 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 		return nil, fmt.Errorf("failed to parse %s: %w", configPath, err)
 	}
 
+	favoriteContexts := favoriteContextSet(fc.Favorites.Contexts)
 	var infos []ContextInfo
 	for _, ctx := range fc.Contexts {
+		_, favorite := favoriteContexts[ctx.Name]
 		infos = append(infos, ContextInfo{
 			Name:         ctx.Name,
 			Order:        ctx.Order,
@@ -311,6 +326,7 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 			SSOAccountID: ctx.SSOAccountID,
 			SSORoleName:  ctx.SSORoleName,
 			Current:      ctx.Name == fc.Current,
+			Favorite:     favorite,
 		})
 	}
 	sort.SliceStable(infos, func(i, j int) bool {
@@ -326,6 +342,14 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 		return false
 	})
 	return infos, nil
+}
+
+func favoriteContextSet(names []string) map[string]struct{} {
+	favorites := make(map[string]struct{}, len(names))
+	for _, name := range normalizeFavoriteContexts(names) {
+		favorites[name] = struct{}{}
+	}
+	return favorites
 }
 
 // SetCurrent updates the "current" field in the config file.
@@ -633,6 +657,35 @@ func SetFavoriteServices(configPath string, services []string) error {
 		return fmt.Errorf("failed to parse %s: %w", configPath, err)
 	}
 	fc.Favorites.Services = normalizeFavoriteServices(services)
+
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	return nil
+}
+
+// SetFavoriteContexts updates the user's preferred context ordering.
+func SetFavoriteContexts(configPath string, contexts []string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to read config: %w", err)
+		}
+		data = []byte(defaultContent())
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+	fc.Favorites.Contexts = normalizeFavoriteContexts(contexts)
 
 	out, err := yaml.Marshal(&fc)
 	if err != nil {

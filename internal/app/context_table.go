@@ -107,12 +107,16 @@ func contextTableRows(contexts []config.ContextInfo) []table.Row {
 		if ctx.Current {
 			current = "*"
 		}
+		name := ctx.Name
+		if ctx.Favorite {
+			name = favoriteServiceStyle.Render(name)
+		}
 		authType := ctx.AuthType
 		if authType == "" {
 			authType = "default"
 		}
 		rows = append(rows, table.Row{
-			ctx.Name,
+			name,
 			ctx.Region,
 			authType,
 			current,

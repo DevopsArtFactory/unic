@@ -147,6 +147,8 @@ favorites:
   services:
     - Bedrock
     - ECS
+  contexts:
+    - prod-admin
 
 ui:
   boot_splash: false
@@ -331,7 +333,7 @@ checks:
 | `C` | Open context picker |
 | `S` | Open settings |
 | `/` | Toggle filter mode on supported screens |
-| `f` | Favorite/unfavorite the selected service on the service list |
+| `f` | Favorite/unfavorite the selected service or context on supported lists |
 | `?` | Toggle context-aware shortcut help |
 | `Ctrl+C` | Force quit |
 
@@ -358,11 +360,11 @@ checks:
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
 | Settings | `Enter`/`Space` toggle selected setting, `Esc`/`q` back |
-| Context Picker | `a` add context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
+| Context Picker | `a` add context, `f` favorite/unfavorite selected context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
 | Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
-The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups/add-ons, ECR repositories/images, FIS experiment templates/history, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
+The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The context picker also supports `f`; context favorites are saved under `favorites.contexts`, displayed first in the picker, and rendered with a distinct color style while preserving the configured context order within favorite and non-favorite groups. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups/add-ons, ECR repositories/images, FIS experiment templates/history, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
 
 The EKS Browser includes a managed add-on status view for each cluster. Add-on rows show the installed version, status, and health summary, with degraded or unhealthy add-ons highlighted so core components such as CoreDNS, kube-proxy, VPC CNI, and CSI drivers are easy to spot.
 
