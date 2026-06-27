@@ -45,6 +45,7 @@ var newSSOClient = func(cfg aws.Config) SSOClientAPI {
 }
 
 var runSSOLoginFn = RunSSOLogin
+var writeSSOConfigFile = os.WriteFile
 
 // ssoTokenCache represents the cached SSO token file structure.
 type ssoTokenCache struct {
@@ -306,6 +307,9 @@ func BuildSSOLoginCmd(cfg *config.Config) (*exec.Cmd, func(), error) {
 		cmd := exec.Command("aws", "sso", "login", "--profile", cfg.Profile)
 		return cmd, func() {}, nil
 	}
+	if cfg.SSOAccountID == "" || cfg.SSORoleName == "" {
+		return nil, nil, fmt.Errorf("SSO login requires sso_account_id and sso_role_name when profile is not set")
+	}
 
 	tmpDir, err := os.MkdirTemp("", "unic-sso-*")
 	if err != nil {
@@ -324,13 +328,14 @@ func BuildSSOLoginCmd(cfg *config.Config) (*exec.Cmd, func(), error) {
 	)
 
 	configPath := filepath.Join(tmpDir, "config")
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+	if err := writeSSOConfigFile(configPath, []byte(configContent), 0600); err != nil {
 		cleanup()
 		return nil, nil, fmt.Errorf("failed to write temp SSO config: %w", err)
 	}
 
 	cmd := exec.Command("aws", "sso", "login", "--profile", profileName)
 	cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+configPath)
+	// On success, callers own the temporary config directory and must defer cleanup().
 	return cmd, cleanup, nil
 }
 
