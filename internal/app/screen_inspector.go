@@ -79,9 +79,7 @@ func (im *inspectorModel) refreshWorkflows() {
 func (im *inspectorModel) ensureWorkflows() {
 	if len(im.workflows) == 0 {
 		im.refreshWorkflows()
-		return
 	}
-	im.refreshWorkflows()
 }
 
 func (im *inspectorModel) Enter(m *Model) {

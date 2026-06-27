@@ -3,7 +3,41 @@ package app
 import (
 	"testing"
 	"unicode/utf8"
+
+	"unic/internal/inspector"
 )
+
+func TestInspectorEnsureWorkflowsKeepsExistingWorkflows(t *testing.T) {
+	im := inspectorModel{
+		workflows: []inspector.Workflow{
+			{
+				Kind:        inspector.WorkflowSecurity,
+				Title:       "Existing Workflow",
+				Description: "already loaded",
+				Available:   true,
+			},
+		},
+	}
+
+	im.ensureWorkflows()
+
+	if len(im.workflows) != 1 {
+		t.Fatalf("expected existing workflow list to be preserved, got %d workflows", len(im.workflows))
+	}
+	if im.workflows[0].Title != "Existing Workflow" {
+		t.Fatalf("expected existing workflow to be preserved, got %#v", im.workflows[0])
+	}
+}
+
+func TestInspectorEnsureWorkflowsRefreshesEmptyWorkflows(t *testing.T) {
+	im := inspectorModel{}
+
+	im.ensureWorkflows()
+
+	if len(im.workflows) != 2 {
+		t.Fatalf("expected empty workflow list to be populated with 2 workflows, got %d", len(im.workflows))
+	}
+}
 
 func TestInspectorShortenHandlesUnicodeSafely(t *testing.T) {
 	tests := []struct {
