@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review unic UX"
+  short_description: "Capture unic TUI screenshots and turn them into UX improvements."
+  default_prompt: "Use $unic-ux-review to run unic locally, capture TUI screenshots, review UX issues, and optionally implement scoped improvements."
