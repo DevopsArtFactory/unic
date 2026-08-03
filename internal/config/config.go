@@ -69,6 +69,7 @@ type ContextEntry struct {
 	RoleArn      string `yaml:"role_arn,omitempty"`
 	ExternalID   string `yaml:"external_id,omitempty"`
 	SSOStartURL  string `yaml:"sso_start_url,omitempty"`
+	SSORegion    string `yaml:"sso_region,omitempty"`
 	SSOAccountID string `yaml:"sso_account_id,omitempty"`
 	SSORoleName  string `yaml:"sso_role_name,omitempty"`
 }
@@ -84,12 +85,24 @@ type Config struct {
 	RoleArn          string
 	ExternalID       string
 	SSOStartURL      string
+	SSORegion        string
 	SSOAccountID     string
 	SSORoleName      string
 	FavoriteServices []string
 	FavoriteContexts []string
 	BootSplash       bool
 	BootSplashSeen   string
+}
+
+// EffectiveSSORegion returns the region used for SSO/portal calls
+// (GetRoleCredentials, ListAccounts, aws sso login). It falls back to the
+// resource Region when sso_region is not set, preserving behavior for configs
+// written before sso_region existed.
+func (c *Config) EffectiveSSORegion() string {
+	if c.SSORegion != "" {
+		return c.SSORegion
+	}
+	return c.Region
 }
 
 func normalizeAuthType(value string) AuthType {
@@ -119,6 +132,7 @@ type ContextInfo struct {
 	RoleArn      string
 	ExternalID   string
 	SSOStartURL  string
+	SSORegion    string
 	SSOAccountID string
 	SSORoleName  string
 	Current      bool
@@ -158,7 +172,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	}
 
 	// New format: resolve current context
-	var contextName, roleArn, externalID, ssoStartURL, ssoAccountID, ssoRoleName string
+	var contextName, roleArn, externalID, ssoStartURL, ssoRegion, ssoAccountID, ssoRoleName string
 	var authType AuthType
 	if fc.Current != "" {
 		for _, ctx := range fc.Contexts {
@@ -174,6 +188,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 				roleArn = ctx.RoleArn
 				externalID = ctx.ExternalID
 				ssoStartURL = ctx.SSOStartURL
+				ssoRegion = ctx.SSORegion
 				ssoAccountID = ctx.SSOAccountID
 				ssoRoleName = ctx.SSORoleName
 				break
@@ -205,6 +220,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		RoleArn:          roleArn,
 		ExternalID:       externalID,
 		SSOStartURL:      ssoStartURL,
+		SSORegion:        ssoRegion,
 		SSOAccountID:     ssoAccountID,
 		SSORoleName:      ssoRoleName,
 		FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
@@ -252,6 +268,7 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			RoleArn:          ctx.RoleArn,
 			ExternalID:       ctx.ExternalID,
 			SSOStartURL:      ctx.SSOStartURL,
+			SSORegion:        ctx.SSORegion,
 			SSOAccountID:     ctx.SSOAccountID,
 			SSORoleName:      ctx.SSORoleName,
 			FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
@@ -323,6 +340,7 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 			RoleArn:      ctx.RoleArn,
 			ExternalID:   ctx.ExternalID,
 			SSOStartURL:  ctx.SSOStartURL,
+			SSORegion:    ctx.SSORegion,
 			SSOAccountID: ctx.SSOAccountID,
 			SSORoleName:  ctx.SSORoleName,
 			Current:      ctx.Name == fc.Current,
