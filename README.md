@@ -170,6 +170,15 @@ contexts:
     sso_account_id: "123456789012"
     sso_role_name: DeveloperRole
 
+  # SSO portal in one region, resources in another
+  - name: seoul-sso-123456789012-admin
+    region: ap-northeast-2          # where resources are queried
+    sso_region: us-east-1           # where the SSO/IAM Identity Center portal lives
+    auth_type: sso
+    sso_start_url: https://example.awsapps.com/start
+    sso_account_id: "123456789012"
+    sso_role_name: Admin
+
   - name: prod-admin
     order: 20
     profile: base-profile
@@ -198,6 +207,8 @@ contexts:
 | `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
 
+For `sso` contexts, `region` is the region resources are queried in. When the IAM Identity Center portal lives in a different region than your resources, set `sso_region` to the portal region — SSO login and role-credential retrieval use `sso_region`, while all resource browsing uses `region`. If `sso_region` is omitted, it defaults to `region` (backward compatible).
+
 TUI startup is passive for SSO contexts: it loads the context picker without launching `aws sso login`. SSO login is prompted when you explicitly select or set up an SSO context, or when an AWS-backed workflow needs credentials.
 
 Optional context fields:
@@ -205,6 +216,7 @@ Optional context fields:
 | Field | Meaning |
 |---|---|
 | `order` | Lower values appear first in the context setup picker. Contexts without `order` fall back after ordered entries in their existing file order. |
+| `sso_region` | (SSO only) Region of the IAM Identity Center portal, used for SSO login and role-credential retrieval. Defaults to `region` when unset. Use it when the SSO portal and your resources live in different regions. |
 
 Resolution priority:
 

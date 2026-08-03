@@ -21,7 +21,8 @@ var fieldsByAuthType = map[string][]fieldDef{
 	"sso": {
 		{key: "name", label: "Name", required: true},
 		{key: "order", label: "Display Order (optional, lower first)", required: false},
-		{key: "region", label: "Region", required: true},
+		{key: "region", label: "Region (resources)", required: true},
+		{key: "sso_region", label: "SSO Login Region (optional, defaults to Region)", required: false},
 		{key: "sso_start_url", label: "SSO Start URL", required: true},
 		{key: "sso_account_id", label: "SSO Account ID", required: true},
 		{key: "sso_role_name", label: "SSO Role Name", required: true},
@@ -135,6 +136,7 @@ func (m Model) saveContext() tea.Cmd {
 			RoleArn:      m.addValues["role_arn"],
 			ExternalID:   m.addValues["external_id"],
 			SSOStartURL:  m.addValues["sso_start_url"],
+			SSORegion:    m.addValues["sso_region"],
 			SSOAccountID: m.addValues["sso_account_id"],
 			SSORoleName:  m.addValues["sso_role_name"],
 		}

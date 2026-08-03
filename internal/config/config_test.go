@@ -240,6 +240,41 @@ ui:
 	}
 }
 
+func TestLoadReadsSSORegionSeparateFromRegion(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: my-sso
+contexts:
+  - name: my-sso
+    auth_type: sso
+    region: ap-northeast-2
+    sso_region: us-east-1
+    sso_start_url: https://example.awsapps.com/start
+    sso_account_id: "123456789012"
+    sso_role_name: Admin
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Region != "ap-northeast-2" {
+		t.Fatalf("expected resource region ap-northeast-2, got %q", cfg.Region)
+	}
+	if cfg.SSORegion != "us-east-1" {
+		t.Fatalf("expected sso_region us-east-1, got %q", cfg.SSORegion)
+	}
+	if cfg.EffectiveSSORegion() != "us-east-1" {
+		t.Fatalf("expected effective SSO region us-east-1, got %q", cfg.EffectiveSSORegion())
+	}
+}
+
+func TestEffectiveSSORegionFallsBackToRegion(t *testing.T) {
+	cfg := &Config{Region: "ap-northeast-2"}
+	if got := cfg.EffectiveSSORegion(); got != "ap-northeast-2" {
+		t.Fatalf("expected fallback to region ap-northeast-2, got %q", got)
+	}
+}
+
 func TestSetBootSplashEnabledWritesConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `

@@ -74,8 +74,9 @@ func resolveSSOCredentials(ctx context.Context, cfg *config.Config) (aws.Config,
 		return aws.Config{}, err
 	}
 
-	// Use the SSO token to get role credentials
-	baseCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.Region))
+	// The SSO portal (GetRoleCredentials) lives in the SSO region, which may
+	// differ from the region where the account's resources live.
+	baseCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.EffectiveSSORegion()))
 	if err != nil {
 		return aws.Config{}, fmt.Errorf("failed to load base AWS config: %w", err)
 	}
@@ -96,6 +97,8 @@ func resolveSSOCredentials(ctx context.Context, cfg *config.Config) (aws.Config,
 		aws.ToString(creds.SecretAccessKey),
 		aws.ToString(creds.SessionToken),
 	)
+	// Downstream resource clients must query the resource region, not the SSO region.
+	baseCfg.Region = cfg.Region
 
 	return baseCfg, nil
 }
@@ -193,7 +196,7 @@ func ListSSOAccounts(ctx context.Context, cfg *config.Config) ([]SSOAccount, err
 		return nil, err
 	}
 
-	baseCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.Region))
+	baseCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.EffectiveSSORegion()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load base AWS config: %w", err)
 	}
@@ -234,7 +237,7 @@ func ListSSOAccountRoles(ctx context.Context, cfg *config.Config, accountID stri
 		return nil, err
 	}
 
-	baseCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.Region))
+	baseCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.EffectiveSSORegion()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load base AWS config: %w", err)
 	}
@@ -321,7 +324,7 @@ func BuildSSOLoginCmd(cfg *config.Config) (*exec.Cmd, func(), error) {
 	configContent := fmt.Sprintf("[profile %s]\nsso_start_url = %s\nsso_region = %s\nsso_account_id = %s\nsso_role_name = %s\nregion = %s\n",
 		profileName,
 		cfg.SSOStartURL,
-		cfg.Region,
+		cfg.EffectiveSSORegion(),
 		cfg.SSOAccountID,
 		cfg.SSORoleName,
 		cfg.Region,

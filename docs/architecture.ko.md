@@ -193,6 +193,8 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
    - `sso_account_id`, `sso_role_name` 포함
    - 직접 env export와 SDK credential 생성 가능
 
+`region`은 리소스 조회 리전이고, `sso_region`(선택)은 SSO 로그인과 `GetRoleCredentials`에 쓰이는 IAM Identity Center 포털 리전이다. `sso_region`이 없으면 `region`으로 폴백하므로 단일 리전 설정은 변경할 필요가 없다.
+
 ## TUI 화면 계열
 
 현재 화면 계열은 다음과 같다.

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,6 +141,59 @@ func TestEnsureSSOLoginRunsLoginWhenTokenExpired(t *testing.T) {
 	}
 	if !result.Refreshed {
 		t.Fatal("expected login result to report a refreshed session")
+	}
+}
+
+func TestBuildSSOLoginCmdSeparatesSSORegionFromResourceRegion(t *testing.T) {
+	origWriteSSOConfigFile := writeSSOConfigFile
+	defer func() { writeSSOConfigFile = origWriteSSOConfigFile }()
+
+	var captured string
+	writeSSOConfigFile = func(_ string, data []byte, _ os.FileMode) error {
+		captured = string(data)
+		return nil
+	}
+
+	cfg := testSSOConfig()
+	cfg.Region = "ap-northeast-2"
+	cfg.SSORegion = "us-east-1"
+
+	_, cleanup, err := BuildSSOLoginCmd(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cleanup()
+
+	if !strings.Contains(captured, "sso_region = us-east-1") {
+		t.Fatalf("expected sso_region = us-east-1 in generated config, got:\n%s", captured)
+	}
+	if !strings.Contains(captured, "region = ap-northeast-2") {
+		t.Fatalf("expected resource region = ap-northeast-2 in generated config, got:\n%s", captured)
+	}
+}
+
+func TestBuildSSOLoginCmdFallsBackToResourceRegionForSSO(t *testing.T) {
+	origWriteSSOConfigFile := writeSSOConfigFile
+	defer func() { writeSSOConfigFile = origWriteSSOConfigFile }()
+
+	var captured string
+	writeSSOConfigFile = func(_ string, data []byte, _ os.FileMode) error {
+		captured = string(data)
+		return nil
+	}
+
+	cfg := testSSOConfig()
+	cfg.Region = "ap-northeast-2"
+	cfg.SSORegion = "" // unset: should fall back to Region
+
+	_, cleanup, err := BuildSSOLoginCmd(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cleanup()
+
+	if !strings.Contains(captured, "sso_region = ap-northeast-2") {
+		t.Fatalf("expected sso_region to fall back to ap-northeast-2, got:\n%s", captured)
 	}
 }
 

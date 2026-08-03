@@ -318,6 +318,7 @@ func buildSSOContextEntry(configPath string, base config.ContextInfo, account aw
 		}
 		if ctx.Profile == base.Profile &&
 			ctx.Region == base.Region &&
+			ctx.SSORegion == base.SSORegion &&
 			ctx.SSOStartURL == base.SSOStartURL &&
 			ctx.SSOAccountID == account.ID &&
 			ctx.SSORoleName == role.Name {
@@ -327,6 +328,7 @@ func buildSSOContextEntry(configPath string, base config.ContextInfo, account aw
 				Region:       ctx.Region,
 				AuthType:     ctx.AuthType,
 				SSOStartURL:  ctx.SSOStartURL,
+				SSORegion:    ctx.SSORegion,
 				SSOAccountID: ctx.SSOAccountID,
 				SSORoleName:  ctx.SSORoleName,
 			}, ctx.Name, nil
@@ -344,6 +346,7 @@ func buildSSOContextEntry(configPath string, base config.ContextInfo, account aw
 		Region:       region,
 		AuthType:     string(config.AuthTypeSSO),
 		SSOStartURL:  base.SSOStartURL,
+		SSORegion:    base.SSORegion,
 		SSOAccountID: account.ID,
 		SSORoleName:  role.Name,
 	}
