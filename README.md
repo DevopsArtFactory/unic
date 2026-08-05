@@ -117,7 +117,7 @@ unic context unset
 `unic ecr login` prints a machine-usable container registry login command to `stdout` and can optionally copy it to the clipboard with `--copy`.
 Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the TUI can show which shell context is currently active.
 Contexts can be prioritized in the setup picker with an `order` field in config.
-In the CLI `unic context setup` flow, the picker now filters contexts, SSO accounts, and SSO roles as you type, with arrow-key navigation and Enter to confirm.
+In the CLI `unic context setup` flow, the picker filters contexts, SSO accounts, SSO roles, and configured resource regions as you type, with arrow-key navigation and Enter to confirm. Multi-region contexts prompt for the shell session region after account/role selection; single-region contexts skip that step. The selection changes `AWS_REGION` and `AWS_DEFAULT_REGION` in the generated exports without modifying the context's persisted default region.
 Use `unic context order` to open reorder mode, choose a context with `↑/↓` or `j/k`, press `Enter` to start moving it, then press `Enter` again to save. `unic context order <name> <number>` still works for direct updates.
 
 ## Configuration

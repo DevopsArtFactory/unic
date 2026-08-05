@@ -49,7 +49,7 @@ func SetupContext(ctx context.Context, configPath string, in io.Reader, errOut i
 		return "", err
 	}
 
-	finalName, err := resolveContextSelection(ctx, configPath, selected, in, reader, errOut)
+	finalName, selectedRegion, err := resolveContextSelection(ctx, configPath, selected, in, reader, errOut)
 	if err != nil {
 		return "", err
 	}
@@ -62,6 +62,7 @@ func SetupContext(ctx context.Context, configPath string, in io.Reader, errOut i
 	if err != nil {
 		return "", err
 	}
+	finalCfg.Region = selectedRegion
 	if finalCfg.AuthType == config.AuthTypeConsoleLogin {
 		if err := runConsoleLoginFn(finalCfg); err != nil {
 			return "", err
@@ -69,43 +70,52 @@ func SetupContext(ctx context.Context, configPath string, in io.Reader, errOut i
 	}
 
 	fmt.Fprintf(errOut, "Selected context: %s\n", finalName)
+	if len(contextRegions(selected.Region, selected.Regions)) > 1 {
+		fmt.Fprintf(errOut, "Selected resource region: %s\n", selectedRegion)
+	}
 	return buildEnvExportsFn(ctx, finalCfg)
 }
 
-func resolveContextSelection(ctx context.Context, configPath string, selected config.ContextInfo, rawIn io.Reader, in *bufio.Reader, errOut io.Writer) (string, error) {
+func resolveContextSelection(ctx context.Context, configPath string, selected config.ContextInfo, rawIn io.Reader, in *bufio.Reader, errOut io.Writer) (string, string, error) {
 	if !IsBaseSSOContext(selected) {
-		return selected.Name, nil
+		region, err := chooseResourceRegion(rawIn, in, errOut, selected.Region, selected.Regions)
+		return selected.Name, region, err
 	}
 
 	fmt.Fprintf(errOut, "Listing AWS accounts for %s ...\n", selected.Name)
 	accounts, err := ListSSOContextAccounts(ctx, configPath, selected)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if len(accounts) == 0 {
-		return "", fmt.Errorf("no SSO accounts available for %q", selected.Name)
+		return "", "", fmt.Errorf("no SSO accounts available for %q", selected.Name)
 	}
 
 	account, err := chooseSSOAccount(rawIn, in, errOut, accounts)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	fmt.Fprintf(errOut, "Listing roles for account %s ...\n", account.ID)
 	roles, err := ListSSOContextRoles(ctx, configPath, selected, account.ID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if len(roles) == 0 {
-		return "", fmt.Errorf("no SSO roles available for account %s", account.ID)
+		return "", "", fmt.Errorf("no SSO roles available for account %s", account.ID)
 	}
 
 	role, err := chooseSSORole(rawIn, in, errOut, roles)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return ResolveSSOContextSelection(configPath, selected, account, role)
+	region, err := chooseResourceRegion(rawIn, in, errOut, selected.Region, selected.Regions)
+	if err != nil {
+		return "", "", err
+	}
+	name, err := ResolveSSOContextSelection(configPath, selected, account, role)
+	return name, region, err
 }
 
 func IsBaseSSOContext(selected config.ContextInfo) bool {
@@ -183,6 +193,28 @@ func chooseSSORole(rawIn io.Reader, in *bufio.Reader, errOut io.Writer, roles []
 		return awsservice.SSORole{}, err
 	}
 	return roles[index], nil
+}
+
+func chooseResourceRegion(rawIn io.Reader, in *bufio.Reader, errOut io.Writer, defaultRegion string, regions []string) (string, error) {
+	regions = contextRegions(defaultRegion, regions)
+	if len(regions) == 0 {
+		return config.DefaultRegion, nil
+	}
+	if len(regions) == 1 {
+		return regions[0], nil
+	}
+	index, err := chooseFilteredIndex(rawIn, in, errOut, "resource regions", regions, func(region string) string {
+		if region == defaultRegion {
+			return region + " (default)"
+		}
+		return region
+	}, func(region, query string) bool {
+		return containsFold(region, query)
+	})
+	if err != nil {
+		return "", err
+	}
+	return regions[index], nil
 }
 
 func chooseIndex(in *bufio.Reader, errOut io.Writer, label string, count int) (int, error) {

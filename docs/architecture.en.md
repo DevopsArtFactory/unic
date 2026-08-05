@@ -195,6 +195,8 @@ Two shapes exist:
 
 Contexts can use the structured `auth` and `resources` sections to keep identity independent from resource location. `auth.sso_region` is used for SSO login and `GetRoleCredentials`; `resources.default_region` is the initial resource region, and `resources.regions` defines the regions available to the runtime picker. Switching regions reuses the credentials provider and only recreates regional SDK clients.
 
+`unic context setup` also treats the active resource region as session state. After any required SSO account and role selection, multi-region contexts prompt for a resource region and export it through `AWS_REGION` and `AWS_DEFAULT_REGION`. The persisted default region is unchanged, and single-region contexts skip the picker.
+
 Legacy flat fields remain supported. `region` maps to `resources.default_region`, `regions` maps to the selectable resource regions, and `sso_region` maps to `auth.sso_region`. A missing region list produces the previous single-region behavior.
 
 ## TUI Screen Families
