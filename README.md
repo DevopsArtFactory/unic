@@ -170,14 +170,19 @@ contexts:
     sso_account_id: "123456789012"
     sso_role_name: DeveloperRole
 
-  # SSO portal in one region, resources in another
-  - name: seoul-sso-123456789012-admin
-    region: ap-northeast-2          # where resources are queried
-    sso_region: us-east-1           # where the SSO/IAM Identity Center portal lives
-    auth_type: sso
-    sso_start_url: https://example.awsapps.com/start
-    sso_account_id: "123456789012"
-    sso_role_name: Admin
+  # Preferred structured format: one identity, several resource regions
+  - name: production
+    auth:
+      type: sso
+      sso_region: us-east-1
+      sso_start_url: https://example.awsapps.com/start
+      sso_account_id: "123456789012"
+      sso_role_name: Admin
+    resources:
+      default_region: ap-northeast-2
+      regions:
+        - us-east-1
+        - eu-west-1
 
   - name: prod-admin
     order: 20
@@ -205,9 +210,11 @@ contexts:
 | `credential` | Use shared AWS profile credentials | `profile` |
 | `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
 | `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
-| `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `profile`, `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name` |
+| `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name`; `profile` is optional |
 
-For `sso` contexts, `region` is the region resources are queried in. When the IAM Identity Center portal lives in a different region than your resources, set `sso_region` to the portal region — SSO login and role-credential retrieval use `sso_region`, while all resource browsing uses `region`. If `sso_region` is omitted, it defaults to `region` (backward compatible).
+The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients.
+
+Legacy flat fields (`auth_type`, `profile`, `region`, `regions`, `sso_region`, and related auth fields) remain supported. A context without a region list behaves as a single-region context, and an omitted SSO region still falls back to its default resource region.
 
 TUI startup is passive for SSO contexts: it loads the context picker without launching `aws sso login`. SSO login is prompted when you explicitly select or set up an SSO context, or when an AWS-backed workflow needs credentials.
 
@@ -217,6 +224,7 @@ Optional context fields:
 |---|---|
 | `order` | Lower values appear first in the context setup picker. Contexts without `order` fall back after ordered entries in their existing file order. |
 | `sso_region` | (SSO only) Region of the IAM Identity Center portal, used for SSO login and role-credential retrieval. Defaults to `region` when unset. Use it when the SSO portal and your resources live in different regions. |
+| `resources.regions` / `regions` | Additional resource regions available through the global `R` picker. The default resource region is always included automatically. |
 
 Resolution priority:
 
@@ -343,6 +351,7 @@ checks:
 | `H` | Jump to service list |
 | `i` | Enter Inspector mode from the service list |
 | `C` | Open context picker |
+| `R` | Switch between the active context's configured resource regions |
 | `S` | Open settings |
 | `/` | Toggle filter mode on supported screens |
 | `f` | Favorite/unfavorite the selected service or context on supported lists |

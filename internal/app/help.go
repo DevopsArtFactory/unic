@@ -84,6 +84,9 @@ func (m Model) globalHelpShortcuts() []helpShortcut {
 		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"S", "Open settings"})
 	}
+	if m.canSwitchResourceRegion() {
+		shortcuts = append(shortcuts, helpShortcut{"R", "Switch the active resource region"})
+	}
 	return shortcuts
 }
 
@@ -716,6 +719,12 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"esc", "Go back to the account list"},
 			{"q", "Cancel and return to the context picker"},
 		}
+	case screenRegionPicker:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between configured resource regions"},
+			{"enter", "Switch to the highlighted region"},
+			{"q / esc", "Cancel the region switch"},
+		}
 	case screenLoading:
 		return []helpShortcut{
 			{"Wait", "The current AWS request is still loading"},
@@ -961,6 +970,8 @@ func (m Model) helpScreenTitle() string {
 		return "Select SSO Account"
 	case screenContextSSORoleList:
 		return "Select SSO Role"
+	case screenRegionPicker:
+		return "Resource Region Picker"
 	case screenSettings:
 		return "Settings"
 	case screenLoading:

@@ -36,10 +36,32 @@ func TestContextAddSelectsConsoleLoginFields(t *testing.T) {
 	if model.addValues["auth_type"] != "console_login" {
 		t.Fatalf("expected console_login selection, got %q", model.addValues["auth_type"])
 	}
-	if len(model.addFields) != 4 {
-		t.Fatalf("expected 4 fields for console_login, got %d", len(model.addFields))
+	if len(model.addFields) != 5 {
+		t.Fatalf("expected 5 fields for console_login, got %d", len(model.addFields))
 	}
-	if model.addFields[3].key != "profile" {
-		t.Fatalf("expected profile field, got %+v", model.addFields)
+	if model.addFields[3].key != "regions" || model.addFields[4].key != "profile" {
+		t.Fatalf("expected regions and profile fields, got %+v", model.addFields)
+	}
+}
+
+func TestContextAddKeepsCurrentFieldVisibleOnShortTerminal(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenContextAdd
+	m.height = 10
+	m.addStep = 1
+	m.addFields = fieldsByAuthType["sso"]
+	m.addFieldIdx = len(m.addFields) - 1
+	m.addInput = "AdministratorAccess"
+	m.addValues = map[string]string{"auth_type": "sso"}
+	for i := 0; i < m.addFieldIdx; i++ {
+		m.addValues[m.addFields[i].key] = "configured"
+	}
+
+	view := m.viewContextAdd()
+	if !strings.Contains(view, "SSO Role Name") || !strings.Contains(view, "AdministratorAccess") {
+		t.Fatalf("expected focused field to remain visible, got %q", view)
+	}
+	if !strings.Contains(view, "earlier fields") {
+		t.Fatalf("expected windowing indicator on short terminal, got %q", view)
 	}
 }

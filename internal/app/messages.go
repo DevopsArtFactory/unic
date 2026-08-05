@@ -65,6 +65,11 @@ type contextSwitchedMsg struct {
 	identity *awsservice.CallerIdentity
 }
 
+type regionSwitchedMsg struct {
+	region string
+	repo   *awsservice.AwsRepository
+}
+
 type ssoLoginDoneMsg struct {
 	err error
 }

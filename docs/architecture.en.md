@@ -193,7 +193,9 @@ Two shapes exist:
    - includes `sso_account_id` and `sso_role_name`
    - can produce direct environment exports and SDK credentials
 
-`region` is the resource region; `sso_region` (optional) is the IAM Identity Center portal region used for SSO login and `GetRoleCredentials`. When `sso_region` is unset it falls back to `region`, so single-region setups need no change.
+Contexts can use the structured `auth` and `resources` sections to keep identity independent from resource location. `auth.sso_region` is used for SSO login and `GetRoleCredentials`; `resources.default_region` is the initial resource region, and `resources.regions` defines the regions available to the runtime picker. Switching regions reuses the credentials provider and only recreates regional SDK clients.
+
+Legacy flat fields remain supported. `region` maps to `resources.default_region`, `regions` maps to the selectable resource regions, and `sso_region` maps to `auth.sso_region`. A missing region list produces the previous single-region behavior.
 
 ## TUI Screen Families
 

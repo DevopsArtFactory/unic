@@ -157,6 +157,34 @@ contexts:
 	}
 }
 
+func TestBuildSSOContextEntryDoesNotDuplicateDefaultRegion(t *testing.T) {
+	dir := t.TempDir()
+	path := writeConfig(t, dir, `
+contexts:
+  - name: base-sso
+    auth_type: sso
+    sso_start_url: https://example.awsapps.com/start
+    region: ap-northeast-2
+`)
+
+	entry, _, err := buildSSOContextEntry(path, config.ContextInfo{
+		Name:        "base-sso",
+		AuthType:    "sso",
+		Region:      "ap-northeast-2",
+		Regions:     []string{"ap-northeast-2", "us-east-1", "eu-west-1"},
+		SSOStartURL: "https://example.awsapps.com/start",
+	}, awsservice.SSOAccount{ID: "123456789012"}, awsservice.SSORole{Name: "Admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.Resources == nil {
+		t.Fatal("expected structured resources")
+	}
+	if got := entry.Resources.Regions; len(got) != 2 || got[0] != "us-east-1" || got[1] != "eu-west-1" {
+		t.Fatalf("expected only additional regions, got %v", got)
+	}
+}
+
 func TestSetupContextSupportsSearchBeforeSelectingContext(t *testing.T) {
 	origBuild := buildEnvExportsFn
 	defer func() {

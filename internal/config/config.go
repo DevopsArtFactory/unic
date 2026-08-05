@@ -61,17 +61,38 @@ const (
 
 // ContextEntry represents a single context definition in config.yaml.
 type ContextEntry struct {
-	Name         string `yaml:"name"`
-	Order        int    `yaml:"order,omitempty"`
+	Name         string            `yaml:"name"`
+	Order        int               `yaml:"order,omitempty"`
+	Profile      string            `yaml:"profile,omitempty"`
+	Region       string            `yaml:"region,omitempty"`
+	AuthType     string            `yaml:"auth_type,omitempty"`
+	RoleArn      string            `yaml:"role_arn,omitempty"`
+	ExternalID   string            `yaml:"external_id,omitempty"`
+	SSOStartURL  string            `yaml:"sso_start_url,omitempty"`
+	SSORegion    string            `yaml:"sso_region,omitempty"`
+	SSOAccountID string            `yaml:"sso_account_id,omitempty"`
+	SSORoleName  string            `yaml:"sso_role_name,omitempty"`
+	Regions      []string          `yaml:"regions,omitempty"`
+	Auth         *ContextAuth      `yaml:"auth,omitempty"`
+	Resources    *ContextResources `yaml:"resources,omitempty"`
+}
+
+// ContextAuth defines the credentials and identity independently from resource location.
+type ContextAuth struct {
+	Type         string `yaml:"type"`
 	Profile      string `yaml:"profile,omitempty"`
-	Region       string `yaml:"region"`
-	AuthType     string `yaml:"auth_type"`
 	RoleArn      string `yaml:"role_arn,omitempty"`
 	ExternalID   string `yaml:"external_id,omitempty"`
 	SSOStartURL  string `yaml:"sso_start_url,omitempty"`
 	SSORegion    string `yaml:"sso_region,omitempty"`
 	SSOAccountID string `yaml:"sso_account_id,omitempty"`
 	SSORoleName  string `yaml:"sso_role_name,omitempty"`
+}
+
+// ContextResources defines the default and selectable AWS resource regions.
+type ContextResources struct {
+	DefaultRegion string   `yaml:"default_region"`
+	Regions       []string `yaml:"regions,omitempty"`
 }
 
 // contextEntry is the alias used internally for fileConfig unmarshalling.
@@ -88,6 +109,7 @@ type Config struct {
 	SSORegion        string
 	SSOAccountID     string
 	SSORoleName      string
+	Regions          []string
 	FavoriteServices []string
 	FavoriteContexts []string
 	BootSplash       bool
@@ -135,13 +157,70 @@ type ContextInfo struct {
 	SSORegion    string
 	SSOAccountID string
 	SSORoleName  string
+	Regions      []string
 	Current      bool
 	Favorite     bool
 }
 
+type resolvedContextEntry struct {
+	Profile, Region, AuthType, RoleArn, ExternalID    string
+	SSOStartURL, SSORegion, SSOAccountID, SSORoleName string
+	Regions                                           []string
+}
+
+func (c ContextEntry) resolved(defaultRegion string) resolvedContextEntry {
+	r := resolvedContextEntry{
+		Profile: c.Profile, Region: c.Region, AuthType: c.AuthType,
+		RoleArn: c.RoleArn, ExternalID: c.ExternalID,
+		SSOStartURL: c.SSOStartURL, SSORegion: c.SSORegion,
+		SSOAccountID: c.SSOAccountID, SSORoleName: c.SSORoleName,
+		Regions: c.Regions,
+	}
+	if c.Auth != nil {
+		r.AuthType = c.Auth.Type
+		r.Profile = c.Auth.Profile
+		r.RoleArn = c.Auth.RoleArn
+		r.ExternalID = c.Auth.ExternalID
+		r.SSOStartURL = c.Auth.SSOStartURL
+		r.SSORegion = c.Auth.SSORegion
+		r.SSOAccountID = c.Auth.SSOAccountID
+		r.SSORoleName = c.Auth.SSORoleName
+	}
+	if c.Resources != nil {
+		r.Region = c.Resources.DefaultRegion
+		r.Regions = c.Resources.Regions
+	}
+	if r.Region == "" {
+		r.Region = defaultRegion
+	}
+	r.Regions = normalizeRegions(r.Region, r.Regions)
+	return r
+}
+
+func normalizeRegions(defaultRegion string, regions []string) []string {
+	seen := make(map[string]struct{}, len(regions)+1)
+	result := make([]string, 0, len(regions)+1)
+	add := func(region string) {
+		region = strings.TrimSpace(region)
+		if region == "" {
+			return
+		}
+		if _, ok := seen[region]; ok {
+			return
+		}
+		seen[region] = struct{}{}
+		result = append(result, region)
+	}
+	add(defaultRegion)
+	for _, region := range regions {
+		add(region)
+	}
+	return result
+}
+
 // FilterText returns a lowercase string for keyword matching.
 func (c ContextInfo) FilterText() string {
-	return strings.ToLower(fmt.Sprintf("%s %s %s", c.Name, c.Profile, c.Region))
+	return strings.ToLower(fmt.Sprintf("%s %s %s", c.Name, c.Profile, strings.Join(c.Regions, " ")))
 }
 
 // Load resolves config with priority: CLI flags > context > config file defaults > hardcoded defaults.
@@ -173,24 +252,25 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 
 	// New format: resolve current context
 	var contextName, roleArn, externalID, ssoStartURL, ssoRegion, ssoAccountID, ssoRoleName string
+	var regions []string
 	var authType AuthType
 	if fc.Current != "" {
 		for _, ctx := range fc.Contexts {
 			if ctx.Name == fc.Current {
+				resolved := ctx.resolved(region)
 				contextName = ctx.Name
-				authType = normalizeAuthType(ctx.AuthType)
-				if ctx.Profile != "" {
-					profile = ctx.Profile
+				authType = normalizeAuthType(resolved.AuthType)
+				if resolved.Profile != "" {
+					profile = resolved.Profile
 				}
-				if ctx.Region != "" {
-					region = ctx.Region
-				}
-				roleArn = ctx.RoleArn
-				externalID = ctx.ExternalID
-				ssoStartURL = ctx.SSOStartURL
-				ssoRegion = ctx.SSORegion
-				ssoAccountID = ctx.SSOAccountID
-				ssoRoleName = ctx.SSORoleName
+				region = resolved.Region
+				regions = resolved.Regions
+				roleArn = resolved.RoleArn
+				externalID = resolved.ExternalID
+				ssoStartURL = resolved.SSOStartURL
+				ssoRegion = resolved.SSORegion
+				ssoAccountID = resolved.SSOAccountID
+				ssoRoleName = resolved.SSORoleName
 				break
 			}
 		}
@@ -202,6 +282,10 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	}
 	if cliRegion != nil {
 		region = *cliRegion
+		regions = normalizeRegions(region, regions)
+	}
+	if len(regions) == 0 {
+		regions = normalizeRegions(region, nil)
 	}
 
 	uniclog.Debug("config", "config resolved",
@@ -223,6 +307,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		SSORegion:        ssoRegion,
 		SSOAccountID:     ssoAccountID,
 		SSORoleName:      ssoRoleName,
+		Regions:          regions,
 		FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
 		FavoriteContexts: normalizeFavoriteContexts(fc.Favorites.Contexts),
 		BootSplash:       boolValue(fc.UI.BootSplash, false),
@@ -255,22 +340,22 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			continue
 		}
 
-		profile := ctx.Profile
-		if ctx.Region != "" {
-			region = ctx.Region
-		}
+		resolved := ctx.resolved(region)
+		profile := resolved.Profile
+		region = resolved.Region
 
 		return &Config{
 			Profile:          profile,
 			Region:           region,
 			ContextName:      ctx.Name,
-			AuthType:         normalizeAuthType(ctx.AuthType),
-			RoleArn:          ctx.RoleArn,
-			ExternalID:       ctx.ExternalID,
-			SSOStartURL:      ctx.SSOStartURL,
-			SSORegion:        ctx.SSORegion,
-			SSOAccountID:     ctx.SSOAccountID,
-			SSORoleName:      ctx.SSORoleName,
+			AuthType:         normalizeAuthType(resolved.AuthType),
+			RoleArn:          resolved.RoleArn,
+			ExternalID:       resolved.ExternalID,
+			SSOStartURL:      resolved.SSOStartURL,
+			SSORegion:        resolved.SSORegion,
+			SSOAccountID:     resolved.SSOAccountID,
+			SSORoleName:      resolved.SSORoleName,
+			Regions:          resolved.Regions,
 			FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
 			FavoriteContexts: normalizeFavoriteContexts(fc.Favorites.Contexts),
 			BootSplash:       boolValue(fc.UI.BootSplash, false),
@@ -330,19 +415,28 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 	favoriteContexts := favoriteContextSet(fc.Favorites.Contexts)
 	var infos []ContextInfo
 	for _, ctx := range fc.Contexts {
+		defaultRegion := fc.Defaults.Region
+		if defaultRegion == "" {
+			defaultRegion = fc.DefaultRegion
+		}
+		if defaultRegion == "" {
+			defaultRegion = DefaultRegion
+		}
+		resolved := ctx.resolved(defaultRegion)
 		_, favorite := favoriteContexts[ctx.Name]
 		infos = append(infos, ContextInfo{
 			Name:         ctx.Name,
 			Order:        ctx.Order,
-			Profile:      ctx.Profile,
-			Region:       ctx.Region,
-			AuthType:     ctx.AuthType,
-			RoleArn:      ctx.RoleArn,
-			ExternalID:   ctx.ExternalID,
-			SSOStartURL:  ctx.SSOStartURL,
-			SSORegion:    ctx.SSORegion,
-			SSOAccountID: ctx.SSOAccountID,
-			SSORoleName:  ctx.SSORoleName,
+			Profile:      resolved.Profile,
+			Region:       resolved.Region,
+			AuthType:     resolved.AuthType,
+			RoleArn:      resolved.RoleArn,
+			ExternalID:   resolved.ExternalID,
+			SSOStartURL:  resolved.SSOStartURL,
+			SSORegion:    resolved.SSORegion,
+			SSOAccountID: resolved.SSOAccountID,
+			SSORoleName:  resolved.SSORoleName,
+			Regions:      resolved.Regions,
 			Current:      ctx.Name == fc.Current,
 			Favorite:     favorite,
 		})

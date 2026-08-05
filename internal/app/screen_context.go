@@ -63,6 +63,14 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.screen = m.ctxPrevScreen
 		return m, tea.ClearScreen, true
 
+	case regionSwitchedMsg:
+		m.cfg.Region = msg.region
+		m.awsRepo = msg.repo
+		// Region-scoped feature state may contain resources from the previous
+		// region, so return to the service catalog after switching.
+		m.screen = screenServiceList
+		return m, tea.ClearScreen, true
+
 	case contextSSOAccountsLoadedMsg:
 		m.contextSSOBase = msg.base
 		m.contextSSOAccounts = msg.accounts

@@ -21,7 +21,8 @@ var fieldsByAuthType = map[string][]fieldDef{
 	"sso": {
 		{key: "name", label: "Name", required: true},
 		{key: "order", label: "Display Order (optional, lower first)", required: false},
-		{key: "region", label: "Region (resources)", required: true},
+		{key: "region", label: "Default Resource Region", required: true},
+		{key: "regions", label: "Other Resource Regions (optional, comma-separated)", required: false},
 		{key: "sso_region", label: "SSO Login Region (optional, defaults to Region)", required: false},
 		{key: "sso_start_url", label: "SSO Start URL", required: true},
 		{key: "sso_account_id", label: "SSO Account ID", required: true},
@@ -31,18 +32,21 @@ var fieldsByAuthType = map[string][]fieldDef{
 		{key: "name", label: "Name", required: true},
 		{key: "order", label: "Display Order (optional, lower first)", required: false},
 		{key: "region", label: "Region", required: true},
+		{key: "regions", label: "Other Resource Regions (optional, comma-separated)", required: false},
 		{key: "profile", label: "Profile", required: true},
 	},
 	"console_login": {
 		{key: "name", label: "Name", required: true},
 		{key: "order", label: "Display Order (optional, lower first)", required: false},
 		{key: "region", label: "Region", required: true},
+		{key: "regions", label: "Other Resource Regions (optional, comma-separated)", required: false},
 		{key: "profile", label: "Profile", required: true},
 	},
 	"assume_role": {
 		{key: "name", label: "Name", required: true},
 		{key: "order", label: "Display Order (optional, lower first)", required: false},
 		{key: "region", label: "Region", required: true},
+		{key: "regions", label: "Other Resource Regions (optional, comma-separated)", required: false},
 		{key: "profile", label: "Profile", required: true},
 		{key: "role_arn", label: "Role ARN", required: true},
 		{key: "external_id", label: "External ID (optional)", required: false},
@@ -128,17 +132,22 @@ func (m Model) saveContext() tea.Cmd {
 			return errMsg{err: err}
 		}
 		entry := config.ContextEntry{
-			Name:         m.addValues["name"],
-			Order:        order,
-			AuthType:     m.addValues["auth_type"],
-			Region:       m.addValues["region"],
-			Profile:      m.addValues["profile"],
-			RoleArn:      m.addValues["role_arn"],
-			ExternalID:   m.addValues["external_id"],
-			SSOStartURL:  m.addValues["sso_start_url"],
-			SSORegion:    m.addValues["sso_region"],
-			SSOAccountID: m.addValues["sso_account_id"],
-			SSORoleName:  m.addValues["sso_role_name"],
+			Name:  m.addValues["name"],
+			Order: order,
+			Auth: &config.ContextAuth{
+				Type:         m.addValues["auth_type"],
+				Profile:      m.addValues["profile"],
+				RoleArn:      m.addValues["role_arn"],
+				ExternalID:   m.addValues["external_id"],
+				SSOStartURL:  m.addValues["sso_start_url"],
+				SSORegion:    m.addValues["sso_region"],
+				SSOAccountID: m.addValues["sso_account_id"],
+				SSORoleName:  m.addValues["sso_role_name"],
+			},
+			Resources: &config.ContextResources{
+				DefaultRegion: m.addValues["region"],
+				Regions:       parseRegionList(m.addValues["regions"]),
+			},
 		}
 		if err := config.AddContext(m.configPath, entry); err != nil {
 			return errMsg{err: err}
@@ -147,6 +156,17 @@ func (m Model) saveContext() tea.Cmd {
 		contexts, _ := config.Contexts(m.configPath)
 		return contextsLoadedMsg{contexts: contexts}
 	}
+}
+
+func parseRegionList(raw string) []string {
+	parts := strings.Split(raw, ",")
+	regions := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if region := strings.TrimSpace(part); region != "" {
+			regions = append(regions, region)
+		}
+	}
+	return regions
 }
 
 func parseOptionalContextOrder(raw string) (int, error) {
@@ -188,7 +208,20 @@ func (m Model) viewContextAdd() string {
 	// Show completed fields
 	b.WriteString(dimStyle.Render(fmt.Sprintf("  auth_type: %s", m.addValues["auth_type"])))
 	b.WriteString("\n")
-	for i := 0; i < len(m.addFields); i++ {
+	visibleLines := len(m.addFields)
+	if m.height > 0 {
+		visibleLines = max(m.height-8, 5)
+	}
+	end := len(m.addFields)
+	if m.addStep > 0 {
+		end = min(m.addFieldIdx+1, len(m.addFields))
+	}
+	start := max(end-visibleLines, 0)
+	if start > 0 {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  ... %d earlier fields", start)))
+		b.WriteString("\n")
+	}
+	for i := start; i < end; i++ {
 		field := m.addFields[i]
 		if m.addStep == -1 || i < m.addFieldIdx {
 			// Completed field

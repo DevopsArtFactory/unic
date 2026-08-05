@@ -374,6 +374,19 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 
 	uniclog.Info("aws", "repository created", "region", cfg.Region, "profile", cfg.Profile)
 
+	return newRepositoryFromConfig(awsCfg, cfg.Region, cfg.Profile), nil
+}
+
+// ForRegion creates service clients for another region while reusing the
+// repository's existing credentials provider. It does not repeat SSO login or
+// assume-role authentication.
+func (r *AwsRepository) ForRegion(region string) *AwsRepository {
+	awsCfg := r.awsCfg
+	awsCfg.Region = region
+	return newRepositoryFromConfig(awsCfg, region, r.Profile)
+}
+
+func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepository {
 	return &AwsRepository{
 		EC2Client:            ec2.NewFromConfig(awsCfg),
 		SSMClient:            ssm.NewFromConfig(awsCfg),
@@ -396,10 +409,10 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		ELBv2Client:          elasticloadbalancingv2.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),
 		LambdaClient:         lambda.NewFromConfig(awsCfg),
-		Region:               cfg.Region,
-		Profile:              cfg.Profile,
+		Region:               region,
+		Profile:              profile,
 		awsCfg:               awsCfg,
-	}, nil
+	}
 }
 
 // ResolveCredentialEnv retrieves the current AWS credentials and returns them
