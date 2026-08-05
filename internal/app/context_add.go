@@ -208,7 +208,20 @@ func (m Model) viewContextAdd() string {
 	// Show completed fields
 	b.WriteString(dimStyle.Render(fmt.Sprintf("  auth_type: %s", m.addValues["auth_type"])))
 	b.WriteString("\n")
-	for i := 0; i < len(m.addFields); i++ {
+	visibleLines := len(m.addFields)
+	if m.height > 0 {
+		visibleLines = max(m.height-8, 5)
+	}
+	end := len(m.addFields)
+	if m.addStep > 0 {
+		end = min(m.addFieldIdx+1, len(m.addFields))
+	}
+	start := max(end-visibleLines, 0)
+	if start > 0 {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  ... %d earlier fields", start)))
+		b.WriteString("\n")
+	}
+	for i := start; i < end; i++ {
 		field := m.addFields[i]
 		if m.addStep == -1 || i < m.addFieldIdx {
 			// Completed field

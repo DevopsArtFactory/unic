@@ -43,3 +43,25 @@ func TestContextAddSelectsConsoleLoginFields(t *testing.T) {
 		t.Fatalf("expected regions and profile fields, got %+v", model.addFields)
 	}
 }
+
+func TestContextAddKeepsCurrentFieldVisibleOnShortTerminal(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenContextAdd
+	m.height = 10
+	m.addStep = 1
+	m.addFields = fieldsByAuthType["sso"]
+	m.addFieldIdx = len(m.addFields) - 1
+	m.addInput = "AdministratorAccess"
+	m.addValues = map[string]string{"auth_type": "sso"}
+	for i := 0; i < m.addFieldIdx; i++ {
+		m.addValues[m.addFields[i].key] = "configured"
+	}
+
+	view := m.viewContextAdd()
+	if !strings.Contains(view, "SSO Role Name") || !strings.Contains(view, "AdministratorAccess") {
+		t.Fatalf("expected focused field to remain visible, got %q", view)
+	}
+	if !strings.Contains(view, "earlier fields") {
+		t.Fatalf("expected windowing indicator on short terminal, got %q", view)
+	}
+}

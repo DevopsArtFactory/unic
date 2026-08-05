@@ -342,6 +342,7 @@ func buildSSOContextEntry(configPath string, base config.ContextInfo, account aw
 	if region == "" {
 		region = config.DefaultRegion
 	}
+	resourceRegions := contextRegions(region, base.Regions)
 	entry := config.ContextEntry{
 		Name: name,
 		Auth: &config.ContextAuth{
@@ -354,7 +355,7 @@ func buildSSOContextEntry(configPath string, base config.ContextInfo, account aw
 		},
 		Resources: &config.ContextResources{
 			DefaultRegion: region,
-			Regions:       base.Regions,
+			Regions:       resourceRegions[1:],
 		},
 	}
 	return entry, name, nil

@@ -84,8 +84,7 @@ func (m Model) globalHelpShortcuts() []helpShortcut {
 		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"S", "Open settings"})
 	}
-	if m.cfg != nil && len(m.cfg.Regions) > 1 && m.screen != screenRegionPicker &&
-		m.screen != screenContextPicker && !m.isTextEntryScreen() {
+	if m.canSwitchResourceRegion() {
 		shortcuts = append(shortcuts, helpShortcut{"R", "Switch the active resource region"})
 	}
 	return shortcuts

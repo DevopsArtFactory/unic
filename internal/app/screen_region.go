@@ -10,6 +10,20 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
+var newAwsRepositoryForRegionFn = awsservice.NewAwsRepository
+
+func (m Model) canSwitchResourceRegion() bool {
+	if m.cfg == nil || len(m.cfg.Regions) <= 1 || m.filterTI.Focused() || m.isTextEntryScreen() {
+		return false
+	}
+	switch m.screen {
+	case screenRegionPicker, screenContextPicker, screenLoading, screenInspectorScanning:
+		return false
+	default:
+		return true
+	}
+}
+
 func (m Model) activeRegionIndex() int {
 	if m.cfg == nil {
 		return 0
@@ -53,7 +67,7 @@ func (m Model) switchResourceRegion(region string) tea.Cmd {
 			return regionSwitchedMsg{region: region, repo: repo.ForRegion(region)}
 		}
 		cfg.Region = region
-		newRepo, err := awsservice.NewAwsRepository(context.Background(), &cfg)
+		newRepo, err := newAwsRepositoryForRegionFn(context.Background(), &cfg)
 		if err != nil {
 			return errMsg{err: fmt.Errorf("failed to switch resource region to %s: %w", region, err)}
 		}
@@ -88,7 +102,8 @@ func (m Model) viewRegionPicker() string {
 			cursor = "> "
 			style = selectedStyle
 		}
-		panel.WriteString(style.Render(fmt.Sprintf("%s%s%s", cursor, region, marker)))
+		panel.WriteString(style.Render(fmt.Sprintf("%s%s", cursor, region)))
+		panel.WriteString(dimStyle.Render(marker))
 		panel.WriteString("\n")
 	}
 	b.WriteString(m.renderListPanel(panel.String()))

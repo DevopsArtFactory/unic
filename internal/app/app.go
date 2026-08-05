@@ -530,9 +530,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Global resource-region switch. Authentication identity remains unchanged;
 		// only region-scoped AWS clients are recreated.
-		if msg.String() == "R" && m.screen != screenRegionPicker &&
-			m.screen != screenContextPicker && !m.filterTI.Focused() &&
-			!m.isTextEntryScreen() && len(m.cfg.Regions) > 1 {
+		if msg.String() == "R" && m.canSwitchResourceRegion() {
 			m.deactivateFilter()
 			m.regionPrevScreen = m.screen
 			m.regionIdx = m.activeRegionIndex()
