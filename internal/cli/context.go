@@ -105,7 +105,7 @@ func newContextSetupCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "setup",
 		Short: "Interactively select a context and copy shell exports to the clipboard",
-		Long:  "Select a context, resolve any required SSO account/role, set it as current, and copy shell export commands to the clipboard.",
+		Long:  "Select a context, resolve any required SSO account/role and resource region, set it as current, and copy shell export commands to the clipboard.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, err := defaultPathFn()
 			if err != nil {

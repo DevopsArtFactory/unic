@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,92 @@ import (
 	"unic/internal/config"
 	awsservice "unic/internal/services/aws"
 )
+
+func TestSetupContextSelectsResourceRegionForShellSession(t *testing.T) {
+	origBuild := buildEnvExportsFn
+	defer func() { buildEnvExportsFn = origBuild }()
+
+	var exportedRegion string
+	buildEnvExportsFn = func(_ context.Context, cfg *config.Config) (string, error) {
+		exportedRegion = cfg.Region
+		return "export AWS_REGION='" + cfg.Region + "'", nil
+	}
+
+	dir := t.TempDir()
+	path := writeConfig(t, dir, `
+current: old
+contexts:
+  - name: old
+    auth_type: credential
+    profile: old
+    region: ap-southeast-1
+  - name: production
+    auth:
+      type: credential
+      profile: production
+    resources:
+      default_region: ap-northeast-2
+      regions:
+        - us-east-1
+`)
+
+	var stderr strings.Builder
+	exports, err := SetupContext(context.Background(), path, strings.NewReader("2\n2\n"), &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exportedRegion != "us-east-1" || !strings.Contains(exports, "us-east-1") {
+		t.Fatalf("expected selected shell region us-east-1, got region=%q exports=%q", exportedRegion, exports)
+	}
+	if !strings.Contains(stderr.String(), "Available resource regions") {
+		t.Fatalf("expected resource region picker, got %q", stderr.String())
+	}
+
+	stored, err := config.LoadNamedContext(path, "production")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Region != "ap-northeast-2" {
+		t.Fatalf("expected persisted default region to remain unchanged, got %q", stored.Region)
+	}
+	current, err := config.Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.ContextName != "production" {
+		t.Fatalf("expected current context production, got %q", current.ContextName)
+	}
+}
+
+func TestSetupContextRegionCancellationDoesNotChangeCurrentContext(t *testing.T) {
+	dir := t.TempDir()
+	path := writeConfig(t, dir, `
+current: old
+contexts:
+  - name: old
+    auth_type: credential
+    profile: old
+    region: ap-southeast-1
+  - name: production
+    auth_type: credential
+    profile: production
+    region: ap-northeast-2
+    regions:
+      - us-east-1
+`)
+
+	_, err := SetupContext(context.Background(), path, strings.NewReader("2\n"), &strings.Builder{})
+	if !errors.Is(err, io.EOF) {
+		t.Fatalf("expected region selection cancellation, got %v", err)
+	}
+	cfg, loadErr := config.Load(nil, nil, path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if cfg.ContextName != "old" {
+		t.Fatalf("expected current context to remain old, got %q", cfg.ContextName)
+	}
+}
 
 func writeConfig(t *testing.T, dir, content string) string {
 	t.Helper()
@@ -39,7 +127,7 @@ func TestSetupContextUpsertsConcreteSSOContext(t *testing.T) {
 		return []awsservice.SSORole{{Name: "AdministratorAccess"}}, nil
 	}
 	buildEnvExportsFn = func(ctx context.Context, cfg *config.Config) (string, error) {
-		return "export AWS_REGION='ap-northeast-2'", nil
+		return "export AWS_REGION='" + cfg.Region + "'", nil
 	}
 	runConsoleLoginFn = func(cfg *config.Config) error { return nil }
 
@@ -52,14 +140,16 @@ contexts:
     auth_type: sso
     sso_start_url: https://example.awsapps.com/start
     region: ap-northeast-2
+    regions:
+      - us-east-1
 `)
 
 	var stderr strings.Builder
-	exports, err := SetupContext(context.Background(), path, strings.NewReader("1\n1\n1\n"), &stderr)
+	exports, err := SetupContext(context.Background(), path, strings.NewReader("1\n1\n1\n2\n"), &stderr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(exports, "export AWS_REGION='ap-northeast-2'") {
+	if !strings.Contains(exports, "export AWS_REGION='us-east-1'") {
 		t.Fatalf("expected exports, got %q", exports)
 	}
 
@@ -77,6 +167,13 @@ contexts:
 	}
 	if len(infos) != 2 {
 		t.Fatalf("expected 2 contexts after upsert, got %d", len(infos))
+	}
+	concrete, err := config.LoadNamedContext(path, "base-sso-123456789012-administratoraccess")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if concrete.Region != "ap-northeast-2" || len(concrete.Regions) != 2 || concrete.Regions[1] != "us-east-1" {
+		t.Fatalf("expected generated context to preserve default and additional regions, got default=%q regions=%v", concrete.Region, concrete.Regions)
 	}
 }
 
