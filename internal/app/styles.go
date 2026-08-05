@@ -109,7 +109,11 @@ func (m Model) renderStatusBar() string {
 		m.screen == screenReachabilityResult {
 		activeRegion = m.activeReachabilityRegion()
 	}
-	leftParts = append(leftParts, fmt.Sprintf("region:%s", activeRegion))
+	regionLabel := fmt.Sprintf("region:%s", activeRegion)
+	if len(m.cfg.Regions) > 1 {
+		regionLabel += " [R switch]"
+	}
+	leftParts = append(leftParts, regionLabel)
 	if m.cfg.AuthType != "" {
 		leftParts = append(leftParts, fmt.Sprintf("auth:%s", m.cfg.AuthType))
 	}

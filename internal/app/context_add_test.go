@@ -36,10 +36,10 @@ func TestContextAddSelectsConsoleLoginFields(t *testing.T) {
 	if model.addValues["auth_type"] != "console_login" {
 		t.Fatalf("expected console_login selection, got %q", model.addValues["auth_type"])
 	}
-	if len(model.addFields) != 4 {
-		t.Fatalf("expected 4 fields for console_login, got %d", len(model.addFields))
+	if len(model.addFields) != 5 {
+		t.Fatalf("expected 5 fields for console_login, got %d", len(model.addFields))
 	}
-	if model.addFields[3].key != "profile" {
-		t.Fatalf("expected profile field, got %+v", model.addFields)
+	if model.addFields[3].key != "regions" || model.addFields[4].key != "profile" {
+		t.Fatalf("expected regions and profile fields, got %+v", model.addFields)
 	}
 }

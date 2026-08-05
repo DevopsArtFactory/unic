@@ -318,6 +318,7 @@ func buildSSOContextEntry(configPath string, base config.ContextInfo, account aw
 		}
 		if ctx.Profile == base.Profile &&
 			ctx.Region == base.Region &&
+			equalContextRegions(ctx.Region, ctx.Regions, base.Region, base.Regions) &&
 			ctx.SSORegion == base.SSORegion &&
 			ctx.SSOStartURL == base.SSOStartURL &&
 			ctx.SSOAccountID == account.ID &&
@@ -331,6 +332,7 @@ func buildSSOContextEntry(configPath string, base config.ContextInfo, account aw
 				SSORegion:    ctx.SSORegion,
 				SSOAccountID: ctx.SSOAccountID,
 				SSORoleName:  ctx.SSORoleName,
+				Regions:      ctx.Regions,
 			}, ctx.Name, nil
 		}
 	}
@@ -341,16 +343,52 @@ func buildSSOContextEntry(configPath string, base config.ContextInfo, account aw
 		region = config.DefaultRegion
 	}
 	entry := config.ContextEntry{
-		Name:         name,
-		Profile:      base.Profile,
-		Region:       region,
-		AuthType:     string(config.AuthTypeSSO),
-		SSOStartURL:  base.SSOStartURL,
-		SSORegion:    base.SSORegion,
-		SSOAccountID: account.ID,
-		SSORoleName:  role.Name,
+		Name: name,
+		Auth: &config.ContextAuth{
+			Type:         string(config.AuthTypeSSO),
+			Profile:      base.Profile,
+			SSOStartURL:  base.SSOStartURL,
+			SSORegion:    base.SSORegion,
+			SSOAccountID: account.ID,
+			SSORoleName:  role.Name,
+		},
+		Resources: &config.ContextResources{
+			DefaultRegion: region,
+			Regions:       base.Regions,
+		},
 	}
 	return entry, name, nil
+}
+
+func equalContextRegions(leftDefault string, left []string, rightDefault string, right []string) bool {
+	left = contextRegions(leftDefault, left)
+	right = contextRegions(rightDefault, right)
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func contextRegions(defaultRegion string, regions []string) []string {
+	result := make([]string, 0, len(regions)+1)
+	seen := make(map[string]struct{}, len(regions)+1)
+	for _, region := range append([]string{defaultRegion}, regions...) {
+		region = strings.TrimSpace(region)
+		if region == "" {
+			continue
+		}
+		if _, ok := seen[region]; ok {
+			continue
+		}
+		seen[region] = struct{}{}
+		result = append(result, region)
+	}
+	return result
 }
 
 func uniqueContextName(existing []config.ContextInfo, base string) string {

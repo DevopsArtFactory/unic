@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 )
 
 func TestLoadBaseConfig_ExplicitProfileOverridesEnvCredentials(t *testing.T) {
@@ -35,6 +38,29 @@ aws_secret_access_key = PROFILESECRET
 
 	if creds.AccessKeyID != "PROFILEKEY" {
 		t.Fatalf("expected explicit profile credentials, got %q from %q", creds.AccessKeyID, creds.Source)
+	}
+}
+
+func TestRepositoryForRegionReusesCredentials(t *testing.T) {
+	provider := credentials.NewStaticCredentialsProvider("KEY", "SECRET", "TOKEN")
+	repo := newRepositoryFromConfig(awssdk.Config{
+		Region:      "ap-northeast-2",
+		Credentials: provider,
+	}, "ap-northeast-2", "production")
+
+	switched := repo.ForRegion("us-east-1")
+	if switched.Region != "us-east-1" {
+		t.Fatalf("expected switched region us-east-1, got %q", switched.Region)
+	}
+	if switched.Profile != "production" {
+		t.Fatalf("expected profile to be preserved, got %q", switched.Profile)
+	}
+	creds, err := switched.awsCfg.Credentials.Retrieve(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creds.AccessKeyID != "KEY" || creds.SessionToken != "TOKEN" {
+		t.Fatalf("expected credentials to be reused, got %+v", creds)
 	}
 }
 

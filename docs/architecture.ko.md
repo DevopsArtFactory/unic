@@ -193,7 +193,9 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
    - `sso_account_id`, `sso_role_name` 포함
    - 직접 env export와 SDK credential 생성 가능
 
-`region`은 리소스 조회 리전이고, `sso_region`(선택)은 SSO 로그인과 `GetRoleCredentials`에 쓰이는 IAM Identity Center 포털 리전이다. `sso_region`이 없으면 `region`으로 폴백하므로 단일 리전 설정은 변경할 필요가 없다.
+컨텍스트는 구조화된 `auth`와 `resources` 섹션을 사용해 인증 정보와 리소스 위치를 분리할 수 있다. `auth.sso_region`은 SSO 로그인과 `GetRoleCredentials`에 사용하고, `resources.default_region`은 최초 리소스 리전, `resources.regions`는 런타임 리전 선택기에 노출할 리전 목록이다. 리전 전환 시 기존 credential provider를 재사용하고 리전별 SDK client만 다시 생성한다.
+
+기존 flat 필드도 계속 지원한다. `region`은 `resources.default_region`, `regions`는 선택 가능한 리전 목록, `sso_region`은 `auth.sso_region`에 대응한다. 리전 목록이 없으면 이전과 동일한 단일 리전 동작을 유지한다.
 
 ## TUI 화면 계열
 

@@ -106,6 +106,7 @@ const (
 	screenContextAdd
 	screenContextSSOAccountList
 	screenContextSSORoleList
+	screenRegionPicker
 	screenSettings
 	screenLoading
 	screenError
@@ -184,6 +185,8 @@ type Model struct {
 	contextSSOAccount    awsservice.SSOAccount
 	contextSSORoles      []awsservice.SSORole
 	contextSSORoleIdx    int
+	regionIdx            int
+	regionPrevScreen     screen
 
 	// Context add wizard
 	addStep     int // 0=auth_type select, 1+=field input, -1=confirm
@@ -525,6 +528,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
 		}
+		// Global resource-region switch. Authentication identity remains unchanged;
+		// only region-scoped AWS clients are recreated.
+		if msg.String() == "R" && m.screen != screenRegionPicker &&
+			m.screen != screenContextPicker && !m.filterTI.Focused() &&
+			!m.isTextEntryScreen() && len(m.cfg.Regions) > 1 {
+			m.deactivateFilter()
+			m.regionPrevScreen = m.screen
+			m.regionIdx = m.activeRegionIndex()
+			m.screen = screenRegionPicker
+			return m, nil
+		}
 		// Global settings — S opens the settings screen (skip text-entry screens
 		// and the filter input so it never steals a typed character).
 		if msg.String() == "S" && !m.filterTI.Focused() && m.screen != screenSettings &&
@@ -556,6 +570,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateContextSSOAccountList(msg)
 		case screenContextSSORoleList:
 			return m.updateContextSSORoleList(msg)
+		case screenRegionPicker:
+			return m.updateRegionPicker(msg)
 		case screenSettings:
 			return m.updateSettings(msg)
 		case screenError:
@@ -714,6 +730,8 @@ func (m Model) View() string {
 		v = m.viewContextSSOAccountList()
 	case screenContextSSORoleList:
 		v = m.viewContextSSORoleList()
+	case screenRegionPicker:
+		v = m.viewRegionPicker()
 	case screenSettings:
 		v = m.viewSettings()
 	case screenLoading:
