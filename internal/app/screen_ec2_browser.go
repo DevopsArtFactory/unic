@@ -17,6 +17,8 @@ type ec2InstanceBrowserModel struct {
 	instances       []awsservice.EC2Instance
 	filtered        []awsservice.EC2Instance
 	idx             int
+	allRegions      bool
+	regionErrors    []awsservice.EC2RegionError
 	selected        *awsservice.EC2Instance
 	relationships   *awsservice.EC2InstanceRelationships
 	relatedKind     ec2RelatedKind
@@ -67,6 +69,7 @@ func (em *ec2InstanceBrowserModel) HandleMessage(m *Model, msg tea.Msg) (tea.Mod
 	switch msg := msg.(type) {
 	case ec2BrowserInstancesLoadedMsg:
 		em.instances = msg.instances
+		em.regionErrors = msg.regionErrors
 		em.filtered = applyFilter(em.instances, m.filterValue(filterEC2BrowserInstances))
 		em.idx = 0
 		em.selected = nil
@@ -154,6 +157,12 @@ func (em *ec2InstanceBrowserModel) updateList(m *Model, msg tea.KeyMsg) (tea.Mod
 	case "r":
 		m.resetFilter(filterEC2BrowserInstances)
 		return m.startLoading(em.loadInstances(*m))
+	case "A":
+		if m.hasMultipleRegions() {
+			em.allRegions = !em.allRegions
+			m.resetFilter(filterEC2BrowserInstances)
+			return m.startLoading(em.loadInstances(*m))
+		}
 	case "enter":
 		if len(em.filtered) > 0 && em.idx < len(em.filtered) {
 			selected := em.filtered[em.idx]
@@ -218,11 +227,21 @@ func (em *ec2InstanceBrowserModel) updateRelatedDetail(m *Model, msg tea.KeyMsg)
 }
 
 func (em ec2InstanceBrowserModel) loadInstances(m Model) tea.Cmd {
+	allRegions := em.allRegions && m.hasMultipleRegions()
+	var regions []string
+	if m.cfg != nil {
+		regions = append(regions, m.cfg.Regions...)
+	}
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
+		}
+
+		if allRegions {
+			instances, regionErrors := repo.ListEC2InstancesAcrossRegions(ctx, regions)
+			return ec2BrowserInstancesLoadedMsg{instances: instances, regionErrors: regionErrors}
 		}
 
 		instances, err := repo.ListEC2Instances(ctx)
@@ -247,6 +266,9 @@ func (em ec2InstanceBrowserModel) loadRelationships(m Model, inst awsservice.EC2
 		if err != nil {
 			return errMsg{err: err}
 		}
+		if inst.Region != "" && inst.Region != repo.Region {
+			repo = repo.ForRegion(inst.Region)
+		}
 		relationships, err := repo.DescribeEC2InstanceRelationships(ctx, inst)
 		if err != nil {
 			return errMsg{err: err}
@@ -259,12 +281,20 @@ func (em ec2InstanceBrowserModel) viewList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("EC2 Instance Browser"))
+	title := "EC2 Instance Browser"
+	if em.allRegions {
+		title += " (all regions)"
+	}
+	b.WriteString(titleStyle.Render(title))
 	b.WriteString("\n")
 
 	b.WriteString(m.renderFilterValue(filterEC2BrowserInstances))
 	b.WriteString("\n\n")
 
+	for _, regionErr := range em.regionErrors {
+		panel.WriteString(errorStyle.Render(fmt.Sprintf("  %s: %v", regionErr.Region, regionErr.Err)))
+		panel.WriteString("\n")
+	}
 	if len(em.filtered) == 0 {
 		emptyText := "  No EC2 instances found"
 		if len(em.instances) > 0 {
@@ -288,7 +318,11 @@ func (em ec2InstanceBrowserModel) viewList(m Model) string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterEC2BrowserInstances, inst.DisplayTitle())))
+			row := inst.DisplayTitle()
+			if em.allRegions {
+				row = fmt.Sprintf("[%s] %s", inst.Region, row)
+			}
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterEC2BrowserInstances, row)))
 			panel.WriteString("\n")
 		}
 
@@ -298,7 +332,11 @@ func (em ec2InstanceBrowserModel) viewList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: details • esc: back • H: home"))
+	helpText := "↑/↓: navigate • /: filter • r: refresh • enter: details • esc: back • H: home"
+	if m.hasMultipleRegions() {
+		helpText = "↑/↓: navigate • /: filter • r: refresh • A: all regions • enter: details • esc: back • H: home"
+	}
+	b.WriteString(m.renderHelpBar(helpText))
 	return b.String()
 }
 
@@ -316,6 +354,7 @@ func (em ec2InstanceBrowserModel) viewDetail(m Model) string {
 	b.WriteString(m.renderEC2DetailLine("Name", ec2ValueOrDash(inst.Name)))
 	b.WriteString(m.renderEC2StyledDetailLine("State", renderEC2InstanceState(inst.State)))
 	b.WriteString(m.renderEC2DetailLine("Type", ec2ValueOrDash(inst.InstanceType)))
+	b.WriteString(m.renderEC2DetailLine("Region", ec2ValueOrDash(inst.Region)))
 	b.WriteString(m.renderEC2DetailLine("AZ", ec2ValueOrDash(inst.AvailabilityZone)))
 	b.WriteString(m.renderEC2DetailLine("VPC", ec2ValueOrDash(inst.VPCID)))
 	b.WriteString(m.renderEC2DetailLine("Subnet", ec2ValueOrDash(inst.SubnetID)))
