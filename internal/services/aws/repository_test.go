@@ -4,10 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+
+	"unic/internal/config"
 )
 
 func TestLoadBaseConfig_ExplicitProfileOverridesEnvCredentials(t *testing.T) {
@@ -80,5 +83,16 @@ func TestLoadBaseConfig_UsesEnvCredentialsWhenProfileUnset(t *testing.T) {
 
 	if creds.AccessKeyID != "ENVKEY" {
 		t.Fatalf("expected env credentials, got %q from %q", creds.AccessKeyID, creds.Source)
+	}
+}
+
+func TestNewAwsRepositoryRejectsOktaSAMLForNow(t *testing.T) {
+	_, err := NewAwsRepository(context.Background(), &config.Config{
+		ContextName: "okta-prod",
+		AuthType:    config.AuthTypeOktaSAML,
+		Region:      "us-east-1",
+	})
+	if err == nil || !strings.Contains(err.Error(), "okta_saml") {
+		t.Fatalf("expected okta_saml not-implemented error, got %v", err)
 	}
 }

@@ -356,6 +356,11 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 			return nil, err
 		}
 
+	case config.AuthTypeOktaSAML:
+		// Schema-only for now: runtime credential exchange lands with the
+		// Okta SAML provider (#85).
+		return nil, fmt.Errorf("context %q uses okta_saml, whose runtime credential exchange is not implemented yet", cfg.ContextName)
+
 	default:
 		// Legacy / no auth_type — auto-detect from config fields.
 		// When a profile is configured, prefer it over ambient env credentials.
