@@ -278,6 +278,12 @@ type ecrRepositoriesLoadedMsg struct {
 	repositories []awsservice.ECRRepository
 }
 
+type ecrLoginResolvedMsg struct {
+	registryURI   string
+	dockerCommand string
+	podmanCommand string
+}
+
 type ecrImagesLoadedMsg struct {
 	repository string
 	images     []awsservice.ECRImage

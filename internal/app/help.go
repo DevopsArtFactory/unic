@@ -492,6 +492,13 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q", "Go back to the feature list"},
 			{"esc", "Go back to the image list"},
 		}
+	case screenECRLoginHelper:
+		return []helpShortcut{
+			{"c", "Copy the Docker login command"},
+			{"p", "Copy the Podman login command"},
+			{"r", "Re-resolve the registry and commands"},
+			{"q / esc", "Go back to the feature list"},
+		}
 	case screenFISTemplateList:
 		shortcuts := listScreenShortcuts("open the selected experiment template", "go back to the feature list", true, false)
 		return append(shortcuts[:3], append([]helpShortcut{
@@ -914,6 +921,8 @@ func (m Model) helpScreenTitle() string {
 		return "ECR Images"
 	case screenECRImageDetail:
 		return "ECR Image Detail"
+	case screenECRLoginHelper:
+		return "ECR Login Helper"
 	case screenFISTemplateList:
 		return "FIS Experiment Templates"
 	case screenFISTemplateDetail:

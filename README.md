@@ -96,7 +96,8 @@ eval "$(unic env prod-admin)"
 # Interactively choose/setup a context and copy exports to clipboard
 unic context setup
 
-# Print an ECR login command for the current context
+# Print an ECR login command for the current context (scripting helper;
+# the TUI's ECR Login Helper is the primary workflow)
 unic ecr login
 
 # Copy a Podman ECR login command to the clipboard
@@ -372,7 +373,7 @@ checks:
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
 | CloudWatch Metrics | preset-driven metric list/detail flow, `/` filter, `space` select related series, `g` preset cycle, `t/p/s` range-period-stat controls, `r` refresh, in-terminal single-series and comparison charts |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
-| ECR Login | CLI helper: `unic ecr login [--runtime docker|podman] [--copy]` |
+| ECR Login Helper | `c` copy Docker login command, `p` copy Podman login command, `r` refresh; CLI helper for scripting: `unic ecr login [--runtime docker|podman] [--copy]` |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
 | EKS Browser | cluster/node group/add-on lists support `/` filter and `r` refresh, cluster view shows version/status/endpoint visibility/ARN summary, `a` opens managed add-ons, `U` opens current-version upgrade readiness, `u` opens kubeconfig access helper, node group detail shows desired/min/max scaling plus health issues |
@@ -389,7 +390,7 @@ The service list defaults to favorites first, then alphabetical order. Press `f`
 
 The EKS Browser includes a managed add-on status view for each cluster. Add-on rows show the installed version, status, and health summary, with degraded or unhealthy add-ons highlighted so core components such as CoreDNS, kube-proxy, VPC CNI, and CSI drivers are easy to spot.
 
-The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
+The ECR Login Helper resolves the private registry URI for the active context and shows copyable Docker and Podman login commands without leaving the TUI; `unic ecr login` remains as a secondary CLI helper for scripting. The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
 
 The FIS Experiment Template Browser lists experiment templates in the active region and opens a detail screen with role ARN, targets, actions, target mappings, parameters, filters, and stop condition summaries without leaving the TUI. Template detail includes a Safe Run Preview that summarizes blast radius, target selection modes, action count, active stop conditions, IAM role, and warnings for missing stop conditions, missing role ARN, broad selection, or unbounded selectors. The preview also states the template ID that any future execution path must type to confirm before a run can start. Press `h` on a selected template or template detail to inspect recent runs for that template, or `H` from the template list to inspect recent experiment history across the active account/region. History rows include run status, timing, and stop/failure summaries, with failed, stopped, stopping, and cancelled runs visually highlighted; `Enter` opens run detail with start/end times, duration, action states, targets, stop conditions, and failure metadata.
 
@@ -402,6 +403,10 @@ The EC2 Instance Browser lists EC2 instances across available states for the act
 Bedrock API key management uses the active unic AWS context and IAM service-specific credential APIs for `bedrock.amazonaws.com`. The TUI lists long-term Bedrock API key metadata, opens a detail screen for inspection, defaults new key generation to the current IAM user when that user can be inferred from caller identity, and keeps another-user generation as an explicit option. Creation supports an optional expiration period, where blank or `0` means no expiration, rotates secrets with a one-time result screen, and deletes keys only after typed confirmation. Generated and rotated key values are intentionally copy-only and are not printed to the terminal; on the result screen, `c` copies the key and `e` copies `export AWS_BEARER_TOKEN_BEDROCK=...`.
 
 Reachability Analyzer starts with a region selection step, defaults to the current context region, and now surfaces the AWS-documented source and destination resource types that unic supports: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, plus IP addresses as destinations. The source and destination pickers support type tabs, keyword filtering, IPv4 destination validation, and automatic cleanup of temporary Network Insights resources after each analysis. During analysis, the loading screen shows a vertical source-to-destination flow and intent summary, and the result view renders path hops and findings in a more readable layout.
+
+## Product Principles
+
+- **TUI-first.** New user-facing AWS service capabilities ship with a TUI entry point first. CLI commands are secondary surfaces for scripting, automation, or copy/paste handoff, and should be documented as such.
 
 ## Development
 

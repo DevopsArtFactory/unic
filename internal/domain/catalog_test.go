@@ -244,3 +244,19 @@ func TestCatalogDoesNotContainInspectorPseudoService(t *testing.T) {
 		}
 	}
 }
+
+func TestCatalogContainsECRLoginHelperFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceECR {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureECRLoginHelper {
+				return
+			}
+		}
+		t.Error("ECR service should have ECR Login Helper feature")
+		return
+	}
+	t.Error("ECR service not found in catalog")
+}

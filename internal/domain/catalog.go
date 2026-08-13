@@ -94,6 +94,10 @@ func Catalog() []Service {
 					Kind:        FeatureECRRepositoryBrowser,
 					Description: "Browse ECR repositories and review image policy settings",
 				},
+				{
+					Kind:        FeatureECRLoginHelper,
+					Description: "Generate and copy a registry login command for the active context",
+				},
 			},
 		},
 		{

@@ -78,6 +78,7 @@ const (
 	screenECRRepositoryDetail
 	screenECRImageList
 	screenECRImageDetail
+	screenECRLoginHelper
 	screenFISTemplateList
 	screenFISTemplateDetail
 	screenFISExperimentList
@@ -670,6 +671,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.ecs.Start(&m)
 			case domain.FeatureECRRepositoryBrowser:
 				return m.ecr.Start(&m)
+			case domain.FeatureECRLoginHelper:
+				return m.ecr.StartLogin(&m)
 			case domain.FeatureEKSBrowser:
 				return m.eks.Start(&m)
 			case domain.FeatureFISTemplateBrowser:
