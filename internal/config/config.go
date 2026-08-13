@@ -68,6 +68,7 @@ type ContextEntry struct {
 	AuthType     string            `yaml:"auth_type,omitempty"`
 	RoleArn      string            `yaml:"role_arn,omitempty"`
 	ExternalID   string            `yaml:"external_id,omitempty"`
+	MFASerial    string            `yaml:"mfa_serial,omitempty"`
 	SSOStartURL  string            `yaml:"sso_start_url,omitempty"`
 	SSORegion    string            `yaml:"sso_region,omitempty"`
 	SSOAccountID string            `yaml:"sso_account_id,omitempty"`
@@ -83,6 +84,7 @@ type ContextAuth struct {
 	Profile      string `yaml:"profile,omitempty"`
 	RoleArn      string `yaml:"role_arn,omitempty"`
 	ExternalID   string `yaml:"external_id,omitempty"`
+	MFASerial    string `yaml:"mfa_serial,omitempty"`
 	SSOStartURL  string `yaml:"sso_start_url,omitempty"`
 	SSORegion    string `yaml:"sso_region,omitempty"`
 	SSOAccountID string `yaml:"sso_account_id,omitempty"`
@@ -105,6 +107,7 @@ type Config struct {
 	AuthType         AuthType
 	RoleArn          string
 	ExternalID       string
+	MFASerial        string
 	SSOStartURL      string
 	SSORegion        string
 	SSOAccountID     string
@@ -153,6 +156,7 @@ type ContextInfo struct {
 	AuthType     string
 	RoleArn      string
 	ExternalID   string
+	MFASerial    string
 	SSOStartURL  string
 	SSORegion    string
 	SSOAccountID string
@@ -164,6 +168,7 @@ type ContextInfo struct {
 
 type resolvedContextEntry struct {
 	Profile, Region, AuthType, RoleArn, ExternalID    string
+	MFASerial                                         string
 	SSOStartURL, SSORegion, SSOAccountID, SSORoleName string
 	Regions                                           []string
 }
@@ -172,6 +177,7 @@ func (c ContextEntry) resolved(defaultRegion string) resolvedContextEntry {
 	r := resolvedContextEntry{
 		Profile: c.Profile, Region: c.Region, AuthType: c.AuthType,
 		RoleArn: c.RoleArn, ExternalID: c.ExternalID,
+		MFASerial:   c.MFASerial,
 		SSOStartURL: c.SSOStartURL, SSORegion: c.SSORegion,
 		SSOAccountID: c.SSOAccountID, SSORoleName: c.SSORoleName,
 		Regions: c.Regions,
@@ -181,6 +187,7 @@ func (c ContextEntry) resolved(defaultRegion string) resolvedContextEntry {
 		r.Profile = c.Auth.Profile
 		r.RoleArn = c.Auth.RoleArn
 		r.ExternalID = c.Auth.ExternalID
+		r.MFASerial = c.Auth.MFASerial
 		r.SSOStartURL = c.Auth.SSOStartURL
 		r.SSORegion = c.Auth.SSORegion
 		r.SSOAccountID = c.Auth.SSOAccountID
@@ -251,7 +258,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	}
 
 	// New format: resolve current context
-	var contextName, roleArn, externalID, ssoStartURL, ssoRegion, ssoAccountID, ssoRoleName string
+	var contextName, roleArn, externalID, mfaSerial, ssoStartURL, ssoRegion, ssoAccountID, ssoRoleName string
 	var regions []string
 	var authType AuthType
 	if fc.Current != "" {
@@ -267,6 +274,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 				regions = resolved.Regions
 				roleArn = resolved.RoleArn
 				externalID = resolved.ExternalID
+				mfaSerial = resolved.MFASerial
 				ssoStartURL = resolved.SSOStartURL
 				ssoRegion = resolved.SSORegion
 				ssoAccountID = resolved.SSOAccountID
@@ -303,6 +311,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		AuthType:         authType,
 		RoleArn:          roleArn,
 		ExternalID:       externalID,
+		MFASerial:        mfaSerial,
 		SSOStartURL:      ssoStartURL,
 		SSORegion:        ssoRegion,
 		SSOAccountID:     ssoAccountID,
@@ -351,6 +360,7 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			AuthType:         normalizeAuthType(resolved.AuthType),
 			RoleArn:          resolved.RoleArn,
 			ExternalID:       resolved.ExternalID,
+			MFASerial:        resolved.MFASerial,
 			SSOStartURL:      resolved.SSOStartURL,
 			SSORegion:        resolved.SSORegion,
 			SSOAccountID:     resolved.SSOAccountID,
@@ -432,6 +442,7 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 			AuthType:     resolved.AuthType,
 			RoleArn:      resolved.RoleArn,
 			ExternalID:   resolved.ExternalID,
+			MFASerial:    resolved.MFASerial,
 			SSOStartURL:  resolved.SSOStartURL,
 			SSORegion:    resolved.SSORegion,
 			SSOAccountID: resolved.SSOAccountID,
