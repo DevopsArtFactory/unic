@@ -136,7 +136,23 @@ func promptOktaCredentials(orgURL string) (string, string, error) {
 
 type oktaAuthnResponse struct {
 	Status       string `json:"status"`
+	StateToken   string `json:"stateToken"`
 	SessionToken string `json:"sessionToken"`
+	FactorResult string `json:"factorResult"`
+	Embedded     struct {
+		Factors []oktaFactor `json:"factors"`
+	} `json:"_embedded"`
+}
+
+type oktaFactor struct {
+	ID         string `json:"id"`
+	FactorType string `json:"factorType"`
+	Provider   string `json:"provider"`
+	Links      struct {
+		Verify struct {
+			Href string `json:"href"`
+		} `json:"verify"`
+	} `json:"_links"`
 }
 
 // oktaPrimaryAuth performs Okta primary authentication and returns a one-time
@@ -177,11 +193,160 @@ func oktaPrimaryAuth(ctx context.Context, client *http.Client, orgURL, username,
 			return "", fmt.Errorf("okta returned SUCCESS without a session token")
 		}
 		return authn.SessionToken, nil
-	case "MFA_REQUIRED", "MFA_ENROLL":
-		return "", fmt.Errorf("okta requires an MFA challenge, which unic does not support yet (see issue #87)")
+	case "MFA_REQUIRED":
+		return oktaMFAChallenge(ctx, client, authn)
+	case "MFA_ENROLL":
+		return "", fmt.Errorf("okta account has no enrolled MFA factor; enroll one in Okta first")
 	default:
 		return "", fmt.Errorf("okta authentication ended in status %q", authn.Status)
 	}
+}
+
+// v1 MFA factor set: TOTP (token:software:totp) and Okta Verify push. TOTP is
+// preferred because it completes without waiting; other factor types are
+// rejected with an explicit list.
+const (
+	oktaFactorTOTP = "token:software:totp"
+	oktaFactorPush = "push"
+)
+
+var (
+	promptOktaMFACodeFn  = promptOktaMFACode
+	oktaPushPollInterval = 3 * time.Second
+	oktaPushPollTimeout  = 60 * time.Second
+)
+
+func promptOktaMFACode(factor oktaFactor) (string, error) {
+	fmt.Fprintf(os.Stderr, "Okta MFA code (%s %s): ", factor.Provider, factor.FactorType)
+	var code string
+	if _, err := fmt.Fscanln(os.Stdin, &code); err != nil {
+		return "", fmt.Errorf("failed to read MFA code: %w", err)
+	}
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return "", fmt.Errorf("MFA code is required")
+	}
+	return code, nil
+}
+
+func selectOktaFactor(factors []oktaFactor) (oktaFactor, error) {
+	var push *oktaFactor
+	for i, factor := range factors {
+		switch factor.FactorType {
+		case oktaFactorTOTP:
+			return factor, nil
+		case oktaFactorPush:
+			if push == nil {
+				push = &factors[i]
+			}
+		}
+	}
+	if push != nil {
+		return *push, nil
+	}
+	types := make([]string, 0, len(factors))
+	for _, factor := range factors {
+		types = append(types, factor.FactorType)
+	}
+	return oktaFactor{}, fmt.Errorf("no supported okta MFA factor found (available: %s); unic currently supports %s and %s",
+		strings.Join(types, ", "), oktaFactorTOTP, oktaFactorPush)
+}
+
+func oktaMFAChallenge(ctx context.Context, client *http.Client, authn oktaAuthnResponse) (string, error) {
+	factor, err := selectOktaFactor(authn.Embedded.Factors)
+	if err != nil {
+		return "", err
+	}
+	if factor.Links.Verify.Href == "" {
+		return "", fmt.Errorf("okta factor %s has no verify link", factor.FactorType)
+	}
+
+	switch factor.FactorType {
+	case oktaFactorTOTP:
+		code, err := promptOktaMFACodeFn(factor)
+		if err != nil {
+			return "", err
+		}
+		resp, err := oktaVerifyFactor(ctx, client, factor.Links.Verify.Href, map[string]string{
+			"stateToken": authn.StateToken,
+			"passCode":   code,
+		})
+		if err != nil {
+			return "", err
+		}
+		if resp.Status != "SUCCESS" || resp.SessionToken == "" {
+			return "", fmt.Errorf("okta MFA verification ended in status %q", resp.Status)
+		}
+		return resp.SessionToken, nil
+
+	case oktaFactorPush:
+		fmt.Fprintln(os.Stderr, "Push notification sent to Okta Verify; waiting for approval...")
+		deadline := time.Now().Add(oktaPushPollTimeout)
+		payload := map[string]string{"stateToken": authn.StateToken}
+		for {
+			resp, err := oktaVerifyFactor(ctx, client, factor.Links.Verify.Href, payload)
+			if err != nil {
+				return "", err
+			}
+			if resp.Status == "SUCCESS" && resp.SessionToken != "" {
+				return resp.SessionToken, nil
+			}
+			if resp.Status == "MFA_CHALLENGE" && resp.FactorResult == "WAITING" {
+				if time.Now().After(deadline) {
+					return "", fmt.Errorf("okta push approval timed out after %s", oktaPushPollTimeout)
+				}
+				select {
+				case <-ctx.Done():
+					return "", ctx.Err()
+				case <-time.After(oktaPushPollInterval):
+				}
+				continue
+			}
+			switch resp.FactorResult {
+			case "REJECTED":
+				return "", fmt.Errorf("okta push was rejected")
+			case "TIMEOUT":
+				return "", fmt.Errorf("okta push timed out")
+			default:
+				return "", fmt.Errorf("okta MFA verification ended in status %q (%s)", resp.Status, resp.FactorResult)
+			}
+		}
+
+	default:
+		return "", fmt.Errorf("unsupported okta MFA factor %q", factor.FactorType)
+	}
+}
+
+func oktaVerifyFactor(ctx context.Context, client *http.Client, href string, payload map[string]string) (oktaAuthnResponse, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return oktaAuthnResponse{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, href, bytes.NewReader(body))
+	if err != nil {
+		return oktaAuthnResponse{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return oktaAuthnResponse{}, fmt.Errorf("okta MFA verification request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
+		return oktaAuthnResponse{}, fmt.Errorf("okta rejected the MFA verification (status %d)", resp.StatusCode)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return oktaAuthnResponse{}, fmt.Errorf("okta MFA verification returned status %d", resp.StatusCode)
+	}
+
+	var verified oktaAuthnResponse
+	if err := json.NewDecoder(resp.Body).Decode(&verified); err != nil {
+		return oktaAuthnResponse{}, fmt.Errorf("failed to parse okta MFA verification response: %w", err)
+	}
+	return verified, nil
 }
 
 // oktaFetchSAMLAssertion loads the app embed link with the one-time session
