@@ -38,6 +38,7 @@ const (
 	screenReachabilityResult
 	screenRDSList
 	screenRDSDetail
+	screenRDSClassPicker
 	screenRDSConfirm
 	screenRoute53ZoneList
 	screenRoute53RecordList

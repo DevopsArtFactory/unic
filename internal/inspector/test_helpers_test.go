@@ -84,6 +84,22 @@ type mockRDSClient struct {
 	stopDBClusterFunc                  func(ctx context.Context, params *rds.StopDBClusterInput, optFns ...func(*rds.Options)) (*rds.StopDBClusterOutput, error)
 	startDBClusterFunc                 func(ctx context.Context, params *rds.StartDBClusterInput, optFns ...func(*rds.Options)) (*rds.StartDBClusterOutput, error)
 	failoverDBClusterFunc              func(ctx context.Context, params *rds.FailoverDBClusterInput, optFns ...func(*rds.Options)) (*rds.FailoverDBClusterOutput, error)
+	describeOrderableOptionsFunc       func(ctx context.Context, params *rds.DescribeOrderableDBInstanceOptionsInput, optFns ...func(*rds.Options)) (*rds.DescribeOrderableDBInstanceOptionsOutput, error)
+	modifyDBInstanceFunc               func(ctx context.Context, params *rds.ModifyDBInstanceInput, optFns ...func(*rds.Options)) (*rds.ModifyDBInstanceOutput, error)
+}
+
+func (m *mockRDSClient) DescribeOrderableDBInstanceOptions(ctx context.Context, params *rds.DescribeOrderableDBInstanceOptionsInput, optFns ...func(*rds.Options)) (*rds.DescribeOrderableDBInstanceOptionsOutput, error) {
+	if m.describeOrderableOptionsFunc != nil {
+		return m.describeOrderableOptionsFunc(ctx, params, optFns...)
+	}
+	return &rds.DescribeOrderableDBInstanceOptionsOutput{}, nil
+}
+
+func (m *mockRDSClient) ModifyDBInstance(ctx context.Context, params *rds.ModifyDBInstanceInput, optFns ...func(*rds.Options)) (*rds.ModifyDBInstanceOutput, error) {
+	if m.modifyDBInstanceFunc != nil {
+		return m.modifyDBInstanceFunc(ctx, params, optFns...)
+	}
+	return &rds.ModifyDBInstanceOutput{}, nil
 }
 
 func (m *mockRDSClient) DescribeDBInstances(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {

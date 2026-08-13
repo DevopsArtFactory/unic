@@ -159,3 +159,52 @@ func (r *AwsRepository) FailoverDBCluster(ctx context.Context, clusterID string)
 	}
 	return nil
 }
+
+// ListOrderableDBInstanceClasses returns the distinct DB instance classes
+// orderable for the given engine (and optional engine version) in the active
+// region, sorted alphabetically.
+func (r *AwsRepository) ListOrderableDBInstanceClasses(ctx context.Context, engine, engineVersion string) ([]string, error) {
+	uniclog.Debug("aws", "ListOrderableDBInstanceClasses called", "engine", engine, "engine_version", engineVersion)
+
+	input := &rds.DescribeOrderableDBInstanceOptionsInput{Engine: awssdk.String(engine)}
+	if engineVersion != "" {
+		input.EngineVersion = awssdk.String(engineVersion)
+	}
+
+	seen := make(map[string]struct{})
+	var classes []string
+	paginator := rds.NewDescribeOrderableDBInstanceOptionsPaginator(r.RDSClient, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list orderable DB instance classes: %w", err)
+		}
+		for _, option := range page.OrderableDBInstanceOptions {
+			class := awssdk.ToString(option.DBInstanceClass)
+			if class == "" {
+				continue
+			}
+			if _, ok := seen[class]; ok {
+				continue
+			}
+			seen[class] = struct{}{}
+			classes = append(classes, class)
+		}
+	}
+	sort.Strings(classes)
+	return classes, nil
+}
+
+// ModifyDBInstanceClass changes the DB instance class of an instance.
+func (r *AwsRepository) ModifyDBInstanceClass(ctx context.Context, dbInstanceID, instanceClass string, applyImmediately bool) error {
+	uniclog.Info("aws", "ModifyDBInstanceClass called", "instance", dbInstanceID, "class", instanceClass, "apply_immediately", applyImmediately)
+	_, err := r.RDSClient.ModifyDBInstance(ctx, &rds.ModifyDBInstanceInput{
+		DBInstanceIdentifier: awssdk.String(dbInstanceID),
+		DBInstanceClass:      awssdk.String(instanceClass),
+		ApplyImmediately:     awssdk.Bool(applyImmediately),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to modify DB instance class for %s: %w", dbInstanceID, err)
+	}
+	return nil
+}
