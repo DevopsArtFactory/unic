@@ -110,6 +110,11 @@ unic context order
 
 # Clear current context and copy cleanup commands to clipboard
 unic context unset
+
+# Generate contexts from the accounts/roles visible to an SSO base context
+unic context sync
+unic context sync dev-sso --dry-run
+unic context sync dev-sso --prune
 ```
 
 `unic context setup` writes its prompts to `stderr` and copies the generated shell commands to the clipboard.
@@ -119,6 +124,7 @@ Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the T
 Contexts can be prioritized in the setup picker with an `order` field in config.
 In the CLI `unic context setup` flow, the picker filters contexts, SSO accounts, SSO roles, and configured resource regions as you type, with arrow-key navigation and Enter to confirm. Multi-region contexts prompt for the shell session region after account/role selection; single-region contexts skip that step. The selection changes `AWS_REGION` and `AWS_DEFAULT_REGION` in the generated exports without modifying the context's persisted default region.
 Use `unic context order` to open reorder mode, choose a context with `↑/↓` or `j/k`, press `Enter` to start moving it, then press `Enter` again to save. `unic context order <name> <number>` still works for direct updates.
+`unic context sync [base-context]` lists the AWS accounts and roles visible to an SSO base context and adds a sync-managed concrete context for each new account/role pair, inheriting the base context's regions. When only one SSO base context exists the argument can be omitted. Existing contexts are never rewritten: pairs that already have a context (manual or synced) are kept as-is. Synced contexts carry a `sync_source: <base-context>` marker in `config.yaml`; when their account/role disappears from SSO they are reported as orphans and removed only with `--prune`. Use `--dry-run` to preview the plan without writing config.
 
 ## Configuration
 
@@ -223,6 +229,7 @@ Optional context fields:
 | Field | Meaning |
 |---|---|
 | `order` | Lower values appear first in the context setup picker. Contexts without `order` fall back after ordered entries in their existing file order. |
+| `sync_source` | Name of the SSO base context that generated this context via `unic context sync`. Marks the context as sync-managed: re-syncs may prune it (with `--prune`) when its account/role disappears from SSO. Contexts without this field are never touched by sync. |
 | `sso_region` | (SSO only) Region of the IAM Identity Center portal, used for SSO login and role-credential retrieval. Defaults to `region` when unset. Use it when the SSO portal and your resources live in different regions. |
 | `resources.regions` / `regions` | Additional resource regions available through the global `R` picker. The default resource region is always included automatically. |
 

@@ -42,6 +42,11 @@ Owns non-TUI commands:
   - live incremental filtering for large context/account/role lists
   - interactive context ordering via `unic context order`
   - can trigger `aws login` for `console_login` contexts
+- `unic context sync [base-context]`
+  - generates a sync-managed context for every account/role pair visible to an SSO base context
+  - generated contexts carry a `sync_source` marker to stay distinguishable from manual ones
+  - sync-managed contexts whose account/role disappeared are reported as orphans and removed only with `--prune`
+  - `--dry-run` prints the plan without writing config
 - `unic context unset`
 
 ### `internal/config/`
