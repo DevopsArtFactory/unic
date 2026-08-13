@@ -211,7 +211,7 @@ contexts:
 | `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
 | `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name`; `profile` is optional |
-| `okta_saml` | Okta SAML federation context (config schema only for now; runtime credential exchange is in progress) | `okta_org_url`, `okta_app_id`; optional `role_arn` for a preferred role. Passwords and MFA secrets are never stored in config |
+| `okta_saml` | Okta SAML federation: `unic env` signs in to Okta (prompt on stderr, password without echo; `UNIC_OKTA_USERNAME`/`UNIC_OKTA_PASSWORD` for automation), exchanges the SAML assertion via `sts:AssumeRoleWithSAML`, and caches the session under `~/.config/unic/cache/okta-saml/`. The TUI reuses a valid cached session passively. Okta MFA challenges are not supported yet | `okta_org_url`, `okta_app_id`; `role_arn` required when the assertion carries multiple roles. Passwords and MFA secrets are never stored |
 
 The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients.
 
