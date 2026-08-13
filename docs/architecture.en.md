@@ -160,7 +160,7 @@ Supporting files include `styles.go`, `filter.go`, and `messages.go`.
 
 ## Authentication Model
 
-UNIC supports four main auth modes.
+UNIC supports five main auth modes.
 
 ### `credential`
 
@@ -181,6 +181,15 @@ UNIC supports four main auth modes.
 - calls STS `AssumeRole`
 - `unic env` exports temporary session credentials
 - SDK clients are initialized with assumed-role credentials
+
+### `okta_saml`
+
+- SAML federation through an Okta AWS app
+- `unic env` runs Okta primary authentication and, when required, an MFA challenge (v1: TOTP and Okta Verify push)
+- the SAML assertion is fetched from the app embed link and exchanged via `sts:AssumeRoleWithSAML`
+- role selection is deterministic: `role_arn` wins, a single role is auto-selected, multiple roles error explicitly
+- only the exchanged AWS session credentials are cached under `~/.config/unic/cache/okta-saml/`; passwords, one-time codes, and Okta session tokens are never persisted
+- the TUI passively reuses a valid cached session and otherwise points at `unic env <context>`
 
 ### `sso`
 

@@ -4,7 +4,7 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 
 - AWS 리소스를 탐색하고 조작하는 Bubble Tea TUI
 - context setup / env export를 위한 Cobra CLI helper
-- credential, assume-role, SSO를 아우르는 context-aware 인증 흐름
+- credential, assume-role, SSO, Okta SAML을 아우르는 context-aware 인증 흐름
 
 ## 현재 범위
 
@@ -48,6 +48,7 @@ Inspector mode는 이제 built-in security scan과 함께 RDS, security group, s
 - AWS CLI `aws login` 기반 로컬 개발 profile을 위한 `console_login` 인증
 - `assume_role` 인증
 - `unic context setup`으로 concrete context를 만드는 `sso` 인증
+- Okta 앱 embed link와 `sts:AssumeRoleWithSAML`을 사용하는 `okta_saml` 인증 (v1 MFA: TOTP, Okta Verify push)
 
 ## 저장소 구조
 

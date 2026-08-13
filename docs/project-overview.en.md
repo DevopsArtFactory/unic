@@ -4,7 +4,7 @@ UNIC is a Go-based AWS terminal console that combines:
 
 - a Bubble Tea TUI for browsing and operating AWS resources
 - Cobra CLI helpers for context setup and environment export
-- context-aware authentication across credential, assume-role, and SSO workflows
+- context-aware authentication across credential, assume-role, SSO, and Okta SAML workflows
 
 ## Current Scope
 
@@ -48,6 +48,7 @@ The app supports:
 - `console_login` auth for AWS CLI `aws login`-backed local development profiles
 - `assume_role` auth
 - `sso` auth, including base contexts resolved by `unic context setup`
+- `okta_saml` auth using the Okta app embed link and `sts:AssumeRoleWithSAML` (v1 MFA: TOTP and Okta Verify push)
 
 ## Repository Layout
 
