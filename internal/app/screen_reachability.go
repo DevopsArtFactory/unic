@@ -419,67 +419,83 @@ func (rm *reachabilityModel) updateConfig(m *Model, msg tea.KeyMsg) (tea.Model, 
 	case "esc":
 		m.screen = screenReachabilityDestinationList
 	case "up", "k":
-		maxField := 1
-		if rm.destination != nil && rm.destination.ManualIP {
-			maxField = 2
-		}
-		rm.configField = previousListIndex(rm.configField, maxField+1)
+		rm.configField = previousListIndex(rm.configField, rm.configMaxField()+1)
 	case "down", "j", "tab":
-		maxField := 1
-		if rm.destination != nil && rm.destination.ManualIP {
-			maxField = 2
-		}
-		rm.configField = nextListIndex(rm.configField, maxField+1)
+		rm.configField = nextListIndex(rm.configField, rm.configMaxField()+1)
 	case "left", "h":
-		if rm.configField == 0 && rm.protocolIdx > 0 {
-			rm.protocolIdx--
-		}
+		rm.adjustConfigProtocol(-1)
 	case "right", "l":
-		if rm.configField == 0 && rm.protocolIdx < len(reachabilityProtocols)-1 {
-			rm.protocolIdx++
-		}
+		rm.adjustConfigProtocol(1)
 	case "backspace":
-		switch rm.configField {
-		case 1:
-			if len(rm.portInput) > 0 {
-				rm.portInput = rm.portInput[:len(rm.portInput)-1]
-			}
-		case 2:
-			if len(rm.destinationIP) > 0 {
-				rm.destinationIP = rm.destinationIP[:len(rm.destinationIP)-1]
-			}
-		}
+		rm.deleteConfigChar()
 	case "enter":
-		if rm.configField == 0 {
-			maxField := 1
-			if rm.destination != nil && rm.destination.ManualIP {
-				maxField = 2
-			}
-			if rm.configField < maxField {
-				rm.configField++
-				return *m, nil
-			}
-		}
-		return m.startLoadingWithMessage(
-			"Finding Network Path",
-			rm.loadingDetails(*m),
-			rm.runAnalysis(*m),
-		)
+		return rm.submitConfig(m)
 	default:
-		if len(msg.String()) == 1 {
-			switch rm.configField {
-			case 1:
-				if msg.String()[0] >= '0' && msg.String()[0] <= '9' {
-					rm.portInput += msg.String()
-				}
-			case 2:
-				if strings.ContainsRune("0123456789.", rune(msg.String()[0])) {
-					rm.destinationIP += msg.String()
-				}
-			}
-		}
+		rm.appendConfigChar(msg.String())
 	}
 	return *m, nil
+}
+
+// configMaxField returns the last selectable config field index; manual-IP
+// destinations expose an extra destination-IP field.
+func (rm *reachabilityModel) configMaxField() int {
+	if rm.destination != nil && rm.destination.ManualIP {
+		return 2
+	}
+	return 1
+}
+
+func (rm *reachabilityModel) adjustConfigProtocol(delta int) {
+	if rm.configField != 0 {
+		return
+	}
+	next := rm.protocolIdx + delta
+	if next >= 0 && next < len(reachabilityProtocols) {
+		rm.protocolIdx = next
+	}
+}
+
+func (rm *reachabilityModel) deleteConfigChar() {
+	switch rm.configField {
+	case 1:
+		if len(rm.portInput) > 0 {
+			rm.portInput = rm.portInput[:len(rm.portInput)-1]
+		}
+	case 2:
+		if len(rm.destinationIP) > 0 {
+			rm.destinationIP = rm.destinationIP[:len(rm.destinationIP)-1]
+		}
+	}
+}
+
+func (rm *reachabilityModel) appendConfigChar(key string) {
+	if len(key) != 1 {
+		return
+	}
+	switch rm.configField {
+	case 1:
+		if key[0] >= '0' && key[0] <= '9' {
+			rm.portInput += key
+		}
+	case 2:
+		if strings.ContainsRune("0123456789.", rune(key[0])) {
+			rm.destinationIP += key
+		}
+	}
+}
+
+// submitConfig advances from the protocol field to the next input field, and
+// starts the analysis when pressed on an input field.
+func (rm *reachabilityModel) submitConfig(m *Model) (tea.Model, tea.Cmd) {
+	if rm.configField == 0 && rm.configField < rm.configMaxField() {
+		rm.configField++
+		return *m, nil
+	}
+	return m.startLoadingWithMessage(
+		"Finding Network Path",
+		rm.loadingDetails(*m),
+		rm.runAnalysis(*m),
+	)
 }
 
 func (rm *reachabilityModel) updateResult(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
