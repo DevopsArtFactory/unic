@@ -22,6 +22,9 @@ type ecrModel struct {
 	imageIdx             int
 	selectedImage        *awsservice.ECRImage
 	copyMsg              string
+	loginRegistryURI     string
+	loginDockerCommand   string
+	loginPodmanCommand   string
 }
 
 func newECRModel() ecrModel {
@@ -30,6 +33,10 @@ func newECRModel() ecrModel {
 
 func (em *ecrModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	return m.startLoading(em.loadRepositories(*m))
+}
+
+func (em *ecrModel) StartLogin(m *Model) (tea.Model, tea.Cmd) {
+	return m.startLoading(em.loadLoginCommands(*m))
 }
 
 func (em *ecrModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -57,6 +64,13 @@ func (em *ecrModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		m.resetFilter(filterECRImages)
 		m.screen = screenECRImageList
 		return *m, nil, true
+	case ecrLoginResolvedMsg:
+		em.loginRegistryURI = msg.registryURI
+		em.loginDockerCommand = msg.dockerCommand
+		em.loginPodmanCommand = msg.podmanCommand
+		em.copyMsg = ""
+		m.screen = screenECRLoginHelper
+		return *m, nil, true
 	}
 	return *m, nil, false
 }
@@ -75,6 +89,9 @@ func (em *ecrModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, boo
 	case screenECRImageDetail:
 		newM, cmd := em.updateImageDetail(m, msg)
 		return newM, cmd, true
+	case screenECRLoginHelper:
+		newM, cmd := em.updateLoginHelper(m, msg)
+		return newM, cmd, true
 	default:
 		return *m, nil, false
 	}
@@ -90,6 +107,8 @@ func (em ecrModel) View(m Model) (string, bool) {
 		return em.viewImageList(m), true
 	case screenECRImageDetail:
 		return em.viewImageDetail(m), true
+	case screenECRLoginHelper:
+		return em.viewLoginHelper(m), true
 	default:
 		return "", false
 	}
@@ -225,6 +244,93 @@ func (em *ecrModel) updateImageDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.
 		}
 	}
 	return *m, nil
+}
+
+func (em *ecrModel) updateLoginHelper(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		em.copyMsg = ""
+		m.screen = screenFeatureList
+	case "r":
+		return m.startLoading(em.loadLoginCommands(*m))
+	case "c":
+		em.copyLoginCommand("Docker", em.loginDockerCommand)
+	case "p":
+		em.copyLoginCommand("Podman", em.loginPodmanCommand)
+	}
+	return *m, nil
+}
+
+func (em *ecrModel) copyLoginCommand(runtime, command string) {
+	if command == "" {
+		em.copyMsg = fmt.Sprintf("No %s login command available", runtime)
+		return
+	}
+	if err := clipboard.Copy(command); err != nil {
+		em.copyMsg = fmt.Sprintf("Clipboard error: %s", err)
+		return
+	}
+	em.copyMsg = fmt.Sprintf("Copied %s login command to clipboard", runtime)
+}
+
+func (em *ecrModel) loadLoginCommands(m Model) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		registryURI, _, err := awsservice.ResolvePrivateECRRegistryURI(ctx, m.cfg)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		docker, err := awsservice.BuildECRLoginCommand(registryURI, m.cfg.Region, awsservice.ECRRuntimeDocker)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		podman, err := awsservice.BuildECRLoginCommand(registryURI, m.cfg.Region, awsservice.ECRRuntimePodman)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return ecrLoginResolvedMsg{
+			registryURI:   registryURI,
+			dockerCommand: withContextEnv(m.cfg.ContextName, docker),
+			podmanCommand: withContextEnv(m.cfg.ContextName, podman),
+		}
+	}
+}
+
+// withContextEnv prefixes a copied command with the active context's shell
+// exports. The registry URI is resolved with the unic context's credentials,
+// but `aws ecr get-login-password` runs with the shell's ambient credentials —
+// without this prefix the copied command could log in to a different account.
+func withContextEnv(contextName, command string) string {
+	if contextName == "" {
+		return command
+	}
+	return fmt.Sprintf("eval \"$(unic env %s)\" && %s", contextName, command)
+}
+
+func (em ecrModel) viewLoginHelper(m Model) string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render("ECR Login Helper"))
+	b.WriteString("\n\n")
+	b.WriteString(dimStyle.Render("  Registry  "))
+	b.WriteString(normalStyle.Render(em.loginRegistryURI))
+	b.WriteString("\n\n")
+	b.WriteString(dimStyle.Render("  Docker"))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render("  " + em.loginDockerCommand))
+	b.WriteString("\n\n")
+	b.WriteString(dimStyle.Render("  Podman"))
+	b.WriteString("\n")
+	b.WriteString(normalStyle.Render("  " + em.loginPodmanCommand))
+	b.WriteString("\n")
+	if em.copyMsg != "" {
+		b.WriteString("\n")
+		b.WriteString(selectedStyle.Render("  " + em.copyMsg))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(m.renderHelpBar("c: copy docker • p: copy podman • r: refresh • esc: back • H: home"))
+	return b.String()
 }
 
 func (em *ecrModel) loadRepositories(m Model) tea.Cmd {
