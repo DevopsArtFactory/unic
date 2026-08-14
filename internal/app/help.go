@@ -87,6 +87,9 @@ func (m Model) globalHelpShortcuts() []helpShortcut {
 	if m.canSwitchResourceRegion() {
 		shortcuts = append(shortcuts, helpShortcut{"R", "Switch the active resource region"})
 	}
+	if m.screen != screenCommandPalette && !m.isTextEntryScreen() {
+		shortcuts = append(shortcuts, helpShortcut{"P", "Open the command palette"})
+	}
 	return shortcuts
 }
 
@@ -741,6 +744,13 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"esc", "Go back to the account list"},
 			{"q", "Cancel and return to the context picker"},
 		}
+	case screenCommandPalette:
+		return []helpShortcut{
+			{"type", "Fuzzy-search features, contexts, and resources"},
+			{"↑/↓", "Move between results"},
+			{"enter", "Jump to the selected result"},
+			{"esc", "Close the palette"},
+		}
 	case screenRegionPicker:
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between configured resource regions"},
@@ -998,6 +1008,8 @@ func (m Model) helpScreenTitle() string {
 		return "Select SSO Role"
 	case screenRegionPicker:
 		return "Resource Region Picker"
+	case screenCommandPalette:
+		return "Command Palette"
 	case screenSettings:
 		return "Settings"
 	case screenLoading:
