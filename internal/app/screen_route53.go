@@ -219,9 +219,7 @@ func (rm *route53Model) updateRecordDetail(m *Model, msg tea.KeyMsg) (tea.Model,
 	case "q", "esc":
 		m.screen = screenRoute53RecordList
 	case "e":
-		// Edit only for A/CNAME non-alias records
-		if rm.selectedRecord != nil && rm.selectedRecord.AliasTarget == "" &&
-			(rm.selectedRecord.Type == "A" || rm.selectedRecord.Type == "CNAME") {
+		if rm.canEditSelectedRecord() {
 			rm.action = "edit"
 			rm.editField = 0
 			rm.editValues = map[string]string{
@@ -232,9 +230,7 @@ func (rm *route53Model) updateRecordDetail(m *Model, msg tea.KeyMsg) (tea.Model,
 			m.screen = screenRoute53RecordEdit
 		}
 	case "d":
-		// Delete allowed for non-NS/SOA records
-		if rm.selectedRecord != nil &&
-			rm.selectedRecord.Type != "NS" && rm.selectedRecord.Type != "SOA" {
+		if rm.canDeleteSelectedRecord() {
 			rm.action = "delete"
 			rm.confirmInput = ""
 			m.screen = screenRoute53RecordDeleteConfirm

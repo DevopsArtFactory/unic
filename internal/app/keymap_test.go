@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"unic/internal/config"
 	awsservice "unic/internal/services/aws"
 )
@@ -93,5 +95,62 @@ func TestLegacyScreensStillUseTheSwitch(t *testing.T) {
 	}
 	if len(m.currentScreenShortcuts()) == 0 {
 		t.Fatal("expected legacy shortcuts to keep working")
+	}
+}
+
+func TestKeymapEligibilityBoundariesMatchBehavior(t *testing.T) {
+	cases := []struct {
+		name      string
+		record    awsservice.DNSRecord
+		canEdit   bool
+		canDelete bool
+	}{
+		{"plain A", awsservice.DNSRecord{Type: "A"}, true, true},
+		{"alias A", awsservice.DNSRecord{Type: "A", AliasTarget: "elb.amazonaws.com"}, false, true},
+		{"plain CNAME", awsservice.DNSRecord{Type: "CNAME"}, true, true},
+		{"SOA", awsservice.DNSRecord{Type: "SOA"}, false, false},
+		{"NS", awsservice.DNSRecord{Type: "NS"}, false, false},
+	}
+	for _, tc := range cases {
+		m := keymapTestModel()
+		m.screen = screenRoute53RecordDetail
+		record := tc.record
+		m.route53.selectedRecord = &record
+
+		bar := m.keymapHelpBar()
+		if strings.Contains(bar, "e: edit") != tc.canEdit {
+			t.Fatalf("%s: help edit visibility mismatch, bar=%q", tc.name, bar)
+		}
+		if strings.Contains(bar, "d: delete") != tc.canDelete {
+			t.Fatalf("%s: help delete visibility mismatch, bar=%q", tc.name, bar)
+		}
+
+		// Behavior follows the same predicates: keys act exactly when shown.
+		next, _ := m.route53.updateRecordDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+		if entered := next.(Model).screen == screenRoute53RecordEdit; entered != tc.canEdit {
+			t.Fatalf("%s: edit key behavior mismatch, entered=%v", tc.name, entered)
+		}
+		m.screen = screenRoute53RecordDetail
+		next, _ = m.route53.updateRecordDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+		if entered := next.(Model).screen == screenRoute53RecordDeleteConfirm; entered != tc.canDelete {
+			t.Fatalf("%s: delete key behavior mismatch, entered=%v", tc.name, entered)
+		}
+	}
+}
+
+func TestKeymapIAMRotationHiddenWhenIneligible(t *testing.T) {
+	m := keymapTestModel()
+	m.screen = screenIAMKeyDetail
+
+	m.iam.rotationEnabled = false
+	m.iam.selectedKey = &awsservice.AccessKey{Status: "Active"}
+	if strings.Contains(m.keymapHelpBar(), "r: rotate") {
+		t.Fatal("expected rotation hidden when the workflow is disabled")
+	}
+
+	m.iam.rotationEnabled = true
+	m.iam.selectedKey = &awsservice.AccessKey{Status: "Inactive"}
+	if strings.Contains(m.keymapHelpBar(), "r: rotate") {
+		t.Fatal("expected rotation hidden for inactive keys")
 	}
 }
