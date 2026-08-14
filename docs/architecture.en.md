@@ -186,6 +186,8 @@ UNIC supports four main auth modes.
 - calls STS `AssumeRole`
 - `unic env` exports temporary session credentials
 - SDK clients are initialized with assumed-role credentials
+- with `mfa_serial` set, CLI flows (`unic env`, `unic context setup`) prompt for a token code on stderr and cache the session credentials under `~/.config/unic/cache/assume-role/` until expiry
+- the TUI passively reuses a valid cached session and otherwise fails with a pointer to `unic env <context>`
 
 ### `sso`
 
@@ -198,7 +200,7 @@ Two shapes exist:
    - includes `sso_account_id` and `sso_role_name`
    - can produce direct environment exports and SDK credentials
 
-Contexts can use the structured `auth` and `resources` sections to keep identity independent from resource location. `auth.sso_region` is used for SSO login and `GetRoleCredentials`; `resources.default_region` is the initial resource region, and `resources.regions` defines the regions available to the runtime picker. Switching regions reuses the credentials provider and only recreates regional SDK clients.
+Contexts can use the structured `auth` and `resources` sections to keep identity independent from resource location. `auth.sso_region` is used for SSO login and `GetRoleCredentials`; `resources.default_region` is the initial resource region, and `resources.regions` defines the regions available to the runtime picker. Switching regions reuses the credentials provider and only recreates regional SDK clients. The EC2 Instance Browser can additionally toggle an all-regions scope with `A`, merging instances from every configured region into one list while reporting per-region query failures inline without hiding other regions' results.
 
 `unic context setup` also treats the active resource region as session state. After any required SSO account and role selection, multi-region contexts prompt for a resource region and export it through `AWS_REGION` and `AWS_DEFAULT_REGION`. The persisted default region is unchanged, and single-region contexts skip the picker.
 

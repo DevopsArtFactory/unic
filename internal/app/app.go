@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"unic/internal/config"
 	"unic/internal/domain"
+	uniclog "unic/internal/log"
 	awsservice "unic/internal/services/aws"
 	"unic/internal/update"
 )
@@ -293,7 +294,10 @@ var appLoadCallerIdentityFn = func(m Model) tea.Cmd {
 func (m Model) checkForUpdate() tea.Cmd {
 	return func() tea.Msg {
 		method := update.DetectInstallMethod()
-		newVersion := update.CheckForUpdate(m.currentVersion)
+		newVersion, err := update.CheckForUpdate(m.currentVersion)
+		if err != nil {
+			uniclog.Info("app", "update check failed", "error", err.Error())
+		}
 		return updateAvailableMsg{version: newVersion, method: method}
 	}
 }

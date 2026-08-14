@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -301,3 +302,74 @@ func containsSubstr(s, sub string) bool {
 	}
 	return false
 }
+
+func regionEC2Mock(region, instanceID string) *mockEC2Client {
+	return &mockEC2Client{
+		describeInstancesFunc: func(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
+			return &ec2.DescribeInstancesOutput{
+				Reservations: []types.Reservation{
+					{
+						Instances: []types.Instance{
+							{
+								InstanceId: aws.String(instanceID),
+								Tags:       []types.Tag{{Key: aws.String("Name"), Value: aws.String(region + "-web")}},
+							},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+}
+
+func TestListEC2InstancesAcrossRegions_MergesAndTagsRegions(t *testing.T) {
+	base := &AwsRepository{Region: "us-east-1", EC2Client: regionEC2Mock("us-east-1", "i-east")}
+	west := &AwsRepository{Region: "eu-west-1", EC2Client: regionEC2Mock("eu-west-1", "i-west")}
+
+	original := ec2RepoForRegion
+	defer func() { ec2RepoForRegion = original }()
+	ec2RepoForRegion = func(r *AwsRepository, region string) *AwsRepository {
+		if region != "eu-west-1" {
+			t.Fatalf("unexpected region requested: %s", region)
+		}
+		return west
+	}
+
+	instances, regionErrors := base.ListEC2InstancesAcrossRegions(context.Background(), []string{"us-east-1", "eu-west-1"})
+	if len(regionErrors) != 0 {
+		t.Fatalf("unexpected region errors: %+v", regionErrors)
+	}
+	if len(instances) != 2 {
+		t.Fatalf("expected 2 instances, got %d", len(instances))
+	}
+	regions := map[string]string{}
+	for _, inst := range instances {
+		regions[inst.InstanceID] = inst.Region
+	}
+	if regions["i-east"] != "us-east-1" || regions["i-west"] != "eu-west-1" {
+		t.Fatalf("expected per-region tagging, got %+v", regions)
+	}
+}
+
+func TestListEC2InstancesAcrossRegions_KeepsPartialResultsOnFailure(t *testing.T) {
+	base := &AwsRepository{Region: "us-east-1", EC2Client: regionEC2Mock("us-east-1", "i-east")}
+	broken := &AwsRepository{Region: "eu-west-1", EC2Client: &mockEC2Client{
+		describeInstancesFunc: func(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
+			return nil, errRegionDown
+		},
+	}}
+
+	original := ec2RepoForRegion
+	defer func() { ec2RepoForRegion = original }()
+	ec2RepoForRegion = func(_ *AwsRepository, _ string) *AwsRepository { return broken }
+
+	instances, regionErrors := base.ListEC2InstancesAcrossRegions(context.Background(), []string{"us-east-1", "eu-west-1"})
+	if len(instances) != 1 || instances[0].InstanceID != "i-east" {
+		t.Fatalf("expected the healthy region's instances to survive, got %+v", instances)
+	}
+	if len(regionErrors) != 1 || regionErrors[0].Region != "eu-west-1" || regionErrors[0].Err != errRegionDown {
+		t.Fatalf("expected one eu-west-1 error, got %+v", regionErrors)
+	}
+}
+
+var errRegionDown = errors.New("region down")

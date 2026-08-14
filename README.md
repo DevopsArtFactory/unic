@@ -197,6 +197,7 @@ contexts:
     auth_type: assume_role
     role_arn: arn:aws:iam::123456789012:role/Admin
     external_id: optional-external-id
+    mfa_serial: arn:aws:iam::123456789012:mfa/my-user   # optional: MFA-protected roles
 
   - name: local-dev
     profile: local-dev
@@ -215,10 +216,10 @@ contexts:
 |---|---|---|
 | `credential` | Use shared AWS profile credentials | `profile` |
 | `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
-| `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
+| `assume_role` | Assume a role from a base profile, optionally with MFA | `profile`, `role_arn`; optional `mfa_serial` |
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name`; `profile` is optional |
 
-The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients.
+The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients. The EC2 Instance Browser can additionally aggregate all configured regions into a single list with `A`.
 
 Legacy flat fields (`auth_type`, `profile`, `region`, `regions`, `sso_region`, and related auth fields) remain supported. A context without a region list behaves as a single-region context, and an omitted SSO region still falls back to its default resource region.
 
@@ -231,6 +232,7 @@ Optional context fields:
 | `order` | Lower values appear first in the context setup picker. Contexts without `order` fall back after ordered entries in their existing file order. |
 | `sync_source` | Name of the SSO base context that generated this context via `unic context sync`. Marks the context as sync-managed: re-syncs may prune it (with `--prune`) when its account/role disappears from SSO. Contexts without this field are never touched by sync. |
 | `sso_region` | (SSO only) Region of the IAM Identity Center portal, used for SSO login and role-credential retrieval. Defaults to `region` when unset. Use it when the SSO portal and your resources live in different regions. |
+| `mfa_serial` | (assume_role only) ARN of the MFA device required by the role's trust policy. CLI flows (`unic env`, `unic context setup`) prompt for a token code on stderr and cache the resulting session under `~/.config/unic/cache/assume-role/` until it expires. The TUI reuses a valid cached session passively and otherwise asks you to run `unic env <context>` first. |
 | `resources.regions` / `regions` | Additional resource regions available through the global `R` picker. The default resource region is always included automatically. |
 
 Resolution priority:
@@ -370,7 +372,7 @@ checks:
 | Area | Keys |
 |---|---|
 | EC2 SSM | `r` refresh, `Enter` connect |
-| EC2 Instance Browser | `r` refresh, `/` filter, `Enter` detail, detail `g/a/t/b/n` opens related security groups/ASG/target groups/load balancers/listeners |
+| EC2 Instance Browser | `r` refresh, `/` filter, `A` toggle all-regions scope (multi-region contexts), `Enter` detail, detail `g/a/t/b/n` opens related security groups/ASG/target groups/load balancers/listeners |
 | Security Groups | `a` add rule, `d` delete rule, `Tab` switch ingress/egress |
 | Reachability Analyzer | Region select first, `←`/`→` or `Tab` change type, `/` filter, `Enter` advance, `Tab`/`↑`/`↓` move config fields, `←`/`→` protocol, `r` rerun |
 | RDS | `s` start, `x` stop, `f` failover, `r` refresh |
@@ -404,7 +406,7 @@ The EKS Browser includes a current-version upgrade readiness view for each selec
 
 The EKS Browser includes an access helper for each selected cluster. Press `u` from the cluster list to review the cluster endpoint, ARN, current region/profile, and copy an `aws eks update-kubeconfig` command or a `kubectl get nodes` smoke-check command for handoff into Kubernetes workflows.
 
-The EC2 Instance Browser lists EC2 instances across available states for the active context and region, separate from the SSM session picker that only lists connectable running instances. The detail screen shows core metadata including instance ID, name tag, state, instance type, AZ, VPC, subnet, security groups, private and public IPs, launch time, platform details, IAM profile, and tags. From instance detail, related-resource drill-down screens open attached security groups (`g`), Auto Scaling membership (`a`), registered target groups (`t`), associated load balancers (`b`), and listeners (`n`). Related lists support filtering, refresh, wrap navigation, empty states for missing associations, and inline errors when a relationship cannot be loaded because of API or permission failures.
+The EC2 Instance Browser lists EC2 instances across available states for the active context and region, separate from the SSM session picker that only lists connectable running instances. For multi-region contexts, press `A` to toggle an all-regions scope that lists instances from every configured resource region in one view: rows gain a region tag, per-region API failures are shown inline without hiding other regions' results, and detail and related-resource drill-downs query the selected instance's own region. The detail screen shows core metadata including instance ID, name tag, state, instance type, AZ, VPC, subnet, security groups, private and public IPs, launch time, platform details, IAM profile, and tags. From instance detail, related-resource drill-down screens open attached security groups (`g`), Auto Scaling membership (`a`), registered target groups (`t`), associated load balancers (`b`), and listeners (`n`). Related lists support filtering, refresh, wrap navigation, empty states for missing associations, and inline errors when a relationship cannot be loaded because of API or permission failures.
 
 Bedrock API key management uses the active unic AWS context and IAM service-specific credential APIs for `bedrock.amazonaws.com`. The TUI lists long-term Bedrock API key metadata, opens a detail screen for inspection, defaults new key generation to the current IAM user when that user can be inferred from caller identity, and keeps another-user generation as an explicit option. Creation supports an optional expiration period, where blank or `0` means no expiration, rotates secrets with a one-time result screen, and deletes keys only after typed confirmation. Generated and rotated key values are intentionally copy-only and are not printed to the terminal; on the result screen, `c` copies the key and `e` copies `export AWS_BEARER_TOKEN_BEDROCK=...`.
 
