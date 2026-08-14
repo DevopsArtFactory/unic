@@ -181,6 +181,8 @@ UNIC supports four main auth modes.
 - calls STS `AssumeRole`
 - `unic env` exports temporary session credentials
 - SDK clients are initialized with assumed-role credentials
+- with `mfa_serial` set, CLI flows (`unic env`, `unic context setup`) prompt for a token code on stderr and cache the session credentials under `~/.config/unic/cache/assume-role/` until expiry
+- the TUI passively reuses a valid cached session and otherwise fails with a pointer to `unic env <context>`
 
 ### `sso`
 

@@ -174,6 +174,8 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - STS `AssumeRole` 호출
 - `unic env`는 임시 세션 자격증명을 export
 - SDK client는 assume-role 결과 자격증명으로 초기화
+- `mfa_serial`이 설정되면 CLI 흐름(`unic env`, `unic context setup`)이 stderr로 token code를 물어보고, 세션 자격증명을 `~/.config/unic/cache/assume-role/`에 만료 시각까지 캐시한다
+- TUI는 유효한 캐시 세션을 passive하게 재사용하고, 캐시가 없으면 `unic env <context>`를 먼저 실행하라는 에러를 보여준다
 
 ### `console_login`
 
