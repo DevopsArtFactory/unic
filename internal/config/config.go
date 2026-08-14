@@ -27,7 +27,20 @@ type fileConfig struct {
 	Defaults  fileDefaults   `yaml:"defaults"`
 	Favorites fileFavorites  `yaml:"favorites,omitempty"`
 	UI        fileUI         `yaml:"ui,omitempty"`
+	Views     []ViewEntry    `yaml:"views,omitempty"`
 	Contexts  []contextEntry `yaml:"contexts"`
+}
+
+// ViewEntry is a saved operational view: a jump target (service feature, an
+// optional context to switch into, and an optional prefilled filter) that can
+// be reapplied in one step. The format is additive: future fields extend it
+// without breaking existing files.
+type ViewEntry struct {
+	Name    string `yaml:"name"`
+	Context string `yaml:"context,omitempty"`
+	Service string `yaml:"service"`
+	Feature string `yaml:"feature"`
+	Filter  string `yaml:"filter,omitempty"`
 }
 
 type fileDefaults struct {
@@ -845,6 +858,53 @@ func SetBootSplashEnabled(configPath string, enabled bool) error {
 func SetBootSplashSeenVersion(configPath, version string) error {
 	return mutateFileConfig(configPath, defaultsIfMissing, func(fc *fileConfig) error {
 		fc.UI.LastBootSplashVersion = strings.TrimSpace(version)
+		return nil
+	})
+}
+
+// Views returns the saved views from config, in file order.
+func Views(configPath string) ([]ViewEntry, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read config: %w", err)
+	}
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+	return fc.Views, nil
+}
+
+// SaveView adds a view or replaces an existing one with the same name.
+func SaveView(configPath string, view ViewEntry) error {
+	if strings.TrimSpace(view.Name) == "" {
+		return fmt.Errorf("view name is required")
+	}
+	return mutateFileConfig(configPath, defaultsIfMissing, func(fc *fileConfig) error {
+		for i := range fc.Views {
+			if fc.Views[i].Name == view.Name {
+				fc.Views[i] = view
+				return nil
+			}
+		}
+		fc.Views = append(fc.Views, view)
+		return nil
+	})
+}
+
+// DeleteView removes the named view; deleting a missing view is not an error.
+func DeleteView(configPath, name string) error {
+	return mutateFileConfig(configPath, failIfMissing, func(fc *fileConfig) error {
+		kept := fc.Views[:0]
+		for _, view := range fc.Views {
+			if view.Name != name {
+				kept = append(kept, view)
+			}
+		}
+		fc.Views = kept
 		return nil
 	})
 }
