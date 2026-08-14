@@ -544,3 +544,58 @@ func TestRunChecklistLogGroupAndBaselineChecks(t *testing.T) {
 		t.Fatalf("expected baseline finding details, got %+v", report.Results[3].Details)
 	}
 }
+
+func TestAppendCheckCreatesValidatesAndRoundTrips(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "custom.yaml")
+
+	check := ChecklistCheck{
+		Type:     ChecklistCheckRDS,
+		Resource: "prod-db",
+		Expect:   ChecklistExpectations{StorageEncrypted: boolPtr(true)},
+	}
+	if err := AppendCheck(path, check); err != nil {
+		t.Fatalf("unexpected error creating checklist: %v", err)
+	}
+
+	second := ChecklistCheck{
+		Type:     ChecklistCheckCloudWatchLogGroup,
+		Resource: "/aws/ecs/app",
+		Expect:   ChecklistExpectations{RetentionDays: intPtr(30)},
+	}
+	if err := AppendCheck(path, second); err != nil {
+		t.Fatalf("unexpected error appending: %v", err)
+	}
+
+	loaded, err := LoadChecklist(path)
+	if err != nil {
+		t.Fatalf("expected generated file to load through validation: %v", err)
+	}
+	if len(loaded.Checks) != 2 || loaded.Checks[1].Resource != "/aws/ecs/app" {
+		t.Fatalf("expected both checks persisted, got %+v", loaded.Checks)
+	}
+}
+
+func TestAppendCheckRejectsInvalidWithoutWriting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "custom.yaml")
+	valid := ChecklistCheck{
+		Type:     ChecklistCheckRDS,
+		Resource: "prod-db",
+		Expect:   ChecklistExpectations{StorageEncrypted: boolPtr(true)},
+	}
+	if err := AppendCheck(path, valid); err != nil {
+		t.Fatal(err)
+	}
+
+	invalid := ChecklistCheck{Type: ChecklistCheckRDS, Resource: "no-expectations"}
+	if err := AppendCheck(path, invalid); err == nil {
+		t.Fatal("expected validation rejection for a check without expectations")
+	}
+
+	loaded, err := LoadChecklist(path)
+	if err != nil || len(loaded.Checks) != 1 {
+		t.Fatalf("expected file untouched after rejection, got %+v err=%v", loaded, err)
+	}
+}
+
+func boolPtr(v bool) *bool { return &v }
+func intPtr(v int) *int    { return &v }

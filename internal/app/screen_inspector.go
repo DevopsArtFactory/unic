@@ -49,6 +49,15 @@ type inspectorModel struct {
 	checklistReport         *inspector.ChecklistReport
 	checklistIdx            int
 	selectedChecklistResult *inspector.ChecklistResult
+
+	// Add-check wizard
+	addStep     int
+	addTypeIdx  int
+	addFields   []checkFieldDef
+	addFieldIdx int
+	addInput    string
+	addValues   map[string]string
+	addError    string
 }
 
 func newInspectorModel(checklistPath string) inspectorModel {
@@ -257,6 +266,9 @@ func (im *inspectorModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cm
 	case screenInspectorChecklistPicker:
 		newM, cmd := im.updateChecklistPicker(m, msg)
 		return newM, cmd, true
+	case screenInspectorChecklistAdd:
+		newM, cmd := im.updateChecklistAdd(m, msg)
+		return newM, cmd, true
 	case screenInspectorResults:
 		newM, cmd := im.updateResults(m, msg)
 		return newM, cmd, true
@@ -282,6 +294,8 @@ func (im inspectorModel) View(m Model) (string, bool) {
 		return im.viewWorkflowPlaceholder(m), true
 	case screenInspectorChecklistPicker:
 		return im.viewChecklistPicker(m), true
+	case screenInspectorChecklistAdd:
+		return im.viewChecklistAdd(m), true
 	case screenInspectorScanning:
 		return im.viewScanning(m), true
 	case screenInspectorResults:
@@ -416,6 +430,8 @@ func (im *inspectorModel) updateChecklistResults(m *Model, msg tea.KeyMsg) (tea.
 		m.screen = screenInspectorHome
 	case "l":
 		return im.openChecklistPicker(m)
+	case "a":
+		return im.openChecklistAdd(m)
 	case "up", "k":
 		if im.checklistReport != nil {
 			im.checklistIdx = previousListIndex(im.checklistIdx, len(im.checklistReport.Results))
@@ -442,6 +458,8 @@ func (im *inspectorModel) updateChecklistDetail(m *Model, msg tea.KeyMsg) (tea.M
 		m.screen = screenInspectorChecklistResults
 	case "l":
 		return im.openChecklistPicker(m)
+	case "a":
+		return im.openChecklistAdd(m)
 	case "r":
 		return im.startWorkflow(m, inspector.WorkflowChecklist)
 	}

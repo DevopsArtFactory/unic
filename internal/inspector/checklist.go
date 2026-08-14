@@ -1152,3 +1152,42 @@ func normalizedDNSNameKey(value string) string {
 func normalizedChecklistKey(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
+
+// AppendCheck adds a check to the checklist file at path, creating the file
+// when it does not exist. The combined checklist is validated through the
+// same rules as LoadChecklist before anything is written, so a bad prompt
+// result can never corrupt an existing file.
+func AppendCheck(path string, check ChecklistCheck) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("checklist path is required")
+	}
+
+	checklist := &Checklist{}
+	if data, err := os.ReadFile(path); err == nil {
+		decoder := yaml.NewDecoder(bytes.NewReader(data))
+		decoder.KnownFields(true)
+		if err := decoder.Decode(checklist); err != nil {
+			return fmt.Errorf("failed to parse checklist %s: %w", path, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read checklist %s: %w", path, err)
+	}
+
+	checklist.Checks = append(checklist.Checks, check)
+	checklist.SourcePath = path
+	if err := checklist.validate(); err != nil {
+		return err
+	}
+
+	out, err := yaml.Marshal(checklist)
+	if err != nil {
+		return fmt.Errorf("failed to marshal checklist: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("failed to create checklist directory: %w", err)
+	}
+	if err := os.WriteFile(path, out, 0644); err != nil {
+		return fmt.Errorf("failed to write checklist %s: %w", path, err)
+	}
+	return nil
+}
