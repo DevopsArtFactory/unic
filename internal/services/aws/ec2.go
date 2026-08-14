@@ -4,7 +4,6 @@ import (
 	"context"
 	"sort"
 	"strings"
-	"sync"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -87,53 +86,13 @@ func (r *AwsRepository) ListEC2Instances(ctx context.Context) ([]EC2Instance, er
 	return instances, nil
 }
 
-// EC2RegionError reports a per-region listing failure during an all-regions scan.
-type EC2RegionError struct {
-	Region string
-	Err    error
-}
-
-// ec2RepoForRegion is a test seam: ForRegion builds real SDK clients, so tests
-// substitute regional repositories with mocked clients here.
-var ec2RepoForRegion = func(r *AwsRepository, region string) *AwsRepository {
-	return r.ForRegion(region)
-}
-
-// ListEC2InstancesAcrossRegions fans ListEC2Instances out over the given regions
-// concurrently, reusing the repository credentials. Per-region failures are
-// returned alongside the successful rows instead of failing the whole scan.
-func (r *AwsRepository) ListEC2InstancesAcrossRegions(ctx context.Context, regions []string) ([]EC2Instance, []EC2RegionError) {
+// ListEC2InstancesAcrossRegions fans ListEC2Instances out over the given
+// regions through the shared all-regions helper.
+func (r *AwsRepository) ListEC2InstancesAcrossRegions(ctx context.Context, regions []string) ([]EC2Instance, []RegionError) {
 	uniclog.Debug("aws", "ListEC2InstancesAcrossRegions called", "regions", regions)
-
-	type regionResult struct {
-		instances []EC2Instance
-		err       error
-	}
-	results := make([]regionResult, len(regions))
-	var wg sync.WaitGroup
-	for i, region := range regions {
-		wg.Add(1)
-		go func(i int, region string) {
-			defer wg.Done()
-			repo := r
-			if region != r.Region {
-				repo = ec2RepoForRegion(r, region)
-			}
-			instances, err := repo.ListEC2Instances(ctx)
-			results[i] = regionResult{instances: instances, err: err}
-		}(i, region)
-	}
-	wg.Wait()
-
-	var instances []EC2Instance
-	var regionErrors []EC2RegionError
-	for i, result := range results {
-		if result.err != nil {
-			regionErrors = append(regionErrors, EC2RegionError{Region: regions[i], Err: result.err})
-			continue
-		}
-		instances = append(instances, result.instances...)
-	}
+	instances, regionErrors := listAcrossRegions(ctx, r, regions, func(ctx context.Context, repo *AwsRepository) ([]EC2Instance, error) {
+		return repo.ListEC2Instances(ctx)
+	})
 	sortEC2Instances(instances)
 	return instances, regionErrors
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"sort"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -29,6 +30,7 @@ func (r *AwsRepository) ListFunctions(ctx context.Context) ([]LambdaFunction, er
 		for _, f := range out.Functions {
 			fn := LambdaFunction{
 				Name:         awssdk.ToString(f.FunctionName),
+				Region:       r.Region,
 				ARN:          awssdk.ToString(f.FunctionArn),
 				Runtime:      string(f.Runtime),
 				Handler:      awssdk.ToString(f.Handler),
@@ -93,4 +95,22 @@ func (r *AwsRepository) InvokeFunction(ctx context.Context, functionName, payloa
 		}
 	}
 	return result, nil
+}
+
+// ListFunctionsAcrossRegions fans ListFunctions out over the given regions
+// through the shared all-regions helper.
+func (r *AwsRepository) ListFunctionsAcrossRegions(ctx context.Context, regions []string) ([]LambdaFunction, []RegionError) {
+	uniclog.Debug("aws", "ListFunctionsAcrossRegions called", "regions", regions)
+	functions, regionErrors := listAcrossRegions(ctx, r, regions, func(ctx context.Context, repo *AwsRepository) ([]LambdaFunction, error) {
+		return repo.ListFunctions(ctx)
+	})
+	sort.Slice(functions, func(i, j int) bool {
+		left := normalizedSortKey(functions[i].Name)
+		right := normalizedSortKey(functions[j].Name)
+		if left == right {
+			return functions[i].Region < functions[j].Region
+		}
+		return left < right
+	})
+	return functions, regionErrors
 }

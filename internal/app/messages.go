@@ -15,7 +15,7 @@ type instancesLoadedMsg struct {
 
 type ec2BrowserInstancesLoadedMsg struct {
 	instances    []awsservice.EC2Instance
-	regionErrors []awsservice.EC2RegionError
+	regionErrors []awsservice.RegionError
 }
 
 type ec2RelationshipsLoadedMsg struct {
@@ -99,7 +99,8 @@ type ssmSessionDoneMsg struct {
 }
 
 type rdsInstancesLoadedMsg struct {
-	instances []awsservice.RDSInstance
+	instances    []awsservice.RDSInstance
+	regionErrors []awsservice.RegionError
 }
 
 type rdsClassesLoadedMsg struct {
@@ -349,7 +350,8 @@ type inspectorChecklistLoadedMsg struct {
 }
 
 type lambdaFunctionsLoadedMsg struct {
-	functions []awsservice.LambdaFunction
+	functions    []awsservice.LambdaFunction
+	regionErrors []awsservice.RegionError
 }
 
 type lambdaInvokeResultMsg struct {

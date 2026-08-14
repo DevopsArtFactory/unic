@@ -237,7 +237,11 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q", "Go back to the feature list"},
 		}
 	case screenRDSList:
-		return listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
+		shortcuts := listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
+		if m.hasMultipleRegions() {
+			shortcuts = append(shortcuts, helpShortcut{"A", "Toggle all-regions instance scope"})
+		}
+		return shortcuts
 	case screenRDSDetail:
 		shortcuts := []helpShortcut{
 			{"m", "Modify the instance class"},
@@ -518,7 +522,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q", "Go back to the feature list"},
 		}
 	case screenLambdaFunctionList:
-		return []helpShortcut{
+		shortcuts := []helpShortcut{
 			{"↑/↓, j/k", "Move between functions"},
 			{"/", "Start filtering functions"},
 			{"r", "Refresh the function list"},
@@ -527,6 +531,10 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"l", "View CloudWatch Logs for the selected function"},
 			{"q / esc", "Go back to the feature list"},
 		}
+		if m.hasMultipleRegions() {
+			shortcuts = append(shortcuts, helpShortcut{"A", "Toggle all-regions function scope"})
+		}
+		return shortcuts
 	case screenLambdaFunctionDetail:
 		return []helpShortcut{
 			{"i", "Invoke the selected function"},

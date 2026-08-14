@@ -60,7 +60,7 @@ func TestEC2BrowserStoresRegionErrorsFromLoadedMsg(t *testing.T) {
 		instances: []awsservice.EC2Instance{
 			{InstanceID: "i-east", Region: "us-east-1"},
 		},
-		regionErrors: []awsservice.EC2RegionError{
+		regionErrors: []awsservice.RegionError{
 			{Region: "eu-west-1", Err: errors.New("access denied")},
 		},
 	}

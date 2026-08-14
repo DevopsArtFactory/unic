@@ -17,7 +17,7 @@ type ec2InstanceBrowserModel struct {
 	filtered        []awsservice.EC2Instance
 	idx             int
 	allRegions      bool
-	regionErrors    []awsservice.EC2RegionError
+	regionErrors    []awsservice.RegionError
 	selected        *awsservice.EC2Instance
 	relationships   *awsservice.EC2InstanceRelationships
 	relatedKind     ec2RelatedKind

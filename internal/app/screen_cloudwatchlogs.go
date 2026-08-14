@@ -33,6 +33,10 @@ var (
 )
 
 type cloudWatchLogsModel struct {
+	// regionOverride pins all log requests to a specific region when the
+	// flow was entered from an all-regions row (e.g. a Lambda function in a
+	// non-active region). Empty means the active context region.
+	regionOverride string
 	groups           []awsservice.LogGroup
 	filteredGroups   []awsservice.LogGroup
 	groupIdx         int
@@ -62,6 +66,7 @@ func newCloudWatchLogsModel() cloudWatchLogsModel {
 }
 
 func (cw *cloudWatchLogsModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	cw.regionOverride = ""
 	cw.selectedGroup = nil
 	cw.selectedStream = nil
 	cw.events = nil
@@ -75,7 +80,8 @@ func (cw *cloudWatchLogsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 }
 
 // StartFromLambda enters the CW logs flow scoped to a Lambda function's log group.
-func (cw *cloudWatchLogsModel) StartFromLambda(m *Model, functionName string) (tea.Model, tea.Cmd) {
+func (cw *cloudWatchLogsModel) StartFromLambda(m *Model, functionName, region string) (tea.Model, tea.Cmd) {
+	cw.regionOverride = region
 	logGroupName := "/aws/lambda/" + functionName
 	cw.selectedGroup = &awsservice.LogGroup{Name: logGroupName}
 	cw.selectedStream = nil
@@ -744,6 +750,9 @@ func (cw cloudWatchLogsModel) loadGroups(m Model, appendMode bool) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
+		if cw.regionOverride != "" && repo.Region != cw.regionOverride {
+			repo = repo.ForRegion(cw.regionOverride)
+		}
 
 		var nextToken *string
 		if appendMode {
@@ -768,6 +777,9 @@ func (cw cloudWatchLogsModel) loadStreams(m Model, logGroupName string, appendMo
 		if err != nil {
 			return errMsg{err: err}
 		}
+		if cw.regionOverride != "" && repo.Region != cw.regionOverride {
+			repo = repo.ForRegion(cw.regionOverride)
+		}
 
 		var nextToken *string
 		if appendMode {
@@ -791,6 +803,9 @@ func (cw cloudWatchLogsModel) loadEvents(m Model, appendMode bool) tea.Cmd {
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return cwLogEventsLoadedMsg{append: appendMode}
+		}
+		if cw.regionOverride != "" && repo.Region != cw.regionOverride {
+			repo = repo.ForRegion(cw.regionOverride)
 		}
 
 		if cw.selectedGroup == nil {
@@ -832,6 +847,9 @@ func (cw cloudWatchLogsModel) pollTail(m Model) tea.Cmd {
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return cwLogEventsLoadedMsg{append: true}
+		}
+		if cw.regionOverride != "" && repo.Region != cw.regionOverride {
+			repo = repo.ForRegion(cw.regionOverride)
 		}
 
 		if cw.selectedGroup == nil {

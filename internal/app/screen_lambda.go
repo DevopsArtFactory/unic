@@ -32,6 +32,8 @@ type lambdaModel struct {
 	invokeResult  *awsservice.LambdaInvokeResult
 	payloadSource lambdaPayloadSource
 	invokeStep    int // 0=source select, 1=text input
+	allRegions    bool
+	regionErrors  []awsservice.RegionError
 }
 
 func newLambdaModel() lambdaModel {
@@ -46,6 +48,7 @@ func (lm *lambdaModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd,
 	switch msg := msg.(type) {
 	case lambdaFunctionsLoadedMsg:
 		lm.functions = msg.functions
+		lm.regionErrors = msg.regionErrors
 		lm.filtered = msg.functions
 		lm.functionIdx = 0
 		m.resetFilter(filterLambdaFunctions)
@@ -118,6 +121,12 @@ func (lm *lambdaModel) updateFunctionList(m *Model, msg tea.KeyMsg) (tea.Model, 
 		lm.functionIdx = nextListIndex(lm.functionIdx, len(lm.filtered))
 	case "/":
 		return *m, m.activateFilter(filterLambdaFunctions)
+	case "A":
+		if m.hasMultipleRegions() {
+			lm.allRegions = !lm.allRegions
+			m.resetFilter(filterLambdaFunctions)
+			return m.startLoading(lm.loadFunctions(*m))
+		}
 	case "r":
 		return m.startLoading(lm.loadFunctions(*m))
 	case "d":
@@ -130,7 +139,7 @@ func (lm *lambdaModel) updateFunctionList(m *Model, msg tea.KeyMsg) (tea.Model, 
 		if len(lm.filtered) > 0 && lm.functionIdx < len(lm.filtered) {
 			fn := lm.filtered[lm.functionIdx]
 			lm.selected = &fn
-			return m.cwLogs.StartFromLambda(m, fn.Name)
+			return m.cwLogs.StartFromLambda(m, fn.Name, fn.Region)
 		}
 	case "enter":
 		if len(lm.filtered) > 0 && lm.functionIdx < len(lm.filtered) {
@@ -149,11 +158,20 @@ func (lm lambdaModel) viewFunctionList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Lambda Functions"))
+	title := "Lambda Functions"
+	allRegions := lm.allRegions && m.hasMultipleRegions()
+	if allRegions {
+		title += " (all regions)"
+	}
+	b.WriteString(titleStyle.Render(title))
 	b.WriteString("\n")
 	b.WriteString(m.renderFilterValue(filterLambdaFunctions))
 	b.WriteString("\n\n")
 
+	for _, regionErr := range lm.regionErrors {
+		panel.WriteString(errorStyle.Render(fmt.Sprintf("  %s: %v", regionErr.Region, regionErr.Err)))
+		panel.WriteString("\n")
+	}
 	if len(lm.filtered) == 0 {
 		panel.WriteString(dimStyle.Render("  No functions found"))
 		panel.WriteString("\n")
@@ -173,7 +191,11 @@ func (lm lambdaModel) viewFunctionList(m Model) string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterLambdaFunctions, fn.DisplayTitle())))
+			row := fn.DisplayTitle()
+			if allRegions {
+				row = fmt.Sprintf("[%s] %s", fn.Region, row)
+			}
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterLambdaFunctions, row)))
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
@@ -182,7 +204,11 @@ func (lm lambdaModel) viewFunctionList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • r: refresh • enter: invoke • d: detail • l: logs • esc: back"))
+	helpText := "↑/↓: navigate • /: filter • r: refresh • enter: invoke • d: detail • l: logs • esc: back"
+	if m.hasMultipleRegions() {
+		helpText = "↑/↓: navigate • /: filter • r: refresh • A: all regions • enter: invoke • d: detail • l: logs • esc: back"
+	}
+	b.WriteString(m.renderHelpBar(helpText))
 	return b.String()
 }
 
@@ -199,7 +225,7 @@ func (lm *lambdaModel) updateFunctionDetail(m *Model, msg tea.KeyMsg) (tea.Model
 		m.screen = screenLambdaInvokeInput
 	case "l":
 		if lm.selected != nil {
-			return m.cwLogs.StartFromLambda(m, lm.selected.Name)
+			return m.cwLogs.StartFromLambda(m, lm.selected.Name, lm.selected.Region)
 		}
 	}
 	return *m, nil
@@ -356,7 +382,7 @@ func (lm *lambdaModel) updateInvokeResult(m *Model, msg tea.KeyMsg) (tea.Model, 
 		m.screen = screenLambdaInvokeInput
 	case "l":
 		if lm.selected != nil {
-			return m.cwLogs.StartFromLambda(m, lm.selected.Name)
+			return m.cwLogs.StartFromLambda(m, lm.selected.Name, lm.selected.Region)
 		}
 	}
 	return *m, nil
@@ -414,12 +440,21 @@ func (lm lambdaModel) viewInvokeResult(m Model) string {
 // --- Load Commands ---
 
 func (lm lambdaModel) loadFunctions(m Model) tea.Cmd {
+	allRegions := lm.allRegions && m.hasMultipleRegions()
+	var regions []string
+	if m.cfg != nil {
+		regions = append(regions, m.cfg.Regions...)
+	}
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.commandContext(), lambdaAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
+		}
+		if allRegions {
+			functions, regionErrors := repo.ListFunctionsAcrossRegions(ctx, regions)
+			return lambdaFunctionsLoadedMsg{functions: functions, regionErrors: regionErrors}
 		}
 		functions, err := repo.ListFunctions(ctx)
 		if err != nil {
@@ -471,6 +506,11 @@ func (lm lambdaModel) invokeFunction(m Model) tea.Cmd {
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
+		}
+		if sel := lm.selected; sel != nil && sel.Region != "" && repo.Region != sel.Region {
+			// Functions loaded through the all-regions scope invoke against
+			// their own region.
+			repo = repo.ForRegion(sel.Region)
 		}
 		result, err := repo.InvokeFunction(ctx, fnName, payload, false)
 		if err != nil {

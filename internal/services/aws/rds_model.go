@@ -13,6 +13,7 @@ type RDSInstance struct {
 	Status                string
 	InstanceClass         string
 	PendingInstanceClass  string
+	Region                string
 	MultiAZ               bool
 	StorageGB             int32
 	StorageEncrypted      bool
@@ -30,8 +31,8 @@ func (r RDSInstance) DisplayTitle() string {
 
 // FilterText returns a lowercase string for keyword matching.
 func (r RDSInstance) FilterText() string {
-	return strings.ToLower(fmt.Sprintf("%s %s %s %s %s %s",
-		r.DBInstanceID, r.Engine, r.EngineVersion, r.Status, r.InstanceClass, r.ClusterID))
+	return strings.ToLower(fmt.Sprintf("%s %s %s %s %s %s %s",
+		r.DBInstanceID, r.Engine, r.EngineVersion, r.Status, r.InstanceClass, r.ClusterID, r.Region))
 }
 
 // IsClusterMember returns true if this instance belongs to an Aurora cluster.

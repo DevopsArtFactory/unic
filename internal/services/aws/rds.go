@@ -37,6 +37,7 @@ func (r *AwsRepository) ListDBInstances(ctx context.Context) ([]RDSInstance, err
 		if db.PendingModifiedValues != nil {
 			inst.PendingInstanceClass = awssdk.ToString(db.PendingModifiedValues.DBInstanceClass)
 		}
+		inst.Region = r.Region
 
 		// Endpoint may be nil for stopped instances
 		if db.Endpoint != nil {
@@ -86,6 +87,7 @@ func (r *AwsRepository) DescribeDBInstance(ctx context.Context, dbInstanceID str
 	if db.PendingModifiedValues != nil {
 		inst.PendingInstanceClass = awssdk.ToString(db.PendingModifiedValues.DBInstanceClass)
 	}
+	inst.Region = r.Region
 	if db.Endpoint != nil {
 		inst.Endpoint = fmt.Sprintf("%s:%d", awssdk.ToString(db.Endpoint.Address), awssdk.ToInt32(db.Endpoint.Port))
 	}
@@ -213,4 +215,22 @@ func (r *AwsRepository) ModifyDBInstanceClass(ctx context.Context, dbInstanceID,
 		return fmt.Errorf("failed to modify DB instance class for %s: %w", dbInstanceID, err)
 	}
 	return nil
+}
+
+// ListDBInstancesAcrossRegions fans ListDBInstances out over the given
+// regions through the shared all-regions helper.
+func (r *AwsRepository) ListDBInstancesAcrossRegions(ctx context.Context, regions []string) ([]RDSInstance, []RegionError) {
+	uniclog.Debug("aws", "ListDBInstancesAcrossRegions called", "regions", regions)
+	instances, regionErrors := listAcrossRegions(ctx, r, regions, func(ctx context.Context, repo *AwsRepository) ([]RDSInstance, error) {
+		return repo.ListDBInstances(ctx)
+	})
+	sort.Slice(instances, func(i, j int) bool {
+		left := normalizedSortKey(instances[i].DBInstanceID)
+		right := normalizedSortKey(instances[j].DBInstanceID)
+		if left == right {
+			return instances[i].Region < instances[j].Region
+		}
+		return left < right
+	})
+	return instances, regionErrors
 }

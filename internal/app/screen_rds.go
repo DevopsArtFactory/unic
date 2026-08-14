@@ -18,6 +18,8 @@ type rdsModel struct {
 	action       string // "start", "stop", "failover", "modify"
 	confirmInput string // typed input for destructive action confirmation
 	polling      bool
+	allRegions   bool
+	regionErrors []awsservice.RegionError
 
 	// Instance class modification
 	classes          []string
@@ -41,6 +43,7 @@ func (rm *rdsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 	switch msg := msg.(type) {
 	case rdsInstancesLoadedMsg:
 		rm.instances = msg.instances
+		rm.regionErrors = msg.regionErrors
 		rm.filtered = applyFilter(rm.instances, m.filterValue(filterRDS))
 		rm.idx = 0
 		m.screen = screenRDSList
@@ -75,7 +78,9 @@ func (rm *rdsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		}
 		rm.selected = msg.instance
 		for i, inst := range rm.instances {
-			if inst.DBInstanceID == msg.instance.DBInstanceID {
+			// Identifiers are only unique per region; an all-regions list can
+			// hold the same ID twice, so match the region as well.
+			if inst.DBInstanceID == msg.instance.DBInstanceID && inst.Region == msg.instance.Region {
 				rm.instances[i] = *msg.instance
 				break
 			}
@@ -160,6 +165,12 @@ func (rm *rdsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		rm.idx = nextListIndex(rm.idx, len(rm.filtered))
 	case "/":
 		return *m, m.activateFilter(filterRDS)
+	case "A":
+		if m.hasMultipleRegions() {
+			rm.allRegions = !rm.allRegions
+			m.resetFilter(filterRDS)
+			return m.startLoading(rm.loadInstances(*m))
+		}
 	case "enter":
 		if len(rm.filtered) > 0 && rm.idx < len(rm.filtered) {
 			selected := rm.filtered[rm.idx]
@@ -317,6 +328,9 @@ func (rm rdsModel) loadClasses(m Model) tea.Cmd {
 			}
 		}
 
+		if instance.Region != "" && repo.Region != instance.Region {
+			repo = repo.ForRegion(instance.Region)
+		}
 		classes, err := repo.ListOrderableDBInstanceClasses(ctx, instance.Engine, instance.EngineVersion)
 		if err != nil {
 			return errMsg{err: err}
@@ -329,6 +343,11 @@ func (rm rdsModel) loadClasses(m Model) tea.Cmd {
 }
 
 func (rm rdsModel) loadInstances(m Model) tea.Cmd {
+	allRegions := rm.allRegions && m.hasMultipleRegions()
+	var regions []string
+	if m.cfg != nil {
+		regions = append(regions, m.cfg.Regions...)
+	}
 	return func() tea.Msg {
 		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -336,6 +355,11 @@ func (rm rdsModel) loadInstances(m Model) tea.Cmd {
 			return errMsg{err: err}
 		}
 		m.awsRepo = repo
+
+		if allRegions {
+			instances, regionErrors := repo.ListDBInstancesAcrossRegions(ctx, regions)
+			return rdsInstancesLoadedMsg{instances: instances, regionErrors: regionErrors}
+		}
 
 		instances, err := repo.ListDBInstances(ctx)
 		if err != nil {
@@ -364,6 +388,12 @@ func (rm rdsModel) executeAction(m Model, action, dbInstanceID string) tea.Cmd {
 			if err != nil {
 				return rdsActionDoneMsg{action: action, instanceID: dbInstanceID, err: err}
 			}
+		}
+
+		if inst := rm.selected; inst != nil && inst.Region != "" && repo.Region != inst.Region {
+			// Rows loaded through the all-regions scope act against their
+			// own region, not the globally active one.
+			repo = repo.ForRegion(inst.Region)
 		}
 
 		var err error
@@ -409,6 +439,9 @@ func (rm rdsModel) pollStatus(m Model, dbInstanceID string) tea.Cmd {
 			}
 		}
 
+		if sel := rm.selected; sel != nil && sel.Region != "" && repo.Region != sel.Region {
+			repo = repo.ForRegion(sel.Region)
+		}
 		inst, err := repo.DescribeDBInstance(ctx, dbInstanceID)
 		return rdsStatusRefreshedMsg{instance: inst, err: err}
 	}
@@ -420,16 +453,28 @@ func (rm rdsModel) tickPoll(dbInstanceID string) tea.Cmd {
 	})
 }
 
+func (rm rdsModel) allRegionsActive(m Model) bool {
+	return rm.allRegions && m.hasMultipleRegions()
+}
+
 func (rm rdsModel) viewList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("RDS Instances"))
+	title := "RDS Instances"
+	if rm.allRegionsActive(m) {
+		title += " (all regions)"
+	}
+	b.WriteString(titleStyle.Render(title))
 	b.WriteString("\n")
 
 	b.WriteString(m.renderFilterValue(filterRDS))
 	b.WriteString("\n\n")
 
+	for _, regionErr := range rm.regionErrors {
+		panel.WriteString(errorStyle.Render(fmt.Sprintf("  %s: %v", regionErr.Region, regionErr.Err)))
+		panel.WriteString("\n")
+	}
 	if len(rm.filtered) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching instances"))
 		panel.WriteString("\n")
@@ -449,7 +494,11 @@ func (rm rdsModel) viewList(m Model) string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterRDS, inst.DisplayTitle())))
+			row := inst.DisplayTitle()
+			if rm.allRegionsActive(m) {
+				row = fmt.Sprintf("[%s] %s", inst.Region, row)
+			}
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterRDS, row)))
 			panel.WriteString("\n")
 		}
 
@@ -459,7 +508,11 @@ func (rm rdsModel) viewList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"))
+	helpText := "↑/↓: navigate • /: filter • enter: detail • esc: back • H: home"
+	if m.hasMultipleRegions() {
+		helpText = "↑/↓: navigate • /: filter • A: all regions • enter: detail • esc: back • H: home"
+	}
+	b.WriteString(m.renderHelpBar(helpText))
 	return b.String()
 }
 
@@ -475,6 +528,10 @@ func (rm rdsModel) viewDetail(m Model) string {
 
 	b.WriteString(renderDetailLine("Identifier", normalStyle.Render(r.DBInstanceID)))
 	b.WriteString("\n")
+	if r.Region != "" {
+		b.WriteString(renderDetailLine("Region", normalStyle.Render(r.Region)))
+		b.WriteString("\n")
+	}
 	b.WriteString(renderDetailLine("Engine", normalStyle.Render(fmt.Sprintf("%s %s", r.Engine, r.EngineVersion))))
 	b.WriteString("\n")
 
