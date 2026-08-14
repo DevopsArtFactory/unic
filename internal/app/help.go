@@ -687,6 +687,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between checklist folders and files"},
 			{"/", "Start filtering entries"},
+			{"a", "Create a check through prompts (starts a new checklist when none is loaded)"},
 			{"enter", "Open the selected folder or load the selected checklist"},
 			{"q / esc", "Go back to Inspector mode"},
 		}
@@ -712,8 +713,23 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"↑/↓, j/k", "Move between checklist results"},
 			{"enter", "Open the selected checklist result"},
 			{"l", "Open the checklist file picker"},
+			{"a", "Add a check through prompts"},
 			{"r", "Run the checklist again"},
 			{"q / esc", "Go back to Inspector mode"},
+		}
+	case screenInspectorChecklistAdd:
+		if m.inspector.addStep == 0 {
+			return []helpShortcut{
+				{"↑/↓, j/k", "Move between check types"},
+				{"enter", "Select the check type"},
+				{"esc", "Cancel adding a check"},
+			}
+		}
+		return []helpShortcut{
+			{"type", "Enter the field value"},
+			{"backspace", "Delete the previous character"},
+			{"enter", "Confirm the field (empty skips optional fields); saving runs the checklist"},
+			{"esc", "Go back to the previous field"},
 		}
 	case screenInspectorChecklistDetail:
 		return []helpShortcut{
@@ -1052,6 +1068,8 @@ func (m Model) helpScreenTitle() string {
 		return "Inspector Finding Detail"
 	case screenInspectorChecklistResults:
 		return "Checklist Inspector Results"
+	case screenInspectorChecklistAdd:
+		return "Checklist Add Check"
 	case screenInspectorChecklistDetail:
 		return "Checklist Inspector Detail"
 	case screenContextPicker:

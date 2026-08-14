@@ -325,7 +325,7 @@ Context ordering:
 
 Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
 
-Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup, and currently supports:
+Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup. Press `a` on the checklist results screen to add a check through type-specific prompts instead of editing YAML: pick one of the twelve rule types, fill the prompted fields (empty skips optional expectations), and the check is appended to the loaded checklist file — or a new `unic-checklist.yaml` when none is loaded — validated through the same `LoadChecklist` rules before anything is written, then the checklist reruns so the new result shows immediately. Currently supported types:
 
 - `rds` for expected DB instance state such as status, engine, class, Multi-AZ, encryption, public access, and backup retention
 - `security_group` for required or forbidden ingress/egress rule matchers
@@ -433,7 +433,7 @@ checks:
 | FIS | `Enter` template detail/run detail, `/` filter, `h` selected-template history, `H` all experiment history, `r` refresh, template detail includes safe-run preview and detail scrolls through targets/actions/stop conditions |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
-| Checklist Inspector | `l` load or switch checklist files, `r` run/rerun the loaded checklist, `Enter` result detail |
+| Checklist Inspector | `l` load or switch checklist files, `a` add a check through type-specific prompts, `r` run/rerun the loaded checklist, `Enter` result detail |
 | Settings | `Enter`/`Space` toggle selected setting, `Esc`/`q` back |
 | Context Picker | `a` add context, `f` favorite/unfavorite selected context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |

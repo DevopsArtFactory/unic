@@ -104,6 +104,7 @@ const (
 	screenInspectorHome
 	screenInspectorWorkflowPlaceholder
 	screenInspectorChecklistPicker
+	screenInspectorChecklistAdd
 	screenInspectorScanning
 	screenInspectorResults
 	screenInspectorFindingDetail
@@ -431,6 +432,9 @@ func (m Model) isTextEntryScreen() bool {
 		return true
 	}
 	if m.screen == screenCloudTrailEventList && m.cloudTrail.lookupInput {
+		return true
+	}
+	if m.screen == screenInspectorChecklistAdd && m.inspector.addStep > 0 {
 		return true
 	}
 	switch m.screen {
