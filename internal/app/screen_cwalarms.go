@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -209,7 +208,7 @@ func featureService(kind domain.FeatureKind) domain.AwsService {
 
 func (am cwAlarmsModel) loadAlarms(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -229,7 +228,7 @@ func (am cwAlarmsModel) loadAlarms(m Model) tea.Cmd {
 
 func (am cwAlarmsModel) loadHistory(m Model, alarmName string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

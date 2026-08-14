@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -87,7 +86,7 @@ func (m Model) beginContextUnset() (tea.Model, tea.Cmd) {
 
 func (m Model) loadSSOContextAccounts(selected config.ContextInfo) tea.Cmd {
 	return func() tea.Msg {
-		accounts, err := contextListSSOAccountsFn(context.Background(), m.configPath, selected)
+		accounts, err := contextListSSOAccountsFn(m.commandContext(), m.configPath, selected)
 		if err != nil {
 			return errMsg{err: err}
 		}
@@ -100,7 +99,7 @@ func (m Model) loadSSOContextAccounts(selected config.ContextInfo) tea.Cmd {
 
 func (m Model) loadSSOContextRoles(base config.ContextInfo, account awsservice.SSOAccount) tea.Cmd {
 	return func() tea.Msg {
-		roles, err := contextListSSORolesFn(context.Background(), m.configPath, base, account.ID)
+		roles, err := contextListSSORolesFn(m.commandContext(), m.configPath, base, account.ID)
 		if err != nil {
 			return errMsg{err: err}
 		}
@@ -135,7 +134,7 @@ func (m Model) setupSelectedContextForTerminal(name string) tea.Cmd {
 			return errMsg{err: err}
 		}
 
-		exports, err := contextBuildEnvExportsFn(context.Background(), cfg)
+		exports, err := contextBuildEnvExportsFn(m.commandContext(), cfg)
 		if err != nil {
 			return errMsg{err: err}
 		}
@@ -156,7 +155,7 @@ func (m Model) copySelectedContextExports(name string) tea.Cmd {
 			return errMsg{err: err}
 		}
 
-		exports, err := contextBuildEnvExportsFn(context.Background(), cfg)
+		exports, err := contextBuildEnvExportsFn(m.commandContext(), cfg)
 		if err != nil {
 			return errMsg{err: err}
 		}

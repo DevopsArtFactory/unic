@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -197,7 +196,7 @@ func (vm *vpcModel) applyIPFilter(m *Model) {
 
 func (vm vpcModel) loadVPCs(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -217,7 +216,7 @@ func (vm vpcModel) loadVPCs(m Model) tea.Cmd {
 
 func (vm vpcModel) loadSubnets(m Model, vpcID string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -240,7 +239,7 @@ func (vm vpcModel) loadSubnets(m Model, vpcID string) tea.Cmd {
 
 func (vm vpcModel) loadAvailableIPs(m Model, subnet awsservice.Subnet) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

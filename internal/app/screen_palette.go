@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -185,7 +184,7 @@ func (m Model) indexPaletteResources() tea.Cmd {
 	cfg := m.cfg
 	generation := m.palette.generation
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, cfg)
 		if err != nil {
 			return paletteResourcesIndexedMsg{generation: generation, errs: []string{err.Error()}}

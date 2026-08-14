@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -544,7 +543,7 @@ func (im *inspectorModel) startChecklistScan(m *Model) (tea.Model, tea.Cmd) {
 
 func (im *inspectorModel) loadSecurityScan(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -570,7 +569,7 @@ func (im *inspectorModel) loadChecklistScan(m Model) tea.Cmd {
 			return errMsg{err: err}
 		}
 
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}

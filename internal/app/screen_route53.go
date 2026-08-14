@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -253,7 +252,7 @@ func (rm *route53Model) updateRecordDetail(m *Model, msg tea.KeyMsg) (tea.Model,
 
 func (rm route53Model) loadZones(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -273,7 +272,7 @@ func (rm route53Model) loadZones(m Model) tea.Cmd {
 
 func (rm route53Model) loadRecords(m Model, zoneID string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -814,7 +813,7 @@ func (rm route53Model) viewRecordDeleteConfirm(m Model) string {
 
 func (rm route53Model) executeCreate(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -854,7 +853,7 @@ func (rm route53Model) executeCreate(m Model) tea.Cmd {
 
 func (rm route53Model) executeUpdate(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -891,7 +890,7 @@ func (rm route53Model) executeUpdate(m Model) tea.Cmd {
 
 func (rm route53Model) executeDelete(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -921,7 +920,7 @@ func (rm route53Model) executeDelete(m Model) tea.Cmd {
 
 func (rm route53Model) pollChangeStatus(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -76,7 +75,7 @@ func (sm *secretsModel) ApplyFilter(m *Model, target filterTarget) bool {
 
 func (sm secretsModel) loadSecrets(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -94,7 +93,7 @@ func (sm secretsModel) loadSecrets(m Model) tea.Cmd {
 
 func (sm secretsModel) loadSecretDetail(m Model, name string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

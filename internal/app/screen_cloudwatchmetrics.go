@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -886,7 +885,7 @@ func cloudWatchSeriesDisplayName(series *awsservice.CloudWatchMetricSeriesData) 
 
 func (cw cloudWatchMetricsModel) loadMetrics(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -902,7 +901,7 @@ func (cw cloudWatchMetricsModel) loadMetrics(m Model) tea.Cmd {
 
 func (cw cloudWatchMetricsModel) loadSeries(m Model, metrics []awsservice.CloudWatchMetric) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}

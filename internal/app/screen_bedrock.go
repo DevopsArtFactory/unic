@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -138,7 +137,7 @@ func (bm *bedrockModel) ApplyFilter(m *Model, target filterTarget) bool {
 
 func (bm bedrockModel) loadAPIKeys(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -155,7 +154,7 @@ func (bm bedrockModel) loadAPIKeys(m Model) tea.Cmd {
 
 func (bm bedrockModel) loadCreateIdentity(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -172,7 +171,7 @@ func (bm bedrockModel) loadCreateIdentity(m Model) tea.Cmd {
 
 func (bm bedrockModel) createAPIKey(m Model, userName string, ageDays int32) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -189,7 +188,7 @@ func (bm bedrockModel) createAPIKey(m Model, userName string, ageDays int32) tea
 
 func (bm bedrockModel) rotateAPIKey(m Model, key awsservice.BedrockAPIKey) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -206,7 +205,7 @@ func (bm bedrockModel) rotateAPIKey(m Model, key awsservice.BedrockAPIKey) tea.C
 
 func (bm bedrockModel) deleteAPIKey(m Model, key awsservice.BedrockAPIKey) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

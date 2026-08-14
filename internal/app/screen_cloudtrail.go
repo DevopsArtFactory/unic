@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -179,7 +178,7 @@ func (cm cloudTrailModel) loadEvents(m Model) tea.Cmd {
 		MutationsOnly: cm.mutationsOnly,
 	}
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
