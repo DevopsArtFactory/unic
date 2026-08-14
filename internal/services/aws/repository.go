@@ -26,6 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
@@ -95,6 +96,17 @@ var _ S3ClientAPI = (*s3.Client)(nil)
 
 // Verify *lambda.Client satisfies LambdaClientAPI at compile time.
 var _ LambdaClientAPI = (*lambda.Client)(nil)
+
+// SQSClientAPI is the interface for SQS operations used by AwsRepository.
+type SQSClientAPI interface {
+	sqs.ListQueuesAPIClient
+	GetQueueAttributes(ctx context.Context, params *sqs.GetQueueAttributesInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error)
+	PurgeQueue(ctx context.Context, params *sqs.PurgeQueueInput, optFns ...func(*sqs.Options)) (*sqs.PurgeQueueOutput, error)
+	StartMessageMoveTask(ctx context.Context, params *sqs.StartMessageMoveTaskInput, optFns ...func(*sqs.Options)) (*sqs.StartMessageMoveTaskOutput, error)
+}
+
+// Verify *sqs.Client satisfies SQSClientAPI at compile time.
+var _ SQSClientAPI = (*sqs.Client)(nil)
 
 // SSMClientAPI is the interface for SSM operations used by AwsRepository.
 type SSMClientAPI interface {
@@ -306,6 +318,7 @@ type CallerIdentity struct {
 type AwsRepository struct {
 	EC2Client            EC2ClientAPI
 	SSMClient            SSMClientAPI
+	SQSClient            SQSClientAPI
 	RDSClient            RDSClientAPI
 	Route53Client        Route53ClientAPI
 	SecretsManagerClient SecretsManagerClientAPI
@@ -425,6 +438,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 	return &AwsRepository{
 		EC2Client:            ec2.NewFromConfig(awsCfg),
 		SSMClient:            ssm.NewFromConfig(awsCfg),
+		SQSClient:            sqs.NewFromConfig(awsCfg),
 		RDSClient:            rds.NewFromConfig(awsCfg),
 		Route53Client:        route53.NewFromConfig(awsCfg),
 		SecretsManagerClient: secretsmanager.NewFromConfig(awsCfg),

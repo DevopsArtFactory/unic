@@ -43,6 +43,7 @@ const (
 	filterBedrockKeys
 	filterCWAlarms
 	filterCloudTrailEvents
+	filterSQSQueues
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

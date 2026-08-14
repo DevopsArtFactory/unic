@@ -188,6 +188,16 @@ type cwLogEventsLoadedMsg struct {
 
 type cwLogTailTickMsg struct{}
 
+type sqsQueuesLoadedMsg struct {
+	queues       []awsservice.SQSQueue
+	regionErrors []awsservice.RegionError
+}
+
+type sqsActionDoneMsg struct {
+	notice string
+	err    error
+}
+
 type s3BucketsLoadedMsg struct {
 	buckets []awsservice.S3Bucket
 }

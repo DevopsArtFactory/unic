@@ -20,6 +20,7 @@ const (
 	ServiceEKS            AwsService = "EKS"
 	ServiceFIS            AwsService = "FIS"
 	ServiceS3             AwsService = "S3"
+	ServiceSQS            AwsService = "SQS"
 	ServiceLambda         AwsService = "Lambda"
 	ServiceBedrock        AwsService = "Bedrock"
 )
@@ -49,6 +50,7 @@ const (
 	FeatureEKSBrowser            FeatureKind = "EKS Cluster Browser"
 	FeatureFISTemplateBrowser    FeatureKind = "FIS Experiment Template Browser"
 	FeatureS3Browser             FeatureKind = "S3 Browser"
+	FeatureSQSBrowser            FeatureKind = "SQS Queue Browser"
 	FeatureLambdaBrowser         FeatureKind = "Lambda Browser"
 	FeatureBedrockAPIKeys        FeatureKind = "Bedrock API Keys"
 )

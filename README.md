@@ -309,6 +309,7 @@ Context ordering:
 | ECS | ECS Browser & Exec |
 | EKS | Cluster & Node Group Browser |
 | FIS | Experiment Template Browser |
+| SQS | Queue Browser |
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
 | Bedrock | API Key Manager |
@@ -437,6 +438,7 @@ checks:
 | Settings | `Enter`/`Space` toggle selected setting, `Esc`/`q` back |
 | Context Picker | `a` add context, `f` favorite/unfavorite selected context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
+| SQS | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` detail, detail `d` jump to DLQ, `m` redrive DLQ (type-to-confirm), `x` purge (type-to-confirm) |
 | Lambda | `A` toggle all-regions scope (multi-region contexts), `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
 The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context; results stream in as they load, per-service failures are shown inline, and matching covers names, IDs, and ARNs where available. Selecting a resource jumps to the owning browser with the shared filter prefilled to that resource.
@@ -450,6 +452,8 @@ The EKS Browser includes a managed add-on status view for each cluster. Add-on r
 The ECR Login Helper resolves the private registry URI for the active context and shows copyable Docker and Podman login commands without leaving the TUI. The copied commands are prefixed with `eval "$(unic env <context>)"` so they authenticate with the active unic context rather than whatever ambient AWS credentials the shell happens to have; `unic ecr login` remains as a secondary CLI helper for scripting. The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
 
 The RDS detail screen can resize an instance with `m`: unic loads the orderable DB instance classes for the instance's engine/version in the active region into a filterable picker (current class marked), then a confirmation screen shows the current and new class with a `Tab`-toggleable apply-immediately choice (default: next maintenance window) and requires typing the instance identifier before calling ModifyDBInstance. After submitting, the detail screen polls the instance status until the change settles.
+
+The SQS Queue Browser is a backlog-first triage view: queues list deepest-backlog first with `!` marking dead-letter queues, showing depth, in-flight, and delayed counts per row. Queue detail shows the redrive relationship — `d` jumps from a source queue into its DLQ, and on a DLQ `m` starts a redrive (StartMessageMoveTask) moving messages back to their source queues. `x` purges a queue. Both actions require typing the queue name to confirm, and rows loaded through the all-regions scope act against their own region.
 
 The CloudTrail Event Lookup answers "who changed what, and when": recent API events list newest-first with mutations marked `*`, actor, call, and source service per row. Keys `1`-`5` switch the time window (1h/6h/24h/3d/7d), `m` restricts to mutations (server-side via the `ReadOnly=false` lookup attribute), and `n` runs a server-side resource-name lookup — CloudTrail accepts one lookup attribute per call, so combining both applies the mutations restriction client-side. Results are capped at 100 events per query, so narrow the window or use the resource lookup when a busy account truncates. Event detail shows actor, source, region, source IP, touched resources, and the full raw event JSON with scrolling.
 

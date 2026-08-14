@@ -36,7 +36,7 @@ type cloudWatchLogsModel struct {
 	// regionOverride pins all log requests to a specific region when the
 	// flow was entered from an all-regions row (e.g. a Lambda function in a
 	// non-active region). Empty means the active context region.
-	regionOverride string
+	regionOverride   string
 	groups           []awsservice.LogGroup
 	filteredGroups   []awsservice.LogGroup
 	groupIdx         int

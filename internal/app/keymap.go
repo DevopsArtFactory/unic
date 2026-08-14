@@ -70,6 +70,33 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to the record detail"},
 	},
 
+	screenSQSQueueList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between queues"},
+		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
+		{keys: "A", bar: "A: all regions", help: "Toggle all-regions queue scope",
+			when: func(m Model) bool { return m.hasMultipleRegions() }},
+		{keys: "r", bar: "r: refresh", help: "Refresh queue backlogs"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected queue"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenSQSQueueDetail: {
+		{keys: "d", bar: "d: open DLQ", help: "Jump to this queue's dead-letter queue",
+			when: func(m Model) bool { return m.sqs.selected != nil && m.sqs.selected.DLQTargetARN != "" }},
+		{keys: "m", bar: "m: redrive", help: "Redrive this DLQ's messages to their source queues",
+			when: func(m Model) bool { return m.sqs.selected != nil && m.sqs.selected.IsDLQ() }},
+		{keys: "x", bar: "x: purge", help: "Purge every message in the queue"},
+		{keys: "r", bar: "r: refresh", help: "Refresh queue backlogs"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the queue list"},
+		{bar: "H: home"},
+	},
+	screenSQSConfirm: {
+		{keys: "type", help: "Enter the queue name to confirm"},
+		{keys: "backspace", help: "Delete the previous character"},
+		{keys: "enter", bar: "enter: confirm", help: "Run the action when the typed name matches"},
+		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to the queue detail"},
+	},
+
 	screenIAMUserList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
 		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
