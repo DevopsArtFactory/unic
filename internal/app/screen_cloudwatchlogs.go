@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -740,7 +739,7 @@ func sliceCWLogMessage(message string, offset int) string {
 
 func (cw cloudWatchLogsModel) loadGroups(m Model, appendMode bool) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -764,7 +763,7 @@ func (cw cloudWatchLogsModel) loadGroups(m Model, appendMode bool) tea.Cmd {
 
 func (cw cloudWatchLogsModel) loadStreams(m Model, logGroupName string, appendMode bool) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -788,7 +787,7 @@ func (cw cloudWatchLogsModel) loadStreams(m Model, logGroupName string, appendMo
 
 func (cw cloudWatchLogsModel) loadEvents(m Model, appendMode bool) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return cwLogEventsLoadedMsg{append: appendMode}
@@ -829,7 +828,7 @@ func (cw cloudWatchLogsModel) loadEvents(m Model, appendMode bool) tea.Cmd {
 
 func (cw cloudWatchLogsModel) pollTail(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return cwLogEventsLoadedMsg{append: true}

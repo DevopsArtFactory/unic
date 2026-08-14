@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -73,7 +72,7 @@ func (m Model) switchResourceRegion(region string) tea.Cmd {
 			return regionSwitchedMsg{region: region, repo: repo.ForRegion(region)}
 		}
 		cfg.Region = region
-		newRepo, err := newAwsRepositoryForRegionFn(context.Background(), &cfg)
+		newRepo, err := newAwsRepositoryForRegionFn(m.commandContext(), &cfg)
 		if err != nil {
 			return errMsg{err: fmt.Errorf("failed to switch resource region to %s: %w", region, err)}
 		}

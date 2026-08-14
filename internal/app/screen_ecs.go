@@ -582,7 +582,7 @@ func (em ecsModel) loadClusters(m Model) tea.Cmd {
 		if err := awsservice.CheckAWSCLIInstalled(); err != nil {
 			return errMsg{err: err}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), ecsAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
@@ -604,7 +604,7 @@ func (em ecsModel) loadServices(m Model) tea.Cmd {
 		if em.selectedCluster == nil {
 			return errMsg{err: fmt.Errorf("no cluster selected")}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), ecsAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
@@ -626,7 +626,7 @@ func (em ecsModel) loadTasks(m Model) tea.Cmd {
 		if em.selectedCluster == nil || em.selectedService == nil {
 			return errMsg{err: fmt.Errorf("no cluster or service selected")}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), ecsAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
@@ -648,7 +648,7 @@ func (em ecsModel) loadServiceDetail(m Model) tea.Cmd {
 		if em.selectedCluster == nil || em.selectedService == nil {
 			return errMsg{err: fmt.Errorf("no cluster or service selected")}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), ecsAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
@@ -667,7 +667,7 @@ func (em ecsModel) loadContainers(m Model) tea.Cmd {
 		if em.selectedCluster == nil || em.selectedTask == nil {
 			return errMsg{err: fmt.Errorf("no cluster or task selected")}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), ecsAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
@@ -691,7 +691,7 @@ func (em ecsModel) startExec(m Model, container awsservice.ECSContainer) tea.Cmd
 			return errMsg{err: fmt.Errorf("no cluster or task selected")}
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), ecsAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), ecsAPITimeout)
 		defer cancel()
 
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -191,7 +190,7 @@ func (im iamModel) loadUsers(m Model) tea.Cmd {
 
 func (im iamModel) loadUsersPage(m Model, marker string, appendPage bool) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -220,7 +219,7 @@ func (im iamModel) loadUsersPage(m Model, marker string, appendPage bool) tea.Cm
 
 func (im iamModel) loadAllUserSummaries(m Model, marker string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -257,7 +256,7 @@ func (im iamModel) loadAllUserSummaries(m Model, marker string) tea.Cmd {
 
 func (im iamModel) loadUserDetail(m Model, userName string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -277,7 +276,7 @@ func (im iamModel) loadUserDetail(m Model, userName string) tea.Cmd {
 
 func (im iamModel) loadKeys(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -297,7 +296,7 @@ func (im iamModel) loadKeys(m Model) tea.Cmd {
 
 func (im iamModel) createKey(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -322,7 +321,7 @@ func (im iamModel) verifyKey(m Model) tea.Cmd {
 			return iamKeyVerifiedMsg{err: err}
 		}
 
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -339,7 +338,7 @@ func (im iamModel) verifyKey(m Model) tea.Cmd {
 
 func (im iamModel) deactivateKey(m Model, oldKeyID string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -356,7 +355,7 @@ func (im iamModel) deactivateKey(m Model, oldKeyID string) tea.Cmd {
 
 func (im iamModel) deleteKey(m Model, keyID string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

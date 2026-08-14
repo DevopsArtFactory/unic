@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -312,7 +311,7 @@ func (rm *rdsModel) updateConfirm(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd)
 func (rm rdsModel) loadClasses(m Model) tea.Cmd {
 	instance := *rm.selected
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -335,7 +334,7 @@ func (rm rdsModel) loadClasses(m Model) tea.Cmd {
 
 func (rm rdsModel) loadInstances(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -361,7 +360,7 @@ func (rm rdsModel) executeAction(m Model, action, dbInstanceID string) tea.Cmd {
 	pendingClass := rm.pendingClass
 	applyImmediately := rm.applyImmediately
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -404,7 +403,7 @@ func (rm rdsModel) executeAction(m Model, action, dbInstanceID string) tea.Cmd {
 
 func (rm rdsModel) pollStatus(m Model, dbInstanceID string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

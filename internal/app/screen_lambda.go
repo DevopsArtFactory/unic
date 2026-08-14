@@ -417,7 +417,7 @@ func (lm lambdaModel) viewInvokeResult(m Model) string {
 
 func (lm lambdaModel) loadFunctions(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), lambdaAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), lambdaAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
@@ -468,7 +468,7 @@ func (lm lambdaModel) invokeFunction(m Model) tea.Cmd {
 			}
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), lambdaAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), lambdaAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {

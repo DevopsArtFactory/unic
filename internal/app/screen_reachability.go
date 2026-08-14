@@ -151,7 +151,7 @@ func (rm reachabilityModel) activeRegion(m Model) string {
 
 func (rm reachabilityModel) loadReachabilityTargets(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		reachabilityCfg := *m.cfg
 		if strings.TrimSpace(rm.region) != "" {
 			reachabilityCfg.Region = strings.TrimSpace(rm.region)
@@ -227,7 +227,7 @@ func (rm *reachabilityModel) updateRegionList(m *Model, msg tea.KeyMsg) (tea.Mod
 
 func (rm reachabilityModel) runAnalysis(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		ctx, cancel := context.WithTimeout(m.commandContext(), 45*time.Second)
 		defer cancel()
 		repo := m.awsRepo
 		if repo == nil {

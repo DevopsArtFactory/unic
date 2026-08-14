@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -114,7 +113,7 @@ func flattenS3Objects(result awsservice.S3ListResult) []awsservice.S3Object {
 
 func (s3m s3Model) loadBuckets(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -135,7 +134,7 @@ func (s3m s3Model) loadBuckets(m Model) tea.Cmd {
 
 func (s3m s3Model) loadObjects(m Model, bucketName, prefix string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -159,7 +158,7 @@ func (s3m s3Model) loadObjects(m Model, bucketName, prefix string) tea.Cmd {
 
 func (s3m s3Model) loadObjectDetail(m Model, bucketName, key string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

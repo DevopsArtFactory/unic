@@ -844,7 +844,7 @@ func (em eksModel) currentAddon() *awsservice.EKSAddon {
 func (em *eksModel) loadClusters(m Model) tea.Cmd {
 	return func() tea.Msg {
 		cfg := m.cfg
-		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), eksAPITimeout)
 		defer cancel()
 
 		repo, err := awsservice.NewAwsRepository(ctx, cfg)
@@ -866,7 +866,7 @@ func (em *eksModel) loadNodeGroups(m Model) tea.Cmd {
 		if cluster == nil {
 			return errMsg{fmt.Errorf("no EKS cluster selected")}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), eksAPITimeout)
 		defer cancel()
 
 		repo, err := awsservice.NewAwsRepository(ctx, cfg)
@@ -888,7 +888,7 @@ func (em *eksModel) loadAddons(m Model) tea.Cmd {
 		if cluster == nil {
 			return errMsg{fmt.Errorf("no EKS cluster selected")}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), eksAPITimeout)
 		defer cancel()
 
 		repo, err := awsservice.NewAwsRepository(ctx, cfg)
@@ -910,7 +910,7 @@ func (em *eksModel) loadUpgradeReadiness(m Model) tea.Cmd {
 		if cluster == nil {
 			return errMsg{fmt.Errorf("no EKS cluster selected")}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), eksAPITimeout)
+		ctx, cancel := context.WithTimeout(m.commandContext(), eksAPITimeout)
 		defer cancel()
 
 		repo, err := awsservice.NewAwsRepository(ctx, cfg)

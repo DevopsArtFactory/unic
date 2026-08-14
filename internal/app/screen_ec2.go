@@ -65,7 +65,7 @@ func (m Model) loadInstances() tea.Cmd {
 			return errMsg{err: err}
 		}
 
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -87,7 +87,7 @@ func (m Model) loadInstances() tea.Cmd {
 
 func (m Model) startSSMSession(inst awsservice.EC2Instance) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 
 		// Initialize AWS repo if needed
 		repo := m.awsRepo
@@ -112,6 +112,8 @@ func (m Model) startSSMSession(inst awsservice.EC2Instance) tea.Cmd {
 		execCmd := tea.ExecProcess(cmd, func(err error) tea.Msg {
 			// Terminate session after plugin exits
 			if sess.SessionId != nil {
+				// Session teardown must run even after the command
+				// lifecycle was cancelled, so it keeps its own context.
 				_ = repo.TerminateSession(context.Background(), *sess.SessionId)
 			}
 			return ssmSessionDoneMsg{err: err}

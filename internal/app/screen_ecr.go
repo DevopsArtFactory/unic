@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -275,7 +274,7 @@ func (em *ecrModel) copyLoginCommand(runtime, command string) {
 
 func (em *ecrModel) loadLoginCommands(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		registryURI, _, err := awsservice.ResolvePrivateECRRegistryURI(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -335,7 +334,7 @@ func (em ecrModel) viewLoginHelper(m Model) string {
 
 func (em *ecrModel) loadRepositories(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -355,7 +354,7 @@ func (em *ecrModel) loadRepositories(m Model) tea.Cmd {
 
 func (em *ecrModel) loadImages(m Model, repositoryName string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -233,7 +232,7 @@ func (em ec2InstanceBrowserModel) loadInstances(m Model) tea.Cmd {
 		regions = append(regions, m.cfg.Regions...)
 	}
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -261,7 +260,7 @@ func (em *ec2InstanceBrowserModel) openRelated(m *Model, kind ec2RelatedKind) (t
 
 func (em ec2InstanceBrowserModel) loadRelationships(m Model, inst awsservice.EC2Instance, kind ec2RelatedKind) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}

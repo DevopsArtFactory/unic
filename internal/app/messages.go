@@ -1,6 +1,8 @@
 package app
 
 import (
+	tea "github.com/charmbracelet/bubbletea"
+
 	"unic/internal/config"
 	"unic/internal/inspector"
 	awsservice "unic/internal/services/aws"
@@ -50,6 +52,13 @@ type paletteResourcesIndexedMsg struct {
 	generation int
 	items      []paletteItem
 	errs       []string
+}
+
+// genBoundMsg wraps a command result with the lifecycle generation it was
+// scheduled under; stale generations are dropped before touching the model.
+type genBoundMsg struct {
+	gen int
+	msg tea.Msg
 }
 
 type screenReadyMsg struct{}

@@ -112,7 +112,11 @@ func TestRegionPickerRepositoryCreationFailure(t *testing.T) {
 	var errResult errMsg
 	found := false
 	for _, batchedCmd := range batch {
-		if msg, ok := batchedCmd().(errMsg); ok {
+		out := batchedCmd()
+		if bound, ok := out.(genBoundMsg); ok {
+			out = bound.msg
+		}
+		if msg, ok := out.(errMsg); ok {
 			errResult = msg
 			found = true
 			break

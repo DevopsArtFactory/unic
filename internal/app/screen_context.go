@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -291,7 +290,7 @@ func (m Model) doFinalizeContextSwitch() tea.Cmd {
 		}
 
 		// Get caller identity with new credentials
-		ctx := context.Background()
+		ctx := m.commandContext()
 		var identity *awsservice.CallerIdentity
 		repo, err := awsservice.NewAwsRepository(ctx, cfg)
 		if err == nil {

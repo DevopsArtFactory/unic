@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -272,7 +271,7 @@ func (fm *fisModel) updateExperimentDetail(m *Model, msg tea.KeyMsg) (tea.Model,
 
 func (fm *fisModel) loadTemplates(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -289,7 +288,7 @@ func (fm *fisModel) loadTemplates(m Model) tea.Cmd {
 
 func (fm *fisModel) loadTemplateDetail(m Model, id string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -309,7 +308,7 @@ func (fm *fisModel) loadTemplateDetail(m Model, id string) tea.Cmd {
 
 func (fm *fisModel) loadExperiments(m Model, templateID string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -329,7 +328,7 @@ func (fm *fisModel) loadExperiments(m Model, templateID string) tea.Cmd {
 
 func (fm *fisModel) loadExperimentDetail(m Model, id string) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

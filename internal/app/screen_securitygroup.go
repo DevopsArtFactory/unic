@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -137,7 +136,7 @@ func (sm *securityGroupModel) ApplyFilter(m *Model, target filterTarget) bool {
 
 func (sm *securityGroupModel) loadSecurityGroups(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			return errMsg{err: err}
@@ -157,7 +156,7 @@ func (sm *securityGroupModel) loadSecurityGroups(m Model) tea.Cmd {
 
 func (sm *securityGroupModel) executeSGAddRule(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -194,7 +193,7 @@ func (sm *securityGroupModel) executeSGAddRule(m Model) tea.Cmd {
 
 func (sm *securityGroupModel) executeSGDeleteRule(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error
@@ -211,7 +210,7 @@ func (sm *securityGroupModel) executeSGDeleteRule(m Model) tea.Cmd {
 
 func (sm *securityGroupModel) refreshSecurityGroup(m Model) tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo := m.awsRepo
 		if repo == nil {
 			var err error

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -201,6 +200,9 @@ type Model struct {
 	regionIdx            int
 	regionPrevScreen     screen
 
+	// Command lifecycle for background AWS loads (shared across model copies)
+	commands *commandLifecycle
+
 	// Command palette
 	palette paletteModel
 
@@ -270,6 +272,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		filterTI:         filterTI,
 		filters:          make(map[filterTarget]string),
 		contextTable:     newContextTable(),
+		commands:         newCommandLifecycle(),
 	}
 	model.ec2Browser = newEC2InstanceBrowserModel()
 	model.ecs = newECSModel()
@@ -390,7 +393,7 @@ func (m Model) loadStartupCallerIdentity() tea.Cmd {
 
 func (m Model) loadCallerIdentity() tea.Cmd {
 	return func() tea.Msg {
-		ctx := context.Background()
+		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
 			// Non-fatal: just skip identity display
@@ -409,6 +412,13 @@ func (m Model) startLoading(cmd tea.Cmd) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) startLoadingWithMessage(title string, details []string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	// A new load supersedes whatever was still in flight. The command is
+	// bound to the renewed generation: it will not run once superseded, and
+	// its result is dropped when the generation moved on before delivery.
+	if m.commands != nil {
+		gen := m.commands.Renew()
+		cmd = m.commands.BindCmd(gen, cmd)
+	}
 	m.screen = screenLoading
 	m.loadingSpinner = newLoadingSpinner()
 	m.loadingTitle = title
@@ -481,6 +491,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, bootupTickCmd()
+	case genBoundMsg:
+		if m.commands == nil || msg.gen != m.commands.CurrentGen() {
+			// The load this result belongs to was superseded or abandoned
+			// after the command already ran; never let it touch the model.
+			return m, nil
+		}
+		return m.Update(msg.msg)
 	case updateAvailableMsg:
 		m.installMethod = msg.method
 		if msg.version != "" {
@@ -570,6 +587,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
 			!m.isTextEntryScreen() && m.screen != screenFISTemplateList {
 			m.deactivateFilter()
+			if m.commands != nil {
+				m.commands.CancelAll()
+			}
 			m.screen = screenServiceList
 			return m, nil
 		}
