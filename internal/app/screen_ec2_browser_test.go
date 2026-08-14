@@ -82,3 +82,16 @@ func TestEC2BrowserStoresRegionErrorsFromLoadedMsg(t *testing.T) {
 		}
 	}
 }
+
+func TestEC2BrowserAllRegionsScopeIgnoredAfterSwitchToSingleRegion(t *testing.T) {
+	m := Model{
+		cfg:    &config.Config{Region: "us-east-1", Regions: []string{"us-east-1"}},
+		screen: screenEC2InstanceBrowserList,
+	}
+	m.ec2Browser.allRegions = true // left over from a previous multi-region context
+
+	view := m.ec2Browser.viewList(m)
+	if strings.Contains(view, "(all regions)") {
+		t.Fatalf("expected single-region context to render without all-regions title, got:\n%s", view)
+	}
+}

@@ -281,8 +281,11 @@ func (em ec2InstanceBrowserModel) viewList(m Model) string {
 	var b strings.Builder
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
+	// allRegions can outlive a switch to a single-region context; render from
+	// the effective scope that loadInstances actually uses.
+	allRegions := em.allRegions && m.hasMultipleRegions()
 	title := "EC2 Instance Browser"
-	if em.allRegions {
+	if allRegions {
 		title += " (all regions)"
 	}
 	b.WriteString(titleStyle.Render(title))
@@ -319,7 +322,7 @@ func (em ec2InstanceBrowserModel) viewList(m Model) string {
 				style = selectedStyle
 			}
 			row := inst.DisplayTitle()
-			if em.allRegions {
+			if allRegions {
 				row = fmt.Sprintf("[%s] %s", inst.Region, row)
 			}
 			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterEC2BrowserInstances, row)))
