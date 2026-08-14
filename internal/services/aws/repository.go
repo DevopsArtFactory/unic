@@ -458,6 +458,29 @@ func (r *AwsRepository) GetCallerIdentity(ctx context.Context) (*CallerIdentity,
 // resolveAssumeRoleCredentials assumes a role and returns an aws.Config with temporary credentials.
 func resolveAssumeRoleCredentials(ctx context.Context, cfg *config.Config) (aws.Config, error) {
 	uniclog.Debug("aws", "resolving assume-role credentials", "role_arn", cfg.RoleArn)
+
+	// MFA-protected roles cannot prompt inside the TUI: reuse the cached
+	// session written by the CLI flows, or fail with a pointer to them.
+	if cfg.MFASerial != "" {
+		session, ok := CachedAssumeRoleSession(cfg)
+		if !ok {
+			return aws.Config{}, fmt.Errorf(
+				"context %q requires MFA (%s); run 'unic env %s' first to enter a token code",
+				cfg.ContextName, cfg.MFASerial, cfg.ContextName,
+			)
+		}
+		baseCfg, err := LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
+		if err != nil {
+			return aws.Config{}, fmt.Errorf("failed to load AWS config: %w", err)
+		}
+		baseCfg.Credentials = credentials.NewStaticCredentialsProvider(
+			session.AccessKeyID,
+			session.SecretAccessKey,
+			session.SessionToken,
+		)
+		return baseCfg, nil
+	}
+
 	baseCfg, err := LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
 	if err != nil {
 		return aws.Config{}, fmt.Errorf("failed to load AWS config: %w", err)

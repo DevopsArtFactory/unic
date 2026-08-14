@@ -191,6 +191,7 @@ contexts:
     auth_type: assume_role
     role_arn: arn:aws:iam::123456789012:role/Admin
     external_id: optional-external-id
+    mfa_serial: arn:aws:iam::123456789012:mfa/my-user   # optional: MFA-protected roles
 
   - name: local-dev
     profile: local-dev
@@ -209,7 +210,7 @@ contexts:
 |---|---|---|
 | `credential` | Use shared AWS profile credentials | `profile` |
 | `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
-| `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
+| `assume_role` | Assume a role from a base profile, optionally with MFA | `profile`, `role_arn`; optional `mfa_serial` |
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name`; `profile` is optional |
 
 The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients.
@@ -224,6 +225,7 @@ Optional context fields:
 |---|---|
 | `order` | Lower values appear first in the context setup picker. Contexts without `order` fall back after ordered entries in their existing file order. |
 | `sso_region` | (SSO only) Region of the IAM Identity Center portal, used for SSO login and role-credential retrieval. Defaults to `region` when unset. Use it when the SSO portal and your resources live in different regions. |
+| `mfa_serial` | (assume_role only) ARN of the MFA device required by the role's trust policy. CLI flows (`unic env`, `unic context setup`) prompt for a token code on stderr and cache the resulting session under `~/.config/unic/cache/assume-role/` until it expires. The TUI reuses a valid cached session passively and otherwise asks you to run `unic env <context>` first. |
 | `resources.regions` / `regions` | Additional resource regions available through the global `R` picker. The default resource region is always included automatically. |
 
 Resolution priority:
