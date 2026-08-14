@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,17 +30,19 @@ func typeIntoViews(t *testing.T, m Model, text string) Model {
 	return m
 }
 
+// drillToRDS selects RDS through the real sorted/filtered service list, so
+// the capture path is exercised with display indices that differ from the
+// catalog order.
 func drillToRDS(t *testing.T, m Model) Model {
 	t.Helper()
-	for i, svc := range m.services {
+	for i, svc := range m.serviceList() {
 		if svc.Name == domain.ServiceRDS {
 			m.svcIdx = i
-			m.features = svc.Features
-			m.featIdx = 0
-			return m
+			next, _ := m.updateServiceList(tea.KeyMsg{Type: tea.KeyEnter})
+			return next.(Model)
 		}
 	}
-	t.Fatal("RDS service not found in catalog")
+	t.Fatal("RDS service not found in service list")
 	return m
 }
 
@@ -156,3 +159,47 @@ func TestViewsNamingCapturesGlobalShortcutLetters(t *testing.T) {
 		t.Fatalf("expected uppercase letters to land in the name input, got %q", m.views.nameInput)
 	}
 }
+
+func TestViewsCaptureUsesServiceIdentityNotDisplayIndex(t *testing.T) {
+	m := viewsTestModel(t)
+	m = drillToRDS(t, m)
+
+	view, ok := m.captureCurrentView()
+	if !ok {
+		t.Fatal("expected a capturable view after drilling into RDS")
+	}
+	if view.Service != "RDS" || view.Feature != string(m.features[m.featIdx].Kind) {
+		t.Fatalf("expected service identity RDS from the sorted list, got %+v", view)
+	}
+}
+
+func TestFailedViewSwitchClearsPendingView(t *testing.T) {
+	m := viewsTestModel(t)
+	view := config.ViewEntry{
+		Name: "prod-incident", Context: "prod-admin",
+		Service: "RDS", Feature: string(domain.FeatureRDSBrowser), Filter: "prod-db",
+	}
+	next, _ := m.applyView(view)
+	m = next.(Model)
+	if m.pendingView == nil {
+		t.Fatal("expected pending view before the switch completes")
+	}
+
+	// The switch fails: the deferred jump must be disarmed.
+	failed, _ := m.Update(errMsg{err: errViewSwitch})
+	m = failed.(Model)
+	if m.pendingView != nil {
+		t.Fatal("expected failed switch to clear the pending view")
+	}
+
+	// A later unrelated successful switch must not jump anywhere.
+	switched, _, _ := m.handleContextMsg(contextSwitchedMsg{
+		cfg: &config.Config{Region: "us-east-1", ContextName: "other"},
+	})
+	after := switched.(Model)
+	if after.filterValue(filterRDS) != "" {
+		t.Fatalf("expected no stale view application, filter=%q", after.filterValue(filterRDS))
+	}
+}
+
+var errViewSwitch = errors.New("sso login failed")

@@ -65,13 +65,15 @@ func (m Model) openViews() (tea.Model, tea.Cmd) {
 // captureCurrentView snapshots the last drilled service feature, its primary
 // filter value, and the active context.
 func (m Model) captureCurrentView() (config.ViewEntry, bool) {
-	if m.svcIdx >= len(m.services) || m.featIdx >= len(m.features) {
+	// activeService is the identity recorded when the feature list was
+	// entered; svcIdx indexes the sorted/filtered display list and must not
+	// be used to resolve the service.
+	if m.activeService == "" || m.featIdx >= len(m.features) {
 		return config.ViewEntry{}, false
 	}
-	svc := m.services[m.svcIdx]
 	feat := m.features[m.featIdx]
 	view := config.ViewEntry{
-		Service: string(svc.Name),
+		Service: string(m.activeService),
 		Feature: string(feat.Kind),
 	}
 	if m.cfg != nil {

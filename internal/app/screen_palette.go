@@ -154,12 +154,14 @@ func (m Model) executePaletteItem(item paletteItem) (tea.Model, tea.Cmd) {
 
 // enterServiceForPalette aligns the service/feature list state with the jump
 // target so esc-navigation behaves as if the user drilled in manually.
+// svcIdx indexes the rendered (sorted/filtered) service list, so it is
+// resolved against filteredServices; activeService carries the identity.
 func (m *Model) enterServiceForPalette(item paletteItem) {
-	for i, svc := range m.services {
+	for _, svc := range m.services {
 		if svc.Name != item.service {
 			continue
 		}
-		m.svcIdx = i
+		m.activeService = svc.Name
 		m.features = svc.Features
 		for j, feat := range svc.Features {
 			if feat.Kind == item.feature {
@@ -167,7 +169,13 @@ func (m *Model) enterServiceForPalette(item paletteItem) {
 				break
 			}
 		}
-		return
+		break
+	}
+	for i, svc := range m.filteredServices {
+		if svc.Name == item.service {
+			m.svcIdx = i
+			break
+		}
 	}
 }
 

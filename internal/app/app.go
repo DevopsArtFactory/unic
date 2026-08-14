@@ -140,8 +140,9 @@ type Model struct {
 	favoriteServices map[domain.AwsService]struct{}
 
 	// Feature selection
-	features []domain.Feature
-	featIdx  int
+	activeService domain.AwsService // identity of the service whose features are loaded
+	features      []domain.Feature
+	featIdx       int
 
 	// Instance list with filtering
 	instances []awsservice.EC2Instance
@@ -493,6 +494,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
 		return m, cmd
 	case errMsg:
+		// A failed view-triggered context switch must not leave its deferred
+		// jump armed for the next unrelated switch.
+		m.pendingView = nil
 		m.errMsg = msg.err.Error()
 		m.loadingTitle = ""
 		m.loadingDetails = nil
@@ -668,6 +672,7 @@ func (m Model) updateServiceList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.inspector.Enter(&m)
 	case "enter":
 		if service, ok := m.selectedService(); ok {
+			m.activeService = service.Name
 			m.features = service.Features
 			m.featIdx = 0
 			m.screen = screenFeatureList
