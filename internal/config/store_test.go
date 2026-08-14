@@ -105,3 +105,20 @@ func TestMutateConfigNodePreservesComments(t *testing.T) {
 		t.Fatalf("expected current to be updated, got:\n%s", data)
 	}
 }
+
+func TestWriteConfigBytesPreservesExistingPermissions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("current: a\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := writeConfigBytes(path, []byte("current: b\n")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatalf("expected 0600 to be preserved on overwrite, got %v err=%v", info.Mode(), err)
+	}
+}

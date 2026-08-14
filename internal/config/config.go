@@ -538,12 +538,22 @@ func readConfigOrSeed(configPath string, onMissing missingPolicy) ([]byte, error
 
 // writeConfigBytes persists the config atomically: the content is written to a
 // temp file in the same directory and renamed into place, so a crash mid-write
-// can never leave a truncated config.yaml behind.
+// can never leave a truncated config.yaml behind. os.Rename replaces the
+// destination as a single operation on POSIX and on Windows (MoveFileEx with
+// MOVEFILE_REPLACE_EXISTING), so the previous config is never unlinked first.
+// An existing file keeps its permission bits (a user's 0600 stays 0600); only
+// newly created files get the 0644 default.
 func writeConfigBytes(configPath string, out []byte) error {
 	dir := filepath.Dir(configPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
+
+	mode := os.FileMode(0644)
+	if info, err := os.Stat(configPath); err == nil {
+		mode = info.Mode().Perm()
+	}
+
 	tmp, err := os.CreateTemp(dir, ".config-*.yaml.tmp")
 	if err != nil {
 		return fmt.Errorf("failed to create temp config file: %w", err)
@@ -555,7 +565,7 @@ func writeConfigBytes(configPath string, out []byte) error {
 		cleanup()
 		return fmt.Errorf("failed to write temp config file: %w", err)
 	}
-	if err := tmp.Chmod(0644); err != nil {
+	if err := tmp.Chmod(mode); err != nil {
 		tmp.Close()
 		cleanup()
 		return fmt.Errorf("failed to chmod temp config file: %w", err)
@@ -565,12 +575,6 @@ func writeConfigBytes(configPath string, out []byte) error {
 		return fmt.Errorf("failed to close temp config file: %w", err)
 	}
 	if err := os.Rename(tmpPath, configPath); err != nil {
-		// Windows cannot rename over an existing file; retry after removing it.
-		if removeErr := os.Remove(configPath); removeErr == nil {
-			if err = os.Rename(tmpPath, configPath); err == nil {
-				return nil
-			}
-		}
 		cleanup()
 		return fmt.Errorf("failed to replace config file: %w", err)
 	}
