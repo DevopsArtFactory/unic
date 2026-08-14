@@ -34,6 +34,9 @@ func (r *AwsRepository) ListDBInstances(ctx context.Context) ([]RDSInstance, err
 			BackupRetentionPeriod: awssdk.ToInt32(db.BackupRetentionPeriod),
 			ClusterID:             awssdk.ToString(db.DBClusterIdentifier),
 		}
+		if db.PendingModifiedValues != nil {
+			inst.PendingInstanceClass = awssdk.ToString(db.PendingModifiedValues.DBInstanceClass)
+		}
 
 		// Endpoint may be nil for stopped instances
 		if db.Endpoint != nil {
@@ -79,6 +82,9 @@ func (r *AwsRepository) DescribeDBInstance(ctx context.Context, dbInstanceID str
 		PubliclyAccessible:    awssdk.ToBool(db.PubliclyAccessible),
 		BackupRetentionPeriod: awssdk.ToInt32(db.BackupRetentionPeriod),
 		ClusterID:             awssdk.ToString(db.DBClusterIdentifier),
+	}
+	if db.PendingModifiedValues != nil {
+		inst.PendingInstanceClass = awssdk.ToString(db.PendingModifiedValues.DBInstanceClass)
 	}
 	if db.Endpoint != nil {
 		inst.Endpoint = fmt.Sprintf("%s:%d", awssdk.ToString(db.Endpoint.Address), awssdk.ToInt32(db.Endpoint.Port))

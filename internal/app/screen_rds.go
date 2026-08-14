@@ -83,7 +83,10 @@ func (rm *rdsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		}
 		rm.filtered = applyFilter(rm.instances, m.filterValue(filterRDS))
 		rm.idx = 0
-		if awsservice.IsTransitionalStatus(msg.instance.Status) {
+		// An immediate class modify can briefly report `available` with the
+		// change still pending; keep polling until the pending value clears.
+		modifyInFlight := rm.action == "modify" && rm.applyImmediately && msg.instance.PendingInstanceClass != ""
+		if awsservice.IsTransitionalStatus(msg.instance.Status) || modifyInFlight {
 			return *m, rm.tickPoll(msg.instance.DBInstanceID), true
 		}
 		rm.polling = false
@@ -237,7 +240,12 @@ func (rm *rdsModel) updateClassPicker(m *Model, msg tea.KeyMsg) (tea.Model, tea.
 		if len(rm.filteredClasses) == 0 || rm.classIdx >= len(rm.filteredClasses) {
 			return *m, nil
 		}
-		rm.pendingClass = rm.filteredClasses[rm.classIdx]
+		chosen := rm.filteredClasses[rm.classIdx]
+		if rm.selected != nil && chosen == rm.selected.InstanceClass {
+			// Modifying to the identical class is a no-op API call; refuse it.
+			return *m, nil
+		}
+		rm.pendingClass = chosen
 		rm.applyImmediately = false
 		rm.action = "modify"
 		rm.confirmInput = ""
@@ -493,6 +501,10 @@ func (rm rdsModel) viewDetail(m Model) string {
 
 	b.WriteString(renderDetailLine("Class", normalStyle.Render(r.InstanceClass)))
 	b.WriteString("\n")
+	if r.PendingInstanceClass != "" {
+		b.WriteString(renderDetailLine("Pending Class", filterStyle.Render(r.PendingInstanceClass)+dimStyle.Render(" (applies at next maintenance window unless applied immediately)")))
+		b.WriteString("\n")
+	}
 	multiAZStr := "No"
 	if r.MultiAZ {
 		multiAZStr = "Yes"
