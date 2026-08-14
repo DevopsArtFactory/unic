@@ -139,7 +139,7 @@ func (lm *lambdaModel) updateFunctionList(m *Model, msg tea.KeyMsg) (tea.Model, 
 		if len(lm.filtered) > 0 && lm.functionIdx < len(lm.filtered) {
 			fn := lm.filtered[lm.functionIdx]
 			lm.selected = &fn
-			return m.cwLogs.StartFromLambda(m, fn.Name)
+			return m.cwLogs.StartFromLambda(m, fn.Name, fn.Region)
 		}
 	case "enter":
 		if len(lm.filtered) > 0 && lm.functionIdx < len(lm.filtered) {
@@ -225,7 +225,7 @@ func (lm *lambdaModel) updateFunctionDetail(m *Model, msg tea.KeyMsg) (tea.Model
 		m.screen = screenLambdaInvokeInput
 	case "l":
 		if lm.selected != nil {
-			return m.cwLogs.StartFromLambda(m, lm.selected.Name)
+			return m.cwLogs.StartFromLambda(m, lm.selected.Name, lm.selected.Region)
 		}
 	}
 	return *m, nil
@@ -382,7 +382,7 @@ func (lm *lambdaModel) updateInvokeResult(m *Model, msg tea.KeyMsg) (tea.Model, 
 		m.screen = screenLambdaInvokeInput
 	case "l":
 		if lm.selected != nil {
-			return m.cwLogs.StartFromLambda(m, lm.selected.Name)
+			return m.cwLogs.StartFromLambda(m, lm.selected.Name, lm.selected.Region)
 		}
 	}
 	return *m, nil

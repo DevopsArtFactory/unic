@@ -78,7 +78,9 @@ func (rm *rdsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		}
 		rm.selected = msg.instance
 		for i, inst := range rm.instances {
-			if inst.DBInstanceID == msg.instance.DBInstanceID {
+			// Identifiers are only unique per region; an all-regions list can
+			// hold the same ID twice, so match the region as well.
+			if inst.DBInstanceID == msg.instance.DBInstanceID && inst.Region == msg.instance.Region {
 				rm.instances[i] = *msg.instance
 				break
 			}
