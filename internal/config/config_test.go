@@ -991,3 +991,63 @@ contexts:
 		t.Errorf("expected structured auth mfa_serial, got '%s'", named.MFASerial)
 	}
 }
+
+func TestContextWithOktaSAML(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: okta-prod
+defaults:
+  region: us-east-1
+contexts:
+  - name: okta-prod
+    region: ap-northeast-2
+    auth_type: okta_saml
+    okta_org_url: https://acme.okta.com
+    okta_app_id: amazon_aws/abc123/272
+  - name: okta-structured
+    auth:
+      type: okta_saml
+      okta_org_url: https://acme.okta.com
+      okta_app_id: amazon_aws/def456/272
+      role_arn: arn:aws:iam::111111111111:role/Dev
+    resources:
+      default_region: us-east-1
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuthType != AuthTypeOktaSAML {
+		t.Errorf("expected okta_saml auth type, got %q", cfg.AuthType)
+	}
+	if cfg.OktaOrgURL != "https://acme.okta.com" || cfg.OktaAppID != "amazon_aws/abc123/272" {
+		t.Errorf("expected flat okta fields, got %q %q", cfg.OktaOrgURL, cfg.OktaAppID)
+	}
+
+	named, err := LoadNamedContext(path, "okta-structured")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if named.OktaAppID != "amazon_aws/def456/272" || named.RoleArn != "arn:aws:iam::111111111111:role/Dev" {
+		t.Errorf("expected structured okta fields, got %+v", named)
+	}
+
+	contexts, err := Contexts(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ctx := range contexts {
+		if ctx.Name == "okta-prod" && ctx.OktaOrgURL != "https://acme.okta.com" {
+			t.Errorf("expected ContextInfo okta org URL, got %+v", ctx)
+		}
+	}
+}
+
+func TestNormalizeAuthTypeOktaSAML(t *testing.T) {
+	if normalizeAuthType("okta_saml") != AuthTypeOktaSAML {
+		t.Error("okta_saml should normalize to AuthTypeOktaSAML")
+	}
+	if normalizeAuthType("okta-saml") != AuthTypeOktaSAML {
+		t.Error("okta-saml should normalize to AuthTypeOktaSAML")
+	}
+}

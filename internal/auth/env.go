@@ -53,6 +53,9 @@ func BuildEnvExports(ctx context.Context, cfg *config.Config) (string, error) {
 		values["AWS_DEFAULT_REGION"] = cfg.Region
 		values["AWS_PROFILE"] = ""
 
+	case config.AuthTypeOktaSAML:
+		return "", fmt.Errorf("context %q uses okta_saml, whose runtime credential exchange is not implemented yet", cfg.ContextName)
+
 	case config.AuthTypeCredential, config.AuthTypeConsoleLogin, config.AuthTypeDefault:
 		if cfg.AuthType == config.AuthTypeConsoleLogin {
 			if err := awsservice.ValidateConsoleLoginContext(cfg); err != nil {

@@ -65,3 +65,20 @@ func TestContextAddKeepsCurrentFieldVisibleOnShortTerminal(t *testing.T) {
 		t.Fatalf("expected windowing indicator on short terminal, got %q", view)
 	}
 }
+
+func TestContextAddDoesNotOfferOktaSAMLYet(t *testing.T) {
+	for _, authType := range authTypes {
+		if authType == "okta_saml" {
+			t.Fatal("okta_saml must stay out of the add-context picker until runtime credential exchange lands")
+		}
+	}
+	fields, ok := fieldsByAuthType["okta_saml"]
+	if !ok || len(fields) == 0 {
+		t.Fatal("okta_saml field definitions should stay ready for the runtime slice")
+	}
+	for _, field := range fields {
+		if strings.Contains(field.key, "password") || strings.Contains(field.key, "secret") || strings.Contains(field.key, "mfa") {
+			t.Fatalf("okta_saml wizard must not collect secrets, got field %q", field.key)
+		}
+	}
+}

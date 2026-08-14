@@ -57,6 +57,7 @@ const (
 	AuthTypeCredential   AuthType = "credential"
 	AuthTypeConsoleLogin AuthType = "console_login"
 	AuthTypeAssumeRole   AuthType = "assume_role"
+	AuthTypeOktaSAML     AuthType = "okta_saml"
 )
 
 // ContextEntry represents a single context definition in config.yaml.
@@ -73,6 +74,8 @@ type ContextEntry struct {
 	SSORegion    string            `yaml:"sso_region,omitempty"`
 	SSOAccountID string            `yaml:"sso_account_id,omitempty"`
 	SSORoleName  string            `yaml:"sso_role_name,omitempty"`
+	OktaOrgURL   string            `yaml:"okta_org_url,omitempty"`
+	OktaAppID    string            `yaml:"okta_app_id,omitempty"`
 	Regions      []string          `yaml:"regions,omitempty"`
 	SyncSource   string            `yaml:"sync_source,omitempty"`
 	Auth         *ContextAuth      `yaml:"auth,omitempty"`
@@ -90,6 +93,8 @@ type ContextAuth struct {
 	SSORegion    string `yaml:"sso_region,omitempty"`
 	SSOAccountID string `yaml:"sso_account_id,omitempty"`
 	SSORoleName  string `yaml:"sso_role_name,omitempty"`
+	OktaOrgURL   string `yaml:"okta_org_url,omitempty"`
+	OktaAppID    string `yaml:"okta_app_id,omitempty"`
 }
 
 // ContextResources defines the default and selectable AWS resource regions.
@@ -113,6 +118,8 @@ type Config struct {
 	SSORegion        string
 	SSOAccountID     string
 	SSORoleName      string
+	OktaOrgURL       string
+	OktaAppID        string
 	Regions          []string
 	FavoriteServices []string
 	FavoriteContexts []string
@@ -143,6 +150,8 @@ func normalizeAuthType(value string) AuthType {
 		return AuthTypeConsoleLogin
 	case "assume_role", "assume-role":
 		return AuthTypeAssumeRole
+	case "okta_saml", "okta-saml":
+		return AuthTypeOktaSAML
 	default:
 		return AuthType(value)
 	}
@@ -162,6 +171,8 @@ type ContextInfo struct {
 	SSORegion    string
 	SSOAccountID string
 	SSORoleName  string
+	OktaOrgURL   string
+	OktaAppID    string
 	Regions      []string
 	SyncSource   string
 	Current      bool
@@ -172,6 +183,7 @@ type resolvedContextEntry struct {
 	Profile, Region, AuthType, RoleArn, ExternalID    string
 	MFASerial                                         string
 	SSOStartURL, SSORegion, SSOAccountID, SSORoleName string
+	OktaOrgURL, OktaAppID                             string
 	Regions                                           []string
 }
 
@@ -182,6 +194,7 @@ func (c ContextEntry) resolved(defaultRegion string) resolvedContextEntry {
 		MFASerial:   c.MFASerial,
 		SSOStartURL: c.SSOStartURL, SSORegion: c.SSORegion,
 		SSOAccountID: c.SSOAccountID, SSORoleName: c.SSORoleName,
+		OktaOrgURL: c.OktaOrgURL, OktaAppID: c.OktaAppID,
 		Regions: c.Regions,
 	}
 	if c.Auth != nil {
@@ -194,6 +207,8 @@ func (c ContextEntry) resolved(defaultRegion string) resolvedContextEntry {
 		r.SSORegion = c.Auth.SSORegion
 		r.SSOAccountID = c.Auth.SSOAccountID
 		r.SSORoleName = c.Auth.SSORoleName
+		r.OktaOrgURL = c.Auth.OktaOrgURL
+		r.OktaAppID = c.Auth.OktaAppID
 	}
 	if c.Resources != nil {
 		r.Region = c.Resources.DefaultRegion
@@ -260,7 +275,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	}
 
 	// New format: resolve current context
-	var contextName, roleArn, externalID, mfaSerial, ssoStartURL, ssoRegion, ssoAccountID, ssoRoleName string
+	var contextName, roleArn, externalID, mfaSerial, ssoStartURL, ssoRegion, ssoAccountID, ssoRoleName, oktaOrgURL, oktaAppID string
 	var regions []string
 	var authType AuthType
 	if fc.Current != "" {
@@ -281,6 +296,8 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 				ssoRegion = resolved.SSORegion
 				ssoAccountID = resolved.SSOAccountID
 				ssoRoleName = resolved.SSORoleName
+				oktaOrgURL = resolved.OktaOrgURL
+				oktaAppID = resolved.OktaAppID
 				break
 			}
 		}
@@ -318,6 +335,8 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		SSORegion:        ssoRegion,
 		SSOAccountID:     ssoAccountID,
 		SSORoleName:      ssoRoleName,
+		OktaOrgURL:       oktaOrgURL,
+		OktaAppID:        oktaAppID,
 		Regions:          regions,
 		FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
 		FavoriteContexts: normalizeFavoriteContexts(fc.Favorites.Contexts),
@@ -367,6 +386,8 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			SSORegion:        resolved.SSORegion,
 			SSOAccountID:     resolved.SSOAccountID,
 			SSORoleName:      resolved.SSORoleName,
+			OktaOrgURL:       resolved.OktaOrgURL,
+			OktaAppID:        resolved.OktaAppID,
 			Regions:          resolved.Regions,
 			FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
 			FavoriteContexts: normalizeFavoriteContexts(fc.Favorites.Contexts),
@@ -449,6 +470,8 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 			SSORegion:    resolved.SSORegion,
 			SSOAccountID: resolved.SSOAccountID,
 			SSORoleName:  resolved.SSORoleName,
+			OktaOrgURL:   resolved.OktaOrgURL,
+			OktaAppID:    resolved.OktaAppID,
 			Regions:      resolved.Regions,
 			SyncSource:   ctx.SyncSource,
 			Current:      ctx.Name == fc.Current,

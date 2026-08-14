@@ -15,6 +15,8 @@ type fieldDef struct {
 	required bool
 }
 
+// okta_saml stays out of the picker until its runtime credential exchange
+// lands (#85); its field definitions below are ready for that slice.
 var authTypes = []string{"sso", "credential", "console_login", "assume_role"}
 
 var fieldsByAuthType = map[string][]fieldDef{
@@ -50,6 +52,17 @@ var fieldsByAuthType = map[string][]fieldDef{
 		{key: "profile", label: "Profile", required: true},
 		{key: "role_arn", label: "Role ARN", required: true},
 		{key: "external_id", label: "External ID (optional)", required: false},
+	},
+	// okta_saml stores only non-secret metadata; passwords and MFA secrets
+	// never go into config.yaml. Runtime credential exchange is tracked in #85.
+	"okta_saml": {
+		{key: "name", label: "Name", required: true},
+		{key: "order", label: "Display Order (optional, lower first)", required: false},
+		{key: "region", label: "Region", required: true},
+		{key: "regions", label: "Other Resource Regions (optional, comma-separated)", required: false},
+		{key: "okta_org_url", label: "Okta Org URL (https://acme.okta.com)", required: true},
+		{key: "okta_app_id", label: "Okta AWS App ID (from the app embed link)", required: true},
+		{key: "role_arn", label: "Preferred Role ARN (optional)", required: false},
 	},
 }
 
@@ -143,6 +156,8 @@ func (m Model) saveContext() tea.Cmd {
 				SSORegion:    m.addValues["sso_region"],
 				SSOAccountID: m.addValues["sso_account_id"],
 				SSORoleName:  m.addValues["sso_role_name"],
+				OktaOrgURL:   m.addValues["okta_org_url"],
+				OktaAppID:    m.addValues["okta_app_id"],
 			},
 			Resources: &config.ContextResources{
 				DefaultRegion: m.addValues["region"],
