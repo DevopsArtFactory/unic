@@ -187,13 +187,110 @@ func TestResolveOktaSAMLSessionReusesCache(t *testing.T) {
 	}
 }
 
-func TestResolveOktaSAMLSessionRejectsMFARequired(t *testing.T) {
+func TestResolveOktaSAMLSessionRejectsUnsupportedFactors(t *testing.T) {
 	server := newOktaTestServer(t, "MFA_REQUIRED")
 	stubOktaSeams(t)
 
 	_, err := ResolveOktaSAMLSession(context.Background(), oktaTestConfig(server.URL))
-	if err == nil || !strings.Contains(err.Error(), "MFA challenge") {
-		t.Fatalf("expected MFA-not-supported error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "no supported okta MFA factor") {
+		t.Fatalf("expected unsupported-factor error, got %v", err)
+	}
+}
+
+func newOktaMFATestServer(t *testing.T, factorType string, verifyResponses []string) *httptest.Server {
+	t.Helper()
+	verifyCalls := 0
+	mux := http.NewServeMux()
+	var server *httptest.Server
+	mux.HandleFunc("/api/v1/authn", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{
+			"status": "MFA_REQUIRED",
+			"stateToken": "state-1",
+			"_embedded": {"factors": [{
+				"id": "factor-1",
+				"factorType": %q,
+				"provider": "OKTA",
+				"_links": {"verify": {"href": "%s/api/v1/authn/factors/factor-1/verify"}}
+			}]}
+		}`, factorType, server.URL)
+	})
+	mux.HandleFunc("/api/v1/authn/factors/factor-1/verify", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		idx := min(verifyCalls, len(verifyResponses)-1)
+		verifyCalls++
+		fmt.Fprint(w, verifyResponses[idx])
+	})
+	mux.HandleFunc("/home/amazon_aws/app123/272", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `<html><input name="SAMLResponse" value="%s"/></html>`, testAssertionB64())
+	})
+	server = httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestResolveOktaSAMLSessionCompletesTOTPChallenge(t *testing.T) {
+	server := newOktaMFATestServer(t, "token:software:totp", []string{
+		`{"status": "SUCCESS", "sessionToken": "tok-123"}`,
+	})
+	stubOktaSeams(t)
+	origMFA := promptOktaMFACodeFn
+	t.Cleanup(func() { promptOktaMFACodeFn = origMFA })
+	promptOktaMFACodeFn = func(oktaFactor) (string, error) { return "654321", nil }
+
+	session, err := ResolveOktaSAMLSession(context.Background(), oktaTestConfig(server.URL))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if session.AccessKeyID != "AKIAOKTA" {
+		t.Fatalf("expected exchanged credentials after TOTP, got %+v", session)
+	}
+}
+
+func TestResolveOktaSAMLSessionPollsPushUntilApproved(t *testing.T) {
+	server := newOktaMFATestServer(t, "push", []string{
+		`{"status": "MFA_CHALLENGE", "factorResult": "WAITING"}`,
+		`{"status": "MFA_CHALLENGE", "factorResult": "WAITING"}`,
+		`{"status": "SUCCESS", "sessionToken": "tok-123"}`,
+	})
+	stubOktaSeams(t)
+	origInterval := oktaPushPollInterval
+	t.Cleanup(func() { oktaPushPollInterval = origInterval })
+	oktaPushPollInterval = time.Millisecond
+
+	session, err := ResolveOktaSAMLSession(context.Background(), oktaTestConfig(server.URL))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if session.AccessKeyID != "AKIAOKTA" {
+		t.Fatalf("expected exchanged credentials after push approval, got %+v", session)
+	}
+}
+
+func TestResolveOktaSAMLSessionFailsOnRejectedPush(t *testing.T) {
+	server := newOktaMFATestServer(t, "push", []string{
+		`{"status": "MFA_CHALLENGE", "factorResult": "REJECTED"}`,
+	})
+	stubOktaSeams(t)
+
+	_, err := ResolveOktaSAMLSession(context.Background(), oktaTestConfig(server.URL))
+	if err == nil || !strings.Contains(err.Error(), "rejected") {
+		t.Fatalf("expected push-rejected error, got %v", err)
+	}
+}
+
+func TestResolveOktaSAMLSessionFailsOnBadTOTPCode(t *testing.T) {
+	server := newOktaMFATestServer(t, "token:software:totp", []string{
+		`{"status": "MFA_CHALLENGE", "factorResult": "REJECTED"}`,
+	})
+	stubOktaSeams(t)
+	origMFA := promptOktaMFACodeFn
+	t.Cleanup(func() { promptOktaMFACodeFn = origMFA })
+	promptOktaMFACodeFn = func(oktaFactor) (string, error) { return "000000", nil }
+
+	_, err := ResolveOktaSAMLSession(context.Background(), oktaTestConfig(server.URL))
+	if err == nil || !strings.Contains(err.Error(), "MFA verification ended") {
+		t.Fatalf("expected TOTP verification failure, got %v", err)
 	}
 }
 
