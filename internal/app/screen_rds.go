@@ -297,13 +297,9 @@ func (rm *rdsModel) updateConfirm(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			return *m, rm.executeAction(*m, rm.action, rm.selected.DBInstanceID)
 		}
 	case "backspace":
-		if len(rm.confirmInput) > 0 {
-			rm.confirmInput = rm.confirmInput[:len(rm.confirmInput)-1]
-		}
+		rm.confirmInput = trimLastRune(rm.confirmInput)
 	default:
-		if runes := msg.Runes; len(runes) > 0 {
-			rm.confirmInput += string(runes)
-		}
+		rm.confirmInput = appendKeyRunes(rm.confirmInput, msg)
 	}
 	return *m, nil
 }

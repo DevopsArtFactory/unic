@@ -132,9 +132,7 @@ func (m Model) updateContextAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.addStep = -1 // confirm step
 		}
 	case "backspace":
-		if len(m.addInput) > 0 {
-			m.addInput = m.addInput[:len(m.addInput)-1]
-		}
+		m.addInput = trimLastRune(m.addInput)
 	default:
 		if len(runes) > 0 {
 			m.addInput += string(runes)

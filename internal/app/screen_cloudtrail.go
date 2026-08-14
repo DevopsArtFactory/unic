@@ -110,13 +110,9 @@ func (cm *cloudTrailModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.
 			cm.lookupText = ""
 			return m.startLoading(cm.loadEvents(*m))
 		case "backspace":
-			if runes := []rune(cm.lookupText); len(runes) > 0 {
-				cm.lookupText = string(runes[:len(runes)-1])
-			}
+			cm.lookupText = trimLastRune(cm.lookupText)
 		default:
-			if runes := msg.Runes; len(runes) > 0 {
-				cm.lookupText += string(runes)
-			}
+			cm.lookupText = appendKeyRunes(cm.lookupText, msg)
 		}
 		return *m, nil
 	}

@@ -354,8 +354,8 @@ func (bm *bedrockModel) updateCreate(m *Model, msg tea.KeyMsg) (tea.Model, tea.C
 		bm.status = ""
 		m.screen = screenBedrockKeyConfirm
 	case "backspace":
-		if bm.createField != bedrockCreateFieldMode && len(bm.createInput) > 0 {
-			bm.createInput = bm.createInput[:len(bm.createInput)-1]
+		if bm.createField != bedrockCreateFieldMode {
+			bm.createInput = trimLastRune(bm.createInput)
 		}
 	default:
 		if runes := msg.Runes; bm.createField != bedrockCreateFieldMode && len(runes) > 0 {
@@ -398,13 +398,9 @@ func (bm *bedrockModel) updateConfirm(m *Model, msg tea.KeyMsg) (tea.Model, tea.
 			}
 		}
 	case "backspace":
-		if len(bm.confirm) > 0 {
-			bm.confirm = bm.confirm[:len(bm.confirm)-1]
-		}
+		bm.confirm = trimLastRune(bm.confirm)
 	default:
-		if runes := msg.Runes; len(runes) > 0 {
-			bm.confirm += string(runes)
-		}
+		bm.confirm = appendKeyRunes(bm.confirm, msg)
 	}
 	return *m, nil
 }

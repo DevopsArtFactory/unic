@@ -434,13 +434,9 @@ func (rm *reachabilityModel) updateConfig(m *Model, msg tea.KeyMsg) (tea.Model, 
 	case "backspace":
 		switch rm.configField {
 		case 1:
-			if len(rm.portInput) > 0 {
-				rm.portInput = rm.portInput[:len(rm.portInput)-1]
-			}
+			rm.portInput = trimLastRune(rm.portInput)
 		case 2:
-			if len(rm.destinationIP) > 0 {
-				rm.destinationIP = rm.destinationIP[:len(rm.destinationIP)-1]
-			}
+			rm.destinationIP = trimLastRune(rm.destinationIP)
 		}
 	case "enter":
 		if rm.configField == 0 && rm.configField < rm.configMaxField() {

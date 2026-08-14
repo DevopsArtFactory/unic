@@ -280,9 +280,7 @@ func (lm *lambdaModel) updateInvokeInput(m *Model, msg tea.KeyMsg) (tea.Model, t
 			return m.startLoading(lm.invokeFunction(*m))
 		}
 	case "backspace":
-		if len(lm.invokePayload) > 0 {
-			lm.invokePayload = lm.invokePayload[:len(lm.invokePayload)-1]
-		}
+		lm.invokePayload = trimLastRune(lm.invokePayload)
 	default:
 		if len(key) == 1 || key == " " {
 			lm.invokePayload += key

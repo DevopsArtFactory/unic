@@ -560,9 +560,7 @@ func (rm *route53Model) updateTextInput(m *Model, key string, cancelScreen scree
 			rm.editInput = "300"
 		}
 	case "backspace":
-		if len(rm.editInput) > 0 {
-			rm.editInput = rm.editInput[:len(rm.editInput)-1]
-		}
+		rm.editInput = trimLastRune(rm.editInput)
 	default:
 		if len(key) == 1 {
 			rm.editInput += key
@@ -583,9 +581,7 @@ func (rm *route53Model) updateCreateTTL(m *Model, key string) (tea.Model, tea.Cm
 		// Execute create
 		return m.startLoading(rm.executeCreate(*m))
 	case "backspace":
-		if len(rm.editInput) > 0 {
-			rm.editInput = rm.editInput[:len(rm.editInput)-1]
-		}
+		rm.editInput = trimLastRune(rm.editInput)
 	default:
 		if len(key) == 1 && key >= "0" && key <= "9" {
 			rm.editInput += key
@@ -670,9 +666,7 @@ func (rm *route53Model) updateRecordEdit(m *Model, msg tea.KeyMsg) (tea.Model, t
 			rm.editField++
 			rm.editInput = rm.editValues["ttl"]
 		case "backspace":
-			if len(rm.editInput) > 0 {
-				rm.editInput = rm.editInput[:len(rm.editInput)-1]
-			}
+			rm.editInput = trimLastRune(rm.editInput)
 		default:
 			if len(key) == 1 {
 				rm.editInput += key
@@ -689,9 +683,7 @@ func (rm *route53Model) updateRecordEdit(m *Model, msg tea.KeyMsg) (tea.Model, t
 			rm.editValues["ttl"] = rm.editInput
 			return m.startLoading(rm.executeUpdate(*m))
 		case "backspace":
-			if len(rm.editInput) > 0 {
-				rm.editInput = rm.editInput[:len(rm.editInput)-1]
-			}
+			rm.editInput = trimLastRune(rm.editInput)
 		default:
 			if len(key) == 1 && key >= "0" && key <= "9" {
 				rm.editInput += key
@@ -765,13 +757,9 @@ func (rm *route53Model) updateRecordDeleteConfirm(m *Model, msg tea.KeyMsg) (tea
 			return m.startLoading(rm.executeDelete(*m))
 		}
 	case "backspace":
-		if len(rm.confirmInput) > 0 {
-			rm.confirmInput = rm.confirmInput[:len(rm.confirmInput)-1]
-		}
+		rm.confirmInput = trimLastRune(rm.confirmInput)
 	default:
-		if runes := msg.Runes; len(runes) > 0 {
-			rm.confirmInput += string(runes)
-		}
+		rm.confirmInput = appendKeyRunes(rm.confirmInput, msg)
 	}
 	return *m, nil
 }

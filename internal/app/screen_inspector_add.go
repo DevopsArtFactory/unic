@@ -305,13 +305,9 @@ func (im *inspectorModel) updateChecklistAdd(m *Model, msg tea.KeyMsg) (tea.Mode
 			return im.saveChecklistAdd(m)
 		}
 	case "backspace":
-		if runes := []rune(im.addInput); len(runes) > 0 {
-			im.addInput = string(runes[:len(runes)-1])
-		}
+		im.addInput = trimLastRune(im.addInput)
 	default:
-		if runes := msg.Runes; len(runes) > 0 {
-			im.addInput += string(runes)
-		}
+		im.addInput = appendKeyRunes(im.addInput, msg)
 	}
 	return *m, nil
 }
