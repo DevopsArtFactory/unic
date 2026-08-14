@@ -25,6 +25,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureSecurityGroupBrowser:  filterSecurityGroups,
 	domain.FeatureIAMUsersBrowser:       filterIAMUsers,
 	domain.FeatureCloudWatchMetrics:     filterCWMetrics,
+	domain.FeatureCloudWatchAlarms:      filterCWAlarms,
 	domain.FeatureCloudWatchLogsBrowser: filterCWLogGroups,
 	domain.FeatureECSExec:               filterECSClusters,
 	domain.FeatureEKSBrowser:            filterEKSClusters,

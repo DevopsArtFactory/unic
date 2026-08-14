@@ -61,6 +61,8 @@ const (
 	screenIAMKeyRotateResult
 	screenCWMetricList
 	screenCWMetricDetail
+	screenCWAlarmList
+	screenCWAlarmDetail
 	screenCWLogGroupList
 	screenCWLogStreamList
 	screenCWLogViewer
@@ -161,6 +163,7 @@ type Model struct {
 	vpc          vpcModel
 	reachability reachabilityModel
 	cwMetrics    cloudWatchMetricsModel
+	cwAlarms     cwAlarmsModel
 	cwLogs       cloudWatchLogsModel
 	rds          rdsModel
 	route53      route53Model
@@ -272,6 +275,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.vpc = newVPCModel()
 	model.reachability = newReachabilityModel()
 	model.cwMetrics = newCloudWatchMetricsModel()
+	model.cwAlarms = newCWAlarmsModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
 	model.route53 = newRoute53Model()
@@ -717,6 +721,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.secrets.Start(&m)
 	case domain.FeatureCloudWatchMetrics:
 		return m.cwMetrics.Start(&m)
+	case domain.FeatureCloudWatchAlarms:
+		return m.cwAlarms.Start(&m)
 	case domain.FeatureCloudWatchLogsBrowser:
 		return m.cwLogs.Start(&m)
 	case domain.FeatureS3Browser:

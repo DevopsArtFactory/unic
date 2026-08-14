@@ -12,8 +12,24 @@ import (
 )
 
 type mockCloudWatchClient struct {
-	listMetricsFunc   func(ctx context.Context, params *cloudwatch.ListMetricsInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error)
-	getMetricDataFunc func(ctx context.Context, params *cloudwatch.GetMetricDataInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error)
+	listMetricsFunc          func(ctx context.Context, params *cloudwatch.ListMetricsInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error)
+	getMetricDataFunc        func(ctx context.Context, params *cloudwatch.GetMetricDataInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error)
+	describeAlarmsFunc       func(ctx context.Context, params *cloudwatch.DescribeAlarmsInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmsOutput, error)
+	describeAlarmHistoryFunc func(ctx context.Context, params *cloudwatch.DescribeAlarmHistoryInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmHistoryOutput, error)
+}
+
+func (m *mockCloudWatchClient) DescribeAlarms(ctx context.Context, params *cloudwatch.DescribeAlarmsInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmsOutput, error) {
+	if m.describeAlarmsFunc != nil {
+		return m.describeAlarmsFunc(ctx, params, optFns...)
+	}
+	return &cloudwatch.DescribeAlarmsOutput{}, nil
+}
+
+func (m *mockCloudWatchClient) DescribeAlarmHistory(ctx context.Context, params *cloudwatch.DescribeAlarmHistoryInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmHistoryOutput, error) {
+	if m.describeAlarmHistoryFunc != nil {
+		return m.describeAlarmHistoryFunc(ctx, params, optFns...)
+	}
+	return &cloudwatch.DescribeAlarmHistoryOutput{}, nil
 }
 
 func (m *mockCloudWatchClient) ListMetrics(ctx context.Context, params *cloudwatch.ListMetricsInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {

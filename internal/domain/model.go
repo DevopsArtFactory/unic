@@ -39,6 +39,7 @@ const (
 	FeatureListAccessKeys        FeatureKind = "ListAccessKeys"
 	FeatureRotateAccessKey       FeatureKind = "RotateAccessKey"
 	FeatureCloudWatchMetrics     FeatureKind = "CloudWatch Metrics Viewer"
+	FeatureCloudWatchAlarms      FeatureKind = "CloudWatch Alarm Browser"
 	FeatureCloudWatchLogsBrowser FeatureKind = "CloudWatch Logs Browser"
 	FeatureECSExec               FeatureKind = "ECS Browser & Exec"
 	FeatureECRRepositoryBrowser  FeatureKind = "ECR Repository Browser"
