@@ -13,6 +13,7 @@ type EC2Instance struct {
 	State            string
 	InstanceType     string
 	AvailabilityZone string
+	Region           string
 	VPCID            string
 	SubnetID         string
 	PrivateIP        string
@@ -39,6 +40,7 @@ func (i EC2Instance) FilterText() string {
 		i.State,
 		i.InstanceType,
 		i.AvailabilityZone,
+		i.Region,
 		i.VPCID,
 		i.SubnetID,
 		i.PrivateIP,

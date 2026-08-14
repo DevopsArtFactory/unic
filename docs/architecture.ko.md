@@ -195,7 +195,7 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
    - `sso_account_id`, `sso_role_name` 포함
    - 직접 env export와 SDK credential 생성 가능
 
-컨텍스트는 구조화된 `auth`와 `resources` 섹션을 사용해 인증 정보와 리소스 위치를 분리할 수 있다. `auth.sso_region`은 SSO 로그인과 `GetRoleCredentials`에 사용하고, `resources.default_region`은 최초 리소스 리전, `resources.regions`는 런타임 리전 선택기에 노출할 리전 목록이다. 리전 전환 시 기존 credential provider를 재사용하고 리전별 SDK client만 다시 생성한다.
+컨텍스트는 구조화된 `auth`와 `resources` 섹션을 사용해 인증 정보와 리소스 위치를 분리할 수 있다. `auth.sso_region`은 SSO 로그인과 `GetRoleCredentials`에 사용하고, `resources.default_region`은 최초 리소스 리전, `resources.regions`는 런타임 리전 선택기에 노출할 리전 목록이다. 리전 전환 시 기존 credential provider를 재사용하고 리전별 SDK client만 다시 생성한다. EC2 Instance Browser는 `A` 키로 all-regions scope를 켜서 구성된 모든 리전의 인스턴스를 한 목록으로 병합해 보여줄 수 있으며, 리전별 조회 실패는 다른 리전 결과를 가리지 않고 인라인으로 표시된다.
 
 `unic context setup`도 활성 리전을 세션 상태로 취급한다. 필요한 SSO account와 role을 선택한 뒤 다중 리전 컨텍스트라면 리소스 리전을 추가로 선택하고, 선택값을 `AWS_REGION`과 `AWS_DEFAULT_REGION`으로 export한다. 저장된 기본 리전은 변경하지 않으며 단일 리전 컨텍스트는 선택 단계를 생략한다.
 
