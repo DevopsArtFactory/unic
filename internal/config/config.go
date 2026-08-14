@@ -68,11 +68,13 @@ type ContextEntry struct {
 	AuthType     string            `yaml:"auth_type,omitempty"`
 	RoleArn      string            `yaml:"role_arn,omitempty"`
 	ExternalID   string            `yaml:"external_id,omitempty"`
+	MFASerial    string            `yaml:"mfa_serial,omitempty"`
 	SSOStartURL  string            `yaml:"sso_start_url,omitempty"`
 	SSORegion    string            `yaml:"sso_region,omitempty"`
 	SSOAccountID string            `yaml:"sso_account_id,omitempty"`
 	SSORoleName  string            `yaml:"sso_role_name,omitempty"`
 	Regions      []string          `yaml:"regions,omitempty"`
+	SyncSource   string            `yaml:"sync_source,omitempty"`
 	Auth         *ContextAuth      `yaml:"auth,omitempty"`
 	Resources    *ContextResources `yaml:"resources,omitempty"`
 }
@@ -83,6 +85,7 @@ type ContextAuth struct {
 	Profile      string `yaml:"profile,omitempty"`
 	RoleArn      string `yaml:"role_arn,omitempty"`
 	ExternalID   string `yaml:"external_id,omitempty"`
+	MFASerial    string `yaml:"mfa_serial,omitempty"`
 	SSOStartURL  string `yaml:"sso_start_url,omitempty"`
 	SSORegion    string `yaml:"sso_region,omitempty"`
 	SSOAccountID string `yaml:"sso_account_id,omitempty"`
@@ -105,6 +108,7 @@ type Config struct {
 	AuthType         AuthType
 	RoleArn          string
 	ExternalID       string
+	MFASerial        string
 	SSOStartURL      string
 	SSORegion        string
 	SSOAccountID     string
@@ -153,17 +157,20 @@ type ContextInfo struct {
 	AuthType     string
 	RoleArn      string
 	ExternalID   string
+	MFASerial    string
 	SSOStartURL  string
 	SSORegion    string
 	SSOAccountID string
 	SSORoleName  string
 	Regions      []string
+	SyncSource   string
 	Current      bool
 	Favorite     bool
 }
 
 type resolvedContextEntry struct {
 	Profile, Region, AuthType, RoleArn, ExternalID    string
+	MFASerial                                         string
 	SSOStartURL, SSORegion, SSOAccountID, SSORoleName string
 	Regions                                           []string
 }
@@ -172,6 +179,7 @@ func (c ContextEntry) resolved(defaultRegion string) resolvedContextEntry {
 	r := resolvedContextEntry{
 		Profile: c.Profile, Region: c.Region, AuthType: c.AuthType,
 		RoleArn: c.RoleArn, ExternalID: c.ExternalID,
+		MFASerial:   c.MFASerial,
 		SSOStartURL: c.SSOStartURL, SSORegion: c.SSORegion,
 		SSOAccountID: c.SSOAccountID, SSORoleName: c.SSORoleName,
 		Regions: c.Regions,
@@ -181,6 +189,7 @@ func (c ContextEntry) resolved(defaultRegion string) resolvedContextEntry {
 		r.Profile = c.Auth.Profile
 		r.RoleArn = c.Auth.RoleArn
 		r.ExternalID = c.Auth.ExternalID
+		r.MFASerial = c.Auth.MFASerial
 		r.SSOStartURL = c.Auth.SSOStartURL
 		r.SSORegion = c.Auth.SSORegion
 		r.SSOAccountID = c.Auth.SSOAccountID
@@ -251,7 +260,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	}
 
 	// New format: resolve current context
-	var contextName, roleArn, externalID, ssoStartURL, ssoRegion, ssoAccountID, ssoRoleName string
+	var contextName, roleArn, externalID, mfaSerial, ssoStartURL, ssoRegion, ssoAccountID, ssoRoleName string
 	var regions []string
 	var authType AuthType
 	if fc.Current != "" {
@@ -267,6 +276,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 				regions = resolved.Regions
 				roleArn = resolved.RoleArn
 				externalID = resolved.ExternalID
+				mfaSerial = resolved.MFASerial
 				ssoStartURL = resolved.SSOStartURL
 				ssoRegion = resolved.SSORegion
 				ssoAccountID = resolved.SSOAccountID
@@ -303,6 +313,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		AuthType:         authType,
 		RoleArn:          roleArn,
 		ExternalID:       externalID,
+		MFASerial:        mfaSerial,
 		SSOStartURL:      ssoStartURL,
 		SSORegion:        ssoRegion,
 		SSOAccountID:     ssoAccountID,
@@ -351,6 +362,7 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			AuthType:         normalizeAuthType(resolved.AuthType),
 			RoleArn:          resolved.RoleArn,
 			ExternalID:       resolved.ExternalID,
+			MFASerial:        resolved.MFASerial,
 			SSOStartURL:      resolved.SSOStartURL,
 			SSORegion:        resolved.SSORegion,
 			SSOAccountID:     resolved.SSOAccountID,
@@ -432,11 +444,13 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 			AuthType:     resolved.AuthType,
 			RoleArn:      resolved.RoleArn,
 			ExternalID:   resolved.ExternalID,
+			MFASerial:    resolved.MFASerial,
 			SSOStartURL:  resolved.SSOStartURL,
 			SSORegion:    resolved.SSORegion,
 			SSOAccountID: resolved.SSOAccountID,
 			SSORoleName:  resolved.SSORoleName,
 			Regions:      resolved.Regions,
+			SyncSource:   ctx.SyncSource,
 			Current:      ctx.Name == fc.Current,
 			Favorite:     favorite,
 		})
@@ -667,6 +681,76 @@ func UpsertContext(configPath string, entry ContextEntry) error {
 	if !replaced {
 		fc.Contexts = append(fc.Contexts, entry)
 	}
+
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	return nil
+}
+
+// RemoveContexts deletes the named contexts from config. The current context
+// selection is cleared when it points at a removed context.
+func RemoveContexts(configPath string, names []string) error {
+	return UpsertAndRemoveContexts(configPath, nil, names)
+}
+
+// UpsertAndRemoveContexts applies additions/updates and removals in one
+// read-modify-write pass so a sync plan is persisted atomically instead of one
+// entry at a time. The current context selection is cleared when it points at
+// a removed context.
+func UpsertAndRemoveContexts(configPath string, upserts []ContextEntry, removals []string) error {
+	if len(upserts) == 0 && len(removals) == 0 {
+		return nil
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if len(upserts) == 0 {
+			return fmt.Errorf("failed to read config: %w", err)
+		}
+		data = []byte("contexts: []\n")
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+
+	for _, entry := range upserts {
+		replaced := false
+		for i := range fc.Contexts {
+			if fc.Contexts[i].Name == entry.Name {
+				fc.Contexts[i] = entry
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			fc.Contexts = append(fc.Contexts, entry)
+		}
+	}
+
+	remove := make(map[string]struct{}, len(removals))
+	for _, name := range removals {
+		remove[name] = struct{}{}
+	}
+	kept := fc.Contexts[:0]
+	for _, ctx := range fc.Contexts {
+		if _, ok := remove[ctx.Name]; ok {
+			if fc.Current == ctx.Name {
+				fc.Current = ""
+			}
+			continue
+		}
+		kept = append(kept, ctx)
+	}
+	fc.Contexts = kept
 
 	out, err := yaml.Marshal(&fc)
 	if err != nil {

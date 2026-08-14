@@ -147,34 +147,38 @@ func CheckLatestVersion() (string, error) {
 	return release.TagName, nil
 }
 
+// checkLatestVersionFn is a test seam for the GitHub releases API call.
+var checkLatestVersionFn = CheckLatestVersion
+
 // CheckForUpdate checks if a newer version is available, using cache when possible.
 // Returns the new version string if available, or empty string if up to date.
-func CheckForUpdate(currentVersion string) string {
+// A non-nil error means the check itself failed and no result is known.
+func CheckForUpdate(currentVersion string) (string, error) {
 	if currentVersion == "dev" {
-		return ""
+		return "", nil
 	}
 
 	// Try cache first
 	if !ShouldCheck() {
 		c, err := readCache()
 		if err == nil && IsNewer(currentVersion, c.Version) {
-			return c.Version
+			return c.Version, nil
 		}
-		return ""
+		return "", nil
 	}
 
-	latest, err := CheckLatestVersion()
+	latest, err := checkLatestVersionFn()
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("update check failed: %w", err)
 	}
 
 	// Update cache regardless of result
 	_ = writeCache(latest)
 
 	if IsNewer(currentVersion, latest) {
-		return latest
+		return latest, nil
 	}
-	return ""
+	return "", nil
 }
 
 // IsNewer returns true if latest is a newer version than current.
