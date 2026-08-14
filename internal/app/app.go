@@ -110,6 +110,7 @@ const (
 	screenContextSSOAccountList
 	screenContextSSORoleList
 	screenRegionPicker
+	screenCommandPalette
 	screenSettings
 	screenLoading
 	screenError
@@ -190,6 +191,9 @@ type Model struct {
 	contextSSORoleIdx    int
 	regionIdx            int
 	regionPrevScreen     screen
+
+	// Command palette
+	palette paletteModel
 
 	// Context add wizard
 	addStep     int // 0=auth_type select, 1+=field input, -1=confirm
@@ -454,6 +458,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateAvailable = msg.version
 		}
 		return m, nil
+	case paletteResourcesIndexedMsg:
+		m.palette.indexing = false
+		m.palette.resources = msg.items
+		m.palette.indexErrs = msg.errs
+		if m.screen == screenCommandPalette {
+			m.palette.refilter()
+		}
+		return m, nil
 	case spinner.TickMsg:
 		if m.screen != screenLoading && m.screen != screenInspectorScanning {
 			return m, nil
@@ -552,6 +564,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenSettings
 			return m, nil
 		}
+		// Global command palette — P opens fuzzy search across features,
+		// contexts, and indexed resources (skip text-entry screens).
+		if msg.String() == "P" && !m.filterTI.Focused() && m.screen != screenCommandPalette &&
+			!m.isTextEntryScreen() {
+			m.deactivateFilter()
+			return m.openPalette()
+		}
 
 		for _, submodel := range m.featureSubmodels() {
 			if newM, cmd, handled := submodel.HandleKey(&m, msg); handled {
@@ -576,6 +595,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateContextSSORoleList(msg)
 		case screenRegionPicker:
 			return m.updateRegionPicker(msg)
+		case screenCommandPalette:
+			return m.updatePalette(msg)
 		case screenSettings:
 			return m.updateSettings(msg)
 		case screenError:
@@ -642,52 +663,58 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.featIdx = nextListIndex(m.featIdx, len(m.features))
 	case "enter":
 		if m.featIdx < len(m.features) {
-			feat := m.features[m.featIdx]
-			switch feat.Kind {
-			case domain.FeatureSSMSession:
-				return m.startLoading(m.loadInstances())
-			case domain.FeatureEC2InstanceBrowser:
-				return m.ec2Browser.Start(&m)
-			case domain.FeatureVPCBrowser:
-				return m.vpc.Start(&m)
-			case domain.FeatureReachabilityAnalyzer:
-				return m.reachability.Start(&m)
-			case domain.FeatureRDSBrowser:
-				return m.rds.Start(&m)
-			case domain.FeatureRoute53Browser:
-				return m.route53.Start(&m)
-			case domain.FeatureSecretsBrowser:
-				return m.secrets.Start(&m)
-			case domain.FeatureCloudWatchMetrics:
-				return m.cwMetrics.Start(&m)
-			case domain.FeatureCloudWatchLogsBrowser:
-				return m.cwLogs.Start(&m)
-			case domain.FeatureS3Browser:
-				return m.s3.Start(&m)
-			case domain.FeatureSecurityGroupBrowser:
-				return m.security.Start(&m)
-			case domain.FeatureIAMUsersBrowser:
-				return m.iam.StartUsers(&m)
-			case domain.FeatureListAccessKeys:
-				return m.iam.StartKeys(&m, false)
-			case domain.FeatureRotateAccessKey:
-				return m.iam.StartKeys(&m, true)
-			case domain.FeatureECSExec:
-				return m.ecs.Start(&m)
-			case domain.FeatureECRRepositoryBrowser:
-				return m.ecr.Start(&m)
-			case domain.FeatureECRLoginHelper:
-				return m.ecr.StartLogin(&m)
-			case domain.FeatureEKSBrowser:
-				return m.eks.Start(&m)
-			case domain.FeatureFISTemplateBrowser:
-				return m.fis.Start(&m)
-			case domain.FeatureLambdaBrowser:
-				return m.lambda.Start(&m)
-			case domain.FeatureBedrockAPIKeys:
-				return m.bedrock.Start(&m)
-			}
+			return m.startFeature(m.features[m.featIdx].Kind)
 		}
+	}
+	return m, nil
+}
+
+// startFeature launches the given feature. It is shared between the feature
+// list and the command palette.
+func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
+	switch kind {
+	case domain.FeatureSSMSession:
+		return m.startLoading(m.loadInstances())
+	case domain.FeatureEC2InstanceBrowser:
+		return m.ec2Browser.Start(&m)
+	case domain.FeatureVPCBrowser:
+		return m.vpc.Start(&m)
+	case domain.FeatureReachabilityAnalyzer:
+		return m.reachability.Start(&m)
+	case domain.FeatureRDSBrowser:
+		return m.rds.Start(&m)
+	case domain.FeatureRoute53Browser:
+		return m.route53.Start(&m)
+	case domain.FeatureSecretsBrowser:
+		return m.secrets.Start(&m)
+	case domain.FeatureCloudWatchMetrics:
+		return m.cwMetrics.Start(&m)
+	case domain.FeatureCloudWatchLogsBrowser:
+		return m.cwLogs.Start(&m)
+	case domain.FeatureS3Browser:
+		return m.s3.Start(&m)
+	case domain.FeatureSecurityGroupBrowser:
+		return m.security.Start(&m)
+	case domain.FeatureIAMUsersBrowser:
+		return m.iam.StartUsers(&m)
+	case domain.FeatureListAccessKeys:
+		return m.iam.StartKeys(&m, false)
+	case domain.FeatureRotateAccessKey:
+		return m.iam.StartKeys(&m, true)
+	case domain.FeatureECSExec:
+		return m.ecs.Start(&m)
+	case domain.FeatureECRRepositoryBrowser:
+		return m.ecr.Start(&m)
+	case domain.FeatureECRLoginHelper:
+		return m.ecr.StartLogin(&m)
+	case domain.FeatureEKSBrowser:
+		return m.eks.Start(&m)
+	case domain.FeatureFISTemplateBrowser:
+		return m.fis.Start(&m)
+	case domain.FeatureLambdaBrowser:
+		return m.lambda.Start(&m)
+	case domain.FeatureBedrockAPIKeys:
+		return m.bedrock.Start(&m)
 	}
 	return m, nil
 }
@@ -738,6 +765,8 @@ func (m Model) View() string {
 		v = m.viewContextSSORoleList()
 	case screenRegionPicker:
 		v = m.viewRegionPicker()
+	case screenCommandPalette:
+		v = m.viewPalette()
 	case screenSettings:
 		v = m.viewSettings()
 	case screenLoading:

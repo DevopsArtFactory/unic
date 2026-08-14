@@ -394,6 +394,7 @@ checks:
 | `C` | Open context picker |
 | `R` | Switch between the active context's configured resource regions |
 | `S` | Open settings |
+| `P` | Open the command palette (fuzzy search across features, contexts, and indexed resources) |
 | `/` | Toggle filter mode on supported screens |
 | `f` | Favorite/unfavorite the selected service or context on supported lists |
 | `?` | Toggle context-aware shortcut help |
@@ -425,6 +426,8 @@ checks:
 | Context Picker | `a` add context, `f` favorite/unfavorite selected context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
 | Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
+
+The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context; results stream in as they load, per-service failures are shown inline, and matching covers names, IDs, and ARNs where available. Selecting a resource jumps to the owning browser with the shared filter prefilled to that resource.
 
 The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The context picker also supports `f`; context favorites are saved under `favorites.contexts`, displayed first in the picker, and rendered with a distinct color style while preserving the configured context order within favorite and non-favorite groups. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups/add-ons, ECR repositories/images, FIS experiment templates/history, S3 buckets/objects, Lambda functions, Bedrock API keys, and the context picker.
 

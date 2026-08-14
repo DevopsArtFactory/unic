@@ -46,6 +46,11 @@ type callerIdentityMsg struct {
 	identity *awsservice.CallerIdentity
 }
 
+type paletteResourcesIndexedMsg struct {
+	items []paletteItem
+	errs  []string
+}
+
 type screenReadyMsg struct{}
 
 type bootupStartMsg struct{}
