@@ -459,6 +459,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case paletteResourcesIndexedMsg:
+		// Ignore results from a superseded palette invocation; a slow index
+		// started under an earlier open (or another context) must not
+		// overwrite the current session.
+		if msg.generation != m.palette.generation {
+			return m, nil
+		}
 		m.palette.indexing = false
 		m.palette.resources = msg.items
 		m.palette.indexErrs = msg.errs

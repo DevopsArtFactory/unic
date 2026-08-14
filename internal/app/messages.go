@@ -47,8 +47,9 @@ type callerIdentityMsg struct {
 }
 
 type paletteResourcesIndexedMsg struct {
-	items []paletteItem
-	errs  []string
+	generation int
+	items      []paletteItem
+	errs       []string
 }
 
 type screenReadyMsg struct{}

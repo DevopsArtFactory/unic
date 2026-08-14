@@ -50,6 +50,11 @@ type paletteModel struct {
 	indexing   bool
 	indexErrs  []string
 	prevScreen screen
+	// generation identifies the current palette invocation; index results
+	// carry the generation they were started for, so a slow index from an
+	// earlier open (possibly under a different context) can never overwrite
+	// a newer session's results.
+	generation int
 }
 
 // openPalette builds the instantly-available items (features, contexts) and
@@ -61,6 +66,7 @@ func (m Model) openPalette() (tea.Model, tea.Cmd) {
 	m.palette.resources = nil
 	m.palette.indexErrs = nil
 	m.palette.indexing = true
+	m.palette.generation++
 
 	var static []paletteItem
 	for _, svc := range domain.Catalog() {
@@ -112,8 +118,8 @@ func (m Model) updatePalette(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down":
 		m.palette.idx = nextListIndex(m.palette.idx, len(m.palette.filtered))
 	case "backspace":
-		if len(m.palette.query) > 0 {
-			m.palette.query = m.palette.query[:len(m.palette.query)-1]
+		if runes := []rune(m.palette.query); len(runes) > 0 {
+			m.palette.query = string(runes[:len(runes)-1])
 			m.palette.refilter()
 		}
 	case "enter":
@@ -169,11 +175,12 @@ func (m *Model) enterServiceForPalette(item paletteItem) {
 // service failures surface as notes without hiding other services' results.
 func (m Model) indexPaletteResources() tea.Cmd {
 	cfg := m.cfg
+	generation := m.palette.generation
 	return func() tea.Msg {
 		ctx := context.Background()
 		repo, err := awsservice.NewAwsRepository(ctx, cfg)
 		if err != nil {
-			return paletteResourcesIndexedMsg{errs: []string{err.Error()}}
+			return paletteResourcesIndexedMsg{generation: generation, errs: []string{err.Error()}}
 		}
 
 		type source struct {
@@ -281,7 +288,7 @@ func (m Model) indexPaletteResources() tea.Cmd {
 			}
 		}
 		sort.SliceStable(items, func(i, j int) bool { return items[i].label < items[j].label })
-		return paletteResourcesIndexedMsg{items: items, errs: failures}
+		return paletteResourcesIndexedMsg{generation: generation, items: items, errs: failures}
 	}
 }
 
