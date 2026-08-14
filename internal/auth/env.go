@@ -143,7 +143,51 @@ func DetectEnvContext(contexts []config.ContextInfo, lookup func(string) string)
 	}
 }
 
+var (
+	promptMFATokenFn    = promptMFAToken
+	cachedMFASessionFn  = awsservice.CachedAssumeRoleSession
+	assumeRoleWithMFAFn = awsservice.AssumeRoleWithMFA
+)
+
+// promptMFAToken asks for an MFA token code on stderr and reads it from stdin,
+// so `eval "$(unic env ...)"` keeps stdout clean for the exports.
+func promptMFAToken(serial string) (string, error) {
+	fmt.Fprintf(os.Stderr, "MFA token code for %s: ", serial)
+	var code string
+	if _, err := fmt.Fscanln(os.Stdin, &code); err != nil {
+		return "", fmt.Errorf("failed to read MFA token code: %w", err)
+	}
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return "", fmt.Errorf("MFA token code is required for %s", serial)
+	}
+	return code, nil
+}
+
+func assumeRoleMFAEnv(ctx context.Context, cfg *config.Config) (map[string]string, error) {
+	session, ok := cachedMFASessionFn(cfg)
+	if !ok {
+		code, err := promptMFATokenFn(cfg.MFASerial)
+		if err != nil {
+			return nil, err
+		}
+		session, err = assumeRoleWithMFAFn(ctx, cfg, code)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return map[string]string{
+		"AWS_ACCESS_KEY_ID":     session.AccessKeyID,
+		"AWS_SECRET_ACCESS_KEY": session.SecretAccessKey,
+		"AWS_SESSION_TOKEN":     session.SessionToken,
+	}, nil
+}
+
 func assumeRoleEnv(ctx context.Context, cfg *config.Config) (map[string]string, error) {
+	if cfg.MFASerial != "" {
+		return assumeRoleMFAEnv(ctx, cfg)
+	}
+
 	baseCfg, err := awsservice.LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
