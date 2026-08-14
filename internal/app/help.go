@@ -148,7 +148,11 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 	case screenInstanceList:
 		return listScreenShortcuts("connect to the selected instance", "go back to the feature list", true, true)
 	case screenEC2InstanceBrowserList:
-		return listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
+		shortcuts := listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
+		if m.hasMultipleRegions() {
+			shortcuts = append(shortcuts, helpShortcut{"A", "Toggle all-regions instance scope"})
+		}
+		return shortcuts
 	case screenEC2InstanceBrowserDetail:
 		return []helpShortcut{
 			{"g", "Open attached security groups"},
@@ -491,6 +495,13 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"t", "Copy the first image tag"},
 			{"q", "Go back to the feature list"},
 			{"esc", "Go back to the image list"},
+		}
+	case screenECRLoginHelper:
+		return []helpShortcut{
+			{"c", "Copy the Docker login command"},
+			{"p", "Copy the Podman login command"},
+			{"r", "Re-resolve the registry and commands"},
+			{"q / esc", "Go back to the feature list"},
 		}
 	case screenFISTemplateList:
 		shortcuts := listScreenShortcuts("open the selected experiment template", "go back to the feature list", true, false)
@@ -914,6 +925,8 @@ func (m Model) helpScreenTitle() string {
 		return "ECR Images"
 	case screenECRImageDetail:
 		return "ECR Image Detail"
+	case screenECRLoginHelper:
+		return "ECR Login Helper"
 	case screenFISTemplateList:
 		return "FIS Experiment Templates"
 	case screenFISTemplateDetail:

@@ -136,11 +136,44 @@ func (r *AwsRepository) ListAvailableIPs(ctx context.Context, subnetID, cidr str
 func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]ReachabilityTarget, error) {
 	uniclog.Debug("aws", "ListReachabilityTargets called")
 
-	targets := make([]ReachabilityTarget, 0)
+	collectors := []func(context.Context) ([]ReachabilityTarget, error){
+		r.collectEC2InstanceTargets,
+		r.collectENITargets,
+		r.collectIGWTargets,
+		r.collectVPCEndpointTargets,
+		r.collectVPCPeeringTargets,
+		r.collectTransitGatewayTargets,
+		r.collectTransitGatewayAttachmentTargets,
+		r.collectVPNGatewayTargets,
+		r.collectVPCEndpointServiceTargets,
+	}
 
-	instPaginator := ec2.NewDescribeInstancesPaginator(r.EC2Client, &ec2.DescribeInstancesInput{})
-	for instPaginator.HasMorePages() {
-		page, err := instPaginator.NextPage(ctx)
+	targets := make([]ReachabilityTarget, 0)
+	for _, collect := range collectors {
+		collected, err := collect(ctx)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, collected...)
+	}
+
+	sort.Slice(targets, func(i, j int) bool {
+		left := normalizedSortKey(targets[i].Name, targets[i].ID)
+		right := normalizedSortKey(targets[j].Name, targets[j].ID)
+		if left == right {
+			return targets[i].ID < targets[j].ID
+		}
+		return left < right
+	})
+
+	return targets, nil
+}
+
+func (r *AwsRepository) collectEC2InstanceTargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	var targets []ReachabilityTarget
+	paginator := ec2.NewDescribeInstancesPaginator(r.EC2Client, &ec2.DescribeInstancesInput{})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe instances: %w", err)
 		}
@@ -158,10 +191,14 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			}
 		}
 	}
+	return targets, nil
+}
 
-	eniPaginator := ec2.NewDescribeNetworkInterfacesPaginator(r.EC2Client, &ec2.DescribeNetworkInterfacesInput{})
-	for eniPaginator.HasMorePages() {
-		page, err := eniPaginator.NextPage(ctx)
+func (r *AwsRepository) collectENITargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	var targets []ReachabilityTarget
+	paginator := ec2.NewDescribeNetworkInterfacesPaginator(r.EC2Client, &ec2.DescribeNetworkInterfacesInput{})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe network interfaces: %w", err)
 		}
@@ -184,10 +221,14 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			})
 		}
 	}
+	return targets, nil
+}
 
-	igwPaginator := ec2.NewDescribeInternetGatewaysPaginator(r.EC2Client, &ec2.DescribeInternetGatewaysInput{})
-	for igwPaginator.HasMorePages() {
-		page, err := igwPaginator.NextPage(ctx)
+func (r *AwsRepository) collectIGWTargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	var targets []ReachabilityTarget
+	paginator := ec2.NewDescribeInternetGatewaysPaginator(r.EC2Client, &ec2.DescribeInternetGatewaysInput{})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe internet gateways: %w", err)
 		}
@@ -209,10 +250,14 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			})
 		}
 	}
+	return targets, nil
+}
 
-	vpcEndpointPaginator := ec2.NewDescribeVpcEndpointsPaginator(r.EC2Client, &ec2.DescribeVpcEndpointsInput{})
-	for vpcEndpointPaginator.HasMorePages() {
-		page, err := vpcEndpointPaginator.NextPage(ctx)
+func (r *AwsRepository) collectVPCEndpointTargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	var targets []ReachabilityTarget
+	paginator := ec2.NewDescribeVpcEndpointsPaginator(r.EC2Client, &ec2.DescribeVpcEndpointsInput{})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe VPC endpoints: %w", err)
 		}
@@ -238,10 +283,14 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			})
 		}
 	}
+	return targets, nil
+}
 
-	vpcPeeringPaginator := ec2.NewDescribeVpcPeeringConnectionsPaginator(r.EC2Client, &ec2.DescribeVpcPeeringConnectionsInput{})
-	for vpcPeeringPaginator.HasMorePages() {
-		page, err := vpcPeeringPaginator.NextPage(ctx)
+func (r *AwsRepository) collectVPCPeeringTargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	var targets []ReachabilityTarget
+	paginator := ec2.NewDescribeVpcPeeringConnectionsPaginator(r.EC2Client, &ec2.DescribeVpcPeeringConnectionsInput{})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe VPC peering connections: %w", err)
 		}
@@ -267,10 +316,14 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			})
 		}
 	}
+	return targets, nil
+}
 
-	transitGatewayPaginator := ec2.NewDescribeTransitGatewaysPaginator(r.EC2Client, &ec2.DescribeTransitGatewaysInput{})
-	for transitGatewayPaginator.HasMorePages() {
-		page, err := transitGatewayPaginator.NextPage(ctx)
+func (r *AwsRepository) collectTransitGatewayTargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	var targets []ReachabilityTarget
+	paginator := ec2.NewDescribeTransitGatewaysPaginator(r.EC2Client, &ec2.DescribeTransitGatewaysInput{})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe transit gateways: %w", err)
 		}
@@ -287,10 +340,14 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			})
 		}
 	}
+	return targets, nil
+}
 
-	transitAttachmentPaginator := ec2.NewDescribeTransitGatewayAttachmentsPaginator(r.EC2Client, &ec2.DescribeTransitGatewayAttachmentsInput{})
-	for transitAttachmentPaginator.HasMorePages() {
-		page, err := transitAttachmentPaginator.NextPage(ctx)
+func (r *AwsRepository) collectTransitGatewayAttachmentTargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	var targets []ReachabilityTarget
+	paginator := ec2.NewDescribeTransitGatewayAttachmentsPaginator(r.EC2Client, &ec2.DescribeTransitGatewayAttachmentsInput{})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe transit gateway attachments: %w", err)
 		}
@@ -312,12 +369,16 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			})
 		}
 	}
+	return targets, nil
+}
 
-	vpnGatewaysOut, err := r.EC2Client.DescribeVpnGateways(ctx, &ec2.DescribeVpnGatewaysInput{})
+func (r *AwsRepository) collectVPNGatewayTargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	out, err := r.EC2Client.DescribeVpnGateways(ctx, &ec2.DescribeVpnGatewaysInput{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe virtual private gateways: %w", err)
 	}
-	for _, gateway := range vpnGatewaysOut.VpnGateways {
+	var targets []ReachabilityTarget
+	for _, gateway := range out.VpnGateways {
 		name := extractNameTag(gateway.Tags)
 		if name == "Unknown" {
 			name = derefString(gateway.VpnGatewayId)
@@ -334,14 +395,18 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 			Description: fmt.Sprintf("state=%s", fallbackString(string(gateway.State), "unknown")),
 		})
 	}
+	return targets, nil
+}
 
-	serviceConfigInput := &ec2.DescribeVpcEndpointServiceConfigurationsInput{}
+func (r *AwsRepository) collectVPCEndpointServiceTargets(ctx context.Context) ([]ReachabilityTarget, error) {
+	var targets []ReachabilityTarget
+	input := &ec2.DescribeVpcEndpointServiceConfigurationsInput{}
 	for {
-		serviceConfigsOut, err := r.EC2Client.DescribeVpcEndpointServiceConfigurations(ctx, serviceConfigInput)
+		out, err := r.EC2Client.DescribeVpcEndpointServiceConfigurations(ctx, input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe VPC endpoint services: %w", err)
 		}
-		for _, service := range serviceConfigsOut.ServiceConfigurations {
+		for _, service := range out.ServiceConfigurations {
 			name := extractNameTag(service.Tags)
 			if name == "Unknown" {
 				name = derefString(service.ServiceName)
@@ -356,21 +421,11 @@ func (r *AwsRepository) ListReachabilityTargets(ctx context.Context) ([]Reachabi
 				Description: fmt.Sprintf("service=%s state=%s", fallbackString(derefString(service.ServiceName), "-"), fallbackString(string(service.ServiceState), "unknown")),
 			})
 		}
-		if strings.TrimSpace(derefString(serviceConfigsOut.NextToken)) == "" {
+		if strings.TrimSpace(derefString(out.NextToken)) == "" {
 			break
 		}
-		serviceConfigInput.NextToken = serviceConfigsOut.NextToken
+		input.NextToken = out.NextToken
 	}
-
-	sort.Slice(targets, func(i, j int) bool {
-		left := normalizedSortKey(targets[i].Name, targets[i].ID)
-		right := normalizedSortKey(targets[j].Name, targets[j].ID)
-		if left == right {
-			return targets[i].ID < targets[j].ID
-		}
-		return left < right
-	})
-
 	return targets, nil
 }
 
