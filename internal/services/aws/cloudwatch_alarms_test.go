@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,13 @@ func TestListAlarmsSortsFiringFirstAndMapsFields(t *testing.T) {
 	mock := &mockCloudWatchClient{
 		describeAlarmsFunc: func(_ context.Context, _ *cloudwatch.DescribeAlarmsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmsOutput, error) {
 			return &cloudwatch.DescribeAlarmsOutput{
+				CompositeAlarms: []cwtypes.CompositeAlarm{
+					{
+						AlarmName:   awssdk.String("service-health"),
+						StateValue:  cwtypes.StateValueAlarm,
+						StateReason: awssdk.String("Child alarm firing"),
+					},
+				},
 				MetricAlarms: []cwtypes.MetricAlarm{
 					{
 						AlarmName:  awssdk.String("healthy-alarm"),
@@ -51,16 +59,24 @@ func TestListAlarmsSortsFiringFirstAndMapsFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(alarms) != 3 {
-		t.Fatalf("expected 3 alarms, got %d", len(alarms))
+	if len(alarms) != 4 {
+		t.Fatalf("expected 4 alarms including the composite, got %d", len(alarms))
 	}
-	if alarms[0].State != "ALARM" || alarms[1].State != "INSUFFICIENT_DATA" || alarms[2].State != "OK" {
-		t.Fatalf("expected firing-first ordering, got %v %v %v", alarms[0].State, alarms[1].State, alarms[2].State)
+	if alarms[0].State != "ALARM" || alarms[1].State != "ALARM" ||
+		alarms[2].State != "INSUFFICIENT_DATA" || alarms[3].State != "OK" {
+		t.Fatalf("expected firing-first ordering across metric and composite alarms, got %+v", alarms)
 	}
 	firing := alarms[0]
 	if firing.Name != "db-cpu-high" || firing.Dimension("DBInstanceIdentifier") != "prod-db" ||
 		firing.Threshold != 80 || !firing.StateUpdated.Equal(updated) {
 		t.Fatalf("expected mapped alarm fields, got %+v", firing)
+	}
+	composite := alarms[1]
+	if composite.Name != "service-health" || !composite.Composite || composite.StateReason != "Child alarm firing" {
+		t.Fatalf("expected mapped composite alarm, got %+v", composite)
+	}
+	if !strings.Contains(composite.DisplayTitle(), "(composite)") {
+		t.Fatalf("expected composite marker in display title, got %q", composite.DisplayTitle())
 	}
 }
 
@@ -73,6 +89,9 @@ func TestListAlarmHistoryMapsItems(t *testing.T) {
 			}
 			if params.ScanBy != cwtypes.ScanByTimestampDescending {
 				t.Fatalf("expected newest-first scan, got %v", params.ScanBy)
+			}
+			if params.HistoryItemType != cwtypes.HistoryItemTypeStateUpdate {
+				t.Fatalf("expected state-update-only history, got %v", params.HistoryItemType)
 			}
 			return &cloudwatch.DescribeAlarmHistoryOutput{
 				AlarmHistoryItems: []cwtypes.AlarmHistoryItem{

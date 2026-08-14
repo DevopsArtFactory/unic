@@ -25,6 +25,9 @@ type CloudWatchAlarm struct {
 	Threshold          float64
 	ComparisonOperator string
 	ActionsEnabled     bool
+	// Composite marks alarms whose state derives from a rule over other
+	// alarms; they carry no metric, dimensions, or threshold.
+	Composite bool
 }
 
 type CloudWatchAlarmDimension struct {
@@ -38,12 +41,18 @@ func (a CloudWatchAlarm) DisplayTitle() string {
 	if a.Namespace != "" {
 		metric = a.Namespace + "/" + a.MetricName
 	}
+	if a.Composite {
+		metric = "(composite)"
+	}
 	return fmt.Sprintf("%-17s %-40s %s", a.State, a.Name, metric)
 }
 
 // FilterText returns a lowercase string for keyword matching.
 func (a CloudWatchAlarm) FilterText() string {
 	parts := []string{a.Name, a.State, a.Namespace, a.MetricName, a.StateReason}
+	if a.Composite {
+		parts = append(parts, "composite")
+	}
 	for _, dim := range a.Dimensions {
 		parts = append(parts, dim.Name, dim.Value)
 	}
@@ -114,6 +123,19 @@ func (r *AwsRepository) ListAlarms(ctx context.Context) ([]CloudWatchAlarm, erro
 			}
 			alarms = append(alarms, mapped)
 		}
+		for _, alarm := range page.CompositeAlarms {
+			mapped := CloudWatchAlarm{
+				Name:           derefString(alarm.AlarmName),
+				State:          string(alarm.StateValue),
+				StateReason:    derefString(alarm.StateReason),
+				ActionsEnabled: alarm.ActionsEnabled != nil && *alarm.ActionsEnabled,
+				Composite:      true,
+			}
+			if alarm.StateUpdatedTimestamp != nil {
+				mapped.StateUpdated = *alarm.StateUpdatedTimestamp
+			}
+			alarms = append(alarms, mapped)
+		}
 	}
 
 	sort.SliceStable(alarms, func(i, j int) bool {
@@ -132,9 +154,10 @@ func (r *AwsRepository) ListAlarmHistory(ctx context.Context, alarmName string) 
 
 	maxRecords := int32(20)
 	out, err := r.CloudWatchClient.DescribeAlarmHistory(ctx, &cloudwatch.DescribeAlarmHistoryInput{
-		AlarmName:  &alarmName,
-		MaxRecords: &maxRecords,
-		ScanBy:     cwtypes.ScanByTimestampDescending,
+		AlarmName:       &alarmName,
+		MaxRecords:      &maxRecords,
+		ScanBy:          cwtypes.ScanByTimestampDescending,
+		HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe alarm history for %s: %w", alarmName, err)
