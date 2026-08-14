@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,5 +102,57 @@ func TestAssumeRoleEnvMFAPropagatesPromptError(t *testing.T) {
 
 	if _, err := assumeRoleEnv(context.Background(), mfaEnvConfig()); err == nil {
 		t.Fatal("expected prompt error to propagate")
+	}
+}
+
+func TestBuildEnvExportsChainsRoleForProfileBackedContexts(t *testing.T) {
+	origAssume := assumeRoleFn
+	t.Cleanup(func() { assumeRoleFn = origAssume })
+	assumed := false
+	assumeRoleFn = func(_ context.Context, cfg *config.Config) (map[string]string, error) {
+		assumed = true
+		if cfg.RoleArn != "arn:aws:iam::123456789012:role/Chained" {
+			t.Fatalf("expected chained role arn, got %q", cfg.RoleArn)
+		}
+		return map[string]string{
+			"AWS_ACCESS_KEY_ID":     "AKIACHAIN",
+			"AWS_SECRET_ACCESS_KEY": "secret",
+			"AWS_SESSION_TOKEN":     "token",
+		}, nil
+	}
+
+	for _, authType := range []config.AuthType{config.AuthTypeCredential, config.AuthTypeConsoleLogin} {
+		assumed = false
+		exports, err := BuildEnvExports(context.Background(), &config.Config{
+			ContextName: "chained",
+			Profile:     "login-profile",
+			Region:      "us-east-1",
+			AuthType:    authType,
+			RoleArn:     "arn:aws:iam::123456789012:role/Chained",
+		})
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", authType, err)
+		}
+		if !assumed {
+			t.Fatalf("%s: expected role chaining to assume the role", authType)
+		}
+		if !strings.Contains(exports, "AKIACHAIN") || !strings.Contains(exports, "unset AWS_PROFILE") {
+			t.Fatalf("%s: expected session credential exports without a profile, got:\n%s", authType, exports)
+		}
+	}
+}
+
+func TestBuildEnvExportsCredentialWithoutRoleStillUsesProfile(t *testing.T) {
+	exports, err := BuildEnvExports(context.Background(), &config.Config{
+		ContextName: "plain",
+		Profile:     "plain-profile",
+		Region:      "us-east-1",
+		AuthType:    config.AuthTypeCredential,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(exports, "export AWS_PROFILE='plain-profile'") {
+		t.Fatalf("expected profile export without chaining, got:\n%s", exports)
 	}
 }

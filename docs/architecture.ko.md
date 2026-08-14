@@ -187,7 +187,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - shared AWS profile과 AWS CLI `aws login`을 함께 사용
 - `unic context setup`이 `aws login --profile <profile> --region <region>`을 실행
 - login 이후에도 profile 기반이므로 `unic env`는 `AWS_PROFILE`과 region 변수를 export
-- 현재는 standalone context로만 지원하며 `role_arn` chaining은 지원하지 않음
+- `role_arn`이 설정되면 login profile 자격증명에서 STS AssumeRole로 체이닝하며, assume_role과 동일한 경로(MFA 세션 캐시 포함)를 사용한다
 
 ### `okta_saml`
 
