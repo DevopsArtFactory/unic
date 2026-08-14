@@ -300,6 +300,7 @@ Context ordering:
 | RDS | Instance Class Modification |
 | Route53 | Route53 Browser |
 | Secrets Manager | Secrets Browser |
+| CloudWatch | Alarm Browser |
 | CloudWatch | Metrics Viewer |
 | CloudWatch Logs | Logs Browser |
 | ECR | ECR Login Helper |
@@ -420,6 +421,7 @@ checks:
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
+| CloudWatch Alarms | `tab` cycle state filter (ALL/ALARM/INSUFFICIENT_DATA/OK), `/` filter, `r` refresh, `Enter` detail with recent transitions, detail `g` jump to related resource (RDS/EC2/ECS/Lambda dimensions), `l` jump to logs when derivable |
 | CloudWatch Metrics | preset-driven metric list/detail flow, `/` filter, `space` select related series, `g` preset cycle, `t/p/s` range-period-stat controls, `r` refresh, in-terminal single-series and comparison charts |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
 | ECR Login Helper | `c` copy Docker login command, `p` copy Podman login command, `r` refresh; CLI helper for scripting: `unic ecr login [--runtime docker|podman] [--copy]` |
@@ -446,6 +448,8 @@ The EKS Browser includes a managed add-on status view for each cluster. Add-on r
 The ECR Login Helper resolves the private registry URI for the active context and shows copyable Docker and Podman login commands without leaving the TUI. The copied commands are prefixed with `eval "$(unic env <context>)"` so they authenticate with the active unic context rather than whatever ambient AWS credentials the shell happens to have; `unic ecr login` remains as a secondary CLI helper for scripting. The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
 
 The RDS detail screen can resize an instance with `m`: unic loads the orderable DB instance classes for the instance's engine/version in the active region into a filterable picker (current class marked), then a confirmation screen shows the current and new class with a `Tab`-toggleable apply-immediately choice (default: next maintenance window) and requires typing the instance identifier before calling ModifyDBInstance. After submitting, the detail screen polls the instance status until the change settles.
+
+The CloudWatch Alarm Browser is an alarm-first incident entry point: alarms list firing-first (ALARM, then INSUFFICIENT_DATA, then OK) with a `tab`-cycled state filter and text filtering across names, states, metrics, and dimensions. Alarm detail shows the state reason, condition, dimensions, and the most recent state transitions. When an alarm's dimensions map to a supported browser (`DBInstanceIdentifier`, `InstanceId`, `ClusterName`, `FunctionName`), `g` jumps into that resource browser with the filter prefilled to the unhealthy resource, and `l` opens CloudWatch Logs prefilled with the derived log group (e.g. `/aws/lambda/<function>`).
 
 The FIS Experiment Template Browser lists experiment templates in the active region and opens a detail screen with role ARN, targets, actions, target mappings, parameters, filters, and stop condition summaries without leaving the TUI. Template detail includes a Safe Run Preview that summarizes blast radius, target selection modes, action count, active stop conditions, IAM role, and warnings for missing stop conditions, missing role ARN, broad selection, or unbounded selectors. The preview also states the template ID that any future execution path must type to confirm before a run can start. Press `h` on a selected template or template detail to inspect recent runs for that template, or `H` from the template list to inspect recent experiment history across the active account/region. History rows include run status, timing, and stop/failure summaries, with failed, stopped, stopping, and cancelled runs visually highlighted; `Enter` opens run detail with start/end times, duration, action states, targets, stop conditions, and failure metadata.
 

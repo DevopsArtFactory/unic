@@ -41,6 +41,7 @@ const (
 	filterInspectorChecklistFiles
 	filterLambdaFunctions
 	filterBedrockKeys
+	filterCWAlarms
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

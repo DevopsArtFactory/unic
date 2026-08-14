@@ -408,6 +408,16 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"r", "Refresh the selected metric series"},
 			{"q / esc", "Go back to the metric list"},
 		}
+	case screenCWAlarmList:
+		shortcuts := listScreenShortcuts("open the selected alarm", "go back to the feature list", true, true)
+		return append(shortcuts, helpShortcut{"tab", "Cycle the alarm state filter"})
+	case screenCWAlarmDetail:
+		return []helpShortcut{
+			{"g", "Jump to the related resource browser"},
+			{"l", "Jump to the related CloudWatch Logs group"},
+			{"r", "Reload the transition history"},
+			{"q / esc", "Go back to the alarm list"},
+		}
 	case screenCWLogGroupList:
 		return listScreenShortcuts("open log streams for the selected group", "go back to the feature list", true, false)
 	case screenCWLogStreamList:
@@ -924,6 +934,10 @@ func (m Model) helpScreenTitle() string {
 		return "IAM Access Key Rotation Confirm"
 	case screenIAMKeyRotateResult:
 		return "IAM Access Key Rotation Result"
+	case screenCWAlarmList:
+		return "CloudWatch Alarms"
+	case screenCWAlarmDetail:
+		return "CloudWatch Alarm Detail"
 	case screenCWLogGroupList:
 		return "CloudWatch Log Groups"
 	case screenCWLogStreamList:

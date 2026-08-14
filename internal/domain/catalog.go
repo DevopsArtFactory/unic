@@ -64,6 +64,10 @@ func Catalog() []Service {
 			Name: ServiceCloudWatch,
 			Features: []Feature{
 				{
+					Kind:        FeatureCloudWatchAlarms,
+					Description: "Triage alarm states and recent transitions as an incident entry point",
+				},
+				{
 					Kind:        FeatureCloudWatchMetrics,
 					Description: "Browse CloudWatch metric series with presets, controls, and comparison charts",
 				},
