@@ -42,6 +42,7 @@ const (
 	FeatureCloudWatchLogsBrowser FeatureKind = "CloudWatch Logs Browser"
 	FeatureECSExec               FeatureKind = "ECS Browser & Exec"
 	FeatureECRRepositoryBrowser  FeatureKind = "ECR Repository Browser"
+	FeatureECRLoginHelper        FeatureKind = "ECR Login Helper"
 	FeatureEKSBrowser            FeatureKind = "EKS Cluster Browser"
 	FeatureFISTemplateBrowser    FeatureKind = "FIS Experiment Template Browser"
 	FeatureS3Browser             FeatureKind = "S3 Browser"

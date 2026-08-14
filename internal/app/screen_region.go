@@ -12,8 +12,14 @@ import (
 
 var newAwsRepositoryForRegionFn = awsservice.NewAwsRepository
 
+// hasMultipleRegions reports whether the active context exposes more than one
+// resource region.
+func (m Model) hasMultipleRegions() bool {
+	return m.cfg != nil && len(m.cfg.Regions) > 1
+}
+
 func (m Model) canSwitchResourceRegion() bool {
-	if m.cfg == nil || len(m.cfg.Regions) <= 1 || m.filterTI.Focused() || m.isTextEntryScreen() {
+	if !m.hasMultipleRegions() || m.filterTI.Focused() || m.isTextEntryScreen() {
 		return false
 	}
 	switch m.screen {

@@ -96,7 +96,8 @@ eval "$(unic env prod-admin)"
 # Interactively choose/setup a context and copy exports to clipboard
 unic context setup
 
-# Print an ECR login command for the current context
+# Print an ECR login command for the current context (scripting helper;
+# the TUI's ECR Login Helper is the primary workflow)
 unic ecr login
 
 # Copy a Podman ECR login command to the clipboard
@@ -110,6 +111,11 @@ unic context order
 
 # Clear current context and copy cleanup commands to clipboard
 unic context unset
+
+# Generate contexts from the accounts/roles visible to an SSO base context
+unic context sync
+unic context sync dev-sso --dry-run
+unic context sync dev-sso --prune
 ```
 
 `unic context setup` writes its prompts to `stderr` and copies the generated shell commands to the clipboard.
@@ -119,6 +125,7 @@ Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the T
 Contexts can be prioritized in the setup picker with an `order` field in config.
 In the CLI `unic context setup` flow, the picker filters contexts, SSO accounts, SSO roles, and configured resource regions as you type, with arrow-key navigation and Enter to confirm. Multi-region contexts prompt for the shell session region after account/role selection; single-region contexts skip that step. The selection changes `AWS_REGION` and `AWS_DEFAULT_REGION` in the generated exports without modifying the context's persisted default region.
 Use `unic context order` to open reorder mode, choose a context with `↑/↓` or `j/k`, press `Enter` to start moving it, then press `Enter` again to save. `unic context order <name> <number>` still works for direct updates.
+`unic context sync [base-context]` lists the AWS accounts and roles visible to an SSO base context and adds a sync-managed concrete context for each new account/role pair, inheriting the base context's regions. When only one SSO base context exists the argument can be omitted. Existing contexts are never rewritten: pairs that already have a context (manual or synced) are kept as-is. Synced contexts carry a `sync_source: <base-context>` marker in `config.yaml`; when their account/role disappears from SSO they are reported as orphans and removed only with `--prune`. Use `--dry-run` to preview the plan without writing config.
 
 ## Configuration
 
@@ -191,6 +198,7 @@ contexts:
     auth_type: assume_role
     role_arn: arn:aws:iam::123456789012:role/Admin
     external_id: optional-external-id
+    mfa_serial: arn:aws:iam::123456789012:mfa/my-user   # optional: MFA-protected roles
 
   - name: local-dev
     profile: local-dev
@@ -209,11 +217,11 @@ contexts:
 |---|---|---|
 | `credential` | Use shared AWS profile credentials | `profile` |
 | `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
-| `assume_role` | Assume a role from a base profile | `profile`, `role_arn` |
+| `assume_role` | Assume a role from a base profile, optionally with MFA | `profile`, `role_arn`; optional `mfa_serial` |
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name`; `profile` is optional |
-| `okta_saml` | Okta SAML federation context (config schema only for now; runtime credential exchange is in progress) | `okta_org_url`, `okta_app_id`; optional `role_arn` for a preferred role. Passwords and MFA secrets are never stored in config |
+| `okta_saml` | Okta SAML federation context (config schema only for now; runtime credential exchange is in progress and the TUI does not offer it in the add-context picker yet) | `okta_org_url`, `okta_app_id`; optional `role_arn` for a preferred role. Passwords and MFA secrets are never stored in config |
 
-The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients.
+The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients. The EC2 Instance Browser can additionally aggregate all configured regions into a single list with `A`.
 
 Legacy flat fields (`auth_type`, `profile`, `region`, `regions`, `sso_region`, and related auth fields) remain supported. A context without a region list behaves as a single-region context, and an omitted SSO region still falls back to its default resource region.
 
@@ -224,7 +232,9 @@ Optional context fields:
 | Field | Meaning |
 |---|---|
 | `order` | Lower values appear first in the context setup picker. Contexts without `order` fall back after ordered entries in their existing file order. |
+| `sync_source` | Name of the SSO base context that generated this context via `unic context sync`. Marks the context as sync-managed: re-syncs may prune it (with `--prune`) when its account/role disappears from SSO. Contexts without this field are never touched by sync. |
 | `sso_region` | (SSO only) Region of the IAM Identity Center portal, used for SSO login and role-credential retrieval. Defaults to `region` when unset. Use it when the SSO portal and your resources live in different regions. |
+| `mfa_serial` | (assume_role only) ARN of the MFA device required by the role's trust policy. CLI flows (`unic env`, `unic context setup`) prompt for a token code on stderr and cache the resulting session under `~/.config/unic/cache/assume-role/` until it expires. The TUI reuses a valid cached session passively and otherwise asks you to run `unic env <context>` first. |
 | `resources.regions` / `regions` | Additional resource regions available through the global `R` picker. The default resource region is always included automatically. |
 
 Resolution priority:
@@ -364,7 +374,7 @@ checks:
 | Area | Keys |
 |---|---|
 | EC2 SSM | `r` refresh, `Enter` connect |
-| EC2 Instance Browser | `r` refresh, `/` filter, `Enter` detail, detail `g/a/t/b/n` opens related security groups/ASG/target groups/load balancers/listeners |
+| EC2 Instance Browser | `r` refresh, `/` filter, `A` toggle all-regions scope (multi-region contexts), `Enter` detail, detail `g/a/t/b/n` opens related security groups/ASG/target groups/load balancers/listeners |
 | Security Groups | `a` add rule, `d` delete rule, `Tab` switch ingress/egress |
 | Reachability Analyzer | Region select first, `←`/`→` or `Tab` change type, `/` filter, `Enter` advance, `Tab`/`↑`/`↓` move config fields, `←`/`→` protocol, `r` rerun |
 | RDS | `s` start, `x` stop, `f` failover, `r` refresh |
@@ -373,7 +383,7 @@ checks:
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
 | CloudWatch Metrics | preset-driven metric list/detail flow, `/` filter, `space` select related series, `g` preset cycle, `t/p/s` range-period-stat controls, `r` refresh, in-terminal single-series and comparison charts |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
-| ECR Login | CLI helper: `unic ecr login [--runtime docker|podman] [--copy]` |
+| ECR Login Helper | `c` copy Docker login command, `p` copy Podman login command, `r` refresh; CLI helper for scripting: `unic ecr login [--runtime docker|podman] [--copy]` |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
 | ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
 | EKS Browser | cluster/node group/add-on lists support `/` filter and `r` refresh, cluster view shows version/status/endpoint visibility/ARN summary, `a` opens managed add-ons, `U` opens current-version upgrade readiness, `u` opens kubeconfig access helper, node group detail shows desired/min/max scaling plus health issues |
@@ -390,7 +400,7 @@ The service list defaults to favorites first, then alphabetical order. Press `f`
 
 The EKS Browser includes a managed add-on status view for each cluster. Add-on rows show the installed version, status, and health summary, with degraded or unhealthy add-ons highlighted so core components such as CoreDNS, kube-proxy, VPC CNI, and CSI drivers are easy to spot.
 
-The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
+The ECR Login Helper resolves the private registry URI for the active context and shows copyable Docker and Podman login commands without leaving the TUI. The copied commands are prefixed with `eval "$(unic env <context>)"` so they authenticate with the active unic context rather than whatever ambient AWS credentials the shell happens to have; `unic ecr login` remains as a secondary CLI helper for scripting. The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
 
 The FIS Experiment Template Browser lists experiment templates in the active region and opens a detail screen with role ARN, targets, actions, target mappings, parameters, filters, and stop condition summaries without leaving the TUI. Template detail includes a Safe Run Preview that summarizes blast radius, target selection modes, action count, active stop conditions, IAM role, and warnings for missing stop conditions, missing role ARN, broad selection, or unbounded selectors. The preview also states the template ID that any future execution path must type to confirm before a run can start. Press `h` on a selected template or template detail to inspect recent runs for that template, or `H` from the template list to inspect recent experiment history across the active account/region. History rows include run status, timing, and stop/failure summaries, with failed, stopped, stopping, and cancelled runs visually highlighted; `Enter` opens run detail with start/end times, duration, action states, targets, stop conditions, and failure metadata.
 
@@ -398,11 +408,15 @@ The EKS Browser includes a current-version upgrade readiness view for each selec
 
 The EKS Browser includes an access helper for each selected cluster. Press `u` from the cluster list to review the cluster endpoint, ARN, current region/profile, and copy an `aws eks update-kubeconfig` command or a `kubectl get nodes` smoke-check command for handoff into Kubernetes workflows.
 
-The EC2 Instance Browser lists EC2 instances across available states for the active context and region, separate from the SSM session picker that only lists connectable running instances. The detail screen shows core metadata including instance ID, name tag, state, instance type, AZ, VPC, subnet, security groups, private and public IPs, launch time, platform details, IAM profile, and tags. From instance detail, related-resource drill-down screens open attached security groups (`g`), Auto Scaling membership (`a`), registered target groups (`t`), associated load balancers (`b`), and listeners (`n`). Related lists support filtering, refresh, wrap navigation, empty states for missing associations, and inline errors when a relationship cannot be loaded because of API or permission failures.
+The EC2 Instance Browser lists EC2 instances across available states for the active context and region, separate from the SSM session picker that only lists connectable running instances. For multi-region contexts, press `A` to toggle an all-regions scope that lists instances from every configured resource region in one view: rows gain a region tag, per-region API failures are shown inline without hiding other regions' results, and detail and related-resource drill-downs query the selected instance's own region. The detail screen shows core metadata including instance ID, name tag, state, instance type, AZ, VPC, subnet, security groups, private and public IPs, launch time, platform details, IAM profile, and tags. From instance detail, related-resource drill-down screens open attached security groups (`g`), Auto Scaling membership (`a`), registered target groups (`t`), associated load balancers (`b`), and listeners (`n`). Related lists support filtering, refresh, wrap navigation, empty states for missing associations, and inline errors when a relationship cannot be loaded because of API or permission failures.
 
 Bedrock API key management uses the active unic AWS context and IAM service-specific credential APIs for `bedrock.amazonaws.com`. The TUI lists long-term Bedrock API key metadata, opens a detail screen for inspection, defaults new key generation to the current IAM user when that user can be inferred from caller identity, and keeps another-user generation as an explicit option. Creation supports an optional expiration period, where blank or `0` means no expiration, rotates secrets with a one-time result screen, and deletes keys only after typed confirmation. Generated and rotated key values are intentionally copy-only and are not printed to the terminal; on the result screen, `c` copies the key and `e` copies `export AWS_BEARER_TOKEN_BEDROCK=...`.
 
 Reachability Analyzer starts with a region selection step, defaults to the current context region, and now surfaces the AWS-documented source and destination resource types that unic supports: EC2 instances, Internet gateways, Network interfaces, Transit gateways, Transit gateway attachments, Virtual private gateways, VPC endpoint services, VPC endpoints, VPC peering connections, plus IP addresses as destinations. The source and destination pickers support type tabs, keyword filtering, IPv4 destination validation, and automatic cleanup of temporary Network Insights resources after each analysis. During analysis, the loading screen shows a vertical source-to-destination flow and intent summary, and the result view renders path hops and findings in a more readable layout.
+
+## Product Principles
+
+- **TUI-first.** New user-facing AWS service capabilities ship with a TUI entry point first. CLI commands are secondary surfaces for scripting, automation, or copy/paste handoff, and should be documented as such.
 
 ## Development
 
