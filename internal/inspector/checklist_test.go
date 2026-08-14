@@ -599,3 +599,53 @@ func TestAppendCheckRejectsInvalidWithoutWriting(t *testing.T) {
 
 func boolPtr(v bool) *bool { return &v }
 func intPtr(v int) *int    { return &v }
+
+func TestAppendCheckWriteFailureLeavesOriginalIntact(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "readiness.yaml")
+	valid := ChecklistCheck{
+		Type:     ChecklistCheckRDS,
+		Resource: "prod-db",
+		Expect:   ChecklistExpectations{StorageEncrypted: boolPtr(true)},
+	}
+	if err := AppendCheck(path, valid); err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make the directory unwritable so the temp-file stage fails before the
+	// original can be touched.
+	if err := os.Chmod(dir, 0500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0755) })
+
+	second := ChecklistCheck{
+		Type:     ChecklistCheckCloudWatchLogGroup,
+		Resource: "/aws/ecs/app",
+		Expect:   ChecklistExpectations{RetentionDays: intPtr(30)},
+	}
+	if err := AppendCheck(path, second); err == nil {
+		t.Fatal("expected write failure in a read-only directory")
+	}
+
+	if err := os.Chmod(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || string(after) != string(original) {
+		t.Fatalf("expected original checklist byte-identical after failed append, err=%v", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), ".tmp") {
+			t.Fatalf("expected no temp files to linger, found %q", entry.Name())
+		}
+	}
+}

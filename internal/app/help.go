@@ -687,6 +687,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return []helpShortcut{
 			{"↑/↓, j/k", "Move between checklist folders and files"},
 			{"/", "Start filtering entries"},
+			{"a", "Create a check through prompts (starts a new checklist when none is loaded)"},
 			{"enter", "Open the selected folder or load the selected checklist"},
 			{"q / esc", "Go back to Inspector mode"},
 		}

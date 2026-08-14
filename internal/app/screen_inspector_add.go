@@ -32,6 +32,7 @@ var checklistPromptFields = map[inspector.ChecklistCheckType][]checkFieldDef{
 	inspector.ChecklistCheckRDS: {
 		{key: "status", label: "Expected status (optional)", kind: "string"},
 		{key: "engine", label: "Expected engine (optional)", kind: "string"},
+		{key: "engine_version", label: "Expected engine version (optional)", kind: "string"},
 		{key: "instance_class", label: "Expected instance class (optional)", kind: "string"},
 		{key: "multi_az", label: "Multi-AZ true/false (optional)", kind: "bool"},
 		{key: "storage_encrypted", label: "Storage encrypted true/false (optional)", kind: "bool"},
@@ -44,6 +45,8 @@ var checklistPromptFields = map[inspector.ChecklistCheckType][]checkFieldDef{
 		{key: "from_port", label: "From port (optional)", kind: "int"},
 		{key: "to_port", label: "To port (optional)", kind: "int"},
 		{key: "cidr", label: "IPv4 CIDR (optional)", kind: "string"},
+		{key: "cidr_v6", label: "IPv6 CIDR (optional)", kind: "string"},
+		{key: "referenced_sg_id", label: "Referenced security group ID (optional)", kind: "string"},
 	},
 	inspector.ChecklistCheckSecret: {
 		{key: "rotation_enabled", label: "Rotation enabled true/false (optional)", kind: "bool"},
@@ -59,6 +62,7 @@ var checklistPromptFields = map[inspector.ChecklistCheckType][]checkFieldDef{
 		{key: "ttl", label: "Expected TTL (optional)", kind: "int"},
 		{key: "values", label: "Expected values (comma-separated, optional)", kind: "csv"},
 		{key: "alias_target", label: "Alias target DNS name (optional)", kind: "string"},
+		{key: "alias_hosted_zone_id", label: "Alias hosted zone ID (optional)", kind: "string"},
 	},
 	inspector.ChecklistCheckVPC: {
 		{key: "cidr", label: "Expected CIDR (optional)", kind: "string"},
@@ -145,6 +149,7 @@ func buildChecklistCheck(checkType inspector.ChecklistCheckType, values map[stri
 	case inspector.ChecklistCheckRDS:
 		check.Expect.Status = str("status")
 		check.Expect.Engine = str("engine")
+		check.Expect.EngineVersion = str("engine_version")
 		check.Expect.InstanceClass = str("instance_class")
 		if check.Expect.MultiAZ, err = boolVal("multi_az"); err != nil {
 			return check, err
@@ -160,8 +165,10 @@ func buildChecklistCheck(checkType inspector.ChecklistCheckType, values map[stri
 		}
 	case inspector.ChecklistCheckSecurityGroup:
 		rule := inspector.ChecklistSecurityGroupRule{
-			Protocol: strings.TrimSpace(values["protocol"]),
-			CIDR:     strings.TrimSpace(values["cidr"]),
+			Protocol:       strings.TrimSpace(values["protocol"]),
+			CIDR:           strings.TrimSpace(values["cidr"]),
+			CIDRv6:         strings.TrimSpace(values["cidr_v6"]),
+			ReferencedSGID: strings.TrimSpace(values["referenced_sg_id"]),
 		}
 		var fromPort, toPort *int
 		if fromPort, err = intVal("from_port"); err != nil {
@@ -205,6 +212,7 @@ func buildChecklistCheck(checkType inspector.ChecklistCheckType, values map[stri
 		}
 		check.Expect.Values = csv("values")
 		check.Expect.AliasTarget = str("alias_target")
+		check.Expect.AliasHostedZoneID = str("alias_hosted_zone_id")
 	case inspector.ChecklistCheckVPC:
 		check.Expect.CIDR = str("cidr")
 		if check.Expect.DefaultVPC, err = boolVal("default_vpc"); err != nil {
@@ -229,6 +237,7 @@ func buildChecklistCheck(checkType inspector.ChecklistCheckType, values map[stri
 }
 
 func (im *inspectorModel) openChecklistAdd(m *Model) (tea.Model, tea.Cmd) {
+	im.addPrevScreen = m.screen
 	im.addStep = 0
 	im.addTypeIdx = 0
 	im.addFieldIdx = 0
@@ -255,8 +264,8 @@ func (im *inspectorModel) updateChecklistAdd(m *Model, msg tea.KeyMsg) (tea.Mode
 	if im.addStep == 0 {
 		switch key {
 		case "q", "esc":
-			m.screen = screenInspectorChecklistResults
-			if im.checklistReport == nil {
+			m.screen = im.addPrevScreen
+			if m.screen == screenInspectorChecklistAdd || m.screen == 0 {
 				m.screen = screenInspectorHome
 			}
 		case "up", "k":

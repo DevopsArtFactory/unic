@@ -1186,8 +1186,31 @@ func AppendCheck(path string, check ChecklistCheck) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("failed to create checklist directory: %w", err)
 	}
-	if err := os.WriteFile(path, out, 0644); err != nil {
-		return fmt.Errorf("failed to write checklist %s: %w", path, err)
+	// Replace atomically via temp file + rename so an I/O failure mid-write
+	// can never truncate an existing hand-maintained checklist.
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".checklist-*.yaml.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp checklist file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpPath) }
+	if _, err := tmp.Write(out); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("failed to write temp checklist file: %w", err)
+	}
+	if err := tmp.Chmod(0644); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("failed to chmod temp checklist file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("failed to close temp checklist file: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		cleanup()
+		return fmt.Errorf("failed to replace checklist %s: %w", path, err)
 	}
 	return nil
 }

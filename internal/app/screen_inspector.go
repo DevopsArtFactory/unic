@@ -51,13 +51,14 @@ type inspectorModel struct {
 	selectedChecklistResult *inspector.ChecklistResult
 
 	// Add-check wizard
-	addStep     int
-	addTypeIdx  int
-	addFields   []checkFieldDef
-	addFieldIdx int
-	addInput    string
-	addValues   map[string]string
-	addError    string
+	addPrevScreen screen
+	addStep       int
+	addTypeIdx    int
+	addFields     []checkFieldDef
+	addFieldIdx   int
+	addInput      string
+	addValues     map[string]string
+	addError      string
 }
 
 func newInspectorModel(checklistPath string) inspectorModel {
@@ -480,6 +481,10 @@ func (im *inspectorModel) updateChecklistPicker(m *Model, msg tea.KeyMsg) (tea.M
 		im.checklistFileIdx = nextListIndex(im.checklistFileIdx, len(im.filteredChecklistFiles))
 	case "/":
 		return *m, m.activateFilter(filterInspectorChecklistFiles)
+	case "a":
+		// Creating the first check must be reachable before any checklist
+		// has been loaded; the wizard writes to a new default file then.
+		return im.openChecklistAdd(m)
 	case "enter":
 		if len(im.filteredChecklistFiles) == 0 || im.checklistFileIdx >= len(im.filteredChecklistFiles) {
 			return *m, nil

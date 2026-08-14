@@ -134,3 +134,77 @@ func TestChecklistAddDefaultsTargetPathWithoutLoadedChecklist(t *testing.T) {
 		t.Fatalf("expected default checklist target, got %q", target)
 	}
 }
+
+func TestChecklistAddReachableFromPickerWithoutLoadedChecklist(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg = &config.Config{Region: "us-east-1", ContextName: "dev"}
+	m.inspector.checklistPath = ""
+	m.inspector.checklistDir = t.TempDir()
+	m.screen = screenInspectorChecklistPicker
+
+	// `a` on the picker opens the wizard even with nothing loaded.
+	newM, _, handled := m.inspector.HandleKey(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	model := newM.(Model)
+	if !handled || model.screen != screenInspectorChecklistAdd {
+		t.Fatalf("expected wizard from the picker, got %v", model.screen)
+	}
+
+	// Complete the wizard end to end: a baseline check needs only a resource.
+	m = model
+	selectChecklistType(t, &m, inspector.ChecklistCheckCloudTrailBaseline)
+	typeIntoChecklistAdd(&m, "cloudtrail")
+	newM2, cmd := m.inspector.updateChecklistAdd(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	model = newM2.(Model)
+	if cmd == nil || model.screen != screenInspectorScanning {
+		t.Fatalf("expected rerun after first-check save, got %v", model.screen)
+	}
+
+	target := filepath.Join(m.inspector.checklistDir, "unic-checklist.yaml")
+	loaded, err := inspector.LoadChecklist(target)
+	if err != nil || len(loaded.Checks) != 1 {
+		t.Fatalf("expected the default checklist to be created at %s, got %+v err=%v", target, loaded, err)
+	}
+
+	// esc from the wizard's type step returns to where it was opened.
+	m = model
+	m.inspector.openChecklistAdd(&m)
+	m.screen = screenInspectorChecklistAdd
+	m.inspector.addPrevScreen = screenInspectorChecklistPicker
+	m.inspector.updateChecklistAdd(&m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.screen != screenInspectorChecklistPicker {
+		t.Fatalf("expected esc to return to the picker, got %v", m.screen)
+	}
+}
+
+func TestChecklistAddSecurityGroupExtendedFields(t *testing.T) {
+	values := map[string]string{
+		"resource":         "sg-web",
+		"rule_mode":        "ingress_present",
+		"cidr_v6":          "::/0",
+		"referenced_sg_id": "sg-db",
+	}
+	check, err := buildChecklistCheck(inspector.ChecklistCheckSecurityGroup, values)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	rule := check.Expect.IngressPresent[0]
+	if rule.CIDRv6 != "::/0" || rule.ReferencedSGID != "sg-db" {
+		t.Fatalf("expected IPv6 and referenced-SG fields mapped, got %+v", rule)
+	}
+}
+
+func TestChecklistAddSchemaCoverageExtras(t *testing.T) {
+	check, err := buildChecklistCheck(inspector.ChecklistCheckRDS, map[string]string{
+		"resource": "prod-db", "engine_version": "16.3",
+	})
+	if err != nil || check.Expect.EngineVersion == nil || *check.Expect.EngineVersion != "16.3" {
+		t.Fatalf("expected engine_version mapped, got %+v err=%v", check.Expect, err)
+	}
+
+	check, err = buildChecklistCheck(inspector.ChecklistCheckRoute53Record, map[string]string{
+		"resource": "api.example.com", "zone": "example.com", "alias_hosted_zone_id": "Z123",
+	})
+	if err != nil || check.Expect.AliasHostedZoneID == nil || *check.Expect.AliasHostedZoneID != "Z123" {
+		t.Fatalf("expected alias_hosted_zone_id mapped, got %+v err=%v", check.Expect, err)
+	}
+}
