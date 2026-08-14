@@ -178,7 +178,7 @@ UNIC supports five main auth modes.
 - uses a shared AWS profile plus AWS CLI `aws login`
 - `unic context setup` runs `aws login --profile <profile> --region <region>`
 - remains profile-backed after login, so `unic env` exports `AWS_PROFILE` and region variables
-- currently supported only as a standalone context and does not chain with `role_arn`
+- with `role_arn` set, the login profile credentials chain into STS AssumeRole through the same path as assume_role (including the MFA session cache)
 
 ### `assume_role`
 

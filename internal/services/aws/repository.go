@@ -347,6 +347,16 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 				return nil, err
 			}
 		}
+		if cfg.RoleArn != "" {
+			// Role chaining: start from the profile-backed credentials and
+			// assume the configured role (shares the assume_role path,
+			// including the MFA session cache).
+			awsCfg, err = resolveAssumeRoleCredentials(ctx, cfg)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
 		awsCfg, err = LoadBaseConfig(ctx, cfg.Region, cfg.Profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load AWS config: %w", err)

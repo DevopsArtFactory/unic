@@ -229,8 +229,8 @@ contexts:
 
 | Auth Type | Meaning | Required Fields |
 |---|---|---|
-| `credential` | Use shared AWS profile credentials | `profile` |
-| `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
+| `credential` | Use shared AWS profile credentials, optionally chaining into a role | `profile`; optional `role_arn` (+ `external_id`, `mfa_serial`) |
+| `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials, optionally chaining into a role | `profile`; optional `role_arn` (+ `external_id`, `mfa_serial`) |
 | `assume_role` | Assume a role from a base profile, optionally with MFA | `profile`, `role_arn`; optional `mfa_serial` |
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name`; `profile` is optional |
 | `okta_saml` | Okta SAML federation: `unic env` signs in to Okta (prompt on stderr, password without echo; `UNIC_OKTA_USERNAME`/`UNIC_OKTA_PASSWORD` for automation), exchanges the SAML assertion via `sts:AssumeRoleWithSAML`, and caches the session under `~/.config/unic/cache/okta-saml/`. The TUI reuses a valid cached session passively. Okta MFA challenges support TOTP codes and Okta Verify push in v1 | `okta_org_url`, `okta_app_id`; `role_arn` required when the assertion carries multiple roles. Passwords and MFA secrets are never stored |

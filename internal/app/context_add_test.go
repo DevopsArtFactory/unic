@@ -36,8 +36,8 @@ func TestContextAddSelectsConsoleLoginFields(t *testing.T) {
 	if model.addValues["auth_type"] != "console_login" {
 		t.Fatalf("expected console_login selection, got %q", model.addValues["auth_type"])
 	}
-	if len(model.addFields) != 5 {
-		t.Fatalf("expected 5 fields for console_login, got %d", len(model.addFields))
+	if len(model.addFields) != 8 {
+		t.Fatalf("expected 8 fields for console_login (incl. optional chaining), got %d", len(model.addFields))
 	}
 	if model.addFields[3].key != "regions" || model.addFields[4].key != "profile" {
 		t.Fatalf("expected regions and profile fields, got %+v", model.addFields)
@@ -107,5 +107,31 @@ func TestContextAddSelectsOktaSAMLFields(t *testing.T) {
 		if strings.Contains(key, "password") || strings.Contains(key, "secret") || strings.Contains(key, "mfa") {
 			t.Fatalf("okta_saml wizard must not collect secrets, got field %q", key)
 		}
+	}
+}
+
+func TestContextAddOffersChainingFieldsForProfileBackedTypes(t *testing.T) {
+	for _, authType := range []string{"credential", "console_login"} {
+		keys := map[string]bool{}
+		required := map[string]bool{}
+		for _, field := range fieldsByAuthType[authType] {
+			keys[field.key] = true
+			required[field.key] = field.required
+		}
+		for _, want := range []string{"role_arn", "external_id", "mfa_serial"} {
+			if !keys[want] {
+				t.Fatalf("%s: expected optional %s field for role chaining", authType, want)
+			}
+			if required[want] {
+				t.Fatalf("%s: expected %s to be optional", authType, want)
+			}
+		}
+	}
+	keys := map[string]bool{}
+	for _, field := range fieldsByAuthType["assume_role"] {
+		keys[field.key] = true
+	}
+	if !keys["mfa_serial"] {
+		t.Fatal("assume_role: expected mfa_serial field")
 	}
 }

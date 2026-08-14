@@ -45,8 +45,5 @@ func ValidateConsoleLoginContext(cfg *config.Config) error {
 	if cfg.Profile == "" {
 		return fmt.Errorf("console_login context %q requires profile", cfg.ContextName)
 	}
-	if cfg.RoleArn != "" {
-		return fmt.Errorf("console_login context %q does not support role_arn", cfg.ContextName)
-	}
 	return nil
 }

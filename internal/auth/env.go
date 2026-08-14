@@ -74,6 +74,19 @@ func BuildEnvExports(ctx context.Context, cfg *config.Config) (string, error) {
 				return "", err
 			}
 		}
+		if cfg.RoleArn != "" {
+			// Role chaining: export the assumed-role session credentials
+			// instead of the base profile.
+			var err error
+			values, err = assumeRoleFn(ctx, cfg)
+			if err != nil {
+				return "", err
+			}
+			values["AWS_REGION"] = cfg.Region
+			values["AWS_DEFAULT_REGION"] = cfg.Region
+			values["AWS_PROFILE"] = ""
+			break
+		}
 		profile := cfg.Profile
 		if profile == "" {
 			profile = "default"
