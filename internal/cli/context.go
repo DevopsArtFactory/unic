@@ -26,6 +26,9 @@ var (
 	setContextOrdersFn   = config.SetContextOrders
 	reorderContextsFn    = reorderContexts
 	copyClipboardFn      = clipboard.Copy
+	listContextsFn       = config.Contexts
+	buildSyncPlanFn      = auth.BuildContextSyncPlan
+	applySyncPlanFn      = auth.ApplyContextSyncPlan
 )
 
 func newContextCmd() *cobra.Command {
@@ -37,7 +40,104 @@ func newContextCmd() *cobra.Command {
 	cmd.AddCommand(newContextSetupCmd())
 	cmd.AddCommand(newContextOrderCmd())
 	cmd.AddCommand(newContextUnsetCmd())
+	cmd.AddCommand(newContextSyncCmd())
 	return cmd
+}
+
+func newContextSyncCmd() *cobra.Command {
+	var prune, dryRun bool
+	cmd := &cobra.Command{
+		Use:   "sync [base-context]",
+		Short: "Generate contexts from the accounts and roles visible to an SSO base context",
+		Long: "List the AWS accounts and roles visible to an SSO base context and add a sync-managed context for each pair. " +
+			"Existing contexts are never rewritten; sync-managed contexts whose account/role disappeared are reported and removed only with --prune.",
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := defaultPathFn()
+			if err != nil {
+				return err
+			}
+			if err := ensureConfigExistsFn(configPath); err != nil {
+				return err
+			}
+			base, err := resolveSyncBase(configPath, args)
+			if err != nil {
+				return err
+			}
+			plan, err := buildSyncPlanFn(context.Background(), configPath, base)
+			if err != nil {
+				return err
+			}
+			printSyncPlan(cmd.OutOrStdout(), plan, prune, dryRun)
+			if dryRun {
+				return nil
+			}
+			return applySyncPlanFn(configPath, plan, prune)
+		},
+	}
+	cmd.Flags().BoolVar(&prune, "prune", false, "remove sync-managed contexts whose SSO account/role is no longer visible")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show the sync plan without writing config")
+	return cmd
+}
+
+func resolveSyncBase(configPath string, args []string) (config.ContextInfo, error) {
+	contexts, err := listContextsFn(configPath)
+	if err != nil {
+		return config.ContextInfo{}, err
+	}
+
+	if len(args) == 1 {
+		for _, ctx := range contexts {
+			if ctx.Name != args[0] {
+				continue
+			}
+			if !auth.IsBaseSSOContext(ctx) {
+				return config.ContextInfo{}, fmt.Errorf("context %q is not an SSO base context", ctx.Name)
+			}
+			return ctx, nil
+		}
+		return config.ContextInfo{}, fmt.Errorf("context %q not found", args[0])
+	}
+
+	var bases []config.ContextInfo
+	for _, ctx := range contexts {
+		if auth.IsBaseSSOContext(ctx) {
+			bases = append(bases, ctx)
+		}
+	}
+	switch len(bases) {
+	case 0:
+		return config.ContextInfo{}, fmt.Errorf("no SSO base context found; add one with sso_start_url and no sso_account_id/sso_role_name")
+	case 1:
+		return bases[0], nil
+	default:
+		names := make([]string, 0, len(bases))
+		for _, base := range bases {
+			names = append(names, base.Name)
+		}
+		return config.ContextInfo{}, fmt.Errorf("multiple SSO base contexts found (%s); pass one as an argument", strings.Join(names, ", "))
+	}
+}
+
+func printSyncPlan(out io.Writer, plan auth.ContextSyncPlan, prune, dryRun bool) {
+	for _, entry := range plan.Add {
+		fmt.Fprintf(out, "add:    %s\n", entry.Name)
+	}
+	for _, name := range plan.Orphans {
+		action := "orphan"
+		if prune {
+			action = "remove"
+		}
+		fmt.Fprintf(out, "%s: %s\n", action, name)
+	}
+	suffix := ""
+	if dryRun {
+		suffix = " (dry run, nothing written)"
+	}
+	fmt.Fprintf(out, "sync %s: %d added, %d kept, %d orphaned%s\n", plan.Base, len(plan.Add), len(plan.Keep), len(plan.Orphans), suffix)
+	if !prune && len(plan.Orphans) > 0 {
+		fmt.Fprintln(out, "use --prune to remove orphaned sync-managed contexts")
+	}
 }
 
 func newContextOrderCmd() *cobra.Command {

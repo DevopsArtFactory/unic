@@ -42,6 +42,11 @@ cmd/unic/main.go
   - 많은 context/account/role 목록에서 live incremental filtering 지원
   - `unic context order`를 통한 interactive context ordering 지원
   - `console_login` context에서 `aws login` 실행 가능
+- `unic context sync [base-context]`
+  - SSO base context에 보이는 account/role 조합마다 sync-managed context를 생성
+  - 생성된 context는 `sync_source` marker로 수동 context와 구분
+  - 사라진 account/role의 sync-managed context는 orphan으로 보고하고 `--prune`일 때만 삭제
+  - `--dry-run`으로 config를 쓰지 않고 plan만 출력
 - `unic context unset`
 
 ### `internal/config/`

@@ -74,6 +74,7 @@ type ContextEntry struct {
 	SSOAccountID string            `yaml:"sso_account_id,omitempty"`
 	SSORoleName  string            `yaml:"sso_role_name,omitempty"`
 	Regions      []string          `yaml:"regions,omitempty"`
+	SyncSource   string            `yaml:"sync_source,omitempty"`
 	Auth         *ContextAuth      `yaml:"auth,omitempty"`
 	Resources    *ContextResources `yaml:"resources,omitempty"`
 }
@@ -162,6 +163,7 @@ type ContextInfo struct {
 	SSOAccountID string
 	SSORoleName  string
 	Regions      []string
+	SyncSource   string
 	Current      bool
 	Favorite     bool
 }
@@ -448,6 +450,7 @@ func Contexts(configPath string) ([]ContextInfo, error) {
 			SSOAccountID: resolved.SSOAccountID,
 			SSORoleName:  resolved.SSORoleName,
 			Regions:      resolved.Regions,
+			SyncSource:   ctx.SyncSource,
 			Current:      ctx.Name == fc.Current,
 			Favorite:     favorite,
 		})
@@ -678,6 +681,76 @@ func UpsertContext(configPath string, entry ContextEntry) error {
 	if !replaced {
 		fc.Contexts = append(fc.Contexts, entry)
 	}
+
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	if err := os.WriteFile(configPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	return nil
+}
+
+// RemoveContexts deletes the named contexts from config. The current context
+// selection is cleared when it points at a removed context.
+func RemoveContexts(configPath string, names []string) error {
+	return UpsertAndRemoveContexts(configPath, nil, names)
+}
+
+// UpsertAndRemoveContexts applies additions/updates and removals in one
+// read-modify-write pass so a sync plan is persisted atomically instead of one
+// entry at a time. The current context selection is cleared when it points at
+// a removed context.
+func UpsertAndRemoveContexts(configPath string, upserts []ContextEntry, removals []string) error {
+	if len(upserts) == 0 && len(removals) == 0 {
+		return nil
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if len(upserts) == 0 {
+			return fmt.Errorf("failed to read config: %w", err)
+		}
+		data = []byte("contexts: []\n")
+	}
+
+	var fc fileConfig
+	if err := yaml.Unmarshal(data, &fc); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", configPath, err)
+	}
+
+	for _, entry := range upserts {
+		replaced := false
+		for i := range fc.Contexts {
+			if fc.Contexts[i].Name == entry.Name {
+				fc.Contexts[i] = entry
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			fc.Contexts = append(fc.Contexts, entry)
+		}
+	}
+
+	remove := make(map[string]struct{}, len(removals))
+	for _, name := range removals {
+		remove[name] = struct{}{}
+	}
+	kept := fc.Contexts[:0]
+	for _, ctx := range fc.Contexts {
+		if _, ok := remove[ctx.Name]; ok {
+			if fc.Current == ctx.Name {
+				fc.Current = ""
+			}
+			continue
+		}
+		kept = append(kept, ctx)
+	}
+	fc.Contexts = kept
 
 	out, err := yaml.Marshal(&fc)
 	if err != nil {
