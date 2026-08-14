@@ -134,6 +134,11 @@ func (m Model) helpModeShortcuts() []helpShortcut {
 }
 
 func (m Model) currentScreenShortcuts() []helpShortcut {
+	// Screens migrated to declarative keymaps render from one definition;
+	// the switch below is the legacy catalog for the rest.
+	if shortcuts, ok := m.keymapShortcuts(); ok {
+		return shortcuts
+	}
 	switch m.screen {
 	case screenServiceList:
 		return []helpShortcut{
@@ -276,44 +281,6 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"enter", "Confirm when the typed identifier matches"},
 			{"esc", "Cancel and return to the detail screen"},
 		}
-	case screenRoute53ZoneList:
-		return listScreenShortcuts("open the selected hosted zone", "go back to the feature list", true, false)
-	case screenRoute53RecordList:
-		shortcuts := listScreenShortcuts("open the selected record", "go back to the hosted zone list", true, false)
-		return append(shortcuts[:3], append([]helpShortcut{{"c", "Create a new DNS record"}}, shortcuts[3:]...)...)
-	case screenRoute53RecordDetail:
-		shortcuts := []helpShortcut{
-			{"c", "Create a new DNS record"},
-			{"q / esc", "Go back to the record list"},
-		}
-		if m.route53.selectedRecord != nil {
-			canEdit := m.route53.selectedRecord.AliasTarget == "" &&
-				(m.route53.selectedRecord.Type == "A" || m.route53.selectedRecord.Type == "CNAME")
-			canDelete := m.route53.selectedRecord.Type != "NS" && m.route53.selectedRecord.Type != "SOA"
-			if canEdit {
-				shortcuts = append([]helpShortcut{{"e", "Edit the selected DNS record"}}, shortcuts...)
-			}
-			if canDelete {
-				shortcuts = append(shortcuts[:len(shortcuts)-1], append([]helpShortcut{{"d", "Delete the selected DNS record"}}, shortcuts[len(shortcuts)-1:]...)...)
-			}
-		}
-		return shortcuts
-	case screenRoute53RecordCreate:
-		return route53FormShortcuts(m.route53.editField == 1)
-	case screenRoute53RecordEdit:
-		return []helpShortcut{
-			{"type", "Edit the current record field"},
-			{"backspace", "Delete the previous character"},
-			{"enter", "Advance to the next field or save the update"},
-			{"esc", "Cancel and return to the record detail"},
-		}
-	case screenRoute53RecordDeleteConfirm:
-		return []helpShortcut{
-			{"type", "Enter the record name to confirm deletion"},
-			{"backspace", "Delete the previous character"},
-			{"enter", "Delete the record when the typed name matches"},
-			{"esc", "Cancel and return to the record detail"},
-		}
 	case screenSecretList:
 		return listScreenShortcuts("open the selected secret", "go back to the feature list", true, false)
 	case screenSecretDetail:
@@ -350,42 +317,6 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"backspace", "Delete the previous character"},
 			{"enter", "Delete the rule when the typed ID matches"},
 			{"esc", "Cancel and return to the security group detail"},
-		}
-	case screenIAMUserList:
-		shortcuts := listScreenShortcuts("open the selected IAM user", "go back to the feature list", true, false)
-		return append(shortcuts[:3], append([]helpShortcut{{"n", "Load the next page of IAM users"}}, shortcuts[3:]...)...)
-	case screenIAMUserDetail:
-		return []helpShortcut{
-			{"q / esc", "Go back to the IAM user list"},
-		}
-	case screenIAMKeyList:
-		return []helpShortcut{
-			{"↑/↓, j/k", "Move between access keys"},
-			{"enter", "Open the selected access key detail"},
-			{"q / esc", "Go back to the feature list"},
-		}
-	case screenIAMKeyDetail:
-		shortcuts := []helpShortcut{
-			{"q / esc", "Go back to the access key list"},
-		}
-		if m.iam.rotationEnabled && m.iam.selectedKey != nil && m.iam.selectedKey.Status == "Active" {
-			shortcuts = append([]helpShortcut{{"r", "Start rotating the selected access key"}}, shortcuts...)
-		}
-		return shortcuts
-	case screenIAMKeyRotateConfirm:
-		return []helpShortcut{
-			{"type", "Enter the access key ID to confirm rotation"},
-			{"backspace", "Delete the previous character"},
-			{"enter", "Create the new key when the typed ID matches"},
-			{"esc", "Cancel and return to the access key detail"},
-		}
-	case screenIAMKeyRotateResult:
-		return []helpShortcut{
-			{"c", "Copy export commands for the new credentials"},
-			{"a", "Apply and verify the new credentials when supported"},
-			{"d", "Deactivate the old access key when allowed"},
-			{"x", "Delete the old access key after deactivation"},
-			{"q / esc", "Return to the access key list"},
 		}
 	case screenCWMetricList:
 		shortcuts := listScreenShortcuts("open the selected metric series", "go back to the feature list", true, true)
@@ -438,10 +369,6 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"r", "Reload the transition history"},
 			{"q / esc", "Go back to the alarm list"},
 		}
-	case screenCWLogGroupList:
-		return listScreenShortcuts("open log streams for the selected group", "go back to the feature list", true, false)
-	case screenCWLogStreamList:
-		return listScreenShortcuts("open the log viewer for the selected stream", "go back to the log group list", true, false)
 	case screenCWLogViewer:
 		shortcuts := []helpShortcut{
 			{"↑/↓, j/k", "Scroll the log viewer"},
@@ -868,20 +795,6 @@ func reachabilityTargetShortcuts(label string, includeQuitBack bool) []helpShort
 		shortcuts = append(shortcuts, helpShortcut{"q / esc", "Go back to the previous step"})
 	}
 	return shortcuts
-}
-
-func route53FormShortcuts(typeSelection bool) []helpShortcut {
-	shortcuts := []helpShortcut{
-		{"enter", "Advance to the next field or save the record"},
-		{"esc", "Cancel and return to the record list"},
-	}
-	if typeSelection {
-		return append([]helpShortcut{{"↑/↓, j/k", "Move between record types"}}, shortcuts...)
-	}
-	return append([]helpShortcut{
-		{"type", "Edit the current field"},
-		{"backspace", "Delete the previous character"},
-	}, shortcuts...)
 }
 
 func capitalizeFirst(value string) string {

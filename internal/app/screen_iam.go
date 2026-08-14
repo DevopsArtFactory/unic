@@ -665,7 +665,7 @@ func (im iamModel) viewUserList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • n: next page • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -719,7 +719,7 @@ func (im iamModel) viewUserDetail(m Model) string {
 	b.WriteString(renderIAMAccessKeyList(u.AccessKeys))
 	b.WriteString("\n\n")
 
-	b.WriteString(m.renderHelpBar("esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -780,7 +780,7 @@ func (im iamModel) viewKeyList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -843,7 +843,7 @@ func (im iamModel) viewKeyDetail(m Model) string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(m.renderHelpBar("esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -874,7 +874,7 @@ func (im iamModel) viewKeyRotateConfirm(m Model) string {
 	b.WriteString("\n")
 	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", im.rotateConfirm)))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -943,7 +943,7 @@ func (im iamModel) viewKeyRotateResult(m Model) string {
 		b.WriteString(dimStyle.Render("  [x] Delete old key (available after deactivation)"))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("esc: back to key list"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
