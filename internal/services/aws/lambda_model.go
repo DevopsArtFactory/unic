@@ -8,6 +8,7 @@ import (
 // LambdaFunction represents an AWS Lambda function.
 type LambdaFunction struct {
 	Name         string
+	Region       string
 	ARN          string
 	Runtime      string
 	Handler      string
@@ -27,7 +28,7 @@ func (f LambdaFunction) DisplayTitle() string {
 }
 
 func (f LambdaFunction) FilterText() string {
-	return f.Name + " " + f.Runtime
+	return f.Name + " " + f.Runtime + " " + f.Region
 }
 
 func (f LambdaFunction) shortLastModified() string {

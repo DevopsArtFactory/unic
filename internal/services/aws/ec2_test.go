@@ -326,9 +326,9 @@ func TestListEC2InstancesAcrossRegions_MergesAndTagsRegions(t *testing.T) {
 	base := &AwsRepository{Region: "us-east-1", EC2Client: regionEC2Mock("us-east-1", "i-east")}
 	west := &AwsRepository{Region: "eu-west-1", EC2Client: regionEC2Mock("eu-west-1", "i-west")}
 
-	original := ec2RepoForRegion
-	defer func() { ec2RepoForRegion = original }()
-	ec2RepoForRegion = func(r *AwsRepository, region string) *AwsRepository {
+	original := repoForRegionFn
+	defer func() { repoForRegionFn = original }()
+	repoForRegionFn = func(r *AwsRepository, region string) *AwsRepository {
 		if region != "eu-west-1" {
 			t.Fatalf("unexpected region requested: %s", region)
 		}
@@ -359,9 +359,9 @@ func TestListEC2InstancesAcrossRegions_KeepsPartialResultsOnFailure(t *testing.T
 		},
 	}}
 
-	original := ec2RepoForRegion
-	defer func() { ec2RepoForRegion = original }()
-	ec2RepoForRegion = func(_ *AwsRepository, _ string) *AwsRepository { return broken }
+	original := repoForRegionFn
+	defer func() { repoForRegionFn = original }()
+	repoForRegionFn = func(_ *AwsRepository, _ string) *AwsRepository { return broken }
 
 	instances, regionErrors := base.ListEC2InstancesAcrossRegions(context.Background(), []string{"us-east-1", "eu-west-1"})
 	if len(instances) != 1 || instances[0].InstanceID != "i-east" {

@@ -235,7 +235,7 @@ contexts:
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name`; `profile` is optional |
 | `okta_saml` | Okta SAML federation: `unic env` signs in to Okta (prompt on stderr, password without echo; `UNIC_OKTA_USERNAME`/`UNIC_OKTA_PASSWORD` for automation), exchanges the SAML assertion via `sts:AssumeRoleWithSAML`, and caches the session under `~/.config/unic/cache/okta-saml/`. The TUI reuses a valid cached session passively. Okta MFA challenges support TOTP codes and Okta Verify push in v1 | `okta_org_url`, `okta_app_id`; `role_arn` required when the assertion carries multiple roles. Passwords and MFA secrets are never stored |
 
-The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients. The EC2 Instance Browser can additionally aggregate all configured regions into a single list with `A`.
+The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients. The EC2 Instance Browser, RDS Browser, and Lambda Browser can additionally aggregate all configured regions into a single list with `A`; rows gain a region tag, per-region failures render inline, and actions (RDS start/stop/modify, Lambda invoke) run against the row's own region.
 
 Legacy flat fields (`auth_type`, `profile`, `region`, `regions`, `sso_region`, and related auth fields) remain supported. A context without a region list behaves as a single-region context, and an omitted SSO region still falls back to its default resource region.
 
@@ -418,7 +418,7 @@ checks:
 | EC2 Instance Browser | `r` refresh, `/` filter, `A` toggle all-regions scope (multi-region contexts), `Enter` detail, detail `g/a/t/b/n` opens related security groups/ASG/target groups/load balancers/listeners |
 | Security Groups | `a` add rule, `d` delete rule, `Tab` switch ingress/egress |
 | Reachability Analyzer | Region select first, `←`/`→` or `Tab` change type, `/` filter, `Enter` advance, `Tab`/`↑`/`↓` move config fields, `←`/`→` protocol, `r` rerun |
-| RDS | `s` start, `x` stop, `f` failover, `m` modify instance class (filterable class picker, `Tab` apply-immediately toggle, type-to-confirm), `r` refresh |
+| RDS | `A` toggle all-regions scope (multi-region contexts), `s` start, `x` stop, `f` failover, `m` modify instance class (filterable class picker, `Tab` apply-immediately toggle, type-to-confirm), `r` refresh |
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
@@ -437,7 +437,7 @@ checks:
 | Settings | `Enter`/`Space` toggle selected setting, `Esc`/`q` back |
 | Context Picker | `a` add context, `f` favorite/unfavorite selected context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
-| Lambda | `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
+| Lambda | `A` toggle all-regions scope (multi-region contexts), `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
 The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context; results stream in as they load, per-service failures are shown inline, and matching covers names, IDs, and ARNs where available. Selecting a resource jumps to the owning browser with the shared filter prefilled to that resource.
 
