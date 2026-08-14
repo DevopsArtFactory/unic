@@ -19,6 +19,7 @@ Thanks for your interest in contributing.
 ## Pull Request Checklist
 
 - [ ] The change is scoped and documented.
+- [ ] New user-facing AWS service capabilities are TUI-first: they ship with a TUI entry point, and any CLI command is a secondary surface for scripting or automation.
 - [ ] Branch name follows `docs/branch-naming-harness.md`.
 - [ ] `README.md` and relevant `docs/` pages were reviewed and updated if needed.
 - [ ] Existing behavior is not broken.

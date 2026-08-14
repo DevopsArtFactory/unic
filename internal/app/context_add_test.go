@@ -66,46 +66,19 @@ func TestContextAddKeepsCurrentFieldVisibleOnShortTerminal(t *testing.T) {
 	}
 }
 
-func TestContextAddSelectsOktaSAMLFields(t *testing.T) {
-	m := New(testConfig(), "", "dev")
-	m.screen = screenContextAdd
-	m.addStep = 0
-	m.addValues = map[string]string{}
-
-	for i, authType := range authTypes {
+func TestContextAddDoesNotOfferOktaSAMLYet(t *testing.T) {
+	for _, authType := range authTypes {
 		if authType == "okta_saml" {
-			m.addAuthIdx = i
-			break
+			t.Fatal("okta_saml must stay out of the add-context picker until runtime credential exchange lands")
 		}
 	}
-
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model := updated.(Model)
-	if model.addValues["auth_type"] != "okta_saml" {
-		t.Fatalf("expected okta_saml selection, got %q", model.addValues["auth_type"])
+	fields, ok := fieldsByAuthType["okta_saml"]
+	if !ok || len(fields) == 0 {
+		t.Fatal("okta_saml field definitions should stay ready for the runtime slice")
 	}
-
-	keys := make([]string, 0, len(model.addFields))
-	required := map[string]bool{}
-	for _, field := range model.addFields {
-		keys = append(keys, field.key)
-		required[field.key] = field.required
-	}
-	joined := strings.Join(keys, ",")
-	for _, want := range []string{"okta_org_url", "okta_app_id", "role_arn"} {
-		if !strings.Contains(joined, want) {
-			t.Fatalf("expected %s field for okta_saml, got %v", want, keys)
-		}
-	}
-	if !required["okta_org_url"] || !required["okta_app_id"] {
-		t.Fatal("expected okta org URL and app ID to be required")
-	}
-	if required["role_arn"] {
-		t.Fatal("expected preferred role ARN to be optional")
-	}
-	for _, key := range keys {
-		if strings.Contains(key, "password") || strings.Contains(key, "secret") || strings.Contains(key, "mfa") {
-			t.Fatalf("okta_saml wizard must not collect secrets, got field %q", key)
+	for _, field := range fields {
+		if strings.Contains(field.key, "password") || strings.Contains(field.key, "secret") || strings.Contains(field.key, "mfa") {
+			t.Fatalf("okta_saml wizard must not collect secrets, got field %q", field.key)
 		}
 	}
 }

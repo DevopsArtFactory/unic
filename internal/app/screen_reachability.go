@@ -413,23 +413,16 @@ func (rm *reachabilityModel) updateDestinationList(m *Model, msg tea.KeyMsg) (te
 }
 
 func (rm *reachabilityModel) updateConfig(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	key := msg.String()
+	switch key {
 	case "q":
 		m.screen = screenFeatureList
 	case "esc":
 		m.screen = screenReachabilityDestinationList
 	case "up", "k":
-		maxField := 1
-		if rm.destination != nil && rm.destination.ManualIP {
-			maxField = 2
-		}
-		rm.configField = previousListIndex(rm.configField, maxField+1)
+		rm.configField = previousListIndex(rm.configField, rm.configMaxField()+1)
 	case "down", "j", "tab":
-		maxField := 1
-		if rm.destination != nil && rm.destination.ManualIP {
-			maxField = 2
-		}
-		rm.configField = nextListIndex(rm.configField, maxField+1)
+		rm.configField = nextListIndex(rm.configField, rm.configMaxField()+1)
 	case "left", "h":
 		if rm.configField == 0 && rm.protocolIdx > 0 {
 			rm.protocolIdx--
@@ -450,15 +443,9 @@ func (rm *reachabilityModel) updateConfig(m *Model, msg tea.KeyMsg) (tea.Model, 
 			}
 		}
 	case "enter":
-		if rm.configField == 0 {
-			maxField := 1
-			if rm.destination != nil && rm.destination.ManualIP {
-				maxField = 2
-			}
-			if rm.configField < maxField {
-				rm.configField++
-				return *m, nil
-			}
+		if rm.configField == 0 && rm.configField < rm.configMaxField() {
+			rm.configField++
+			return *m, nil
 		}
 		return m.startLoadingWithMessage(
 			"Finding Network Path",
@@ -466,20 +453,30 @@ func (rm *reachabilityModel) updateConfig(m *Model, msg tea.KeyMsg) (tea.Model, 
 			rm.runAnalysis(*m),
 		)
 	default:
-		if len(msg.String()) == 1 {
-			switch rm.configField {
-			case 1:
-				if msg.String()[0] >= '0' && msg.String()[0] <= '9' {
-					rm.portInput += msg.String()
-				}
-			case 2:
-				if strings.ContainsRune("0123456789.", rune(msg.String()[0])) {
-					rm.destinationIP += msg.String()
-				}
+		if len(key) != 1 {
+			break
+		}
+		switch rm.configField {
+		case 1:
+			if key[0] >= '0' && key[0] <= '9' {
+				rm.portInput += key
+			}
+		case 2:
+			if strings.ContainsRune("0123456789.", rune(key[0])) {
+				rm.destinationIP += key
 			}
 		}
 	}
 	return *m, nil
+}
+
+// configMaxField returns the last selectable config field index; manual-IP
+// destinations expose an extra destination-IP field.
+func (rm *reachabilityModel) configMaxField() int {
+	if rm.destination != nil && rm.destination.ManualIP {
+		return 2
+	}
+	return 1
 }
 
 func (rm *reachabilityModel) updateResult(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
