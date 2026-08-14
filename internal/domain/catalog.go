@@ -150,6 +150,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceELB,
+			Features: []Feature{
+				{
+					Kind:        FeatureELBBrowser,
+					Description: "Inspect load balancers, target groups, and per-target health",
+				},
+			},
+		},
+		{
 			Name: ServiceLambda,
 			Features: []Feature{
 				{

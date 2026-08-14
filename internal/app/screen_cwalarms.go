@@ -150,6 +150,13 @@ func (am *cwAlarmsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.
 			if feature, target, value, ok := alarmRelatedResource(*am.selected); ok {
 				m.enterServiceForPalette(paletteItem{service: featureService(feature), feature: feature})
 				m.storeFilterValue(target, value)
+				if feature == domain.FeatureELBBrowser {
+					// Narrow the drill-down to the alarm's target group once
+					// the user enters the matched load balancer.
+					if tg := elbDimensionName(am.selected.Dimension("TargetGroup")); tg != "" {
+						m.storeFilterValue(filterELBTargetGroups, tg)
+					}
+				}
 				return m.startFeature(feature)
 			}
 		}
@@ -180,7 +187,25 @@ func alarmRelatedResource(alarm awsservice.CloudWatchAlarm) (domain.FeatureKind,
 	if value := alarm.Dimension("FunctionName"); value != "" {
 		return domain.FeatureLambdaBrowser, filterLambdaFunctions, value, true
 	}
+	if value := elbDimensionName(alarm.Dimension("LoadBalancer")); value != "" {
+		return domain.FeatureELBBrowser, filterELBs, value, true
+	}
+	if value := elbDimensionName(alarm.Dimension("TargetGroup")); value != "" {
+		// A TargetGroup-only alarm still lands in the LB browser; the target
+		// group prefill below narrows the drill-down.
+		return domain.FeatureELBBrowser, filterELBs, "", true
+	}
 	return "", filterNone, "", false
+}
+
+// elbDimensionName extracts the resource name from ELB metric dimension
+// values like "app/my-alb/50dc6c495c0c9188" or "targetgroup/my-tg/73e2d6bc".
+func elbDimensionName(value string) string {
+	parts := strings.Split(value, "/")
+	if len(parts) >= 2 {
+		return parts[1]
+	}
+	return value
 }
 
 // alarmRelatedLogGroup derives an obvious log group from alarm dimensions.

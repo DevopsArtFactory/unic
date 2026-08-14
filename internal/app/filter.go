@@ -44,6 +44,8 @@ const (
 	filterCWAlarms
 	filterCloudTrailEvents
 	filterSQSQueues
+	filterELBs
+	filterELBTargetGroups
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

@@ -198,6 +198,16 @@ type sqsActionDoneMsg struct {
 	err    error
 }
 
+type elbLoadBalancersLoadedMsg struct {
+	balancers    []awsservice.ELBLoadBalancer
+	regionErrors []awsservice.RegionError
+}
+
+type elbTargetGroupsLoadedMsg struct {
+	loadBalancerARN string
+	groups          []awsservice.ELBTargetGroupHealth
+}
+
 type s3BucketsLoadedMsg struct {
 	buckets []awsservice.S3Bucket
 }
