@@ -408,6 +408,26 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"r", "Refresh the selected metric series"},
 			{"q / esc", "Go back to the metric list"},
 		}
+	case screenCloudTrailEventList:
+		if m.cloudTrail.lookupInput {
+			return []helpShortcut{
+				{"type", "Enter a resource name to look up server-side"},
+				{"backspace", "Delete the previous character"},
+				{"enter", "Run the resource lookup"},
+				{"esc", "Cancel the lookup input"},
+			}
+		}
+		shortcuts := listScreenShortcuts("open the selected event", "go back to the feature list", true, true)
+		return append(shortcuts,
+			helpShortcut{"1-5", "Change the time window (1h/6h/24h/3d/7d)"},
+			helpShortcut{"m", "Toggle mutations-only"},
+			helpShortcut{"n", "Look up events by resource name"},
+		)
+	case screenCloudTrailEventDetail:
+		return []helpShortcut{
+			{"↑/↓, j/k", "Scroll the raw event"},
+			{"q / esc", "Go back to the event list"},
+		}
 	case screenCWAlarmList:
 		shortcuts := listScreenShortcuts("open the selected alarm", "go back to the feature list", true, true)
 		return append(shortcuts, helpShortcut{"tab", "Cycle the alarm state filter"})
@@ -934,6 +954,10 @@ func (m Model) helpScreenTitle() string {
 		return "IAM Access Key Rotation Confirm"
 	case screenIAMKeyRotateResult:
 		return "IAM Access Key Rotation Result"
+	case screenCloudTrailEventList:
+		return "CloudTrail Events"
+	case screenCloudTrailEventDetail:
+		return "CloudTrail Event Detail"
 	case screenCWAlarmList:
 		return "CloudWatch Alarms"
 	case screenCWAlarmDetail:

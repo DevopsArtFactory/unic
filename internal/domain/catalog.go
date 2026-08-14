@@ -74,6 +74,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceCloudTrail,
+			Features: []Feature{
+				{
+					Kind:        FeatureCloudTrailEvents,
+					Description: "Look up recent API activity: who changed what, and when",
+				},
+			},
+		},
+		{
 			Name: ServiceCloudWatchLogs,
 			Features: []Feature{
 				{

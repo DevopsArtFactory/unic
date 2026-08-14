@@ -32,6 +32,10 @@ func (m *mockCloudTrailClient) GetTrailStatus(ctx context.Context, params *cloud
 	return &cloudtrail.GetTrailStatusOutput{}, nil
 }
 
+func (m *mockCloudTrailClient) LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+	return &cloudtrail.LookupEventsOutput{}, nil
+}
+
 type mockGuardDutyClient struct {
 	listDetectorsFunc func(ctx context.Context, params *guardduty.ListDetectorsInput, optFns ...func(*guardduty.Options)) (*guardduty.ListDetectorsOutput, error)
 	getDetectorFunc   func(ctx context.Context, params *guardduty.GetDetectorInput, optFns ...func(*guardduty.Options)) (*guardduty.GetDetectorOutput, error)

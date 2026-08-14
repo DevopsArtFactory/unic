@@ -300,6 +300,7 @@ Context ordering:
 | RDS | Instance Class Modification |
 | Route53 | Route53 Browser |
 | Secrets Manager | Secrets Browser |
+| CloudTrail | Event Lookup |
 | CloudWatch | Alarm Browser |
 | CloudWatch | Metrics Viewer |
 | CloudWatch Logs | Logs Browser |
@@ -421,6 +422,7 @@ checks:
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
+| CloudTrail Events | `1`-`5` time window (1h/6h/24h/3d/7d), `m` mutations-only toggle, `n` server-side resource-name lookup, `/` filter, `r` refresh, `Enter` detail with scrollable raw event |
 | CloudWatch Alarms | `tab` cycle state filter (ALL/ALARM/INSUFFICIENT_DATA/OK), `/` filter, `r` refresh, `Enter` detail with recent transitions, detail `g` jump to related resource (RDS/EC2/ECS/Lambda dimensions), `l` jump to logs when derivable |
 | CloudWatch Metrics | preset-driven metric list/detail flow, `/` filter, `space` select related series, `g` preset cycle, `t/p/s` range-period-stat controls, `r` refresh, in-terminal single-series and comparison charts |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
@@ -448,6 +450,8 @@ The EKS Browser includes a managed add-on status view for each cluster. Add-on r
 The ECR Login Helper resolves the private registry URI for the active context and shows copyable Docker and Podman login commands without leaving the TUI. The copied commands are prefixed with `eval "$(unic env <context>)"` so they authenticate with the active unic context rather than whatever ambient AWS credentials the shell happens to have; `unic ecr login` remains as a secondary CLI helper for scripting. The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
 
 The RDS detail screen can resize an instance with `m`: unic loads the orderable DB instance classes for the instance's engine/version in the active region into a filterable picker (current class marked), then a confirmation screen shows the current and new class with a `Tab`-toggleable apply-immediately choice (default: next maintenance window) and requires typing the instance identifier before calling ModifyDBInstance. After submitting, the detail screen polls the instance status until the change settles.
+
+The CloudTrail Event Lookup answers "who changed what, and when": recent API events list newest-first with mutations marked `*`, actor, call, and source service per row. Keys `1`-`5` switch the time window (1h/6h/24h/3d/7d), `m` restricts to mutations (server-side via the `ReadOnly=false` lookup attribute), and `n` runs a server-side resource-name lookup — CloudTrail accepts one lookup attribute per call, so combining both applies the mutations restriction client-side. Results are capped at 100 events per query, so narrow the window or use the resource lookup when a busy account truncates. Event detail shows actor, source, region, source IP, touched resources, and the full raw event JSON with scrolling.
 
 The CloudWatch Alarm Browser is an alarm-first incident entry point: alarms list firing-first (ALARM, then INSUFFICIENT_DATA, then OK) with a `tab`-cycled state filter and text filtering across names, states, metrics, and dimensions. Alarm detail shows the state reason, condition, dimensions, and the most recent state transitions. When an alarm's dimensions map to a supported browser (`DBInstanceIdentifier`, `InstanceId`, `ClusterName`, `FunctionName`), `g` jumps into that resource browser with the filter prefilled to the unhealthy resource, and `l` opens CloudWatch Logs prefilled with the derived log group (e.g. `/aws/lambda/<function>`).
 

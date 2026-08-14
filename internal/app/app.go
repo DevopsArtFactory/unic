@@ -61,6 +61,8 @@ const (
 	screenIAMKeyRotateResult
 	screenCWMetricList
 	screenCWMetricDetail
+	screenCloudTrailEventList
+	screenCloudTrailEventDetail
 	screenCWAlarmList
 	screenCWAlarmDetail
 	screenCWLogGroupList
@@ -164,6 +166,7 @@ type Model struct {
 	reachability reachabilityModel
 	cwMetrics    cloudWatchMetricsModel
 	cwAlarms     cwAlarmsModel
+	cloudTrail   cloudTrailModel
 	cwLogs       cloudWatchLogsModel
 	rds          rdsModel
 	route53      route53Model
@@ -276,6 +279,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.reachability = newReachabilityModel()
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwAlarms = newCWAlarmsModel()
+	model.cloudTrail = newCloudTrailModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
 	model.route53 = newRoute53Model()
@@ -424,6 +428,9 @@ func (m Model) isTextEntryScreen() bool {
 		return true
 	}
 	if m.screen == screenViewList && m.views.naming {
+		return true
+	}
+	if m.screen == screenCloudTrailEventList && m.cloudTrail.lookupInput {
 		return true
 	}
 	switch m.screen {
@@ -723,6 +730,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.cwMetrics.Start(&m)
 	case domain.FeatureCloudWatchAlarms:
 		return m.cwAlarms.Start(&m)
+	case domain.FeatureCloudTrailEvents:
+		return m.cloudTrail.Start(&m)
 	case domain.FeatureCloudWatchLogsBrowser:
 		return m.cwLogs.Start(&m)
 	case domain.FeatureS3Browser:
