@@ -38,7 +38,7 @@ func (e CloudTrailEvent) DisplayTitle() string {
 	if !e.ReadOnly {
 		mutation = "*"
 	}
-	return fmt.Sprintf("%s %s  %-32s %-24s %s",
+	return fmt.Sprintf("%s %s  %-32.32s %-24.24s %s",
 		mutation, e.Time.Local().Format("01-02 15:04:05"), e.Name, valueOrDash(e.Username), e.Source)
 }
 

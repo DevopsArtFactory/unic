@@ -2,6 +2,8 @@ package aws
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -120,4 +122,48 @@ func (m *mockCloudTrailEventsClient) GetTrailStatus(_ context.Context, _ *cloudt
 
 func (m *mockCloudTrailEventsClient) LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
 	return m.lookupEventsFunc(ctx, params, optFns...)
+}
+
+func TestLookupEventsWrapsAPIErrors(t *testing.T) {
+	mock := &mockCloudTrailEventsClient{
+		lookupEventsFunc: func(_ context.Context, _ *cloudtrail.LookupEventsInput, _ ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+			return nil, fmt.Errorf("throttled")
+		},
+	}
+	repo := &AwsRepository{CloudTrailClient: mock}
+
+	_, err := repo.LookupEvents(context.Background(), CloudTrailLookup{Since: time.Hour})
+	if err == nil || !strings.Contains(err.Error(), "failed to look up CloudTrail events") {
+		t.Fatalf("expected wrapped lookup error, got %v", err)
+	}
+}
+
+func TestLookupEventsCapsAtMaxAcrossPages(t *testing.T) {
+	page := 0
+	mock := &mockCloudTrailEventsClient{
+		lookupEventsFunc: func(_ context.Context, _ *cloudtrail.LookupEventsInput, _ ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+			page++
+			events := make([]cttypes.Event, 60)
+			for i := range events {
+				events[i] = cttypes.Event{
+					EventId:         awssdk.String(fmt.Sprintf("evt-%d-%d", page, i)),
+					CloudTrailEvent: awssdk.String("{}"),
+				}
+			}
+			token := "next"
+			return &cloudtrail.LookupEventsOutput{Events: events, NextToken: &token}, nil
+		},
+	}
+	repo := &AwsRepository{CloudTrailClient: mock}
+
+	events, err := repo.LookupEvents(context.Background(), CloudTrailLookup{Since: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != cloudTrailMaxEvents {
+		t.Fatalf("expected result cap at %d events, got %d", cloudTrailMaxEvents, len(events))
+	}
+	if page > 2 {
+		t.Fatalf("expected pagination to stop once capped, fetched %d pages", page)
+	}
 }

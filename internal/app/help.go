@@ -412,6 +412,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		if m.cloudTrail.lookupInput {
 			return []helpShortcut{
 				{"type", "Enter a resource name to look up server-side"},
+				{"backspace", "Delete the previous character"},
 				{"enter", "Run the resource lookup"},
 				{"esc", "Cancel the lookup input"},
 			}

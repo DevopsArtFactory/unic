@@ -88,3 +88,29 @@ func TestCloudTrailDetailShowsEnvelopeAndRawEvent(t *testing.T) {
 		}
 	}
 }
+
+func TestCloudTrailCancelAndExitTransitions(t *testing.T) {
+	m := cloudTrailTestModel()
+	m.cloudTrail.HandleMessage(&m, cloudTrailEventsLoadedMsg{events: testCloudTrailEvents()})
+	m.screen = screenCloudTrailEventList
+
+	// esc cancels the lookup input without leaving the list
+	m.cloudTrail.updateList(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m.cloudTrail.updateList(&m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.cloudTrail.lookupInput || m.screen != screenCloudTrailEventList {
+		t.Fatalf("expected esc to cancel lookup input, lookup=%v screen=%v", m.cloudTrail.lookupInput, m.screen)
+	}
+
+	// esc from detail returns to the list
+	m.cloudTrail.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m.cloudTrail.updateDetail(&m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.screen != screenCloudTrailEventList {
+		t.Fatalf("expected detail esc to return to the list, got %v", m.screen)
+	}
+
+	// esc from the list exits to the feature list
+	m.cloudTrail.updateList(&m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.screen != screenFeatureList {
+		t.Fatalf("expected list esc to exit to the feature list, got %v", m.screen)
+	}
+}
