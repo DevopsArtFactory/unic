@@ -104,16 +104,14 @@ func BuildContextSyncPlan(ctx context.Context, configPath string, base config.Co
 	return plan, nil
 }
 
-// ApplyContextSyncPlan persists a sync plan: additions are upserted as
-// sync-managed contexts, and orphans are removed only when prune is set.
+// ApplyContextSyncPlan persists a sync plan in a single config write:
+// additions are upserted as sync-managed contexts, and orphans are removed
+// only when prune is set. Applying everything in one mutation avoids leaving
+// the config half-synced when a write fails partway.
 func ApplyContextSyncPlan(configPath string, plan ContextSyncPlan, prune bool) error {
-	for _, entry := range plan.Add {
-		if err := config.UpsertContext(configPath, entry); err != nil {
-			return err
-		}
-	}
+	var removals []string
 	if prune {
-		return config.RemoveContexts(configPath, plan.Orphans)
+		removals = plan.Orphans
 	}
-	return nil
+	return config.UpsertAndRemoveContexts(configPath, plan.Add, removals)
 }
