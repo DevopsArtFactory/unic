@@ -119,13 +119,9 @@ func (m Model) updateViews(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.views.nameInput = ""
 			m.views.notice = fmt.Sprintf("Saved view %q", name)
 		case "backspace":
-			if runes := []rune(m.views.nameInput); len(runes) > 0 {
-				m.views.nameInput = string(runes[:len(runes)-1])
-			}
+			m.views.nameInput = trimLastRune(m.views.nameInput)
 		default:
-			if runes := msg.Runes; len(runes) > 0 {
-				m.views.nameInput += string(runes)
-			}
+			m.views.nameInput = appendKeyRunes(m.views.nameInput, msg)
 		}
 		return m, nil
 	}

@@ -520,9 +520,7 @@ func (sm *securityGroupModel) updateSGAddTextInput(m *Model, key string) (tea.Mo
 			sm.sgAddField = 4
 		}
 	case "backspace":
-		if len(sm.sgAddInput) > 0 {
-			sm.sgAddInput = sm.sgAddInput[:len(sm.sgAddInput)-1]
-		}
+		sm.sgAddInput = trimLastRune(sm.sgAddInput)
 	default:
 		if len(key) == 1 {
 			sm.sgAddInput += key
@@ -647,13 +645,9 @@ func (sm *securityGroupModel) updateSecurityGroupDeleteConfirm(m *Model, msg tea
 			return m.startLoading(sm.executeSGDeleteRule(*m))
 		}
 	case "backspace":
-		if len(sm.sgDeleteConfirm) > 0 {
-			sm.sgDeleteConfirm = sm.sgDeleteConfirm[:len(sm.sgDeleteConfirm)-1]
-		}
+		sm.sgDeleteConfirm = trimLastRune(sm.sgDeleteConfirm)
 	default:
-		if runes := msg.Runes; len(runes) > 0 {
-			sm.sgDeleteConfirm += string(runes)
-		}
+		sm.sgDeleteConfirm = appendKeyRunes(sm.sgDeleteConfirm, msg)
 	}
 	return *m, nil
 }

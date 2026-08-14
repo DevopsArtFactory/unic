@@ -65,7 +65,7 @@ func handleFilterKey(key, current string) (next string, deactivate bool, changed
 		if len(current) == 0 {
 			return current, false, false
 		}
-		return current[:len(current)-1], false, true
+		return trimLastRune(current), false, true
 	}
 
 	if len(key) == 1 {

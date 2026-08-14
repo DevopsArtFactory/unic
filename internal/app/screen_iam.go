@@ -533,13 +533,9 @@ func (im *iamModel) updateKeyRotateConfirm(m *Model, msg tea.KeyMsg) (tea.Model,
 			return m.startLoading(im.createKey(*m))
 		}
 	case "backspace":
-		if len(im.rotateConfirm) > 0 {
-			im.rotateConfirm = im.rotateConfirm[:len(im.rotateConfirm)-1]
-		}
+		im.rotateConfirm = trimLastRune(im.rotateConfirm)
 	default:
-		if runes := msg.Runes; len(runes) > 0 {
-			im.rotateConfirm += string(runes)
-		}
+		im.rotateConfirm = appendKeyRunes(im.rotateConfirm, msg)
 	}
 	return *m, nil
 }
