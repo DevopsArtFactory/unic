@@ -42,6 +42,7 @@ const (
 	filterLambdaFunctions
 	filterBedrockKeys
 	filterCWAlarms
+	filterCloudTrailEvents
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

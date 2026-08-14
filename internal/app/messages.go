@@ -140,6 +140,10 @@ type cwLogGroupsLoadedMsg struct {
 	append    bool
 }
 
+type cloudTrailEventsLoadedMsg struct {
+	events []awsservice.CloudTrailEvent
+}
+
 type cwAlarmsLoadedMsg struct {
 	alarms []awsservice.CloudWatchAlarm
 }
