@@ -413,7 +413,8 @@ func (rm *reachabilityModel) updateDestinationList(m *Model, msg tea.KeyMsg) (te
 }
 
 func (rm *reachabilityModel) updateConfig(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	key := msg.String()
+	switch key {
 	case "q":
 		m.screen = screenFeatureList
 	case "esc":
@@ -423,15 +424,48 @@ func (rm *reachabilityModel) updateConfig(m *Model, msg tea.KeyMsg) (tea.Model, 
 	case "down", "j", "tab":
 		rm.configField = nextListIndex(rm.configField, rm.configMaxField()+1)
 	case "left", "h":
-		rm.adjustConfigProtocol(-1)
+		if rm.configField == 0 && rm.protocolIdx > 0 {
+			rm.protocolIdx--
+		}
 	case "right", "l":
-		rm.adjustConfigProtocol(1)
+		if rm.configField == 0 && rm.protocolIdx < len(reachabilityProtocols)-1 {
+			rm.protocolIdx++
+		}
 	case "backspace":
-		rm.deleteConfigChar()
+		switch rm.configField {
+		case 1:
+			if len(rm.portInput) > 0 {
+				rm.portInput = rm.portInput[:len(rm.portInput)-1]
+			}
+		case 2:
+			if len(rm.destinationIP) > 0 {
+				rm.destinationIP = rm.destinationIP[:len(rm.destinationIP)-1]
+			}
+		}
 	case "enter":
-		return rm.submitConfig(m)
+		if rm.configField == 0 && rm.configField < rm.configMaxField() {
+			rm.configField++
+			return *m, nil
+		}
+		return m.startLoadingWithMessage(
+			"Finding Network Path",
+			rm.loadingDetails(*m),
+			rm.runAnalysis(*m),
+		)
 	default:
-		rm.appendConfigChar(msg.String())
+		if len(key) != 1 {
+			break
+		}
+		switch rm.configField {
+		case 1:
+			if key[0] >= '0' && key[0] <= '9' {
+				rm.portInput += key
+			}
+		case 2:
+			if strings.ContainsRune("0123456789.", rune(key[0])) {
+				rm.destinationIP += key
+			}
+		}
 	}
 	return *m, nil
 }
@@ -443,59 +477,6 @@ func (rm *reachabilityModel) configMaxField() int {
 		return 2
 	}
 	return 1
-}
-
-func (rm *reachabilityModel) adjustConfigProtocol(delta int) {
-	if rm.configField != 0 {
-		return
-	}
-	next := rm.protocolIdx + delta
-	if next >= 0 && next < len(reachabilityProtocols) {
-		rm.protocolIdx = next
-	}
-}
-
-func (rm *reachabilityModel) deleteConfigChar() {
-	switch rm.configField {
-	case 1:
-		if len(rm.portInput) > 0 {
-			rm.portInput = rm.portInput[:len(rm.portInput)-1]
-		}
-	case 2:
-		if len(rm.destinationIP) > 0 {
-			rm.destinationIP = rm.destinationIP[:len(rm.destinationIP)-1]
-		}
-	}
-}
-
-func (rm *reachabilityModel) appendConfigChar(key string) {
-	if len(key) != 1 {
-		return
-	}
-	switch rm.configField {
-	case 1:
-		if key[0] >= '0' && key[0] <= '9' {
-			rm.portInput += key
-		}
-	case 2:
-		if strings.ContainsRune("0123456789.", rune(key[0])) {
-			rm.destinationIP += key
-		}
-	}
-}
-
-// submitConfig advances from the protocol field to the next input field, and
-// starts the analysis when pressed on an input field.
-func (rm *reachabilityModel) submitConfig(m *Model) (tea.Model, tea.Cmd) {
-	if rm.configField == 0 && rm.configField < rm.configMaxField() {
-		rm.configField++
-		return *m, nil
-	}
-	return m.startLoadingWithMessage(
-		"Finding Network Path",
-		rm.loadingDetails(*m),
-		rm.runAnalysis(*m),
-	)
 }
 
 func (rm *reachabilityModel) updateResult(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
