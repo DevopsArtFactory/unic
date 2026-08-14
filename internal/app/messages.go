@@ -87,6 +87,11 @@ type rdsInstancesLoadedMsg struct {
 	instances []awsservice.RDSInstance
 }
 
+type rdsClassesLoadedMsg struct {
+	instanceID string
+	classes    []string
+}
+
 type rdsActionDoneMsg struct {
 	action     string
 	instanceID string

@@ -12,6 +12,7 @@ type RDSInstance struct {
 	EngineVersion         string
 	Status                string
 	InstanceClass         string
+	PendingInstanceClass  string
 	MultiAZ               bool
 	StorageGB             int32
 	StorageEncrypted      bool

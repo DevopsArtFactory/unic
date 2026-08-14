@@ -260,6 +260,7 @@ Context ordering:
 | VPC | VPC Browser |
 | VPC | Reachability Analyzer |
 | RDS | RDS Browser |
+| RDS | Instance Class Modification |
 | Route53 | Route53 Browser |
 | Secrets Manager | Secrets Browser |
 | CloudWatch | Metrics Viewer |
@@ -376,7 +377,7 @@ checks:
 | EC2 Instance Browser | `r` refresh, `/` filter, `A` toggle all-regions scope (multi-region contexts), `Enter` detail, detail `g/a/t/b/n` opens related security groups/ASG/target groups/load balancers/listeners |
 | Security Groups | `a` add rule, `d` delete rule, `Tab` switch ingress/egress |
 | Reachability Analyzer | Region select first, `←`/`→` or `Tab` change type, `/` filter, `Enter` advance, `Tab`/`↑`/`↓` move config fields, `←`/`→` protocol, `r` rerun |
-| RDS | `s` start, `x` stop, `f` failover, `r` refresh |
+| RDS | `s` start, `x` stop, `f` failover, `m` modify instance class (filterable class picker, `Tab` apply-immediately toggle, type-to-confirm), `r` refresh |
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
@@ -400,6 +401,8 @@ The service list defaults to favorites first, then alphabetical order. Press `f`
 The EKS Browser includes a managed add-on status view for each cluster. Add-on rows show the installed version, status, and health summary, with degraded or unhealthy add-ons highlighted so core components such as CoreDNS, kube-proxy, VPC CNI, and CSI drivers are easy to spot.
 
 The ECR Login Helper resolves the private registry URI for the active context and shows copyable Docker and Podman login commands without leaving the TUI. The copied commands are prefixed with `eval "$(unic env <context>)"` so they authenticate with the active unic context rather than whatever ambient AWS credentials the shell happens to have; `unic ecr login` remains as a secondary CLI helper for scripting. The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.
+
+The RDS detail screen can resize an instance with `m`: unic loads the orderable DB instance classes for the instance's engine/version in the active region into a filterable picker (current class marked), then a confirmation screen shows the current and new class with a `Tab`-toggleable apply-immediately choice (default: next maintenance window) and requires typing the instance identifier before calling ModifyDBInstance. After submitting, the detail screen polls the instance status until the change settles.
 
 The FIS Experiment Template Browser lists experiment templates in the active region and opens a detail screen with role ARN, targets, actions, target mappings, parameters, filters, and stop condition summaries without leaving the TUI. Template detail includes a Safe Run Preview that summarizes blast radius, target selection modes, action count, active stop conditions, IAM role, and warnings for missing stop conditions, missing role ARN, broad selection, or unbounded selectors. The preview also states the template ID that any future execution path must type to confirm before a run can start. Press `h` on a selected template or template detail to inspect recent runs for that template, or `H` from the template list to inspect recent experiment history across the active account/region. History rows include run status, timing, and stop/failure summaries, with failed, stopped, stopping, and cancelled runs visually highlighted; `Enter` opens run detail with start/end times, duration, action states, targets, stop conditions, and failure metadata.
 

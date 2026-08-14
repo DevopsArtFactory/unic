@@ -24,6 +24,22 @@ type mockRDSClient struct {
 	stopDBClusterFunc                  func(ctx context.Context, params *rds.StopDBClusterInput, optFns ...func(*rds.Options)) (*rds.StopDBClusterOutput, error)
 	startDBClusterFunc                 func(ctx context.Context, params *rds.StartDBClusterInput, optFns ...func(*rds.Options)) (*rds.StartDBClusterOutput, error)
 	failoverDBClusterFunc              func(ctx context.Context, params *rds.FailoverDBClusterInput, optFns ...func(*rds.Options)) (*rds.FailoverDBClusterOutput, error)
+	describeOrderableOptionsFunc       func(ctx context.Context, params *rds.DescribeOrderableDBInstanceOptionsInput, optFns ...func(*rds.Options)) (*rds.DescribeOrderableDBInstanceOptionsOutput, error)
+	modifyDBInstanceFunc               func(ctx context.Context, params *rds.ModifyDBInstanceInput, optFns ...func(*rds.Options)) (*rds.ModifyDBInstanceOutput, error)
+}
+
+func (m *mockRDSClient) DescribeOrderableDBInstanceOptions(ctx context.Context, params *rds.DescribeOrderableDBInstanceOptionsInput, optFns ...func(*rds.Options)) (*rds.DescribeOrderableDBInstanceOptionsOutput, error) {
+	if m.describeOrderableOptionsFunc != nil {
+		return m.describeOrderableOptionsFunc(ctx, params, optFns...)
+	}
+	return &rds.DescribeOrderableDBInstanceOptionsOutput{}, nil
+}
+
+func (m *mockRDSClient) ModifyDBInstance(ctx context.Context, params *rds.ModifyDBInstanceInput, optFns ...func(*rds.Options)) (*rds.ModifyDBInstanceOutput, error) {
+	if m.modifyDBInstanceFunc != nil {
+		return m.modifyDBInstanceFunc(ctx, params, optFns...)
+	}
+	return &rds.ModifyDBInstanceOutput{}, nil
 }
 
 func (m *mockRDSClient) DescribeDBInstances(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {
@@ -570,5 +586,52 @@ func TestIsTransitionalStatus(t *testing.T) {
 		if IsTransitionalStatus(s) {
 			t.Errorf("%q should not be transitional", s)
 		}
+	}
+}
+
+func TestListOrderableDBInstanceClassesDedupesAndSorts(t *testing.T) {
+	mock := &mockRDSClient{
+		describeOrderableOptionsFunc: func(_ context.Context, params *rds.DescribeOrderableDBInstanceOptionsInput, _ ...func(*rds.Options)) (*rds.DescribeOrderableDBInstanceOptionsOutput, error) {
+			if awssdk.ToString(params.Engine) != "postgres" || awssdk.ToString(params.EngineVersion) != "16.3" {
+				t.Fatalf("expected engine filters, got %+v", params)
+			}
+			return &rds.DescribeOrderableDBInstanceOptionsOutput{
+				OrderableDBInstanceOptions: []rdstypes.OrderableDBInstanceOption{
+					{DBInstanceClass: awssdk.String("db.t3.medium")},
+					{DBInstanceClass: awssdk.String("db.r6g.large")},
+					{DBInstanceClass: awssdk.String("db.t3.medium")},
+					{DBInstanceClass: awssdk.String("")},
+				},
+			}, nil
+		},
+	}
+	repo := &AwsRepository{RDSClient: mock}
+
+	classes, err := repo.ListOrderableDBInstanceClasses(context.Background(), "postgres", "16.3")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(classes) != 2 || classes[0] != "db.r6g.large" || classes[1] != "db.t3.medium" {
+		t.Fatalf("expected deduped sorted classes, got %+v", classes)
+	}
+}
+
+func TestModifyDBInstanceClassPassesParameters(t *testing.T) {
+	var got *rds.ModifyDBInstanceInput
+	mock := &mockRDSClient{
+		modifyDBInstanceFunc: func(_ context.Context, params *rds.ModifyDBInstanceInput, _ ...func(*rds.Options)) (*rds.ModifyDBInstanceOutput, error) {
+			got = params
+			return &rds.ModifyDBInstanceOutput{}, nil
+		},
+	}
+	repo := &AwsRepository{RDSClient: mock}
+
+	if err := repo.ModifyDBInstanceClass(context.Background(), "prod-db", "db.r6g.large", true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if awssdk.ToString(got.DBInstanceIdentifier) != "prod-db" ||
+		awssdk.ToString(got.DBInstanceClass) != "db.r6g.large" ||
+		!awssdk.ToBool(got.ApplyImmediately) {
+		t.Fatalf("expected modify parameters to be passed, got %+v", got)
 	}
 }
