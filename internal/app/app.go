@@ -412,10 +412,12 @@ func (m Model) startLoading(cmd tea.Cmd) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) startLoadingWithMessage(title string, details []string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
-	// A new load supersedes whatever was still in flight; commands resolve
-	// their context at run time, so they pick up this fresh generation.
+	// A new load supersedes whatever was still in flight. The command is
+	// bound to the renewed generation: it will not run once superseded, and
+	// its result is dropped when the generation moved on before delivery.
 	if m.commands != nil {
-		m.commands.Renew()
+		gen := m.commands.Renew()
+		cmd = m.commands.BindCmd(gen, cmd)
 	}
 	m.screen = screenLoading
 	m.loadingSpinner = newLoadingSpinner()
@@ -489,6 +491,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, bootupTickCmd()
+	case genBoundMsg:
+		if m.commands == nil || msg.gen != m.commands.CurrentGen() {
+			// The load this result belongs to was superseded or abandoned
+			// after the command already ran; never let it touch the model.
+			return m, nil
+		}
+		return m.Update(msg.msg)
 	case updateAvailableMsg:
 		m.installMethod = msg.method
 		if msg.version != "" {

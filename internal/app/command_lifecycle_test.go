@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"unic/internal/config"
@@ -15,14 +16,18 @@ func TestCommandLifecycleRenewCancelsPreviousGeneration(t *testing.T) {
 	if first.Err() != nil {
 		t.Fatal("expected a live initial context")
 	}
-	second := lifecycle.Renew()
+	firstGen := lifecycle.CurrentGen()
+	if gen := lifecycle.Renew(); gen != firstGen+1 {
+		t.Fatalf("expected renewal to advance the generation, got %d", gen)
+	}
 	if first.Err() == nil {
 		t.Fatal("expected renewal to cancel the previous generation")
 	}
-	if second.Err() != nil {
+	renewed := lifecycle.Current()
+	if renewed.Err() != nil {
 		t.Fatal("expected the renewed context to be live")
 	}
-	if _, ok := second.Deadline(); !ok {
+	if _, ok := renewed.Deadline(); !ok {
 		t.Fatal("expected the command context to carry a deadline")
 	}
 }
@@ -59,4 +64,89 @@ func TestStartLoadingRenewsAndHomeCancelsInFlightWork(t *testing.T) {
 	if inFlight.Err() == nil {
 		t.Fatal("expected abandoning the screen with H to cancel in-flight work")
 	}
+}
+
+func TestQueuedCommandCannotMigrateAcrossRenewal(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg = &config.Config{Region: "us-east-1", ContextName: "dev"}
+
+	executed := false
+	next, boundCmd := m.startLoading(func() tea.Msg {
+		executed = true
+		return screenReadyMsg{}
+	})
+	m = next.(Model)
+
+	// A second load supersedes the first before its goroutine ever ran.
+	m.commands.Renew()
+
+	msg := runBatchedUserCmd(t, boundCmd)
+	if executed {
+		t.Fatal("expected the superseded command body to be skipped entirely")
+	}
+	if msg != nil {
+		t.Fatalf("expected no message from a superseded command, got %#v", msg)
+	}
+}
+
+func TestQueuedCommandCannotSurviveCancelAll(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg = &config.Config{Region: "us-east-1", ContextName: "dev"}
+
+	executed := false
+	next, boundCmd := m.startLoading(func() tea.Msg {
+		executed = true
+		return screenReadyMsg{}
+	})
+	m = next.(Model)
+
+	// The user abandons the screen before the command ran.
+	m.commands.CancelAll()
+
+	if msg := runBatchedUserCmd(t, boundCmd); executed || msg != nil {
+		t.Fatalf("expected abandonment to keep the queued command from running, executed=%v msg=%#v", executed, msg)
+	}
+}
+
+func TestStaleGenerationMessageIsDroppedAtDelivery(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg = &config.Config{Region: "us-east-1", ContextName: "dev"}
+	m.screen = screenRDSList
+
+	// A command from generation N completes, but the generation moves on
+	// before its message is delivered.
+	staleGen := m.commands.Renew()
+	m.commands.Renew()
+
+	next, _ := m.Update(genBoundMsg{gen: staleGen, msg: cwAlarmsLoadedMsg{}})
+	model := next.(Model)
+	if model.screen != screenRDSList {
+		t.Fatalf("expected stale message to be dropped without touching the model, got screen %v", model.screen)
+	}
+}
+
+// runBatchedUserCmd extracts and runs the user command from the tea.Batch that
+// startLoading returns (the other entry is the spinner tick).
+func runBatchedUserCmd(t *testing.T, batched tea.Cmd) tea.Msg {
+	t.Helper()
+	if batched == nil {
+		t.Fatal("expected a command from startLoading")
+	}
+	msg := batched()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		return msg
+	}
+	var result tea.Msg
+	for _, cmd := range batch {
+		if cmd == nil {
+			continue
+		}
+		out := cmd()
+		if _, isTick := out.(spinner.TickMsg); isTick {
+			continue
+		}
+		result = out
+	}
+	return result
 }
