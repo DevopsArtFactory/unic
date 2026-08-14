@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	uniclog "unic/internal/log"
 )
@@ -123,15 +124,25 @@ func (r *AwsRepository) ListLoadBalancers(ctx context.Context) ([]ELBLoadBalance
 func (r *AwsRepository) ListTargetGroupHealth(ctx context.Context, loadBalancerARN string) ([]ELBTargetGroupHealth, error) {
 	uniclog.Debug("aws", "ListTargetGroupHealth called", "lb", loadBalancerARN)
 
-	out, err := r.ELBv2Client.DescribeTargetGroups(ctx, &elasticloadbalancingv2.DescribeTargetGroupsInput{
-		LoadBalancerArn: &loadBalancerARN,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to describe target groups: %w", err)
+	var targetGroups []elbtypes.TargetGroup
+	var marker *string
+	for {
+		out, err := r.ELBv2Client.DescribeTargetGroups(ctx, &elasticloadbalancingv2.DescribeTargetGroupsInput{
+			LoadBalancerArn: &loadBalancerARN,
+			Marker:          marker,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe target groups: %w", err)
+		}
+		targetGroups = append(targetGroups, out.TargetGroups...)
+		if out.NextMarker == nil || derefString(out.NextMarker) == "" {
+			break
+		}
+		marker = out.NextMarker
 	}
 
-	groups := make([]ELBTargetGroupHealth, 0, len(out.TargetGroups))
-	for _, tg := range out.TargetGroups {
+	groups := make([]ELBTargetGroupHealth, 0, len(targetGroups))
+	for _, tg := range targetGroups {
 		group := ELBTargetGroupHealth{
 			Name:       derefString(tg.TargetGroupName),
 			ARN:        derefString(tg.TargetGroupArn),

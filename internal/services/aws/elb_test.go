@@ -168,6 +168,50 @@ func TestListTargetGroupHealthAggregatesAndSorts(t *testing.T) {
 	}
 }
 
+func TestListTargetGroupHealthFollowsPagination(t *testing.T) {
+	pages := 0
+	mock := &mockELBv2Client{
+		describeTargetGroupsFunc: func(_ context.Context, params *elasticloadbalancingv2.DescribeTargetGroupsInput, _ ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error) {
+			pages++
+			if pages == 1 {
+				if params.Marker != nil {
+					t.Fatalf("first page should have no marker, got %v", params.Marker)
+				}
+				return &elasticloadbalancingv2.DescribeTargetGroupsOutput{
+					TargetGroups: []elbtypes.TargetGroup{
+						{TargetGroupArn: awssdk.String("arn:tg/page1"), TargetGroupName: awssdk.String("page1-tg")},
+					},
+					NextMarker: awssdk.String("page2"),
+				}, nil
+			}
+			if awssdk.ToString(params.Marker) != "page2" {
+				t.Fatalf("second page should carry marker, got %v", params.Marker)
+			}
+			return &elasticloadbalancingv2.DescribeTargetGroupsOutput{
+				TargetGroups: []elbtypes.TargetGroup{
+					{TargetGroupArn: awssdk.String("arn:tg/page2"), TargetGroupName: awssdk.String("page2-tg")},
+				},
+			}, nil
+		},
+		describeTargetHealthFunc: func(_ context.Context, _ *elasticloadbalancingv2.DescribeTargetHealthInput, _ ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
+			return &elasticloadbalancingv2.DescribeTargetHealthOutput{}, nil
+		},
+	}
+	repo := &AwsRepository{ELBv2Client: mock}
+
+	groups, err := repo.ListTargetGroupHealth(context.Background(), "arn:lb")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Fatalf("expected target groups from both pages, got %d", len(groups))
+	}
+	names := []string{groups[0].Name, groups[1].Name}
+	if names[0] != "page1-tg" || names[1] != "page2-tg" {
+		t.Fatalf("expected both pages' groups included, got %v", names)
+	}
+}
+
 func TestListTargetGroupHealthWrapsHealthError(t *testing.T) {
 	mock := &mockELBv2Client{
 		describeTargetGroupsFunc: func(_ context.Context, _ *elasticloadbalancingv2.DescribeTargetGroupsInput, _ ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error) {
