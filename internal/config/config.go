@@ -501,98 +501,163 @@ func favoriteContextSet(names []string) map[string]struct{} {
 	return favorites
 }
 
-// SetCurrent updates the "current" field in the config file.
-func SetCurrent(configPath, name string) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read config: %w", err)
-	}
+// The config store routes every mutation through one of two paths and a
+// single atomic writer:
+//
+//   - mutateFileConfig: typed path. The whole file is parsed into fileConfig,
+//     mutated, and rewritten. Comments and key order are NOT preserved.
+//   - mutateConfigNode: formatting-preserving path. The file is parsed into a
+//     yaml.Node tree so comments and layout survive targeted edits.
+//
+// Which operation uses which path is a deliberate, per-operation choice.
 
-	// Parse to validate the context name exists
+// missingPolicy controls how a mutation treats an absent config file.
+type missingPolicy int
+
+const (
+	failIfMissing missingPolicy = iota
+	emptyContextsIfMissing
+	defaultsIfMissing
+)
+
+func readConfigOrSeed(configPath string, onMissing missingPolicy) ([]byte, error) {
+	data, err := os.ReadFile(configPath)
+	if err == nil {
+		return data, nil
+	}
+	switch onMissing {
+	case emptyContextsIfMissing:
+		return []byte("contexts: []\n"), nil
+	case defaultsIfMissing:
+		if os.IsNotExist(err) {
+			return []byte(defaultContent()), nil
+		}
+	}
+	return nil, fmt.Errorf("failed to read config: %w", err)
+}
+
+// writeConfigBytes persists the config atomically: the content is written to a
+// temp file in the same directory and renamed into place, so a crash mid-write
+// can never leave a truncated config.yaml behind.
+func writeConfigBytes(configPath string, out []byte) error {
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	tmp, err := os.CreateTemp(dir, ".config-*.yaml.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp config file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpPath) }
+	if _, err := tmp.Write(out); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("failed to write temp config file: %w", err)
+	}
+	if err := tmp.Chmod(0644); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("failed to chmod temp config file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("failed to close temp config file: %w", err)
+	}
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		// Windows cannot rename over an existing file; retry after removing it.
+		if removeErr := os.Remove(configPath); removeErr == nil {
+			if err = os.Rename(tmpPath, configPath); err == nil {
+				return nil
+			}
+		}
+		cleanup()
+		return fmt.Errorf("failed to replace config file: %w", err)
+	}
+	return nil
+}
+
+func mutateFileConfig(configPath string, onMissing missingPolicy, mutate func(*fileConfig) error) error {
+	data, err := readConfigOrSeed(configPath, onMissing)
+	if err != nil {
+		return err
+	}
 	var fc fileConfig
 	if err := yaml.Unmarshal(data, &fc); err != nil {
 		return fmt.Errorf("failed to parse %s: %w", configPath, err)
 	}
-
-	found := false
-	for _, ctx := range fc.Contexts {
-		if ctx.Name == name {
-			found = true
-			break
-		}
+	if err := mutate(&fc); err != nil {
+		return err
 	}
-	if !found {
-		return fmt.Errorf("context %q not found in config", name)
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
+	return writeConfigBytes(configPath, out)
+}
 
-	// Use yaml.Node to preserve formatting and comments
+// mutateConfigNode passes the raw file content alongside the document mapping
+// so callers can run typed validation before editing nodes.
+func mutateConfigNode(configPath string, onMissing missingPolicy, mutate func(data []byte, mapping *yaml.Node) error) error {
+	data, err := readConfigOrSeed(configPath, onMissing)
+	if err != nil {
+		return err
+	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return fmt.Errorf("failed to parse config as node: %w", err)
 	}
-
-	// doc is a Document node; its first child is the Mapping
 	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
 		return fmt.Errorf("unexpected config structure")
 	}
-	mapping := doc.Content[0]
-
-	updated := false
-	for i := 0; i < len(mapping.Content)-1; i += 2 {
-		if mapping.Content[i].Value == "current" {
-			mapping.Content[i+1].Value = name
-			updated = true
-			break
-		}
+	if err := mutate(data, doc.Content[0]); err != nil {
+		return err
 	}
+	out, err := yaml.Marshal(&doc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	return writeConfigBytes(configPath, out)
+}
 
-	if !updated {
+// SetCurrent updates the "current" field in the config file.
+func SetCurrent(configPath, name string) error {
+	return mutateConfigNode(configPath, failIfMissing, func(data []byte, mapping *yaml.Node) error {
+		// Validate the context name exists before editing nodes.
+		var fc fileConfig
+		if err := yaml.Unmarshal(data, &fc); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", configPath, err)
+		}
+		found := false
+		for _, ctx := range fc.Contexts {
+			if ctx.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("context %q not found in config", name)
+		}
+
+		for i := 0; i < len(mapping.Content)-1; i += 2 {
+			if mapping.Content[i].Value == "current" {
+				mapping.Content[i+1].Value = name
+				return nil
+			}
+		}
 		// Add "current" key at the top of the mapping
 		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "current"}
 		valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: name}
 		mapping.Content = append([]*yaml.Node{keyNode, valNode}, mapping.Content...)
-	}
-
-	out, err := yaml.Marshal(&doc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // UnsetCurrent clears the "current" field in the config file.
 func UnsetCurrent(configPath string) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read config: %w", err)
-	}
-
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("failed to parse config as node: %w", err)
-	}
-	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
-		return fmt.Errorf("unexpected config structure")
-	}
-	mapping := doc.Content[0]
-
-	if err := unsetCurrentFromMapping(mapping); err != nil {
-		return err
-	}
-
-	out, err := yaml.Marshal(&doc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	return nil
+	return mutateConfigNode(configPath, failIfMissing, func(_ []byte, mapping *yaml.Node) error {
+		return unsetCurrentFromMapping(mapping)
+	})
 }
 
 func unsetCurrentFromMapping(mapping *yaml.Node) error {
@@ -612,110 +677,52 @@ func unsetCurrentFromMapping(mapping *yaml.Node) error {
 
 // AddContext appends a new context entry to the config file.
 func AddContext(configPath string, entry ContextEntry) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		// If file doesn't exist, create with minimal structure
-		data = []byte("contexts: []\n")
-	}
-
-	// Check for duplicate name
-	var fc fileConfig
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", configPath, err)
-	}
-	for _, ctx := range fc.Contexts {
-		if ctx.Name == entry.Name {
-			return fmt.Errorf("context %q already exists", entry.Name)
+	return mutateConfigNode(configPath, emptyContextsIfMissing, func(data []byte, mapping *yaml.Node) error {
+		// Check for duplicate name
+		var fc fileConfig
+		if err := yaml.Unmarshal(data, &fc); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", configPath, err)
 		}
-	}
-
-	// Parse as Node to preserve formatting
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("failed to parse config as node: %w", err)
-	}
-
-	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
-		return fmt.Errorf("unexpected config structure")
-	}
-	mapping := doc.Content[0]
-
-	// Find or create the "contexts" sequence
-	var ctxSeq *yaml.Node
-	for i := 0; i < len(mapping.Content)-1; i += 2 {
-		if mapping.Content[i].Value == "contexts" {
-			ctxSeq = mapping.Content[i+1]
-			break
+		for _, ctx := range fc.Contexts {
+			if ctx.Name == entry.Name {
+				return fmt.Errorf("context %q already exists", entry.Name)
+			}
 		}
-	}
-	if ctxSeq == nil {
-		// Add "contexts" key
-		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "contexts"}
-		ctxSeq = &yaml.Node{Kind: yaml.SequenceNode}
-		mapping.Content = append(mapping.Content, keyNode, ctxSeq)
-	}
 
-	// Marshal the new entry to a yaml.Node and append
-	entryBytes, err := yaml.Marshal(&entry)
-	if err != nil {
-		return fmt.Errorf("failed to marshal context entry: %w", err)
-	}
-	var entryNode yaml.Node
-	if err := yaml.Unmarshal(entryBytes, &entryNode); err != nil {
-		return fmt.Errorf("failed to parse context entry node: %w", err)
-	}
-	// entryNode is a Document containing a Mapping
-	if entryNode.Kind == yaml.DocumentNode && len(entryNode.Content) > 0 {
-		ctxSeq.Content = append(ctxSeq.Content, entryNode.Content[0])
-	}
+		// Find or create the "contexts" sequence
+		var ctxSeq *yaml.Node
+		for i := 0; i < len(mapping.Content)-1; i += 2 {
+			if mapping.Content[i].Value == "contexts" {
+				ctxSeq = mapping.Content[i+1]
+				break
+			}
+		}
+		if ctxSeq == nil {
+			keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "contexts"}
+			ctxSeq = &yaml.Node{Kind: yaml.SequenceNode}
+			mapping.Content = append(mapping.Content, keyNode, ctxSeq)
+		}
 
-	out, err := yaml.Marshal(&doc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-
-	return nil
+		// Marshal the new entry to a yaml.Node and append
+		entryBytes, err := yaml.Marshal(&entry)
+		if err != nil {
+			return fmt.Errorf("failed to marshal context entry: %w", err)
+		}
+		var entryNode yaml.Node
+		if err := yaml.Unmarshal(entryBytes, &entryNode); err != nil {
+			return fmt.Errorf("failed to parse context entry node: %w", err)
+		}
+		// entryNode is a Document containing a Mapping
+		if entryNode.Kind == yaml.DocumentNode && len(entryNode.Content) > 0 {
+			ctxSeq.Content = append(ctxSeq.Content, entryNode.Content[0])
+		}
+		return nil
+	})
 }
 
 // UpsertContext adds a new context or replaces an existing one with the same name.
 func UpsertContext(configPath string, entry ContextEntry) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		data = []byte("contexts: []\n")
-	}
-
-	var fc fileConfig
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", configPath, err)
-	}
-
-	replaced := false
-	for i := range fc.Contexts {
-		if fc.Contexts[i].Name == entry.Name {
-			fc.Contexts[i] = entry
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		fc.Contexts = append(fc.Contexts, entry)
-	}
-
-	out, err := yaml.Marshal(&fc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	return nil
+	return UpsertAndRemoveContexts(configPath, []ContextEntry{entry}, nil)
 }
 
 // RemoveContexts deletes the named contexts from config. The current context
@@ -732,241 +739,110 @@ func UpsertAndRemoveContexts(configPath string, upserts []ContextEntry, removals
 	if len(upserts) == 0 && len(removals) == 0 {
 		return nil
 	}
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if len(upserts) == 0 {
-			return fmt.Errorf("failed to read config: %w", err)
-		}
-		data = []byte("contexts: []\n")
+	onMissing := failIfMissing
+	if len(upserts) > 0 {
+		onMissing = emptyContextsIfMissing
 	}
-
-	var fc fileConfig
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", configPath, err)
-	}
-
-	for _, entry := range upserts {
-		replaced := false
-		for i := range fc.Contexts {
-			if fc.Contexts[i].Name == entry.Name {
-				fc.Contexts[i] = entry
-				replaced = true
-				break
+	return mutateFileConfig(configPath, onMissing, func(fc *fileConfig) error {
+		for _, entry := range upserts {
+			replaced := false
+			for i := range fc.Contexts {
+				if fc.Contexts[i].Name == entry.Name {
+					fc.Contexts[i] = entry
+					replaced = true
+					break
+				}
+			}
+			if !replaced {
+				fc.Contexts = append(fc.Contexts, entry)
 			}
 		}
-		if !replaced {
-			fc.Contexts = append(fc.Contexts, entry)
-		}
-	}
 
-	remove := make(map[string]struct{}, len(removals))
-	for _, name := range removals {
-		remove[name] = struct{}{}
-	}
-	kept := fc.Contexts[:0]
-	for _, ctx := range fc.Contexts {
-		if _, ok := remove[ctx.Name]; ok {
-			if fc.Current == ctx.Name {
-				fc.Current = ""
+		remove := make(map[string]struct{}, len(removals))
+		for _, name := range removals {
+			remove[name] = struct{}{}
+		}
+		kept := fc.Contexts[:0]
+		for _, ctx := range fc.Contexts {
+			if _, ok := remove[ctx.Name]; ok {
+				if fc.Current == ctx.Name {
+					fc.Current = ""
+				}
+				continue
 			}
-			continue
+			kept = append(kept, ctx)
 		}
-		kept = append(kept, ctx)
-	}
-	fc.Contexts = kept
-
-	out, err := yaml.Marshal(&fc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	return nil
+		fc.Contexts = kept
+		return nil
+	})
 }
 
 // SetContextOrder updates the display order for a named context.
 func SetContextOrder(configPath, name string, order int) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read config: %w", err)
-	}
-
-	var fc fileConfig
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", configPath, err)
-	}
-
-	found := false
-	for i := range fc.Contexts {
-		if fc.Contexts[i].Name == name {
-			fc.Contexts[i].Order = order
-			found = true
-			break
+	return mutateFileConfig(configPath, failIfMissing, func(fc *fileConfig) error {
+		for i := range fc.Contexts {
+			if fc.Contexts[i].Name == name {
+				fc.Contexts[i].Order = order
+				return nil
+			}
 		}
-	}
-	if !found {
 		return fmt.Errorf("context %q not found in config", name)
-	}
-
-	out, err := yaml.Marshal(&fc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	return nil
+	})
 }
 
 // SetContextOrders rewrites all context orders based on the provided name order.
 func SetContextOrders(configPath string, names []string) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read config: %w", err)
-	}
-
-	var fc fileConfig
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", configPath, err)
-	}
-
-	if len(names) != len(fc.Contexts) {
-		return fmt.Errorf("expected %d context names, got %d", len(fc.Contexts), len(names))
-	}
-
-	orderMap := make(map[string]int, len(names))
-	for i, name := range names {
-		orderMap[name] = i + 1
-	}
-
-	for i := range fc.Contexts {
-		order, ok := orderMap[fc.Contexts[i].Name]
-		if !ok {
-			return fmt.Errorf("context %q missing from order list", fc.Contexts[i].Name)
+	return mutateFileConfig(configPath, failIfMissing, func(fc *fileConfig) error {
+		if len(names) != len(fc.Contexts) {
+			return fmt.Errorf("expected %d context names, got %d", len(fc.Contexts), len(names))
 		}
-		fc.Contexts[i].Order = order
-	}
 
-	out, err := yaml.Marshal(&fc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	return nil
+		orderMap := make(map[string]int, len(names))
+		for i, name := range names {
+			orderMap[name] = i + 1
+		}
+
+		for i := range fc.Contexts {
+			order, ok := orderMap[fc.Contexts[i].Name]
+			if !ok {
+				return fmt.Errorf("context %q missing from order list", fc.Contexts[i].Name)
+			}
+			fc.Contexts[i].Order = order
+		}
+		return nil
+	})
 }
 
 // SetFavoriteServices updates the user's preferred service ordering.
 func SetFavoriteServices(configPath string, services []string) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to read config: %w", err)
-		}
-		data = []byte(defaultContent())
-	}
-
-	var fc fileConfig
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", configPath, err)
-	}
-	fc.Favorites.Services = normalizeFavoriteServices(services)
-
-	out, err := yaml.Marshal(&fc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	return nil
+	return mutateFileConfig(configPath, defaultsIfMissing, func(fc *fileConfig) error {
+		fc.Favorites.Services = normalizeFavoriteServices(services)
+		return nil
+	})
 }
 
 // SetFavoriteContexts updates the user's preferred context ordering.
 func SetFavoriteContexts(configPath string, contexts []string) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to read config: %w", err)
-		}
-		data = []byte(defaultContent())
-	}
-
-	var fc fileConfig
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", configPath, err)
-	}
-	fc.Favorites.Contexts = normalizeFavoriteContexts(contexts)
-
-	out, err := yaml.Marshal(&fc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	return nil
+	return mutateFileConfig(configPath, defaultsIfMissing, func(fc *fileConfig) error {
+		fc.Favorites.Contexts = normalizeFavoriteContexts(contexts)
+		return nil
+	})
 }
 
 // SetBootSplashEnabled updates whether the startup splash should run on every launch.
 func SetBootSplashEnabled(configPath string, enabled bool) error {
-	fc, err := readFileConfigOrDefault(configPath)
-	if err != nil {
-		return err
-	}
-	fc.UI.BootSplash = &enabled
-	return writeFileConfig(configPath, fc)
+	return mutateFileConfig(configPath, defaultsIfMissing, func(fc *fileConfig) error {
+		fc.UI.BootSplash = &enabled
+		return nil
+	})
 }
 
 // SetBootSplashSeenVersion records the app version that has already shown the one-time splash.
 func SetBootSplashSeenVersion(configPath, version string) error {
-	fc, err := readFileConfigOrDefault(configPath)
-	if err != nil {
-		return err
-	}
-	fc.UI.LastBootSplashVersion = strings.TrimSpace(version)
-	return writeFileConfig(configPath, fc)
-}
-
-func readFileConfigOrDefault(configPath string) (*fileConfig, error) {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to read config: %w", err)
-		}
-		data = []byte(defaultContent())
-	}
-
-	var fc fileConfig
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return nil, fmt.Errorf("failed to parse %s: %w", configPath, err)
-	}
-	return &fc, nil
-}
-
-func writeFileConfig(configPath string, fc *fileConfig) error {
-	out, err := yaml.Marshal(fc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	return nil
+	return mutateFileConfig(configPath, defaultsIfMissing, func(fc *fileConfig) error {
+		fc.UI.LastBootSplashVersion = strings.TrimSpace(version)
+		return nil
+	})
 }
 
 // DefaultPath returns the default config file path following XDG Base Directory spec.
@@ -992,17 +868,7 @@ func EnsureConfigExists(configPath string) error {
 	if _, err := os.Stat(configPath); err == nil {
 		return nil
 	}
-
-	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-
-	if err := os.WriteFile(configPath, []byte(defaultContent()), 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	return nil
+	return writeConfigBytes(configPath, []byte(defaultContent()))
 }
 
 // CreateConfig creates a config file. Returns true if a new file was created.
@@ -1013,15 +879,8 @@ func CreateConfig(configPath string, force bool) (bool, error) {
 			return false, nil
 		}
 	}
-
-	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return false, fmt.Errorf("failed to create config directory: %w", err)
+	if err := writeConfigBytes(configPath, []byte(defaultContent())); err != nil {
+		return false, err
 	}
-
-	if err := os.WriteFile(configPath, []byte(defaultContent()), 0644); err != nil {
-		return false, fmt.Errorf("failed to write config file: %w", err)
-	}
-
 	return true, nil
 }
