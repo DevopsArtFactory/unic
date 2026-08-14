@@ -27,9 +27,10 @@ type SQSQueue struct {
 	VisibilitySec    int
 	RetentionSec     int
 	Fifo             bool
-	DLQTargetARN     string // where this queue's failures go
+	DLQTargetARN     string   // where this queue's failures go
 	MaxReceiveCount  int
-	SourceQueueCount int // how many queues use this one as their DLQ
+	SourceQueueARNs  []string // queues that dead-letter into this one
+	SourceQueueCount int      // len(SourceQueueARNs), kept for display
 }
 
 // IsDLQ reports whether other queues dead-letter into this queue.
@@ -98,15 +99,17 @@ func (r *AwsRepository) ListQueues(ctx context.Context) ([]SQSQueue, error) {
 		}
 	}
 
-	// Second pass: count how many queues dead-letter into each ARN.
-	sources := make(map[string]int)
+	// Second pass: record which queues dead-letter into each ARN, so a DLQ
+	// can navigate back to its sources.
+	sources := make(map[string][]string)
 	for _, queue := range queues {
 		if queue.DLQTargetARN != "" {
-			sources[queue.DLQTargetARN]++
+			sources[queue.DLQTargetARN] = append(sources[queue.DLQTargetARN], queue.ARN)
 		}
 	}
 	for i := range queues {
-		queues[i].SourceQueueCount = sources[queues[i].ARN]
+		queues[i].SourceQueueARNs = sources[queues[i].ARN]
+		queues[i].SourceQueueCount = len(queues[i].SourceQueueARNs)
 	}
 
 	sort.SliceStable(queues, func(i, j int) bool {

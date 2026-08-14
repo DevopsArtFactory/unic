@@ -136,10 +136,18 @@ func (sm *sqsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "r":
 		return m.startLoading(sm.loadQueues(*m))
 	case "d":
-		// Jump between a queue and its DLQ.
+		// Jump from a source queue into its DLQ.
 		if sm.selected != nil && sm.selected.DLQTargetARN != "" {
 			if dlq := sm.queueByARN(sm.selected.DLQTargetARN); dlq != nil {
 				sm.selected = dlq
+				sm.notice = ""
+			}
+		}
+	case "s":
+		// Jump from a DLQ back to its (first) source queue.
+		if sm.selected != nil && len(sm.selected.SourceQueueARNs) > 0 {
+			if source := sm.queueByARN(sm.selected.SourceQueueARNs[0]); source != nil {
+				sm.selected = source
 				sm.notice = ""
 			}
 		}
@@ -339,6 +347,9 @@ func (sm sqsModel) viewDetail(m Model) string {
 	}
 	if queue.IsDLQ() {
 		b.WriteString(m.renderEC2DetailLine("Is DLQ For", fmt.Sprintf("%d source queue(s)", queue.SourceQueueCount)))
+		for _, sourceARN := range queue.SourceQueueARNs {
+			b.WriteString(m.renderEC2DetailLine("", sourceARN))
+		}
 	}
 	if queue.DLQTargetARN == "" && !queue.IsDLQ() {
 		b.WriteString(dimStyle.Render("  (no redrive policy)"))

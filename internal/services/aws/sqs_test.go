@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -125,5 +126,88 @@ func TestRedriveQueueUsesDLQAsSource(t *testing.T) {
 	}
 	if gotSource != "arn:aws:sqs:us-east-1:1:orders-dlq" {
 		t.Fatalf("expected DLQ ARN as the move source, got %q", gotSource)
+	}
+}
+
+func TestListQueuesAggregatesPages(t *testing.T) {
+	page := 0
+	mock := &mockSQSClient{
+		listQueuesFunc: func(_ context.Context, params *sqs.ListQueuesInput, _ ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error) {
+			page++
+			if page == 1 {
+				token := "next"
+				return &sqs.ListQueuesOutput{
+					QueueUrls: []string{"https://sqs.us-east-1.amazonaws.com/1/a"},
+					NextToken: &token,
+				}, nil
+			}
+			return &sqs.ListQueuesOutput{QueueUrls: []string{"https://sqs.us-east-1.amazonaws.com/1/b"}}, nil
+		},
+		getQueueAttributesFunc: func(_ context.Context, params *sqs.GetQueueAttributesInput, _ ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error) {
+			return &sqs.GetQueueAttributesOutput{Attributes: sqsQueueAttrs("arn:"+awssdk.ToString(params.QueueUrl), "0", nil)}, nil
+		},
+	}
+	repo := &AwsRepository{Region: "us-east-1", SQSClient: mock}
+
+	queues, err := repo.ListQueues(context.Background())
+	if err != nil || len(queues) != 2 {
+		t.Fatalf("expected both pages aggregated, got %d err=%v", len(queues), err)
+	}
+}
+
+func TestSQSOperationsWrapAPIErrors(t *testing.T) {
+	boom := errors.New("throttled")
+	mock := &mockSQSClient{
+		listQueuesFunc: func(_ context.Context, _ *sqs.ListQueuesInput, _ ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error) {
+			return nil, boom
+		},
+	}
+	repo := &AwsRepository{SQSClient: mock}
+	if _, err := repo.ListQueues(context.Background()); err == nil || !strings.Contains(err.Error(), "failed to list SQS queues") {
+		t.Fatalf("expected wrapped list error, got %v", err)
+	}
+
+	mock = &mockSQSClient{
+		listQueuesFunc: func(_ context.Context, _ *sqs.ListQueuesInput, _ ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error) {
+			return &sqs.ListQueuesOutput{QueueUrls: []string{"https://q/u"}}, nil
+		},
+		getQueueAttributesFunc: func(_ context.Context, _ *sqs.GetQueueAttributesInput, _ ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error) {
+			return nil, boom
+		},
+	}
+	repo = &AwsRepository{SQSClient: mock}
+	if _, err := repo.ListQueues(context.Background()); err == nil || !strings.Contains(err.Error(), "failed to get attributes") {
+		t.Fatalf("expected wrapped attributes error, got %v", err)
+	}
+
+	repo = &AwsRepository{SQSClient: &mockSQSClient{
+		purgeQueueFunc: func(_ context.Context, _ *sqs.PurgeQueueInput, _ ...func(*sqs.Options)) (*sqs.PurgeQueueOutput, error) {
+			return nil, boom
+		},
+	}}
+	if err := repo.PurgeQueue(context.Background(), "https://q/u"); err == nil || !strings.Contains(err.Error(), "failed to purge") {
+		t.Fatalf("expected wrapped purge error, got %v", err)
+	}
+
+	repo = &AwsRepository{SQSClient: &mockSQSClient{
+		startMessageMoveTaskFunc: func(_ context.Context, _ *sqs.StartMessageMoveTaskInput, _ ...func(*sqs.Options)) (*sqs.StartMessageMoveTaskOutput, error) {
+			return nil, boom
+		},
+	}}
+	if err := repo.RedriveQueue(context.Background(), "arn:q"); err == nil || !strings.Contains(err.Error(), "failed to start redrive") {
+		t.Fatalf("expected wrapped redrive error, got %v", err)
+	}
+}
+
+func TestPurgeQueuePassesURL(t *testing.T) {
+	var got string
+	repo := &AwsRepository{SQSClient: &mockSQSClient{
+		purgeQueueFunc: func(_ context.Context, params *sqs.PurgeQueueInput, _ ...func(*sqs.Options)) (*sqs.PurgeQueueOutput, error) {
+			got = awssdk.ToString(params.QueueUrl)
+			return &sqs.PurgeQueueOutput{}, nil
+		},
+	}}
+	if err := repo.PurgeQueue(context.Background(), "https://q/orders"); err != nil || got != "https://q/orders" {
+		t.Fatalf("expected purge URL passed, got %q err=%v", got, err)
 	}
 }

@@ -107,3 +107,37 @@ func TestSQSRedriveOnlyOfferedForDLQs(t *testing.T) {
 		t.Fatalf("expected redrive confirm, got %v action=%q", m.screen, m.sqs.action)
 	}
 }
+
+func TestSQSActionErrorOpensErrorScreen(t *testing.T) {
+	m := sqsTestModel()
+	m.screen = screenSQSQueueDetail
+
+	_, _, handled := m.sqs.HandleMessage(&m, sqsActionDoneMsg{err: errSQSTest})
+	if !handled || m.screen != screenError || !strings.Contains(m.errMsg, "access denied") {
+		t.Fatalf("expected error screen with message, got %v %q", m.screen, m.errMsg)
+	}
+}
+
+func TestSQSSourceJumpFromDLQ(t *testing.T) {
+	m := sqsTestModel()
+	queues := testQueues()
+	queues[0].SourceQueueARNs = []string{"arn:aws:sqs:us-east-1:1:orders"}
+	m.sqs.HandleMessage(&m, sqsQueuesLoadedMsg{queues: queues})
+	dlq := queues[0]
+	m.sqs.selected = &dlq
+	m.screen = screenSQSQueueDetail
+
+	if !strings.Contains(m.keymapHelpBar(), "s: open source") {
+		t.Fatal("expected source jump offered on a DLQ")
+	}
+	m.sqs.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if m.sqs.selected == nil || m.sqs.selected.Name != "orders" {
+		t.Fatalf("expected s to jump back to the source queue, got %+v", m.sqs.selected)
+	}
+}
+
+var errSQSTest = errSQS{}
+
+type errSQS struct{}
+
+func (errSQS) Error() string { return "access denied" }

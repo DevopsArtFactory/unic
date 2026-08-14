@@ -83,6 +83,8 @@ var screenKeymaps = map[screen][]keyBinding{
 	screenSQSQueueDetail: {
 		{keys: "d", bar: "d: open DLQ", help: "Jump to this queue's dead-letter queue",
 			when: func(m Model) bool { return m.sqs.selected != nil && m.sqs.selected.DLQTargetARN != "" }},
+		{keys: "s", bar: "s: open source", help: "Jump back to a queue that dead-letters into this one",
+			when: func(m Model) bool { return m.sqs.selected != nil && len(m.sqs.selected.SourceQueueARNs) > 0 }},
 		{keys: "m", bar: "m: redrive", help: "Redrive this DLQ's messages to their source queues",
 			when: func(m Model) bool { return m.sqs.selected != nil && m.sqs.selected.IsDLQ() }},
 		{keys: "x", bar: "x: purge", help: "Purge every message in the queue"},
