@@ -345,7 +345,7 @@ func (cw cloudWatchLogsModel) viewGroupList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • n: load more • enter: streams • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -464,7 +464,7 @@ func (cw cloudWatchLogsModel) viewStreamList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • n: load more • enter: view logs • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 

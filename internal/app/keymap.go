@@ -1,0 +1,177 @@
+package app
+
+import "strings"
+
+// keyBinding declares one shortcut in a single place: the overlay key label,
+// the compact bottom-bar form, the overlay description, and an optional
+// visibility condition. Both the `?` overlay and the bottom help bar render
+// from the same binding, so the two surfaces can no longer drift apart.
+//
+// A binding with an empty help is bar-only (globals like `H: home` that the
+// overlay lists in its Global section); an empty bar is overlay-only.
+type keyBinding struct {
+	keys string
+	bar  string
+	help string
+	when func(Model) bool
+}
+
+// screenKeymaps holds the screens migrated to declarative keymaps. Screens not
+// listed here still use the legacy switch in currentScreenShortcuts and their
+// hand-written help-bar strings; they migrate incrementally. The CloudWatch
+// log viewer intentionally stays legacy: its bar labels embed live state
+// (wrap on/off, horizontal offset) that a static declaration cannot express.
+var screenKeymaps = map[screen][]keyBinding{
+	screenRoute53ZoneList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
+		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
+		{keys: "enter", bar: "enter: records", help: "Open the selected hosted zone"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenRoute53RecordList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
+		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
+		{keys: "c", bar: "c: create", help: "Create a new DNS record"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected record"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the hosted zone list"},
+		{bar: "H: home"},
+	},
+	screenRoute53RecordDetail: {
+		{keys: "c", bar: "c: create", help: "Create a new DNS record",
+			when: func(m Model) bool { return m.route53.selectedRecord != nil }},
+		{keys: "e", bar: "e: edit", help: "Edit the selected DNS record",
+			when: func(m Model) bool { return m.route53.canEditSelectedRecord() }},
+		{keys: "d", bar: "d: delete", help: "Delete the selected DNS record",
+			when: func(m Model) bool { return m.route53.canDeleteSelectedRecord() }},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the record list"},
+		{bar: "H: home"},
+	},
+	screenRoute53RecordCreate: {
+		{keys: "↑/↓, j/k", help: "Move between record types",
+			when: func(m Model) bool { return m.route53.editField == 1 }},
+		{keys: "type", help: "Edit the current field",
+			when: func(m Model) bool { return m.route53.editField != 1 }},
+		{keys: "backspace", help: "Delete the previous character",
+			when: func(m Model) bool { return m.route53.editField != 1 }},
+		{keys: "enter", bar: "enter: next", help: "Advance to the next field or save the record"},
+		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to the record list"},
+	},
+	screenRoute53RecordEdit: {
+		{keys: "type", help: "Edit the current record field"},
+		{keys: "backspace", help: "Delete the previous character"},
+		{keys: "enter", bar: "enter: next", help: "Advance to the next field or save the update"},
+		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to the record detail"},
+	},
+	screenRoute53RecordDeleteConfirm: {
+		{keys: "type", help: "Enter the record name to confirm deletion"},
+		{keys: "backspace", help: "Delete the previous character"},
+		{keys: "enter", bar: "enter: confirm", help: "Delete the record when the typed name matches"},
+		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to the record detail"},
+	},
+
+	screenIAMUserList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
+		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
+		{keys: "n", bar: "n: next page", help: "Load the next page of IAM users"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected IAM user"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenIAMUserDetail: {
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the IAM user list"},
+		{bar: "H: home"},
+	},
+	screenIAMKeyList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between access keys"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected access key detail"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenIAMKeyDetail: {
+		{keys: "r", bar: "r: rotate", help: "Start rotating the selected access key",
+			when: func(m Model) bool {
+				return m.iam.rotationEnabled && m.iam.selectedKey != nil && m.iam.selectedKey.Status == "Active"
+			}},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the access key list"},
+		{bar: "H: home"},
+	},
+	screenIAMKeyRotateConfirm: {
+		{keys: "type", help: "Enter the access key ID to confirm rotation"},
+		{keys: "backspace", help: "Delete the previous character"},
+		{keys: "enter", bar: "enter: confirm", help: "Create the new key when the typed ID matches"},
+		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to the access key detail"},
+	},
+	screenIAMKeyRotateResult: {
+		{keys: "c", bar: "c: copy exports", help: "Copy export commands for the new credentials"},
+		{keys: "a", bar: "a: apply+verify", help: "Apply and verify the new credentials when supported"},
+		{keys: "d", bar: "d: deactivate old", help: "Deactivate the old access key when allowed"},
+		{keys: "x", bar: "x: delete old", help: "Delete the old access key after deactivation"},
+		{keys: "q / esc", bar: "esc: back to key list", help: "Return to the access key list"},
+	},
+
+	screenCWLogGroupList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
+		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
+		{keys: "n", bar: "n: load more", help: "Load more log groups"},
+		{keys: "enter", bar: "enter: streams", help: "Open log streams for the selected group"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenCWLogStreamList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
+		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
+		{keys: "n", bar: "n: load more", help: "Load more log streams"},
+		{keys: "enter", bar: "enter: view logs", help: "Open the log viewer for the selected stream"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the log group list"},
+		{bar: "H: home"},
+	},
+}
+
+// visibleBindings returns the declared bindings whose conditions hold.
+func (m Model) visibleBindings(s screen) ([]keyBinding, bool) {
+	bindings, ok := screenKeymaps[s]
+	if !ok {
+		return nil, false
+	}
+	visible := make([]keyBinding, 0, len(bindings))
+	for _, binding := range bindings {
+		if binding.when != nil && !binding.when(m) {
+			continue
+		}
+		visible = append(visible, binding)
+	}
+	return visible, true
+}
+
+// keymapHelpBar renders the bottom help bar for the current screen from its
+// declared keymap.
+func (m Model) keymapHelpBar() string {
+	bindings, ok := m.visibleBindings(m.screen)
+	if !ok {
+		return ""
+	}
+	parts := make([]string, 0, len(bindings))
+	for _, binding := range bindings {
+		if binding.bar != "" {
+			parts = append(parts, binding.bar)
+		}
+	}
+	return strings.Join(parts, " • ")
+}
+
+// keymapShortcuts renders the `?` overlay entries for the current screen from
+// its declared keymap.
+func (m Model) keymapShortcuts() ([]helpShortcut, bool) {
+	bindings, ok := m.visibleBindings(m.screen)
+	if !ok {
+		return nil, false
+	}
+	shortcuts := make([]helpShortcut, 0, len(bindings))
+	for _, binding := range bindings {
+		if binding.help != "" {
+			shortcuts = append(shortcuts, helpShortcut{binding.keys, binding.help})
+		}
+	}
+	return shortcuts, true
+}

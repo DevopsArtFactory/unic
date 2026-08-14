@@ -219,9 +219,7 @@ func (rm *route53Model) updateRecordDetail(m *Model, msg tea.KeyMsg) (tea.Model,
 	case "q", "esc":
 		m.screen = screenRoute53RecordList
 	case "e":
-		// Edit only for A/CNAME non-alias records
-		if rm.selectedRecord != nil && rm.selectedRecord.AliasTarget == "" &&
-			(rm.selectedRecord.Type == "A" || rm.selectedRecord.Type == "CNAME") {
+		if rm.canEditSelectedRecord() {
 			rm.action = "edit"
 			rm.editField = 0
 			rm.editValues = map[string]string{
@@ -232,9 +230,7 @@ func (rm *route53Model) updateRecordDetail(m *Model, msg tea.KeyMsg) (tea.Model,
 			m.screen = screenRoute53RecordEdit
 		}
 	case "d":
-		// Delete allowed for non-NS/SOA records
-		if rm.selectedRecord != nil &&
-			rm.selectedRecord.Type != "NS" && rm.selectedRecord.Type != "SOA" {
+		if rm.canDeleteSelectedRecord() {
 			rm.action = "delete"
 			rm.confirmInput = ""
 			m.screen = screenRoute53RecordDeleteConfirm
@@ -359,7 +355,7 @@ func (rm route53Model) viewZoneList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • enter: records • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -448,7 +444,7 @@ func (rm route53Model) viewRecordList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • /: filter • c: create • enter: detail • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -485,20 +481,7 @@ func (rm route53Model) viewRecordDetail(m Model) string {
 	}
 
 	b.WriteString("\n")
-	hints := "esc: back • H: home"
-	if rm.selectedRecord != nil {
-		canEdit := rm.selectedRecord.AliasTarget == "" &&
-			(rm.selectedRecord.Type == "A" || rm.selectedRecord.Type == "CNAME")
-		canDelete := rm.selectedRecord.Type != "NS" && rm.selectedRecord.Type != "SOA"
-		if canEdit {
-			hints = "e: edit • " + hints
-		}
-		if canDelete {
-			hints = "d: delete • " + hints
-		}
-		hints = "c: create • " + hints
-	}
-	b.WriteString(m.renderHelpBar(hints))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -644,7 +627,7 @@ func (rm route53Model) viewRecordCreate(m Model) string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(m.renderHelpBar("enter: next • esc: cancel"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -736,7 +719,7 @@ func (rm route53Model) viewRecordEdit(m Model) string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(m.renderHelpBar("enter: next • esc: cancel"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -793,7 +776,7 @@ func (rm route53Model) viewRecordDeleteConfirm(m Model) string {
 	b.WriteString("\n")
 	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", rm.confirmInput)))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("enter: confirm • esc: cancel"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
@@ -939,4 +922,19 @@ func parseTTL(s string) int64 {
 		return defaultTTL
 	}
 	return ttl
+}
+
+// canEditSelectedRecord reports whether the selected record supports in-TUI
+// editing (plain A/CNAME records without an alias target).
+func (rm route53Model) canEditSelectedRecord() bool {
+	return rm.selectedRecord != nil &&
+		rm.selectedRecord.AliasTarget == "" &&
+		(rm.selectedRecord.Type == "A" || rm.selectedRecord.Type == "CNAME")
+}
+
+// canDeleteSelectedRecord reports whether the selected record may be deleted
+// (NS/SOA records are protected).
+func (rm route53Model) canDeleteSelectedRecord() bool {
+	return rm.selectedRecord != nil &&
+		rm.selectedRecord.Type != "NS" && rm.selectedRecord.Type != "SOA"
 }
