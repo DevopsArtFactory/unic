@@ -165,7 +165,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 
 ## 인증 모델
 
-UNIC은 현재 세 가지 인증 모드를 지원한다.
+UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 
 ### `credential`
 
@@ -188,6 +188,15 @@ UNIC은 현재 세 가지 인증 모드를 지원한다.
 - `unic context setup`이 `aws login --profile <profile> --region <region>`을 실행
 - login 이후에도 profile 기반이므로 `unic env`는 `AWS_PROFILE`과 region 변수를 export
 - 현재는 standalone context로만 지원하며 `role_arn` chaining은 지원하지 않음
+
+### `okta_saml`
+
+- Okta AWS 앱을 통한 SAML federation
+- `unic env`가 Okta primary authentication을 수행하고, 필요하면 MFA challenge(v1: TOTP, Okta Verify push)를 처리한다
+- app embed link에서 SAML assertion을 가져와 `sts:AssumeRoleWithSAML`로 교환한다
+- role 선택은 결정적이다: `role_arn` 우선, 단일 role 자동 선택, 복수 role은 명시적 에러
+- 교환된 세션 자격증명만 `~/.config/unic/cache/okta-saml/`에 캐시하고, 비밀번호/OTP/Okta 세션 토큰은 저장하지 않는다
+- TUI는 유효한 캐시 세션을 passive하게 재사용하고, 없으면 `unic env <context>`를 안내한다
 
 ### `sso`
 
