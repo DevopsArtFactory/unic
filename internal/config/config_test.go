@@ -954,6 +954,44 @@ contexts:
 	}
 }
 
+func TestContextWithMFASerial(t *testing.T) {
+	dir := t.TempDir()
+	path := writeUnicConfig(t, dir, `
+current: prod-admin
+defaults:
+  region: us-east-1
+contexts:
+  - name: prod-admin
+    profile: base-user
+    auth_type: assume_role
+    role_arn: arn:aws:iam::111111111111:role/AdministratorAccess
+    mfa_serial: arn:aws:iam::111111111111:mfa/user
+  - name: prod-structured
+    auth:
+      type: assume_role
+      profile: base-user
+      role_arn: arn:aws:iam::111111111111:role/ReadOnly
+      mfa_serial: arn:aws:iam::111111111111:mfa/other
+    resources:
+      default_region: us-east-1
+`)
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MFASerial != "arn:aws:iam::111111111111:mfa/user" {
+		t.Errorf("expected flat mfa_serial, got '%s'", cfg.MFASerial)
+	}
+
+	named, err := LoadNamedContext(path, "prod-structured")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if named.MFASerial != "arn:aws:iam::111111111111:mfa/other" {
+		t.Errorf("expected structured auth mfa_serial, got '%s'", named.MFASerial)
+	}
+}
+
 func TestContextWithOktaSAML(t *testing.T) {
 	dir := t.TempDir()
 	path := writeUnicConfig(t, dir, `

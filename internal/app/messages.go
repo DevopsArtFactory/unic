@@ -12,7 +12,8 @@ type instancesLoadedMsg struct {
 }
 
 type ec2BrowserInstancesLoadedMsg struct {
-	instances []awsservice.EC2Instance
+	instances    []awsservice.EC2Instance
+	regionErrors []awsservice.EC2RegionError
 }
 
 type ec2RelationshipsLoadedMsg struct {
@@ -276,6 +277,12 @@ type eksUpgradeReadinessLoadedMsg struct {
 
 type ecrRepositoriesLoadedMsg struct {
 	repositories []awsservice.ECRRepository
+}
+
+type ecrLoginResolvedMsg struct {
+	registryURI   string
+	dockerCommand string
+	podmanCommand string
 }
 
 type ecrImagesLoadedMsg struct {

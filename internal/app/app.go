@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"unic/internal/config"
 	"unic/internal/domain"
+	uniclog "unic/internal/log"
 	awsservice "unic/internal/services/aws"
 	"unic/internal/update"
 )
@@ -78,6 +79,7 @@ const (
 	screenECRRepositoryDetail
 	screenECRImageList
 	screenECRImageDetail
+	screenECRLoginHelper
 	screenFISTemplateList
 	screenFISTemplateDetail
 	screenFISExperimentList
@@ -293,7 +295,10 @@ var appLoadCallerIdentityFn = func(m Model) tea.Cmd {
 func (m Model) checkForUpdate() tea.Cmd {
 	return func() tea.Msg {
 		method := update.DetectInstallMethod()
-		newVersion := update.CheckForUpdate(m.currentVersion)
+		newVersion, err := update.CheckForUpdate(m.currentVersion)
+		if err != nil {
+			uniclog.Info("app", "update check failed", "error", err.Error())
+		}
 		return updateAvailableMsg{version: newVersion, method: method}
 	}
 }
@@ -670,6 +675,8 @@ func (m Model) updateFeatureList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.ecs.Start(&m)
 			case domain.FeatureECRRepositoryBrowser:
 				return m.ecr.Start(&m)
+			case domain.FeatureECRLoginHelper:
+				return m.ecr.StartLogin(&m)
 			case domain.FeatureEKSBrowser:
 				return m.eks.Start(&m)
 			case domain.FeatureFISTemplateBrowser:

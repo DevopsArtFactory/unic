@@ -1,6 +1,8 @@
 package update
 
 import (
+	"errors"
+	"strings"
 	"testing"
 )
 
@@ -113,8 +115,45 @@ func TestWriteAndReadCache(t *testing.T) {
 
 func TestCheckForUpdate_DevVersion(t *testing.T) {
 	// dev version should never trigger update check
-	result := CheckForUpdate("dev")
+	result, err := CheckForUpdate("dev")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if result != "" {
 		t.Errorf("expected empty string for dev version, got %q", result)
+	}
+}
+
+func TestCheckForUpdate_PropagatesCheckError(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	orig := checkLatestVersionFn
+	t.Cleanup(func() { checkLatestVersionFn = orig })
+	checkLatestVersionFn = func() (string, error) {
+		return "", errors.New("api down")
+	}
+
+	result, err := CheckForUpdate("0.1.0")
+	if err == nil || !strings.Contains(err.Error(), "api down") {
+		t.Fatalf("expected wrapped check error, got %v", err)
+	}
+	if result != "" {
+		t.Errorf("expected empty version on error, got %q", result)
+	}
+}
+
+func TestCheckForUpdate_ReturnsNewerVersion(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	orig := checkLatestVersionFn
+	t.Cleanup(func() { checkLatestVersionFn = orig })
+	checkLatestVersionFn = func() (string, error) {
+		return "v0.2.0", nil
+	}
+
+	result, err := CheckForUpdate("0.1.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "v0.2.0" {
+		t.Errorf("expected v0.2.0, got %q", result)
 	}
 }

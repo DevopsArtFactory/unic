@@ -305,3 +305,27 @@ func TestOktaPrimaryAuthRejectsBadCredentials(t *testing.T) {
 		t.Fatalf("expected credential rejection error, got %v", err)
 	}
 }
+
+func TestSAMLResponseFromHTMLIsAttributeOrderAgnostic(t *testing.T) {
+	assertion := testAssertionB64()
+	pages := []string{
+		// canonical: name before value, double quotes
+		`<html><form><input type="hidden" name="SAMLResponse" value="` + assertion + `"/></form></html>`,
+		// value before name
+		`<html><form><input value="` + assertion + `" type="hidden" name="SAMLResponse"></form></html>`,
+		// single quotes and extra attributes
+		`<html><form><input id='x' value='` + assertion + `' name='SAMLResponse'/></form></html>`,
+		// unquoted name attribute
+		`<html><form><input name=SAMLResponse value="` + assertion + `"></form></html>`,
+	}
+	for i, page := range pages {
+		got, ok := samlResponseFromHTML([]byte(page))
+		if !ok || got != assertion {
+			t.Fatalf("variant %d: expected assertion to be extracted, ok=%v", i, ok)
+		}
+	}
+
+	if _, ok := samlResponseFromHTML([]byte(`<html><input name="RelayState" value="x"/></html>`)); ok {
+		t.Fatal("expected no match without a SAMLResponse input")
+	}
+}
