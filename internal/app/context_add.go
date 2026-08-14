@@ -34,6 +34,9 @@ var fieldsByAuthType = map[string][]fieldDef{
 		{key: "region", label: "Region", required: true},
 		{key: "regions", label: "Other Resource Regions (optional, comma-separated)", required: false},
 		{key: "profile", label: "Profile", required: true},
+		{key: "role_arn", label: "Role ARN to chain into (optional)", required: false},
+		{key: "external_id", label: "External ID (optional)", required: false},
+		{key: "mfa_serial", label: "MFA Device ARN (optional)", required: false},
 	},
 	"console_login": {
 		{key: "name", label: "Name", required: true},
@@ -41,6 +44,9 @@ var fieldsByAuthType = map[string][]fieldDef{
 		{key: "region", label: "Region", required: true},
 		{key: "regions", label: "Other Resource Regions (optional, comma-separated)", required: false},
 		{key: "profile", label: "Profile", required: true},
+		{key: "role_arn", label: "Role ARN to chain into (optional)", required: false},
+		{key: "external_id", label: "External ID (optional)", required: false},
+		{key: "mfa_serial", label: "MFA Device ARN (optional)", required: false},
 	},
 	"assume_role": {
 		{key: "name", label: "Name", required: true},
@@ -50,6 +56,7 @@ var fieldsByAuthType = map[string][]fieldDef{
 		{key: "profile", label: "Profile", required: true},
 		{key: "role_arn", label: "Role ARN", required: true},
 		{key: "external_id", label: "External ID (optional)", required: false},
+		{key: "mfa_serial", label: "MFA Device ARN (optional)", required: false},
 	},
 	// okta_saml stores only non-secret metadata; passwords and MFA secrets
 	// never go into config.yaml. Runtime credential exchange is tracked in #85.
@@ -150,6 +157,7 @@ func (m Model) saveContext() tea.Cmd {
 				Profile:      m.addValues["profile"],
 				RoleArn:      m.addValues["role_arn"],
 				ExternalID:   m.addValues["external_id"],
+				MFASerial:    m.addValues["mfa_serial"],
 				SSOStartURL:  m.addValues["sso_start_url"],
 				SSORegion:    m.addValues["sso_region"],
 				SSOAccountID: m.addValues["sso_account_id"],
