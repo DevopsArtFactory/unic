@@ -111,6 +111,7 @@ const (
 	screenContextSSORoleList
 	screenRegionPicker
 	screenCommandPalette
+	screenViewList
 	screenSettings
 	screenLoading
 	screenError
@@ -194,6 +195,10 @@ type Model struct {
 
 	// Command palette
 	palette paletteModel
+
+	// Saved views
+	views       viewsModel
+	pendingView *config.ViewEntry
 
 	// Context add wizard
 	addStep     int // 0=auth_type select, 1+=field input, -1=confirm
@@ -408,6 +413,14 @@ func (m Model) startLoadingWithMessage(title string, details []string, cmd tea.C
 // (or confirmation) input, so global single-letter shortcuts like S must not
 // fire and steal a keystroke from the active field.
 func (m Model) isTextEntryScreen() bool {
+	// The command palette query and the saved-view name input consume free
+	// typing, so global single-key shortcuts must stay out of their way.
+	if m.screen == screenCommandPalette {
+		return true
+	}
+	if m.screen == screenViewList && m.views.naming {
+		return true
+	}
 	switch m.screen {
 	case screenContextAdd,
 		screenRoute53RecordCreate,
@@ -523,7 +536,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		}
-		if msg.String() == "?" {
+		if msg.String() == "?" && !m.filterTI.Focused() && !m.isTextEntryScreen() {
 			m.helpVisible = !m.helpVisible
 			return m, nil
 		}
@@ -536,18 +549,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Global home — return to service list from any screen (skip text-input screens)
 		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
-			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-			m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
-			m.screen != screenBedrockKeyConfirm && m.screen != screenFISTemplateList {
+			!m.isTextEntryScreen() && m.screen != screenFISTemplateList {
 			m.deactivateFilter()
 			m.screen = screenServiceList
 			return m, nil
 		}
 		// Global context switch — C key opens context picker (skip text-input screens)
-		if msg.String() == "C" && m.screen != screenContextPicker &&
-			m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-			m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
-			m.screen != screenBedrockKeyConfirm {
+		if msg.String() == "C" && m.screen != screenContextPicker && !m.isTextEntryScreen() {
 			m.deactivateFilter()
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
@@ -577,6 +585,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.deactivateFilter()
 			return m.openPalette()
 		}
+		// Global saved views — V opens the saved views screen (skip
+		// text-entry screens and the views screen's own name input).
+		if msg.String() == "V" && !m.filterTI.Focused() && m.screen != screenViewList &&
+			!m.isTextEntryScreen() {
+			m.deactivateFilter()
+			return m.openViews()
+		}
 
 		for _, submodel := range m.featureSubmodels() {
 			if newM, cmd, handled := submodel.HandleKey(&m, msg); handled {
@@ -603,6 +618,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateRegionPicker(msg)
 		case screenCommandPalette:
 			return m.updatePalette(msg)
+		case screenViewList:
+			return m.updateViews(msg)
 		case screenSettings:
 			return m.updateSettings(msg)
 		case screenError:
@@ -773,6 +790,8 @@ func (m Model) View() string {
 		v = m.viewRegionPicker()
 	case screenCommandPalette:
 		v = m.viewPalette()
+	case screenViewList:
+		v = m.viewViews()
 	case screenSettings:
 		v = m.viewSettings()
 	case screenLoading:

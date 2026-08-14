@@ -60,6 +60,14 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
+		if m.pendingView != nil {
+			// A saved view triggered this switch: continue the jump now that
+			// the new context is active.
+			view := *m.pendingView
+			m.pendingView = nil
+			newM, cmd := m.jumpToView(view)
+			return newM, tea.Batch(tea.ClearScreen, cmd), true
+		}
 		m.screen = m.ctxPrevScreen
 		return m, tea.ClearScreen, true
 

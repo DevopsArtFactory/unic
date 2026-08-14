@@ -90,6 +90,9 @@ func (m Model) globalHelpShortcuts() []helpShortcut {
 	if m.screen != screenCommandPalette && !m.isTextEntryScreen() {
 		shortcuts = append(shortcuts, helpShortcut{"P", "Open the command palette"})
 	}
+	if m.screen != screenViewList && !m.isTextEntryScreen() {
+		shortcuts = append(shortcuts, helpShortcut{"V", "Open saved views"})
+	}
 	return shortcuts
 }
 
@@ -744,6 +747,21 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"esc", "Go back to the account list"},
 			{"q", "Cancel and return to the context picker"},
 		}
+	case screenViewList:
+		if m.views.naming {
+			return []helpShortcut{
+				{"type", "Enter a name for the current view"},
+				{"enter", "Save the view"},
+				{"esc", "Cancel saving"},
+			}
+		}
+		return []helpShortcut{
+			{"↑/↓, j/k", "Move between saved views"},
+			{"enter", "Apply the selected view"},
+			{"s", "Save the current feature, filter, and context as a view"},
+			{"d", "Delete the selected view"},
+			{"q / esc", "Go back"},
+		}
 	case screenCommandPalette:
 		return []helpShortcut{
 			{"type", "Fuzzy-search features, contexts, and resources"},
@@ -1010,6 +1028,8 @@ func (m Model) helpScreenTitle() string {
 		return "Resource Region Picker"
 	case screenCommandPalette:
 		return "Command Palette"
+	case screenViewList:
+		return "Saved Views"
 	case screenSettings:
 		return "Settings"
 	case screenLoading:
