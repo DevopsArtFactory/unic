@@ -15,9 +15,7 @@ type fieldDef struct {
 	required bool
 }
 
-// okta_saml stays out of the picker until its runtime credential exchange
-// lands (#85); its field definitions below are ready for that slice.
-var authTypes = []string{"sso", "credential", "console_login", "assume_role"}
+var authTypes = []string{"sso", "credential", "console_login", "assume_role", "okta_saml"}
 
 var fieldsByAuthType = map[string][]fieldDef{
 	"sso": {

@@ -7,18 +7,17 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"html"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"golang.org/x/net/html"
 	"golang.org/x/term"
 
 	"unic/internal/config"
@@ -38,7 +37,6 @@ var (
 	stsAssumeRoleWithSAMLFn  = stsAssumeRoleWithSAML
 	cachedOktaSessionFn      = awsservice.CachedOktaSAMLSession
 	saveOktaSessionFn        = awsservice.SaveOktaSAMLSession
-	samlResponseInputPattern = regexp.MustCompile(`name="SAMLResponse"[^>]*value="([^"]+)"`)
 )
 
 // OktaSAMLRole is one AWS role/principal pair carried in the SAML assertion.
@@ -208,11 +206,48 @@ func oktaFetchSAMLAssertion(ctx context.Context, client *http.Client, orgURL, ap
 		return "", err
 	}
 
-	match := samlResponseInputPattern.FindSubmatch(page)
-	if match == nil {
+	assertion, ok := samlResponseFromHTML(page)
+	if !ok {
 		return "", fmt.Errorf("no SAMLResponse found in the okta app response; check okta_app_id")
 	}
-	return html.UnescapeString(string(match[1])), nil
+	return assertion, nil
+}
+
+// samlResponseFromHTML tokenizes the auto-submit form and returns the value of
+// the input named SAMLResponse. Tokenizing keeps the extraction independent of
+// attribute order, quoting style, and incidental markup changes.
+func samlResponseFromHTML(page []byte) (string, bool) {
+	tokenizer := html.NewTokenizer(bytes.NewReader(page))
+	for {
+		tokenType := tokenizer.Next()
+		if tokenType == html.ErrorToken {
+			return "", false
+		}
+		if tokenType != html.StartTagToken && tokenType != html.SelfClosingTagToken {
+			continue
+		}
+		name, hasAttr := tokenizer.TagName()
+		if string(name) != "input" || !hasAttr {
+			continue
+		}
+		var isSAMLResponse bool
+		var value string
+		for {
+			key, val, more := tokenizer.TagAttr()
+			switch string(key) {
+			case "name":
+				isSAMLResponse = string(val) == "SAMLResponse"
+			case "value":
+				value = string(val)
+			}
+			if !more {
+				break
+			}
+		}
+		if isSAMLResponse && value != "" {
+			return value, true
+		}
+	}
 }
 
 // parseSAMLRoles extracts the AWS role/principal pairs from a base64 SAML assertion.
