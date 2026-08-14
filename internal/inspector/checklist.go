@@ -320,44 +320,69 @@ func (c Checklist) validate() error {
 	return nil
 }
 
+// lazyCache memoizes a single fetch: the first Get runs fetch once, and every
+// later Get returns the same value and error without refetching.
+type lazyCache[T any] struct {
+	done  bool
+	value T
+	err   error
+}
+
+func (l *lazyCache[T]) Get(fetch func() (T, error)) (T, error) {
+	if !l.done {
+		l.done = true
+		l.value, l.err = fetch()
+	}
+	return l.value, l.err
+}
+
+type rdsIndex struct {
+	byID map[string]RDSInstance
+}
+
+type hostedZoneIndex struct {
+	byID   map[string]HostedZone
+	byName map[string][]HostedZone
+}
+
+type vpcIndex struct {
+	byID   map[string]VPC
+	byName map[string][]VPC
+}
+
+type subnetIndex struct {
+	byID   map[string]Subnet
+	byName map[string][]Subnet
+	byVPC  map[string][]Subnet
+}
+
+type logGroupIndex struct {
+	byName map[string]LogGroup
+	byARN  map[string]LogGroup
+}
+
+type securityGroupIndex struct {
+	byID   map[string]SecurityGroup
+	byName map[string][]SecurityGroup
+}
+
+type secretIndex struct {
+	byName map[string]Secret
+	byARN  map[string]Secret
+}
+
 type checklistRunner struct {
 	repo *AwsRepository
 
-	rdsLoaded bool
-	rdsErr    error
-	rdsByID   map[string]RDSInstance
+	rds            lazyCache[rdsIndex]
+	hostedZones    lazyCache[hostedZoneIndex]
+	vpcs           lazyCache[vpcIndex]
+	subnets        lazyCache[subnetIndex]
+	logGroups      lazyCache[logGroupIndex]
+	securityGroups lazyCache[securityGroupIndex]
+	secrets        lazyCache[secretIndex]
 
-	hostedZonesLoaded bool
-	hostedZonesErr    error
-	hostedZonesByID   map[string]HostedZone
-	hostedZonesByName map[string][]HostedZone
-	zoneRecords       map[string][]DNSRecord
-
-	vpcsLoaded bool
-	vpcsErr    error
-	vpcsByID   map[string]VPC
-	vpcsByName map[string][]VPC
-
-	subnetsLoaded bool
-	subnetsErr    error
-	subnetsByID   map[string]Subnet
-	subnetsByName map[string][]Subnet
-	subnetsByVPC  map[string][]Subnet
-
-	logGroupsLoaded bool
-	logGroupsErr    error
-	logGroupsByName map[string]LogGroup
-	logGroupsByARN  map[string]LogGroup
-
-	securityGroupsLoaded bool
-	securityGroupsErr    error
-	securityGroupsByID   map[string]SecurityGroup
-	securityGroupsByName map[string][]SecurityGroup
-
-	secretsLoaded bool
-	secretsErr    error
-	secretsByName map[string]Secret
-	secretsByARN  map[string]Secret
+	zoneRecords   map[string][]DNSRecord
 	secretDetails map[string]*SecretDetail
 }
 
@@ -664,29 +689,30 @@ func (r *checklistRunner) runBaselineCheck(
 }
 
 func (r *checklistRunner) findHostedZone(ctx context.Context, resource string) (*HostedZone, error) {
-	if !r.hostedZonesLoaded {
-		r.hostedZonesLoaded = true
+	index, err := r.hostedZones.Get(func() (hostedZoneIndex, error) {
 		zones, err := r.repo.ListHostedZones(ctx)
 		if err != nil {
-			r.hostedZonesErr = fmt.Errorf("failed to list hosted zones: %w", err)
-		} else {
-			r.hostedZonesByID = make(map[string]HostedZone, len(zones))
-			r.hostedZonesByName = make(map[string][]HostedZone)
-			for _, zone := range zones {
-				r.hostedZonesByID[normalizedHostedZoneIDKey(zone.ID)] = zone
-				key := normalizedDNSNameKey(zone.Name)
-				r.hostedZonesByName[key] = append(r.hostedZonesByName[key], zone)
-			}
+			return hostedZoneIndex{}, fmt.Errorf("failed to list hosted zones: %w", err)
 		}
-	}
-	if r.hostedZonesErr != nil {
-		return nil, r.hostedZonesErr
+		index := hostedZoneIndex{
+			byID:   make(map[string]HostedZone, len(zones)),
+			byName: make(map[string][]HostedZone),
+		}
+		for _, zone := range zones {
+			index.byID[normalizedHostedZoneIDKey(zone.ID)] = zone
+			key := normalizedDNSNameKey(zone.Name)
+			index.byName[key] = append(index.byName[key], zone)
+		}
+		return index, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	if zone, ok := r.hostedZonesByID[normalizedHostedZoneIDKey(resource)]; ok {
+	if zone, ok := index.byID[normalizedHostedZoneIDKey(resource)]; ok {
 		return &zone, nil
 	}
-	nameMatches := r.hostedZonesByName[normalizedDNSNameKey(resource)]
+	nameMatches := index.byName[normalizedDNSNameKey(resource)]
 	if len(nameMatches) == 1 {
 		return &nameMatches[0], nil
 	}
@@ -776,38 +802,35 @@ func (r *checklistRunner) findRoute53Record(ctx context.Context, zoneResource, r
 	}
 }
 
-func (r *checklistRunner) loadVPCs(ctx context.Context) error {
-	if r.vpcsLoaded {
-		return r.vpcsErr
-	}
-	r.vpcsLoaded = true
-
-	vpcs, err := r.repo.ListVPCs(ctx)
-	if err != nil {
-		r.vpcsErr = fmt.Errorf("failed to list VPCs: %w", err)
-		return r.vpcsErr
-	}
-
-	r.vpcsByID = make(map[string]VPC, len(vpcs))
-	r.vpcsByName = make(map[string][]VPC)
-	for _, vpc := range vpcs {
-		r.vpcsByID[normalizedChecklistKey(vpc.VPCID)] = vpc
-		key := normalizedChecklistKey(vpc.Name)
-		r.vpcsByName[key] = append(r.vpcsByName[key], vpc)
-	}
-
-	return nil
+func (r *checklistRunner) loadVPCs(ctx context.Context) (vpcIndex, error) {
+	return r.vpcs.Get(func() (vpcIndex, error) {
+		vpcs, err := r.repo.ListVPCs(ctx)
+		if err != nil {
+			return vpcIndex{}, fmt.Errorf("failed to list VPCs: %w", err)
+		}
+		index := vpcIndex{
+			byID:   make(map[string]VPC, len(vpcs)),
+			byName: make(map[string][]VPC),
+		}
+		for _, vpc := range vpcs {
+			index.byID[normalizedChecklistKey(vpc.VPCID)] = vpc
+			key := normalizedChecklistKey(vpc.Name)
+			index.byName[key] = append(index.byName[key], vpc)
+		}
+		return index, nil
+	})
 }
 
 func (r *checklistRunner) findVPC(ctx context.Context, resource string) (*VPC, error) {
-	if err := r.loadVPCs(ctx); err != nil {
+	index, err := r.loadVPCs(ctx)
+	if err != nil {
 		return nil, err
 	}
 
-	if vpc, ok := r.vpcsByID[normalizedChecklistKey(resource)]; ok {
+	if vpc, ok := index.byID[normalizedChecklistKey(resource)]; ok {
 		return &vpc, nil
 	}
-	nameMatches := r.vpcsByName[normalizedChecklistKey(resource)]
+	nameMatches := index.byName[normalizedChecklistKey(resource)]
 	if len(nameMatches) == 1 {
 		return &nameMatches[0], nil
 	}
@@ -821,49 +844,48 @@ func (r *checklistRunner) findVPC(ctx context.Context, resource string) (*VPC, e
 	return nil, fmt.Errorf("VPC %q was not found", resource)
 }
 
-func (r *checklistRunner) loadSubnets(ctx context.Context) error {
-	if r.subnetsLoaded {
-		return r.subnetsErr
-	}
-	r.subnetsLoaded = true
-
-	if err := r.loadVPCs(ctx); err != nil {
-		r.subnetsErr = err
-		return r.subnetsErr
-	}
-
-	r.subnetsByID = make(map[string]Subnet)
-	r.subnetsByName = make(map[string][]Subnet)
-	r.subnetsByVPC = make(map[string][]Subnet)
-	for _, vpc := range r.vpcsByID {
-		subnets, err := r.repo.ListSubnets(ctx, vpc.VPCID)
+func (r *checklistRunner) loadSubnets(ctx context.Context) (subnetIndex, error) {
+	return r.subnets.Get(func() (subnetIndex, error) {
+		vpcs, err := r.loadVPCs(ctx)
 		if err != nil {
-			r.subnetsErr = fmt.Errorf("failed to list subnets for VPC %s: %w", vpc.VPCID, err)
-			return r.subnetsErr
+			return subnetIndex{}, err
 		}
-		for _, subnet := range subnets {
-			if subnet.VPCID == "" {
-				subnet.VPCID = vpc.VPCID
-			}
-			r.subnetsByID[normalizedChecklistKey(subnet.SubnetID)] = subnet
-			r.subnetsByName[normalizedChecklistKey(subnet.Name)] = append(r.subnetsByName[normalizedChecklistKey(subnet.Name)], subnet)
-			key := normalizedChecklistKey(subnet.VPCID)
-			r.subnetsByVPC[key] = append(r.subnetsByVPC[key], subnet)
-		}
-	}
 
-	return nil
+		index := subnetIndex{
+			byID:   make(map[string]Subnet),
+			byName: make(map[string][]Subnet),
+			byVPC:  make(map[string][]Subnet),
+		}
+		for _, vpc := range vpcs.byID {
+			subnets, err := r.repo.ListSubnets(ctx, vpc.VPCID)
+			if err != nil {
+				return subnetIndex{}, fmt.Errorf("failed to list subnets for VPC %s: %w", vpc.VPCID, err)
+			}
+			for _, subnet := range subnets {
+				if subnet.VPCID == "" {
+					subnet.VPCID = vpc.VPCID
+				}
+				index.byID[normalizedChecklistKey(subnet.SubnetID)] = subnet
+				index.byName[normalizedChecklistKey(subnet.Name)] = append(index.byName[normalizedChecklistKey(subnet.Name)], subnet)
+				key := normalizedChecklistKey(subnet.VPCID)
+				index.byVPC[key] = append(index.byVPC[key], subnet)
+			}
+		}
+		return index, nil
+	})
 }
 
 func (r *checklistRunner) subnetsForVPC(ctx context.Context, vpcID string) ([]Subnet, error) {
-	if err := r.loadSubnets(ctx); err != nil {
+	index, err := r.loadSubnets(ctx)
+	if err != nil {
 		return nil, err
 	}
-	return append([]Subnet(nil), r.subnetsByVPC[normalizedChecklistKey(vpcID)]...), nil
+	return append([]Subnet(nil), index.byVPC[normalizedChecklistKey(vpcID)]...), nil
 }
 
 func (r *checklistRunner) findSubnet(ctx context.Context, resource, vpcResource string) (*Subnet, error) {
-	if err := r.loadSubnets(ctx); err != nil {
+	index, err := r.loadSubnets(ctx)
+	if err != nil {
 		return nil, err
 	}
 
@@ -876,14 +898,14 @@ func (r *checklistRunner) findSubnet(ctx context.Context, resource, vpcResource 
 		expectedVPCID = vpc.VPCID
 	}
 
-	if subnet, ok := r.subnetsByID[normalizedChecklistKey(resource)]; ok {
+	if subnet, ok := index.byID[normalizedChecklistKey(resource)]; ok {
 		if expectedVPCID != "" && normalizedChecklistKey(subnet.VPCID) != normalizedChecklistKey(expectedVPCID) {
 			return nil, fmt.Errorf("subnet %q is in VPC %s, not %s", resource, subnet.VPCID, expectedVPCID)
 		}
 		return &subnet, nil
 	}
 
-	nameMatches := r.subnetsByName[normalizedChecklistKey(resource)]
+	nameMatches := index.byName[normalizedChecklistKey(resource)]
 	filtered := make([]Subnet, 0, len(nameMatches))
 	for _, subnet := range nameMatches {
 		if expectedVPCID == "" || normalizedChecklistKey(subnet.VPCID) == normalizedChecklistKey(expectedVPCID) {
@@ -907,51 +929,51 @@ func (r *checklistRunner) findSubnet(ctx context.Context, resource, vpcResource 
 }
 
 func (r *checklistRunner) findLogGroup(ctx context.Context, resource string) (*LogGroup, error) {
-	if !r.logGroupsLoaded {
-		r.logGroupsLoaded = true
+	index, err := r.logGroups.Get(func() (logGroupIndex, error) {
 		groups, err := r.repo.ListLogGroups(ctx)
 		if err != nil {
-			r.logGroupsErr = fmt.Errorf("failed to list CloudWatch log groups: %w", err)
-		} else {
-			r.logGroupsByName = make(map[string]LogGroup, len(groups))
-			r.logGroupsByARN = make(map[string]LogGroup, len(groups))
-			for _, group := range groups {
-				r.logGroupsByName[normalizedChecklistKey(group.Name)] = group
-				r.logGroupsByARN[normalizedChecklistKey(group.ARN)] = group
-			}
+			return logGroupIndex{}, fmt.Errorf("failed to list CloudWatch log groups: %w", err)
 		}
-	}
-	if r.logGroupsErr != nil {
-		return nil, r.logGroupsErr
+		index := logGroupIndex{
+			byName: make(map[string]LogGroup, len(groups)),
+			byARN:  make(map[string]LogGroup, len(groups)),
+		}
+		for _, group := range groups {
+			index.byName[normalizedChecklistKey(group.Name)] = group
+			index.byARN[normalizedChecklistKey(group.ARN)] = group
+		}
+		return index, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	if group, ok := r.logGroupsByName[normalizedChecklistKey(resource)]; ok {
+	if group, ok := index.byName[normalizedChecklistKey(resource)]; ok {
 		return &group, nil
 	}
-	if group, ok := r.logGroupsByARN[normalizedChecklistKey(resource)]; ok {
+	if group, ok := index.byARN[normalizedChecklistKey(resource)]; ok {
 		return &group, nil
 	}
 	return nil, fmt.Errorf("CloudWatch log group %q was not found", resource)
 }
 
 func (r *checklistRunner) findRDSInstance(ctx context.Context, resource string) (*RDSInstance, error) {
-	if !r.rdsLoaded {
-		r.rdsLoaded = true
+	index, err := r.rds.Get(func() (rdsIndex, error) {
 		instances, err := r.repo.ListDBInstances(ctx)
 		if err != nil {
-			r.rdsErr = fmt.Errorf("failed to list RDS instances: %w", err)
-		} else {
-			r.rdsByID = make(map[string]RDSInstance, len(instances))
-			for _, instance := range instances {
-				r.rdsByID[normalizedChecklistKey(instance.DBInstanceID)] = instance
-			}
+			return rdsIndex{}, fmt.Errorf("failed to list RDS instances: %w", err)
 		}
-	}
-	if r.rdsErr != nil {
-		return nil, r.rdsErr
+		index := rdsIndex{byID: make(map[string]RDSInstance, len(instances))}
+		for _, instance := range instances {
+			index.byID[normalizedChecklistKey(instance.DBInstanceID)] = instance
+		}
+		return index, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	instance, ok := r.rdsByID[normalizedChecklistKey(resource)]
+	instance, ok := index.byID[normalizedChecklistKey(resource)]
 	if !ok {
 		return nil, fmt.Errorf("RDS instance %q was not found", resource)
 	}
@@ -959,29 +981,30 @@ func (r *checklistRunner) findRDSInstance(ctx context.Context, resource string) 
 }
 
 func (r *checklistRunner) findSecurityGroup(ctx context.Context, resource string) (*SecurityGroup, error) {
-	if !r.securityGroupsLoaded {
-		r.securityGroupsLoaded = true
+	index, err := r.securityGroups.Get(func() (securityGroupIndex, error) {
 		groups, err := r.repo.ListSecurityGroups(ctx)
 		if err != nil {
-			r.securityGroupsErr = fmt.Errorf("failed to list security groups: %w", err)
-		} else {
-			r.securityGroupsByID = make(map[string]SecurityGroup, len(groups))
-			r.securityGroupsByName = make(map[string][]SecurityGroup)
-			for _, group := range groups {
-				r.securityGroupsByID[normalizedChecklistKey(group.GroupID)] = group
-				key := normalizedChecklistKey(group.Name)
-				r.securityGroupsByName[key] = append(r.securityGroupsByName[key], group)
-			}
+			return securityGroupIndex{}, fmt.Errorf("failed to list security groups: %w", err)
 		}
-	}
-	if r.securityGroupsErr != nil {
-		return nil, r.securityGroupsErr
+		index := securityGroupIndex{
+			byID:   make(map[string]SecurityGroup, len(groups)),
+			byName: make(map[string][]SecurityGroup),
+		}
+		for _, group := range groups {
+			index.byID[normalizedChecklistKey(group.GroupID)] = group
+			key := normalizedChecklistKey(group.Name)
+			index.byName[key] = append(index.byName[key], group)
+		}
+		return index, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	if group, ok := r.securityGroupsByID[normalizedChecklistKey(resource)]; ok {
+	if group, ok := index.byID[normalizedChecklistKey(resource)]; ok {
 		return &group, nil
 	}
-	nameMatches := r.securityGroupsByName[normalizedChecklistKey(resource)]
+	nameMatches := index.byName[normalizedChecklistKey(resource)]
 	if len(nameMatches) == 1 {
 		return &nameMatches[0], nil
 	}
@@ -996,28 +1019,29 @@ func (r *checklistRunner) findSecurityGroup(ctx context.Context, resource string
 }
 
 func (r *checklistRunner) findSecret(ctx context.Context, resource string) (*Secret, error) {
-	if !r.secretsLoaded {
-		r.secretsLoaded = true
+	index, err := r.secrets.Get(func() (secretIndex, error) {
 		secrets, err := r.repo.ListSecrets(ctx)
 		if err != nil {
-			r.secretsErr = fmt.Errorf("failed to list secrets: %w", err)
-		} else {
-			r.secretsByName = make(map[string]Secret, len(secrets))
-			r.secretsByARN = make(map[string]Secret, len(secrets))
-			for _, secret := range secrets {
-				r.secretsByName[normalizedChecklistKey(secret.Name)] = secret
-				r.secretsByARN[normalizedChecklistKey(secret.ARN)] = secret
-			}
+			return secretIndex{}, fmt.Errorf("failed to list secrets: %w", err)
 		}
-	}
-	if r.secretsErr != nil {
-		return nil, r.secretsErr
+		index := secretIndex{
+			byName: make(map[string]Secret, len(secrets)),
+			byARN:  make(map[string]Secret, len(secrets)),
+		}
+		for _, secret := range secrets {
+			index.byName[normalizedChecklistKey(secret.Name)] = secret
+			index.byARN[normalizedChecklistKey(secret.ARN)] = secret
+		}
+		return index, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	if secret, ok := r.secretsByName[normalizedChecklistKey(resource)]; ok {
+	if secret, ok := index.byName[normalizedChecklistKey(resource)]; ok {
 		return &secret, nil
 	}
-	if secret, ok := r.secretsByARN[normalizedChecklistKey(resource)]; ok {
+	if secret, ok := index.byARN[normalizedChecklistKey(resource)]; ok {
 		return &secret, nil
 	}
 	return nil, fmt.Errorf("secret %q was not found", resource)
