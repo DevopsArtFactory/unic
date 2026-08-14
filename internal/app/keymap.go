@@ -99,6 +99,31 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to the queue detail"},
 	},
 
+	screenELBList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between load balancers"},
+		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
+		{keys: "A", bar: "A: all regions", help: "Toggle all-regions load balancer scope",
+			when: func(m Model) bool { return m.hasMultipleRegions() }},
+		{keys: "r", bar: "r: refresh", help: "Refresh the load balancer list"},
+		{keys: "enter", bar: "enter: target groups", help: "Open the selected load balancer's target groups"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenELBTargetGroupList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between target groups"},
+		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
+		{keys: "r", bar: "r: refresh", help: "Refresh target health"},
+		{keys: "enter", bar: "enter: targets", help: "Open the selected target group's target health"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the load balancer list"},
+		{bar: "H: home"},
+	},
+	screenELBTargetList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between targets"},
+		{keys: "r", bar: "r: refresh", help: "Refresh target health"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the target group list"},
+		{bar: "H: home"},
+	},
+
 	screenIAMUserList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
 		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
