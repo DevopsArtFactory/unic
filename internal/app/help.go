@@ -951,6 +951,12 @@ func (m Model) helpScreenTitle() string {
 		return "FIS Experiment History"
 	case screenFISExperimentDetail:
 		return "FIS Experiment Detail"
+	case screenSQSQueueList:
+		return "SQS Queues"
+	case screenSQSQueueDetail:
+		return "SQS Queue Detail"
+	case screenSQSConfirm:
+		return "SQS Confirmation"
 	case screenS3BucketList:
 		return "S3 Buckets"
 	case screenS3ObjectList:

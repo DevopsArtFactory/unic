@@ -88,6 +88,9 @@ const (
 	screenFISTemplateDetail
 	screenFISExperimentList
 	screenFISExperimentDetail
+	screenSQSQueueList
+	screenSQSQueueDetail
+	screenSQSConfirm
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -175,6 +178,7 @@ type Model struct {
 	secrets      secretsModel
 	security     securityGroupModel
 	s3           s3Model
+	sqs          sqsModel
 	lambda       lambdaModel
 	inspector    inspectorModel
 
@@ -292,6 +296,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.secrets = newSecretsModel()
 	model.security = newSecurityGroupModel()
 	model.s3 = newS3Model()
+	model.sqs = newSQSModel()
 	model.lambda = newLambdaModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
@@ -445,6 +450,9 @@ func (m Model) isTextEntryScreen() bool {
 		return true
 	}
 	if m.screen == screenInspectorChecklistAdd && m.inspector.addStep > 0 {
+		return true
+	}
+	if m.screen == screenSQSConfirm {
 		return true
 	}
 	switch m.screen {
@@ -760,6 +768,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.cwLogs.Start(&m)
 	case domain.FeatureS3Browser:
 		return m.s3.Start(&m)
+	case domain.FeatureSQSBrowser:
+		return m.sqs.Start(&m)
 	case domain.FeatureSecurityGroupBrowser:
 		return m.security.Start(&m)
 	case domain.FeatureIAMUsersBrowser:

@@ -141,6 +141,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceSQS,
+			Features: []Feature{
+				{
+					Kind:        FeatureSQSBrowser,
+					Description: "Triage queue backlogs and dead-letter queues, with redrive and purge",
+				},
+			},
+		},
+		{
 			Name: ServiceLambda,
 			Features: []Feature{
 				{

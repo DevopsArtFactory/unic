@@ -33,6 +33,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureECRRepositoryBrowser:  filterECRRepositories,
 	domain.FeatureFISTemplateBrowser:    filterFISTemplates,
 	domain.FeatureS3Browser:             filterS3Buckets,
+	domain.FeatureSQSBrowser:            filterSQSQueues,
 	domain.FeatureLambdaBrowser:         filterLambdaFunctions,
 	domain.FeatureBedrockAPIKeys:        filterBedrockKeys,
 	domain.FeatureVPCBrowser:            filterVPCs,
