@@ -16,6 +16,7 @@ import (
 
 var assumeRoleFn = assumeRoleEnv
 var resolveSSORoleFn = resolveSSORoleEnv
+var resolveOktaSAMLSessionFn = ResolveOktaSAMLSession
 
 const ContextEnvVar = "UNIC_CONTEXT"
 
@@ -54,7 +55,18 @@ func BuildEnvExports(ctx context.Context, cfg *config.Config) (string, error) {
 		values["AWS_PROFILE"] = ""
 
 	case config.AuthTypeOktaSAML:
-		return "", fmt.Errorf("context %q uses okta_saml, whose runtime credential exchange is not implemented yet", cfg.ContextName)
+		session, err := resolveOktaSAMLSessionFn(ctx, cfg)
+		if err != nil {
+			return "", err
+		}
+		values = map[string]string{
+			"AWS_ACCESS_KEY_ID":     session.AccessKeyID,
+			"AWS_SECRET_ACCESS_KEY": session.SecretAccessKey,
+			"AWS_SESSION_TOKEN":     session.SessionToken,
+			"AWS_REGION":            cfg.Region,
+			"AWS_DEFAULT_REGION":    cfg.Region,
+			"AWS_PROFILE":           "",
+		}
 
 	case config.AuthTypeCredential, config.AuthTypeConsoleLogin, config.AuthTypeDefault:
 		if cfg.AuthType == config.AuthTypeConsoleLogin {

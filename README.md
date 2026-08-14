@@ -6,7 +6,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 ## What It Does
 
 - Browse AWS services from a single terminal UI
-- Switch between credential, assume-role, and SSO contexts
+- Switch between credential, assume-role, SSO, and Okta SAML contexts
 - Export shell environment variables for the active context
 - Drill down into resources with filters, detail views, and action screens
 - Open a context-aware keyboard shortcut help screen with `?`
@@ -209,6 +209,13 @@ contexts:
     profile: staging
     region: eu-west-1
     auth_type: credential
+
+  - name: okta-prod
+    region: ap-northeast-2
+    auth_type: okta_saml
+    okta_org_url: https://acme.okta.com
+    okta_app_id: amazon_aws/0oa1b2c3d4e5f6g7h8i9/272
+    role_arn: arn:aws:iam::123456789012:role/OktaAdmin   # required when the assertion carries multiple roles
 ```
 
 ### Auth Types
@@ -219,13 +226,35 @@ contexts:
 | `console_login` | Run `aws login` during `unic context setup`, then use the resulting profile-backed console credentials | `profile` |
 | `assume_role` | Assume a role from a base profile, optionally with MFA | `profile`, `role_arn`; optional `mfa_serial` |
 | `sso` | Use AWS IAM Identity Center / SSO, reusing a valid AWS CLI SSO cache and prompting for login only when needed | `sso_start_url`, and for concrete contexts `sso_account_id`, `sso_role_name`; `profile` is optional |
-| `okta_saml` | Okta SAML federation context (config schema only for now; runtime credential exchange is in progress and the TUI does not offer it in the add-context picker yet) | `okta_org_url`, `okta_app_id`; optional `role_arn` for a preferred role. Passwords and MFA secrets are never stored in config |
+| `okta_saml` | Okta SAML federation: `unic env` signs in to Okta (prompt on stderr, password without echo; `UNIC_OKTA_USERNAME`/`UNIC_OKTA_PASSWORD` for automation), exchanges the SAML assertion via `sts:AssumeRoleWithSAML`, and caches the session under `~/.config/unic/cache/okta-saml/`. The TUI reuses a valid cached session passively. Okta MFA challenges support TOTP codes and Okta Verify push in v1 | `okta_org_url`, `okta_app_id`; `role_arn` required when the assertion carries multiple roles. Passwords and MFA secrets are never stored |
 
 The preferred context format separates `auth` from `resources`. `auth.sso_region` controls IAM Identity Center login and role-credential retrieval. `resources.default_region` is selected at startup, and `resources.regions` lists additional regions available from the global `R` region picker. Switching regions reuses the current credentials and recreates only the regional AWS clients. The EC2 Instance Browser can additionally aggregate all configured regions into a single list with `A`.
 
 Legacy flat fields (`auth_type`, `profile`, `region`, `regions`, `sso_region`, and related auth fields) remain supported. A context without a region list behaves as a single-region context, and an omitted SSO region still falls back to its default resource region.
 
 TUI startup is passive for SSO contexts: it loads the context picker without launching `aws sso login`. SSO login is prompted when you explicitly select or set up an SSO context, or when an AWS-backed workflow needs credentials.
+
+### Okta SAML Contexts
+
+`okta_saml` contexts federate into AWS through an Okta AWS app:
+
+```bash
+# Sign in to Okta and export session credentials
+eval "$(unic env okta-prod)"
+
+# Non-interactive (CI or scripts)
+UNIC_OKTA_USERNAME=user@acme.com UNIC_OKTA_PASSWORD=... unic env okta-prod
+```
+
+Runtime flow: Okta primary authentication → optional MFA challenge → SAML assertion from the app embed link → `sts:AssumeRoleWithSAML` → session credentials cached under `~/.config/unic/cache/okta-saml/` until expiry. The TUI reuses a valid cached session passively and otherwise asks you to run `unic env <context>` first — it never prompts for Okta credentials itself.
+
+`okta_app_id` is the app-specific part of the Okta app embed link: for `https://acme.okta.com/home/amazon_aws/0oa1b2c3d4e5f6g7h8i9/272`, use `amazon_aws/0oa1b2c3d4e5f6g7h8i9/272`.
+
+v1 limitations:
+
+- MFA factors: TOTP (`token:software:totp`) and Okta Verify push only. TOTP is preferred when both are enrolled; push polls for approval with a 60s deadline. Other factors fail with a list of what was found.
+- Role selection is deterministic: `role_arn` wins, a single assertion role is auto-selected, and multiple roles without `role_arn` produce an explicit error listing the ARNs.
+- Passwords, one-time codes, and Okta session tokens are never persisted; only the exchanged AWS session credentials are cached (0600 files in a 0700 directory).
 
 Optional context fields:
 

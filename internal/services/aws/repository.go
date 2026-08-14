@@ -359,9 +359,24 @@ func NewAwsRepository(ctx context.Context, cfg *config.Config) (*AwsRepository, 
 		}
 
 	case config.AuthTypeOktaSAML:
-		// Schema-only for now: runtime credential exchange lands with the
-		// Okta SAML provider (#85).
-		return nil, fmt.Errorf("context %q uses okta_saml, whose runtime credential exchange is not implemented yet", cfg.ContextName)
+		// The TUI cannot prompt for Okta credentials: reuse the cached
+		// session written by the CLI flows, or fail with a pointer to them.
+		session, ok := CachedOktaSAMLSession(cfg)
+		if !ok {
+			return nil, fmt.Errorf(
+				"context %q has no valid Okta SAML session; run 'unic env %s' first to sign in to Okta",
+				cfg.ContextName, cfg.ContextName,
+			)
+		}
+		awsCfg, err = LoadBaseConfig(ctx, cfg.Region, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		}
+		awsCfg.Credentials = credentials.NewStaticCredentialsProvider(
+			session.AccessKeyID,
+			session.SecretAccessKey,
+			session.SessionToken,
+		)
 
 	default:
 		// Legacy / no auth_type — auto-detect from config fields.
