@@ -288,8 +288,23 @@ func (em *ecrModel) loadLoginCommands(m Model) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		return ecrLoginResolvedMsg{registryURI: registryURI, dockerCommand: docker, podmanCommand: podman}
+		return ecrLoginResolvedMsg{
+			registryURI:   registryURI,
+			dockerCommand: withContextEnv(m.cfg.ContextName, docker),
+			podmanCommand: withContextEnv(m.cfg.ContextName, podman),
+		}
 	}
+}
+
+// withContextEnv prefixes a copied command with the active context's shell
+// exports. The registry URI is resolved with the unic context's credentials,
+// but `aws ecr get-login-password` runs with the shell's ambient credentials —
+// without this prefix the copied command could log in to a different account.
+func withContextEnv(contextName, command string) string {
+	if contextName == "" {
+		return command
+	}
+	return fmt.Sprintf("eval \"$(unic env %s)\" && %s", contextName, command)
 }
 
 func (em ecrModel) viewLoginHelper(m Model) string {

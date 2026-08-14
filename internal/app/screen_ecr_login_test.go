@@ -57,3 +57,12 @@ func TestECRLoginHelperEscReturnsToFeatureList(t *testing.T) {
 		t.Fatalf("expected copy message to be cleared, got %q", m.ecr.copyMsg)
 	}
 }
+
+func TestECRLoginCommandsApplyContextEnv(t *testing.T) {
+	if got := withContextEnv("prod-admin", "aws ecr get-login-password | docker login ..."); !strings.HasPrefix(got, `eval "$(unic env prod-admin)" && aws ecr`) {
+		t.Fatalf("expected context env prefix, got %q", got)
+	}
+	if got := withContextEnv("", "aws ecr get-login-password | docker login ..."); strings.Contains(got, "unic env") {
+		t.Fatalf("expected no prefix without a context name, got %q", got)
+	}
+}
