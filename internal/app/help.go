@@ -229,6 +229,7 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		return listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
 	case screenRDSDetail:
 		shortcuts := []helpShortcut{
+			{"m", "Modify the instance class"},
 			{"r", "Refresh the selected instance status"},
 			{"q / esc", "Go back to the instance list"},
 		}
@@ -242,11 +243,21 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			shortcuts = append([]helpShortcut{{"f", "Trigger failover for the selected instance or cluster"}}, shortcuts...)
 		}
 		return shortcuts
+	case screenRDSClassPicker:
+		return listScreenShortcuts("choose the class and continue to confirmation", "go back to the instance detail", true, false)
 	case screenRDSConfirm:
 		if m.rds.action == "start" {
 			return []helpShortcut{
 				{"y / enter", "Confirm the start action"},
 				{"n / esc", "Cancel and return to the detail screen"},
+			}
+		}
+		if m.rds.action == "modify" {
+			return []helpShortcut{
+				{"type", "Enter the instance identifier to confirm"},
+				{"tab", "Toggle apply-immediately"},
+				{"enter", "Confirm the class modification"},
+				{"esc", "Go back to the class picker"},
 			}
 		}
 		target := "instance identifier"
@@ -845,6 +856,8 @@ func (m Model) helpScreenTitle() string {
 		return "RDS Instances"
 	case screenRDSDetail:
 		return "RDS Detail"
+	case screenRDSClassPicker:
+		return "RDS Instance Class Picker"
 	case screenRDSConfirm:
 		return "RDS Confirmation"
 	case screenRoute53ZoneList:
