@@ -148,7 +148,11 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 	case screenInstanceList:
 		return listScreenShortcuts("connect to the selected instance", "go back to the feature list", true, true)
 	case screenEC2InstanceBrowserList:
-		return listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
+		shortcuts := listScreenShortcuts("open the selected instance", "go back to the feature list", true, false)
+		if m.hasMultipleRegions() {
+			shortcuts = append(shortcuts, helpShortcut{"A", "Toggle all-regions instance scope"})
+		}
+		return shortcuts
 	case screenEC2InstanceBrowserDetail:
 		return []helpShortcut{
 			{"g", "Open attached security groups"},
