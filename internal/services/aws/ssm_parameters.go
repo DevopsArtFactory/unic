@@ -71,7 +71,8 @@ func (r *AwsRepository) ListParameters(ctx context.Context) ([]SSMParameter, err
 	}
 
 	sort.Slice(parameters, func(i, j int) bool {
-		return normalizedSortKey(parameters[i].Name) < normalizedSortKey(parameters[j].Name)
+		left, right := normalizedSortKey(parameters[i].Name), normalizedSortKey(parameters[j].Name)
+		return left < right || left == right && parameters[i].Name < parameters[j].Name
 	})
 	return parameters, nil
 }

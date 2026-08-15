@@ -41,11 +41,13 @@ func TestListParametersMapsAndSorts(t *testing.T) {
 			}
 			return &ssm.DescribeParametersOutput{
 				Parameters: []ssmtypes.ParameterMetadata{
+					{Name: aws.String("/App/Config")},
 					{
 						Name: aws.String("/app/dev/api-url"),
 						Type: ssmtypes.ParameterTypeString,
 						Tier: ssmtypes.ParameterTierStandard,
 					},
+					{Name: aws.String("/app/config")},
 				},
 			}, nil
 		},
@@ -56,13 +58,16 @@ func TestListParametersMapsAndSorts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(parameters) != 2 {
+	if len(parameters) != 4 {
 		t.Fatalf("expected parameters from both pages, got %d", len(parameters))
 	}
-	if parameters[0].Name != "/app/dev/api-url" || parameters[1].Name != "/app/prod/db-password" {
-		t.Fatalf("expected path-sorted order, got %s, %s", parameters[0].Name, parameters[1].Name)
+	wantNames := []string{"/App/Config", "/app/config", "/app/dev/api-url", "/app/prod/db-password"}
+	for i, want := range wantNames {
+		if parameters[i].Name != want {
+			t.Fatalf("expected path-sorted order %v, got %+v", wantNames, parameters)
+		}
 	}
-	secure := parameters[1]
+	secure := parameters[3]
 	if secure.Type != "SecureString" || !secure.IsSecure() || secure.Version != 3 || secure.KMSKeyID != "alias/app-key" {
 		t.Fatalf("unexpected mapping: %+v", secure)
 	}
