@@ -148,6 +148,8 @@ var screenKeymaps = map[screen][]keyBinding{
 		{bar: "H: home"},
 	},
 	screenACMCertificateDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll certificate details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll certificate details by one page"},
 		{keys: "q / esc", bar: "esc: back", help: "Go back to the certificate list"},
 		{bar: "H: home"},
 	},

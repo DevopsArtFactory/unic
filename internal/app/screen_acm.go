@@ -163,7 +163,7 @@ func (am acmModel) viewDetail(m Model) string {
 		b.WriteString(line)
 	}
 	b.WriteString("\n")
-	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
 }
 
