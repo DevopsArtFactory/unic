@@ -24,6 +24,7 @@ type ssmParamsModel struct {
 	revealed bool
 	value    string
 	notice   string
+	request  int
 }
 
 // ssmParamsCopyFn is swapped out in tests to observe copies without a real
@@ -35,6 +36,7 @@ func newSSMParamsModel() ssmParamsModel {
 }
 
 func (pm *ssmParamsModel) clearValue() {
+	pm.request++
 	pm.revealed = false
 	pm.value = ""
 	pm.notice = ""
@@ -54,7 +56,7 @@ func (pm *ssmParamsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.C
 		m.screen = screenSSMParamList
 		return *m, nil, true
 	case ssmParamValueLoadedMsg:
-		if pm.selected == nil || pm.selected.Name != msg.name {
+		if pm.selected == nil || pm.selected.Name != msg.name || pm.request != msg.request {
 			return *m, nil, true
 		}
 		if msg.copyOnly {
@@ -146,11 +148,13 @@ func (pm *ssmParamsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea
 		m.screen = screenSSMParamList
 	case "v":
 		if pm.selected != nil && !pm.revealed {
-			return m.startLoadingWithMessage("Fetching value...", []string{pm.selected.Name}, pm.loadValue(*m, pm.selected.Name, false))
+			pm.request++
+			return m.startLoadingWithMessage("Fetching value...", []string{pm.selected.Name}, pm.loadValue(*m, pm.selected.Name, false, pm.request))
 		}
 	case "y":
 		if pm.selected != nil {
-			return m.startLoadingWithMessage("Copying value...", []string{pm.selected.Name}, pm.loadValue(*m, pm.selected.Name, true))
+			pm.request++
+			return m.startLoadingWithMessage("Copying value...", []string{pm.selected.Name}, pm.loadValue(*m, pm.selected.Name, true, pm.request))
 		}
 	}
 	return *m, nil
@@ -174,7 +178,7 @@ func (pm ssmParamsModel) loadParameters(m Model) tea.Cmd {
 	}
 }
 
-func (pm ssmParamsModel) loadValue(m Model, name string, copyOnly bool) tea.Cmd {
+func (pm ssmParamsModel) loadValue(m Model, name string, copyOnly bool, request int) tea.Cmd {
 	return func() tea.Msg {
 		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -185,7 +189,7 @@ func (pm ssmParamsModel) loadValue(m Model, name string, copyOnly bool) tea.Cmd 
 		if err != nil {
 			return errMsg{err: err}
 		}
-		return ssmParamValueLoadedMsg{name: name, value: value, copyOnly: copyOnly}
+		return ssmParamValueLoadedMsg{name: name, value: value, copyOnly: copyOnly, request: request}
 	}
 }
 

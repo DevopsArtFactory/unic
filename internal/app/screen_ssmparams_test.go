@@ -69,7 +69,7 @@ func TestSSMParamRevealFetchesAndShowsValue(t *testing.T) {
 	m = newM.(Model)
 
 	// ...and the loaded message reveals it.
-	m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "s3cret"})
+	m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "s3cret", request: m.ssmParams.request})
 	view, _ := m.ssmParams.View(m)
 	if !strings.Contains(view, "s3cret") {
 		t.Fatalf("expected revealed value, got:\n%s", view)
@@ -111,7 +111,7 @@ func TestSSMParamCopyNeverRendersValue(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected y to start the copy fetch")
 	}
-	m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "s3cret", copyOnly: true})
+	m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "s3cret", copyOnly: true, request: m.ssmParams.request})
 	if copied != "s3cret" {
 		t.Fatalf("expected value copied to clipboard, got %q", copied)
 	}
@@ -185,5 +185,24 @@ func TestSSMParamPaletteCancelRestoresUsableDetail(t *testing.T) {
 	}
 	if m.ssmParams.revealed || m.ssmParams.value != "" || strings.Contains(view, "s3cret") {
 		t.Fatalf("expected restored detail to keep the value cleared, got %+v", m.ssmParams)
+	}
+}
+
+func TestSSMParamLateRevealDoesNotEscapePalette(t *testing.T) {
+	m := ssmParamsTestModel()
+	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+	m.ssmParams.idx = 1
+	m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	updated, _ := m.ssmParams.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	m = updated.(Model)
+	request := m.ssmParams.request
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	m = updated.(Model)
+
+	updated, _ = m.Update(ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "s3cret", request: request})
+	m = updated.(Model)
+	if m.screen != screenCommandPalette || m.ssmParams.revealed || m.ssmParams.value != "" {
+		t.Fatalf("expected late reveal to be ignored in palette, screen=%v state=%+v", m.screen, m.ssmParams)
 	}
 }

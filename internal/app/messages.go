@@ -216,6 +216,7 @@ type ssmParamValueLoadedMsg struct {
 	name     string
 	value    string
 	copyOnly bool
+	request  int
 }
 
 type s3BucketsLoadedMsg struct {
