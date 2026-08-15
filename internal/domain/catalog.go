@@ -168,6 +168,13 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceACM,
+			Features: []Feature{{
+				Kind:        FeatureACMCertificateBrowser,
+				Description: "Triage certificates by expiry, renewal eligibility, and usage",
+			}},
+		},
+		{
 			Name: ServiceLambda,
 			Features: []Feature{
 				{

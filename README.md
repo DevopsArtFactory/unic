@@ -312,6 +312,7 @@ Context ordering:
 | SQS | Queue Browser |
 | ELB | Load Balancer Browser |
 | SSM Parameter Store | Parameter Browser |
+| ACM | Certificate Browser |
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
 | Bedrock | API Key Manager |
@@ -443,6 +444,7 @@ checks:
 | SQS | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` detail, detail `d` jump to DLQ, `m` redrive DLQ (type-to-confirm), `x` purge (type-to-confirm) |
 | ELB | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` target groups, target group list `Enter` per-target health |
 | Parameter Store | `/` filter, `r` refresh, `Enter` detail, detail `v` reveal value (decrypts SecureString), `y` copy value without revealing |
+| ACM Certificates | `/` filter, `r` refresh, `Enter` certificate detail |
 | Lambda | `A` toggle all-regions scope (multi-region contexts), `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
 The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context; results stream in as they load, per-service failures are shown inline, and matching covers names, IDs, and ARNs where available. Selecting a resource jumps to the owning browser with the shared filter prefilled to that resource.
@@ -462,6 +464,8 @@ The SQS Queue Browser is a backlog-first triage view: queues list deepest-backlo
 The Load Balancer Browser is a target-health-first triage view: the load balancer list (name, type, scheme, state, with `A` toggling an all-regions scope) drills into the balancer's target groups sorted unhealthiest first with per-group healthy/unhealthy/other counts, and one more `Enter` opens per-target health with unhealthy targets first, showing reason codes (e.g. `Target.Timeout`) and descriptions. Rows loaded through the all-regions scope drill into their own region.
 
 The Parameter Store Browser lists parameter metadata (hierarchical path, type, tier, last-modified) with the shared filter matching path segments. Values are never fetched or rendered implicitly: parameter detail shows metadata with the value hidden, `v` explicitly fetches and reveals it (decrypting SecureString), and `y` fetches and copies the value straight to the clipboard without ever printing it to the terminal.
+
+The ACM Certificate Browser sorts certificates by soonest expiry and shows status, days remaining, in-use count, renewal eligibility, domains/SANs, validation state, and attached resource ARNs. Security Inspector reports certificates expiring within 30 days, with certificates at seven days or less raised as high severity.
 
 The CloudTrail Event Lookup answers "who changed what, and when": recent API events list newest-first with mutations marked `*`, actor, call, and source service per row. Keys `1`-`5` switch the time window (1h/6h/24h/3d/7d), `m` restricts to mutations (server-side via the `ReadOnly=false` lookup attribute), and `n` runs a server-side resource-name lookup — CloudTrail accepts one lookup attribute per call, so combining both applies the mutations restriction client-side. Results are capped at 100 events per query, so narrow the window or use the resource lookup when a busy account truncates. Event detail shows actor, source, region, source IP, touched resources, and the full raw event JSON with scrolling.
 

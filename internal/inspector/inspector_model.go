@@ -61,6 +61,7 @@ func (w Workflow) StatusLabel() string {
 
 type AwsRepository = awsservice.AwsRepository
 type AccessKey = awsservice.AccessKey
+type ACMClientAPI = awsservice.ACMClientAPI
 type CloudTrailClientAPI = awsservice.CloudTrailClientAPI
 type CloudWatchLogsClientAPI = awsservice.CloudWatchLogsClientAPI
 type ConfigServiceClientAPI = awsservice.ConfigServiceClientAPI
