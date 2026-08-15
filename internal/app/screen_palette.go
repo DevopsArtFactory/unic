@@ -57,6 +57,25 @@ type paletteModel struct {
 	// a newer session's results.
 	generation   int
 	crossContext bool
+	indexCtx     context.Context
+	cancelIndex  context.CancelFunc
+}
+
+func (pm *paletteModel) restartIndex(ctx context.Context) {
+	if pm.cancelIndex != nil {
+		pm.cancelIndex()
+	}
+	pm.indexCtx, pm.cancelIndex = context.WithCancel(ctx)
+	pm.indexing = true
+	pm.generation++
+}
+
+func (pm *paletteModel) stopIndex() {
+	if pm.cancelIndex != nil {
+		pm.cancelIndex()
+	}
+	pm.cancelIndex = nil
+	pm.indexCtx = nil
 }
 
 var (
@@ -73,8 +92,7 @@ func (m Model) openPalette() (tea.Model, tea.Cmd) {
 	m.palette.idx = 0
 	m.palette.resources = nil
 	m.palette.indexErrs = nil
-	m.palette.indexing = true
-	m.palette.generation++
+	m.palette.restartIndex(m.commandContext())
 
 	var static []paletteItem
 	for _, svc := range domain.Catalog() {
@@ -123,11 +141,11 @@ func (m Model) updatePalette(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.palette.crossContext = !m.palette.crossContext
 		m.palette.resources = nil
 		m.palette.indexErrs = nil
-		m.palette.indexing = true
-		m.palette.generation++
+		m.palette.restartIndex(m.commandContext())
 		m.palette.refilter()
 		return m, m.indexPaletteResources()
 	case "esc":
+		m.palette.stopIndex()
 		if m.palette.prevScreen == screenLoading && m.ssmParams.loading {
 			return m.ssmParams.Start(&m)
 		}
@@ -160,6 +178,7 @@ func (m Model) updatePalette(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) executePaletteItem(item paletteItem) (tea.Model, tea.Cmd) {
+	m.palette.stopIndex()
 	switch item.kind {
 	case paletteItemContext:
 		return m.startLoading(m.switchContext(item.contextName))
@@ -226,8 +245,8 @@ func (m Model) indexPaletteResources() tea.Cmd {
 	}
 	configPath := m.configPath
 	generation := m.palette.generation
+	ctx := m.palette.indexCtx
 	return func() tea.Msg {
-		ctx := m.commandContext()
 		results := make([][]paletteItem, len(targets))
 		errs := make([][]string, len(targets))
 		sem := make(chan struct{}, 3)
@@ -236,7 +255,11 @@ func (m Model) indexPaletteResources() tea.Cmd {
 			wg.Add(1)
 			go func(i int, target paletteIndexTarget) {
 				defer wg.Done()
-				sem <- struct{}{}
+				select {
+				case sem <- struct{}{}:
+				case <-ctx.Done():
+					return
+				}
 				defer func() { <-sem }()
 				cfg := target.cfg
 				var err error

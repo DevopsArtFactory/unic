@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -226,6 +227,42 @@ func TestPaletteCrossContextIndexIncludesSyncedContextsAndFailures(t *testing.T)
 	}
 	if got := strings.Join(m.palette.indexErrs, "\n"); !strings.Contains(got, "prod-admin/eu-west-1: access denied") {
 		t.Fatalf("expected synced-context failure, got %q", got)
+	}
+}
+
+func TestPaletteScopeToggleCancelsSupersededIndex(t *testing.T) {
+	originalIndex := paletteIndexContextFn
+	t.Cleanup(func() { paletteIndexContextFn = originalIndex })
+
+	started := make(chan struct{})
+	canceled := make(chan struct{})
+	paletteIndexContextFn = func(ctx context.Context, _ *config.Config, _ string) ([]paletteItem, []string) {
+		close(started)
+		<-ctx.Done()
+		close(canceled)
+		return nil, nil
+	}
+
+	m := paletteTestModel()
+	updated, firstCmd := m.openPalette()
+	m = updated.(Model)
+	firstDone := make(chan struct{})
+	go func() {
+		firstCmd()
+		close(firstDone)
+	}()
+	<-started
+
+	next, replacementCmd := m.updatePalette(tea.KeyMsg{Type: tea.KeyTab})
+	m = next.(Model)
+	select {
+	case <-canceled:
+	case <-time.After(time.Second):
+		t.Fatal("expected scope toggle to cancel the superseded index")
+	}
+	<-firstDone
+	if replacementCmd == nil || m.palette.indexCtx == nil {
+		t.Fatal("expected a replacement index with a fresh context")
 	}
 }
 
