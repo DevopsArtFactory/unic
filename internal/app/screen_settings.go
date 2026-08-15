@@ -28,10 +28,9 @@ func (m Model) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		if m.settingsPrevScreen == 0 || m.settingsPrevScreen == screenSettings {
-			m.screen = screenContextPicker
-		} else {
-			m.screen = m.settingsPrevScreen
+			return m.restoreScreenAfterOverlay(screenContextPicker)
 		}
+		return m.restoreScreenAfterOverlay(m.settingsPrevScreen)
 	case "up", "k":
 		m.settingsIdx = previousListIndex(m.settingsIdx, len(items))
 	case "down", "j":

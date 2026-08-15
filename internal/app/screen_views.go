@@ -131,7 +131,7 @@ func (m Model) updateViews(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "q", "esc":
-		m.screen = m.views.prevScreen
+		return m.restoreScreenAfterOverlay(m.views.prevScreen)
 	case "up", "k":
 		m.views.idx = previousListIndex(m.views.idx, len(m.views.views))
 	case "down", "j":
