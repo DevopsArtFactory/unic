@@ -76,6 +76,23 @@ func TestSSMParamRevealFetchesAndShowsValue(t *testing.T) {
 	}
 }
 
+func TestSSMParamRevealEscapesTerminalControlSequences(t *testing.T) {
+	m := ssmParamsTestModel()
+	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+	m.ssmParams.idx = 1
+	m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	value := "safe\x1b[31mred\x1b]52;c;payload\a"
+	m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: value})
+	view, _ := m.ssmParams.View(m)
+	if strings.Contains(view, "\x1b") || strings.Contains(view, "\a") {
+		t.Fatalf("revealed value must not contain active terminal controls: %q", view)
+	}
+	if !strings.Contains(view, `\x1b[31m`) || !strings.Contains(view, `\x1b]52;c;payload\a`) {
+		t.Fatalf("expected terminal controls to be visibly escaped: %q", view)
+	}
+}
+
 func TestSSMParamCopyNeverRendersValue(t *testing.T) {
 	m := ssmParamsTestModel()
 	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
@@ -129,5 +146,23 @@ func TestSSMParamBackClearsRevealedValue(t *testing.T) {
 	m.ssmParams.updateDetail(&m, tea.KeyMsg{Type: tea.KeyEsc})
 	if m.ssmParams.revealed || m.ssmParams.value != "" || m.ssmParams.selected != nil {
 		t.Fatalf("expected esc to clear the revealed value, got %+v", m.ssmParams)
+	}
+}
+
+func TestSSMParamGlobalNavigationClearsRevealedValue(t *testing.T) {
+	for _, key := range []string{"H", "C", "P"} {
+		t.Run(key, func(t *testing.T) {
+			m := ssmParamsTestModel()
+			m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+			m.ssmParams.idx = 1
+			m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+			m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "s3cret"})
+
+			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+			m = updated.(Model)
+			if m.ssmParams.revealed || m.ssmParams.value != "" || m.ssmParams.selected != nil {
+				t.Fatalf("expected %s navigation to clear revealed value, got %+v", key, m.ssmParams)
+			}
+		})
 	}
 }

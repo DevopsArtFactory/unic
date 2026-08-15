@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -31,6 +32,13 @@ var ssmParamsCopyFn = clipboard.Copy
 
 func newSSMParamsModel() ssmParamsModel {
 	return ssmParamsModel{}
+}
+
+func (pm *ssmParamsModel) clearValue() {
+	pm.selected = nil
+	pm.revealed = false
+	pm.value = ""
+	pm.notice = ""
 }
 
 func (pm *ssmParamsModel) Start(m *Model) (tea.Model, tea.Cmd) {
@@ -134,10 +142,7 @@ func (pm *ssmParamsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.C
 func (pm *ssmParamsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
-		pm.selected = nil
-		pm.revealed = false
-		pm.value = ""
-		pm.notice = ""
+		pm.clearValue()
 		m.screen = screenSSMParamList
 	case "v":
 		if pm.selected != nil && !pm.revealed {
@@ -263,7 +268,7 @@ func (pm ssmParamsModel) viewDetail(m Model) string {
 	b.WriteString(titleStyle.Render("Value"))
 	b.WriteString("\n")
 	if pm.revealed {
-		b.WriteString(normalStyle.Render("  " + pm.value))
+		b.WriteString(normalStyle.Render("  " + strconv.QuoteToGraphic(pm.value)))
 		b.WriteString("\n")
 	} else {
 		hidden := "  (hidden — press v to reveal, y to copy without revealing)"
