@@ -114,6 +114,10 @@ func (m Model) updatePalette(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.palette.prevScreen == screenLoading && m.ssmParams.loading {
 			return m.ssmParams.Start(&m)
 		}
+		if m.palette.prevScreen == screenLoading && m.ssmParams.selected != nil {
+			m.screen = screenSSMParamDetail
+			return m, nil
+		}
 		m.screen = m.palette.prevScreen
 	case "up":
 		m.palette.idx = previousListIndex(m.palette.idx, len(m.palette.filtered))

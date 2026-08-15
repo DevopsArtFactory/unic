@@ -310,6 +310,32 @@ func TestSSMParamPaletteCancelRestartsInitialLoad(t *testing.T) {
 	}
 }
 
+func TestSSMParamPaletteCancelDuringValueLoadRestoresDetail(t *testing.T) {
+	for _, key := range []rune{'v', 'y'} {
+		t.Run(string(key), func(t *testing.T) {
+			m := ssmParamsTestModel()
+			m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+			m.ssmParams.idx = 1
+			m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+
+			updated, _ := m.ssmParams.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{key}})
+			m = updated.(Model)
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+			m = updated.(Model)
+			updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = updated.(Model)
+
+			view, ok := m.ssmParams.View(m)
+			if m.screen != screenSSMParamDetail || cmd != nil || !ok || !strings.Contains(view, "/app/prod/db-password") {
+				t.Fatalf("expected palette cancel to restore hidden parameter detail, screen=%v view=%q", m.screen, view)
+			}
+			if m.ssmParams.revealed || m.ssmParams.value != "" {
+				t.Fatalf("expected restored detail to keep the value hidden, got %+v", m.ssmParams)
+			}
+		})
+	}
+}
+
 func TestSSMParamLateListFailureDoesNotEscapePalette(t *testing.T) {
 	m := ssmParamsTestModel()
 	m.ssmParams.request++
