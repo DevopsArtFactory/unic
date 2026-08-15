@@ -32,6 +32,10 @@ func TestListCertificatesMapsAndSortsByExpiry(t *testing.T) {
 			if in.Includes == nil || len(in.Includes.KeyTypes) != 7 {
 				t.Fatalf("expected all supported key types, got %+v", in.Includes)
 			}
+			origins := in.CertificateKeyPairOrigins
+			if len(origins) != 3 || origins[0] != acmtypes.CertificateKeyPairOriginAwsManaged || origins[1] != acmtypes.CertificateKeyPairOriginAcme || origins[2] != acmtypes.CertificateKeyPairOriginCustomerProvided {
+				t.Fatalf("expected all supported certificate origins, got %+v", origins)
+			}
 			return &acm.ListCertificatesOutput{CertificateSummaryList: []acmtypes.CertificateSummary{
 				{CertificateArn: awssdk.String("late")}, {CertificateArn: awssdk.String("soon")},
 			}}, nil

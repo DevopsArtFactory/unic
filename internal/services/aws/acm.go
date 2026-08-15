@@ -65,6 +65,11 @@ func (r *AwsRepository) ListCertificates(ctx context.Context) ([]ACMCertificate,
 	for {
 		out, err := r.ACMClient.ListCertificates(ctx, &acm.ListCertificatesInput{
 			NextToken: nextToken,
+			CertificateKeyPairOrigins: []acmtypes.CertificateKeyPairOrigin{
+				acmtypes.CertificateKeyPairOriginAwsManaged,
+				acmtypes.CertificateKeyPairOriginAcme,
+				acmtypes.CertificateKeyPairOriginCustomerProvided,
+			},
 			Includes: &acmtypes.Filters{KeyTypes: []acmtypes.KeyAlgorithm{
 				acmtypes.KeyAlgorithmRsa1024, acmtypes.KeyAlgorithmRsa2048, acmtypes.KeyAlgorithmRsa3072, acmtypes.KeyAlgorithmRsa4096,
 				acmtypes.KeyAlgorithmEcPrime256v1, acmtypes.KeyAlgorithmEcSecp384r1, acmtypes.KeyAlgorithmEcSecp521r1,
