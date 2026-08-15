@@ -590,7 +590,7 @@ func escapeTerminalControls(value string) string {
 }
 
 func (m Model) renderEC2StyledDetailLineWithLabelWidth(label, renderedValue string, labelWidth int) string {
-	label = truncateEC2DetailValue(label, labelWidth)
+	label = truncateEC2DetailValue(escapeTerminalControls(label), labelWidth)
 	padding := labelWidth - lipgloss.Width(label)
 	if padding < 0 {
 		padding = 0

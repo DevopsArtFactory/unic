@@ -89,6 +89,25 @@ func TestCloudTrailDetailShowsEnvelopeAndRawEvent(t *testing.T) {
 	}
 }
 
+func TestCloudTrailDetailEscapesTerminalControlsInResourceLabels(t *testing.T) {
+	m := cloudTrailTestModel()
+	events := testCloudTrailEvents()
+	events[0].Resources = []awsservice.CloudTrailEventResource{{
+		Type: "x\x1b[31m\x1b]x\a",
+		Name: "resource",
+	}}
+	m.cloudTrail.HandleMessage(&m, cloudTrailEventsLoadedMsg{events: events})
+	m.cloudTrail.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	view, _ := m.cloudTrail.View(m)
+	if strings.Contains(view, "\x1b") || strings.Contains(view, "\a") {
+		t.Fatalf("resource label must not contain active terminal controls: %q", view)
+	}
+	if !strings.Contains(view, `x\x1b[31m\x1b]x\a`) {
+		t.Fatalf("expected terminal controls to be visibly escaped: %q", view)
+	}
+}
+
 func TestCloudTrailCancelAndExitTransitions(t *testing.T) {
 	m := cloudTrailTestModel()
 	m.cloudTrail.HandleMessage(&m, cloudTrailEventsLoadedMsg{events: testCloudTrailEvents()})
