@@ -276,3 +276,19 @@ func TestSSMParamLateFailureDoesNotEscapePalette(t *testing.T) {
 		t.Fatalf("expected late failure to be ignored in palette, screen=%v error=%q", m.screen, m.errMsg)
 	}
 }
+
+func TestSSMParamLateListDoesNotEscapePalette(t *testing.T) {
+	m := ssmParamsTestModel()
+	m.ssmParams.request++
+	request := m.ssmParams.request
+	m.screen = screenLoading
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	m = updated.(Model)
+	updated, _ = m.Update(ssmParametersLoadedMsg{parameters: testParameters(), request: request})
+	m = updated.(Model)
+
+	if m.screen != screenCommandPalette || len(m.ssmParams.items) != 0 {
+		t.Fatalf("expected late list response to be ignored in palette, screen=%v items=%d", m.screen, len(m.ssmParams.items))
+	}
+}

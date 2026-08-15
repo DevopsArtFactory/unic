@@ -210,6 +210,7 @@ type elbTargetGroupsLoadedMsg struct {
 
 type ssmParametersLoadedMsg struct {
 	parameters []awsservice.SSMParameter
+	request    int
 }
 
 type ssmParamValueLoadedMsg struct {

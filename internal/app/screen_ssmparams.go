@@ -44,12 +44,16 @@ func (pm *ssmParamsModel) clearValue() {
 }
 
 func (pm *ssmParamsModel) Start(m *Model) (tea.Model, tea.Cmd) {
-	return m.startLoading(pm.loadParameters(*m))
+	pm.request++
+	return m.startLoading(pm.loadParameters(*m, pm.request))
 }
 
 func (pm *ssmParamsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case ssmParametersLoadedMsg:
+		if pm.request != msg.request {
+			return *m, nil, true
+		}
 		pm.items = msg.parameters
 		pm.filtered = applyFilter(pm.items, m.filterValue(filterSSMParameters))
 		pm.idx = 0
@@ -133,7 +137,8 @@ func (pm *ssmParamsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.C
 		return *m, m.activateFilter(filterSSMParameters)
 	case "r":
 		m.resetFilter(filterSSMParameters)
-		return m.startLoading(pm.loadParameters(*m))
+		pm.request++
+		return m.startLoading(pm.loadParameters(*m, pm.request))
 	case "enter":
 		if len(pm.filtered) > 0 && pm.idx < len(pm.filtered) {
 			selected := pm.filtered[pm.idx]
@@ -167,7 +172,7 @@ func (pm *ssmParamsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea
 	return *m, nil
 }
 
-func (pm ssmParamsModel) loadParameters(m Model) tea.Cmd {
+func (pm ssmParamsModel) loadParameters(m Model, request int) tea.Cmd {
 	return func() tea.Msg {
 		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -178,7 +183,7 @@ func (pm ssmParamsModel) loadParameters(m Model) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		return ssmParametersLoadedMsg{parameters: parameters}
+		return ssmParametersLoadedMsg{parameters: parameters, request: request}
 	}
 }
 
