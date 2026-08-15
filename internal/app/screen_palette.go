@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"unic/internal/config"
 	"unic/internal/domain"
 	awsservice "unic/internal/services/aws"
 )
@@ -53,8 +55,15 @@ type paletteModel struct {
 	// carry the generation they were started for, so a slow index from an
 	// earlier open (possibly under a different context) can never overwrite
 	// a newer session's results.
-	generation int
+	generation   int
+	crossContext bool
 }
+
+var (
+	paletteLoadNamedContextFn = config.LoadNamedContext
+	paletteNewRepositoryFn    = awsservice.NewAwsRepository
+	paletteIndexContextFn     = indexPaletteContext
+)
 
 // openPalette builds the instantly-available items (features, contexts) and
 // starts the async resource index for the current context.
@@ -110,6 +119,14 @@ func (pm *paletteModel) refilter() {
 
 func (m Model) updatePalette(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "tab":
+		m.palette.crossContext = !m.palette.crossContext
+		m.palette.resources = nil
+		m.palette.indexErrs = nil
+		m.palette.indexing = true
+		m.palette.generation++
+		m.palette.refilter()
+		return m, m.indexPaletteResources()
 	case "esc":
 		if m.palette.prevScreen == screenLoading && m.ssmParams.loading {
 			return m.ssmParams.Start(&m)
@@ -147,6 +164,16 @@ func (m Model) executePaletteItem(item paletteItem) (tea.Model, tea.Cmd) {
 	case paletteItemContext:
 		return m.startLoading(m.switchContext(item.contextName))
 	case paletteItemFeature, paletteItemResource:
+		if item.kind == paletteItemResource && item.contextName != "" && item.contextName != m.cfg.ContextName {
+			m.pendingView = &config.ViewEntry{
+				Context: item.contextName,
+				Service: string(item.service),
+				Feature: string(item.feature),
+				Filter:  item.resourceKey,
+			}
+			m.ctxPrevScreen = screenServiceList
+			return m.startLoading(m.switchContext(item.contextName))
+		}
 		m.enterServiceForPalette(item)
 		if item.kind == paletteItemResource && item.filterTarget != filterNone {
 			// Prefill the browser's shared filter so the target resource is
@@ -188,122 +215,176 @@ func (m *Model) enterServiceForPalette(item paletteItem) {
 // indexPaletteResources lists resources across services concurrently. Per-
 // service failures surface as notes without hiding other services' results.
 func (m Model) indexPaletteResources() tea.Cmd {
-	cfg := m.cfg
+	targets := []paletteIndexTarget{{name: m.cfg.ContextName, cfg: m.cfg}}
+	if m.palette.crossContext {
+		for _, info := range m.ctxList {
+			if info.Name == m.cfg.ContextName || info.SyncSource == "" {
+				continue
+			}
+			targets = append(targets, paletteIndexTarget{name: info.Name})
+		}
+	}
+	configPath := m.configPath
 	generation := m.palette.generation
 	return func() tea.Msg {
 		ctx := m.commandContext()
-		repo, err := awsservice.NewAwsRepository(ctx, cfg)
-		if err != nil {
-			return paletteResourcesIndexedMsg{generation: generation, errs: []string{err.Error()}}
-		}
-
-		type source struct {
-			name  string
-			fetch func() ([]paletteItem, error)
-		}
-		sources := []source{
-			{"EC2", func() ([]paletteItem, error) {
-				instances, err := repo.ListEC2Instances(ctx)
-				if err != nil {
-					return nil, err
-				}
-				items := make([]paletteItem, 0, len(instances))
-				for _, inst := range instances {
-					items = append(items, paletteResourceItem("EC2", inst.DisplayTitle(), inst.FilterText(),
-						domain.FeatureEC2InstanceBrowser, domain.ServiceEC2, filterEC2BrowserInstances, inst.InstanceID))
-				}
-				return items, nil
-			}},
-			{"RDS", func() ([]paletteItem, error) {
-				instances, err := repo.ListDBInstances(ctx)
-				if err != nil {
-					return nil, err
-				}
-				items := make([]paletteItem, 0, len(instances))
-				for _, inst := range instances {
-					items = append(items, paletteResourceItem("RDS", inst.DisplayTitle(), inst.FilterText(),
-						domain.FeatureRDSBrowser, domain.ServiceRDS, filterRDS, inst.DBInstanceID))
-				}
-				return items, nil
-			}},
-			{"Lambda", func() ([]paletteItem, error) {
-				functions, err := repo.ListFunctions(ctx)
-				if err != nil {
-					return nil, err
-				}
-				items := make([]paletteItem, 0, len(functions))
-				for _, fn := range functions {
-					items = append(items, paletteResourceItem("Lambda", fn.DisplayTitle(), fn.FilterText(),
-						domain.FeatureLambdaBrowser, domain.ServiceLambda, filterLambdaFunctions, fn.Name))
-				}
-				return items, nil
-			}},
-			{"S3", func() ([]paletteItem, error) {
-				buckets, err := repo.ListBuckets(ctx)
-				if err != nil {
-					return nil, err
-				}
-				items := make([]paletteItem, 0, len(buckets))
-				for _, bucket := range buckets {
-					items = append(items, paletteResourceItem("S3", bucket.DisplayTitle(), bucket.FilterText(),
-						domain.FeatureS3Browser, domain.ServiceS3, filterS3Buckets, bucket.Name))
-				}
-				return items, nil
-			}},
-			{"ECS", func() ([]paletteItem, error) {
-				clusters, err := repo.ListClusters(ctx)
-				if err != nil {
-					return nil, err
-				}
-				items := make([]paletteItem, 0, len(clusters))
-				for _, cluster := range clusters {
-					items = append(items, paletteResourceItem("ECS", cluster.DisplayTitle(), cluster.FilterText(),
-						domain.FeatureECSExec, domain.ServiceECS, filterECSClusters, cluster.Name))
-				}
-				return items, nil
-			}},
-			{"Route53", func() ([]paletteItem, error) {
-				zones, err := repo.ListHostedZones(ctx)
-				if err != nil {
-					return nil, err
-				}
-				items := make([]paletteItem, 0, len(zones))
-				for _, zone := range zones {
-					items = append(items, paletteResourceItem("Route53", zone.DisplayTitle(), zone.FilterText(),
-						domain.FeatureRoute53Browser, domain.ServiceRoute53, filterRoute53Zones, zone.Name))
-				}
-				return items, nil
-			}},
-		}
-
-		results := make([][]paletteItem, len(sources))
-		errs := make([]string, len(sources))
+		results := make([][]paletteItem, len(targets))
+		errs := make([][]string, len(targets))
+		sem := make(chan struct{}, 3)
 		var wg sync.WaitGroup
-		for i, src := range sources {
+		for i, target := range targets {
 			wg.Add(1)
-			go func(i int, src source) {
+			go func(i int, target paletteIndexTarget) {
 				defer wg.Done()
-				items, err := src.fetch()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				cfg := target.cfg
+				var err error
+				if cfg == nil {
+					cfg, err = paletteLoadNamedContextFn(configPath, target.name)
+				}
 				if err != nil {
-					errs[i] = fmt.Sprintf("%s: %v", src.name, err)
+					errs[i] = []string{fmt.Sprintf("%s: %v", target.name, err)}
 					return
 				}
-				results[i] = items
-			}(i, src)
+				results[i], errs[i] = paletteIndexContextFn(ctx, cfg, target.name)
+			}(i, target)
 		}
 		wg.Wait()
 
 		var items []paletteItem
 		var failures []string
-		for i := range sources {
+		for i := range targets {
 			items = append(items, results[i]...)
-			if errs[i] != "" {
-				failures = append(failures, errs[i])
-			}
+			failures = append(failures, errs[i]...)
 		}
 		sort.SliceStable(items, func(i, j int) bool { return items[i].label < items[j].label })
 		return paletteResourcesIndexedMsg{generation: generation, items: items, errs: failures}
 	}
+}
+
+type paletteIndexTarget struct {
+	name string
+	cfg  *config.Config
+}
+
+func indexPaletteContext(ctx context.Context, cfg *config.Config, contextName string) ([]paletteItem, []string) {
+	repo, err := paletteNewRepositoryFn(ctx, cfg)
+	if err != nil {
+		return nil, []string{fmt.Sprintf("%s: %v", contextName, err)}
+	}
+
+	type source struct {
+		name  string
+		fetch func() ([]paletteItem, error)
+	}
+	sources := []source{
+		{"EC2", func() ([]paletteItem, error) {
+			instances, err := repo.ListEC2Instances(ctx)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]paletteItem, 0, len(instances))
+			for _, inst := range instances {
+				items = append(items, paletteResourceItem("EC2", inst.DisplayTitle(), inst.FilterText(),
+					domain.FeatureEC2InstanceBrowser, domain.ServiceEC2, filterEC2BrowserInstances, inst.InstanceID))
+			}
+			return items, nil
+		}},
+		{"RDS", func() ([]paletteItem, error) {
+			instances, err := repo.ListDBInstances(ctx)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]paletteItem, 0, len(instances))
+			for _, inst := range instances {
+				items = append(items, paletteResourceItem("RDS", inst.DisplayTitle(), inst.FilterText(),
+					domain.FeatureRDSBrowser, domain.ServiceRDS, filterRDS, inst.DBInstanceID))
+			}
+			return items, nil
+		}},
+		{"Lambda", func() ([]paletteItem, error) {
+			functions, err := repo.ListFunctions(ctx)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]paletteItem, 0, len(functions))
+			for _, fn := range functions {
+				items = append(items, paletteResourceItem("Lambda", fn.DisplayTitle(), fn.FilterText(),
+					domain.FeatureLambdaBrowser, domain.ServiceLambda, filterLambdaFunctions, fn.Name))
+			}
+			return items, nil
+		}},
+		{"S3", func() ([]paletteItem, error) {
+			buckets, err := repo.ListBuckets(ctx)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]paletteItem, 0, len(buckets))
+			for _, bucket := range buckets {
+				items = append(items, paletteResourceItem("S3", bucket.DisplayTitle(), bucket.FilterText(),
+					domain.FeatureS3Browser, domain.ServiceS3, filterS3Buckets, bucket.Name))
+			}
+			return items, nil
+		}},
+		{"ECS", func() ([]paletteItem, error) {
+			clusters, err := repo.ListClusters(ctx)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]paletteItem, 0, len(clusters))
+			for _, cluster := range clusters {
+				items = append(items, paletteResourceItem("ECS", cluster.DisplayTitle(), cluster.FilterText(),
+					domain.FeatureECSExec, domain.ServiceECS, filterECSClusters, cluster.Name))
+			}
+			return items, nil
+		}},
+		{"Route53", func() ([]paletteItem, error) {
+			zones, err := repo.ListHostedZones(ctx)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]paletteItem, 0, len(zones))
+			for _, zone := range zones {
+				items = append(items, paletteResourceItem("Route53", zone.DisplayTitle(), zone.FilterText(),
+					domain.FeatureRoute53Browser, domain.ServiceRoute53, filterRoute53Zones, zone.Name))
+			}
+			return items, nil
+		}},
+	}
+
+	results := make([][]paletteItem, len(sources))
+	errs := make([]string, len(sources))
+	var wg sync.WaitGroup
+	for i, src := range sources {
+		wg.Add(1)
+		go func(i int, src source) {
+			defer wg.Done()
+			items, err := src.fetch()
+			if err != nil {
+				errs[i] = fmt.Sprintf("%s: %v", src.name, err)
+				return
+			}
+			for j := range items {
+				items[j].contextName = contextName
+				items[j].label = fmt.Sprintf("%-10s [%s/%s] %s", src.name, contextName, cfg.Region, strings.TrimSpace(items[j].label[10:]))
+				items[j].filterText += " " + contextName + " " + cfg.Region
+			}
+			results[i] = items
+		}(i, src)
+	}
+	wg.Wait()
+
+	var items []paletteItem
+	var failures []string
+	for i := range sources {
+		items = append(items, results[i]...)
+		if errs[i] != "" {
+			failures = append(failures, fmt.Sprintf("%s/%s: %s", contextName, cfg.Region, errs[i]))
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].label < items[j].label })
+	return items, failures
 }
 
 func paletteResourceItem(typeLabel, title, filterText string, feature domain.FeatureKind, service domain.AwsService, target filterTarget, key string) paletteItem {
@@ -327,7 +408,11 @@ func (m Model) viewPalette() string {
 	b.WriteString(filterStyle.Render(fmt.Sprintf("  > %s▏", m.palette.query)))
 	b.WriteString("\n")
 	if m.palette.indexing {
-		b.WriteString(dimStyle.Render("  Indexing resources across services..."))
+		scope := "current context"
+		if m.palette.crossContext {
+			scope = "synced contexts"
+		}
+		b.WriteString(dimStyle.Render("  Indexing resources across " + scope + "..."))
 		b.WriteString("\n")
 	}
 	for _, indexErr := range m.palette.indexErrs {
@@ -363,6 +448,6 @@ func (m Model) viewPalette() string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("type: search • ↑/↓: navigate • enter: jump • esc: close"))
+	b.WriteString(m.renderHelpBar("type: search • ↑/↓: navigate • tab: toggle context scope • enter: jump • esc: close"))
 	return b.String()
 }
