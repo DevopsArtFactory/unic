@@ -37,7 +37,7 @@ func (c ACMCertificate) DaysToExpiry(now time.Time) int {
 	if c.NotAfter.IsZero() {
 		return 0
 	}
-	return int(math.Ceil(c.NotAfter.Sub(now).Hours() / 24))
+	return max(int(math.Ceil(c.NotAfter.Sub(now).Hours()/24)), 0)
 }
 
 // DisplayTitle returns a column-aligned certificate row.

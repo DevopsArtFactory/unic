@@ -61,3 +61,11 @@ func TestListCertificatesMapsAndSortsByExpiry(t *testing.T) {
 		t.Fatalf("unexpected mapping: %+v", soon)
 	}
 }
+
+func TestCertificateDaysToExpiryClampsExpiredCertificate(t *testing.T) {
+	now := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
+	certificate := ACMCertificate{NotAfter: now.Add(-24 * time.Hour)}
+	if got := certificate.DaysToExpiry(now); got != 0 {
+		t.Fatalf("expected expired certificate to report zero days, got %d", got)
+	}
+}
