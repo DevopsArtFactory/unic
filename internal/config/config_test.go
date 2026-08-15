@@ -69,6 +69,20 @@ func TestFallsBackToHardcodedDefaultsWhenNothingSet(t *testing.T) {
 	if cfg.Region != "us-east-1" {
 		t.Errorf("expected region 'us-east-1', got '%s'", cfg.Region)
 	}
+	if cfg.ACMExpiryWindowDays != 30 {
+		t.Errorf("expected default ACM expiry window of 30 days, got %d", cfg.ACMExpiryWindowDays)
+	}
+}
+
+func TestLoadReadsACMExpiryWindow(t *testing.T) {
+	path := writeUnicConfig(t, t.TempDir(), "inspector:\n  acm_expiry_window_days: 60\n")
+	cfg, err := Load(nil, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ACMExpiryWindowDays != 60 {
+		t.Fatalf("expected ACM expiry window of 60 days, got %d", cfg.ACMExpiryWindowDays)
+	}
 }
 
 func TestPartialConfigFillsMissingWithDefaults(t *testing.T) {
