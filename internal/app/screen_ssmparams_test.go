@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -27,14 +28,18 @@ func testParameters() []awsservice.SSMParameter {
 
 func TestSSMParametersLoadedOpensList(t *testing.T) {
 	m := ssmParamsTestModel()
+	parameters := testParameters()
+	parameters[0].LastModified = time.Date(2026, 8, 1, 12, 34, 0, 0, time.UTC)
 
-	_, _, handled := m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+	_, _, handled := m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: parameters})
 	if !handled || m.screen != screenSSMParamList {
 		t.Fatalf("expected parameter list screen, got %v", m.screen)
 	}
 	view, ok := m.ssmParams.View(m)
-	if !ok || !strings.Contains(view, "/app/dev/api-url") || !strings.Contains(view, "SecureString") {
-		t.Fatalf("expected parameter rows with type column, got:\n%s", view)
+	for _, want := range []string{"PATH", "TYPE", "TIER", "LAST MODIFIED", "/app/dev/api-url", "SecureString", "2026-08-01 12:34"} {
+		if !ok || !strings.Contains(view, want) {
+			t.Fatalf("expected aligned parameter table containing %q, got:\n%s", want, view)
+		}
 	}
 }
 

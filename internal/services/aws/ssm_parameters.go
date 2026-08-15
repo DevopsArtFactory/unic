@@ -29,15 +29,6 @@ type SSMParameter struct {
 // IsSecure reports whether the parameter is an encrypted SecureString.
 func (p SSMParameter) IsSecure() bool { return p.Type == "SecureString" }
 
-// DisplayTitle returns a formatted string for list display.
-func (p SSMParameter) DisplayTitle() string {
-	modified := "-"
-	if !p.LastModified.IsZero() {
-		modified = p.LastModified.Format("2006-01-02 15:04")
-	}
-	return fmt.Sprintf("%-56.56s %-13s %-17s %s", p.Name, p.Type, p.Tier, modified)
-}
-
 // FilterText returns a lowercase string for keyword matching. Names are
 // hierarchical paths (/app/env/key), so path segments match naturally.
 func (p SSMParameter) FilterText() string {

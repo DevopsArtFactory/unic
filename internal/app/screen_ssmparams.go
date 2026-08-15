@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"unic/internal/clipboard"
 	awsservice "unic/internal/services/aws"
@@ -212,7 +213,13 @@ func (pm ssmParamsModel) viewList(m Model) string {
 		panel.WriteString(dimStyle.Render(emptyText))
 		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-10, 5)
+		pathCol := lipgloss.NewStyle().Width(56).MaxWidth(56)
+		typeCol := lipgloss.NewStyle().Width(13).MaxWidth(13)
+		tierCol := lipgloss.NewStyle().Width(17).MaxWidth(17)
+		panel.WriteString(dimStyle.Render("  " + pathCol.Render("PATH") + " " + typeCol.Render("TYPE") + " " + tierCol.Render("TIER") + " LAST MODIFIED"))
+		panel.WriteString("\n")
+
+		visibleLines := max(m.height-11, 5)
 		start := 0
 		if pm.idx >= visibleLines {
 			start = pm.idx - visibleLines + 1
@@ -220,13 +227,18 @@ func (pm ssmParamsModel) viewList(m Model) string {
 		end := min(start+visibleLines, len(pm.filtered))
 		for i := start; i < end; i++ {
 			param := pm.filtered[i]
+			modified := "-"
+			if !param.LastModified.IsZero() {
+				modified = param.LastModified.Format("2006-01-02 15:04")
+			}
+			row := pathCol.Render(param.Name) + " " + typeCol.Render(param.Type) + " " + tierCol.Render(param.Tier) + " " + modified
 			cursor := "  "
 			style := normalStyle
 			if i == pm.idx {
 				cursor = "> "
 				style = selectedStyle
 			}
-			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSSMParameters, param.DisplayTitle())))
+			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSSMParameters, row)))
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
