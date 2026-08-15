@@ -156,6 +156,25 @@ func TestSSMParamCopyNeverRendersValue(t *testing.T) {
 	}
 }
 
+func TestSSMParamCopyClearsPreviouslyRevealedValue(t *testing.T) {
+	m := ssmParamsTestModel()
+	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+	m.ssmParams.idx = 1
+	m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "old", request: m.ssmParams.request})
+
+	origCopy := ssmParamsCopyFn
+	ssmParamsCopyFn = func(string) error { return nil }
+	defer func() { ssmParamsCopyFn = origCopy }()
+
+	m.ssmParams.request++
+	m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "new", copyOnly: true, request: m.ssmParams.request})
+	view, _ := m.ssmParams.View(m)
+	if m.ssmParams.revealed || m.ssmParams.value != "" || strings.Contains(view, "old") {
+		t.Fatalf("expected copy to clear the stale revealed value, got %+v view=%q", m.ssmParams, view)
+	}
+}
+
 func TestSSMParamValueLoadIgnoresStaleSelection(t *testing.T) {
 	m := ssmParamsTestModel()
 	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})

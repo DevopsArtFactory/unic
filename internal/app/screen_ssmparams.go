@@ -67,6 +67,7 @@ func (pm *ssmParamsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.C
 		}
 		if msg.copyOnly {
 			// The value goes straight to the clipboard, never the screen.
+			pm.clearValue()
 			if err := ssmParamsCopyFn(msg.value); err != nil {
 				pm.notice = fmt.Sprintf("Copy failed: %v", err)
 			} else {
