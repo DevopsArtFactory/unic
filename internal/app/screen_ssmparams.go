@@ -26,6 +26,7 @@ type ssmParamsModel struct {
 	value    string
 	notice   string
 	request  int
+	loading  bool
 }
 
 // ssmParamsCopyFn is swapped out in tests to observe copies without a real
@@ -45,6 +46,7 @@ func (pm *ssmParamsModel) clearValue() {
 
 func (pm *ssmParamsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	pm.request++
+	pm.loading = true
 	return m.startLoading(pm.loadParameters(*m, pm.request))
 }
 
@@ -53,6 +55,11 @@ func (pm *ssmParamsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.C
 	case ssmParametersLoadedMsg:
 		if pm.request != msg.request {
 			return *m, nil, true
+		}
+		pm.loading = false
+		if msg.err != nil {
+			newM, cmd := m.Update(errMsg{err: msg.err})
+			return newM, cmd, true
 		}
 		pm.items = msg.parameters
 		pm.filtered = applyFilter(pm.items, m.filterValue(filterSSMParameters))
@@ -138,6 +145,7 @@ func (pm *ssmParamsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.C
 	case "r":
 		m.resetFilter(filterSSMParameters)
 		pm.request++
+		pm.loading = true
 		return m.startLoading(pm.loadParameters(*m, pm.request))
 	case "enter":
 		if len(pm.filtered) > 0 && pm.idx < len(pm.filtered) {
@@ -177,11 +185,11 @@ func (pm ssmParamsModel) loadParameters(m Model, request int) tea.Cmd {
 		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
-			return errMsg{err: err}
+			return ssmParametersLoadedMsg{request: request, err: err}
 		}
 		parameters, err := repo.ListParameters(ctx)
 		if err != nil {
-			return errMsg{err: err}
+			return ssmParametersLoadedMsg{request: request, err: err}
 		}
 		return ssmParametersLoadedMsg{parameters: parameters, request: request}
 	}

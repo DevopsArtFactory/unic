@@ -280,6 +280,7 @@ func TestSSMParamLateFailureDoesNotEscapePalette(t *testing.T) {
 func TestSSMParamLateListDoesNotEscapePalette(t *testing.T) {
 	m := ssmParamsTestModel()
 	m.ssmParams.request++
+	m.ssmParams.loading = true
 	request := m.ssmParams.request
 	m.screen = screenLoading
 
@@ -290,5 +291,38 @@ func TestSSMParamLateListDoesNotEscapePalette(t *testing.T) {
 
 	if m.screen != screenCommandPalette || len(m.ssmParams.items) != 0 {
 		t.Fatalf("expected late list response to be ignored in palette, screen=%v items=%d", m.screen, len(m.ssmParams.items))
+	}
+}
+
+func TestSSMParamPaletteCancelRestartsInitialLoad(t *testing.T) {
+	m := ssmParamsTestModel()
+	m.ssmParams.request++
+	m.ssmParams.loading = true
+	m.screen = screenLoading
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+
+	if m.screen != screenLoading || cmd == nil || !m.ssmParams.loading {
+		t.Fatalf("expected palette cancel to restart the parameter load, screen=%v loading=%v", m.screen, m.ssmParams.loading)
+	}
+}
+
+func TestSSMParamLateListFailureDoesNotEscapePalette(t *testing.T) {
+	m := ssmParamsTestModel()
+	m.ssmParams.request++
+	m.ssmParams.loading = true
+	request := m.ssmParams.request
+	m.screen = screenLoading
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	m = updated.(Model)
+	updated, _ = m.Update(ssmParametersLoadedMsg{request: request, err: errors.New("list failed")})
+	m = updated.(Model)
+
+	if m.screen != screenCommandPalette || m.errMsg != "" {
+		t.Fatalf("expected late list failure to be ignored in palette, screen=%v error=%q", m.screen, m.errMsg)
 	}
 }

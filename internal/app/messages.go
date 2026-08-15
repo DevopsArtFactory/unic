@@ -211,6 +211,7 @@ type elbTargetGroupsLoadedMsg struct {
 type ssmParametersLoadedMsg struct {
 	parameters []awsservice.SSMParameter
 	request    int
+	err        error
 }
 
 type ssmParamValueLoadedMsg struct {
