@@ -59,6 +59,11 @@ func (pm *ssmParamsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.C
 		if pm.selected == nil || pm.selected.Name != msg.name || pm.request != msg.request {
 			return *m, nil, true
 		}
+		if msg.err != nil {
+			pm.clearValue()
+			newM, cmd := m.Update(errMsg{err: msg.err})
+			return newM, cmd, true
+		}
 		if msg.copyOnly {
 			// The value goes straight to the clipboard, never the screen.
 			if err := ssmParamsCopyFn(msg.value); err != nil {
@@ -183,11 +188,11 @@ func (pm ssmParamsModel) loadValue(m Model, name string, copyOnly bool, request 
 		ctx := m.commandContext()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
 		if err != nil {
-			return errMsg{err: err}
+			return ssmParamValueLoadedMsg{name: name, request: request, err: err}
 		}
 		value, err := repo.GetParameterValue(ctx, name)
 		if err != nil {
-			return errMsg{err: err}
+			return ssmParamValueLoadedMsg{name: name, request: request, err: err}
 		}
 		return ssmParamValueLoadedMsg{name: name, value: value, copyOnly: copyOnly, request: request}
 	}

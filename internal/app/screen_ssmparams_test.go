@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -204,5 +205,24 @@ func TestSSMParamLateRevealDoesNotEscapePalette(t *testing.T) {
 	m = updated.(Model)
 	if m.screen != screenCommandPalette || m.ssmParams.revealed || m.ssmParams.value != "" {
 		t.Fatalf("expected late reveal to be ignored in palette, screen=%v state=%+v", m.screen, m.ssmParams)
+	}
+}
+
+func TestSSMParamLateFailureDoesNotEscapePalette(t *testing.T) {
+	m := ssmParamsTestModel()
+	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+	m.ssmParams.idx = 1
+	m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	updated, _ := m.ssmParams.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	m = updated.(Model)
+	request := m.ssmParams.request
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	m = updated.(Model)
+
+	updated, _ = m.Update(ssmParamValueLoadedMsg{name: "/app/prod/db-password", request: request, err: errors.New("fetch failed")})
+	m = updated.(Model)
+	if m.screen != screenCommandPalette || m.errMsg != "" {
+		t.Fatalf("expected late failure to be ignored in palette, screen=%v error=%q", m.screen, m.errMsg)
 	}
 }
