@@ -296,9 +296,8 @@ func TestSSMParamLateListDoesNotEscapePalette(t *testing.T) {
 
 func TestSSMParamPaletteCancelRestartsInitialLoad(t *testing.T) {
 	m := ssmParamsTestModel()
-	m.ssmParams.request++
-	m.ssmParams.loading = true
-	m.screen = screenLoading
+	started, _ := m.ssmParams.Start(&m)
+	m = started.(Model)
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
 	m = updated.(Model)
@@ -340,9 +339,8 @@ func TestSSMParamGlobalOverlayCancelRestoresInterruptedLoad(t *testing.T) {
 	for _, overlay := range []rune{'S', 'V'} {
 		t.Run(string(overlay)+"/list", func(t *testing.T) {
 			m := ssmParamsTestModel()
-			m.ssmParams.request++
-			m.ssmParams.loading = true
-			m.screen = screenLoading
+			started, _ := m.ssmParams.Start(&m)
+			m = started.(Model)
 
 			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{overlay}})
 			m = updated.(Model)
@@ -376,6 +374,28 @@ func TestSSMParamGlobalOverlayCancelRestoresInterruptedLoad(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestSSMParamGlobalOverlayCancelDoesNotRestoreAbandonedSSMLoad(t *testing.T) {
+	for _, overlay := range []rune{'P', 'S', 'V'} {
+		t.Run(string(overlay), func(t *testing.T) {
+			m := ssmParamsTestModel()
+			m.ssmParams.loading = true
+			selected := testParameters()[0]
+			m.ssmParams.selected = &selected
+			updated, _ := m.startLoading(nil)
+			m = updated.(Model)
+
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{overlay}})
+			m = updated.(Model)
+			updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = updated.(Model)
+
+			if m.screen != screenLoading || cmd != nil {
+				t.Fatalf("expected %c cancel to restore the unrelated load, screen=%v cmd=%v", overlay, m.screen, cmd)
+			}
+		})
 	}
 }
 
