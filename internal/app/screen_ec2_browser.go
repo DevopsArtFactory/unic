@@ -3,8 +3,10 @@ package app
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -571,7 +573,20 @@ func (m Model) renderEC2TagLine(label, value string) string {
 
 func (m Model) renderEC2DetailLineWithLabelWidth(label, value string, labelWidth int) string {
 	width := m.ec2DetailValueWidth(labelWidth)
-	return m.renderEC2StyledDetailLineWithLabelWidth(label, normalStyle.Render(truncateEC2DetailValue(value, width)), labelWidth)
+	return m.renderEC2StyledDetailLineWithLabelWidth(label, normalStyle.Render(truncateEC2DetailValue(escapeTerminalControls(value), width)), labelWidth)
+}
+
+func escapeTerminalControls(value string) string {
+	var b strings.Builder
+	for _, r := range value {
+		if unicode.IsControl(r) {
+			quoted := strconv.QuoteRuneToGraphic(r)
+			b.WriteString(quoted[1 : len(quoted)-1])
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 func (m Model) renderEC2StyledDetailLineWithLabelWidth(label, renderedValue string, labelWidth int) string {

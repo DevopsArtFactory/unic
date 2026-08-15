@@ -94,6 +94,22 @@ func TestSSMParamRevealEscapesTerminalControlSequences(t *testing.T) {
 	}
 }
 
+func TestSSMParamDetailEscapesTerminalControlsInDescription(t *testing.T) {
+	m := ssmParamsTestModel()
+	parameters := testParameters()
+	parameters[0].Description = "safe\x1b[31mred\x1b]52;c;payload\a"
+	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: parameters})
+	m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	view, _ := m.ssmParams.View(m)
+	if strings.Contains(view, "\x1b") || strings.Contains(view, "\a") {
+		t.Fatalf("description must not contain active terminal controls: %q", view)
+	}
+	if !strings.Contains(view, `safe\x1b[31mred\x1b]52;c;payload\a`) {
+		t.Fatalf("expected terminal controls to be visibly escaped: %q", view)
+	}
+}
+
 func TestSSMParamCopyNeverRendersValue(t *testing.T) {
 	m := ssmParamsTestModel()
 	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
