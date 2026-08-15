@@ -336,6 +336,49 @@ func TestSSMParamPaletteCancelDuringValueLoadRestoresDetail(t *testing.T) {
 	}
 }
 
+func TestSSMParamGlobalOverlayCancelRestoresInterruptedLoad(t *testing.T) {
+	for _, overlay := range []rune{'S', 'V'} {
+		t.Run(string(overlay)+"/list", func(t *testing.T) {
+			m := ssmParamsTestModel()
+			m.ssmParams.request++
+			m.ssmParams.loading = true
+			m.screen = screenLoading
+
+			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{overlay}})
+			m = updated.(Model)
+			updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = updated.(Model)
+
+			if m.screen != screenLoading || cmd == nil || !m.ssmParams.loading {
+				t.Fatalf("expected %c cancel to restart the parameter load, screen=%v loading=%v", overlay, m.screen, m.ssmParams.loading)
+			}
+		})
+
+		for _, action := range []rune{'v', 'y'} {
+			t.Run(string(overlay)+"/"+string(action), func(t *testing.T) {
+				m := ssmParamsTestModel()
+				m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+				m.ssmParams.idx = 1
+				m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+
+				updated, _ := m.ssmParams.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{action}})
+				m = updated.(Model)
+				updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{overlay}})
+				m = updated.(Model)
+				updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+				m = updated.(Model)
+
+				if m.screen != screenSSMParamDetail || cmd != nil || m.ssmParams.selected == nil {
+					t.Fatalf("expected %c cancel during %c to restore parameter detail, screen=%v", overlay, action, m.screen)
+				}
+				if m.ssmParams.revealed || m.ssmParams.value != "" {
+					t.Fatalf("expected restored detail to keep the value hidden, got %+v", m.ssmParams)
+				}
+			})
+		}
+	}
+}
+
 func TestSSMParamLateListFailureDoesNotEscapePalette(t *testing.T) {
 	m := ssmParamsTestModel()
 	m.ssmParams.request++

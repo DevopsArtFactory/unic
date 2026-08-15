@@ -44,6 +44,18 @@ func (pm *ssmParamsModel) clearValue() {
 	pm.notice = ""
 }
 
+func (m Model) restoreScreenAfterOverlay(previous screen) (tea.Model, tea.Cmd) {
+	if previous == screenLoading && m.ssmParams.loading {
+		return m.ssmParams.Start(&m)
+	}
+	if previous == screenLoading && m.ssmParams.selected != nil {
+		m.screen = screenSSMParamDetail
+		return m, nil
+	}
+	m.screen = previous
+	return m, nil
+}
+
 func (pm *ssmParamsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	pm.request++
 	pm.loading = true
