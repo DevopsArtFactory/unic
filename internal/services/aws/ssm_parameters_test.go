@@ -119,3 +119,22 @@ func TestGetParameterValueWrapsError(t *testing.T) {
 		t.Fatalf("expected wrapped error, got %v", err)
 	}
 }
+
+func TestGetParameterValueRejectsMissingValue(t *testing.T) {
+	responses := []*ssm.GetParameterOutput{
+		nil,
+		{},
+		{Parameter: &ssmtypes.Parameter{}},
+	}
+	for _, response := range responses {
+		mock := &mockSSMClient{
+			getParameterFunc: func(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+				return response, nil
+			},
+		}
+		repo := &AwsRepository{SSMClient: mock}
+		if _, err := repo.GetParameterValue(context.Background(), "/x"); err == nil || err.Error() != "parameter /x has no value" {
+			t.Fatalf("expected missing-value error, got %v", err)
+		}
+	}
+}

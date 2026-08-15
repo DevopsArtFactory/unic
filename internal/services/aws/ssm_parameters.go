@@ -88,7 +88,7 @@ func (r *AwsRepository) GetParameterValue(ctx context.Context, name string) (str
 	if err != nil {
 		return "", fmt.Errorf("failed to get parameter %s: %w", name, err)
 	}
-	if out.Parameter == nil {
+	if out == nil || out.Parameter == nil || out.Parameter.Value == nil {
 		return "", fmt.Errorf("parameter %s has no value", name)
 	}
 	return awssdk.ToString(out.Parameter.Value), nil
