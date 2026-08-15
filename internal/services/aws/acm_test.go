@@ -2,6 +2,8 @@ package aws
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -67,5 +69,42 @@ func TestCertificateDaysToExpiryClampsExpiredCertificate(t *testing.T) {
 	certificate := ACMCertificate{NotAfter: now.Add(-24 * time.Hour)}
 	if got := certificate.DaysToExpiry(now); got != 0 {
 		t.Fatalf("expected expired certificate to report zero days, got %d", got)
+	}
+}
+
+func TestListCertificatesDescribesConcurrentlyWithLimit(t *testing.T) {
+	const certificateCount = 12
+	summaries := make([]acmtypes.CertificateSummary, certificateCount)
+	for i := range summaries {
+		summaries[i].CertificateArn = awssdk.String(fmt.Sprintf("cert-%d", i))
+	}
+
+	var active, peak atomic.Int32
+	release := make(chan struct{})
+	mock := &mockACMClient{
+		list: func(context.Context, *acm.ListCertificatesInput, ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
+			return &acm.ListCertificatesOutput{CertificateSummaryList: summaries}, nil
+		},
+		describe: func(_ context.Context, in *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
+			current := active.Add(1)
+			for current > peak.Load() && !peak.CompareAndSwap(peak.Load(), current) {
+			}
+			if current == 10 {
+				close(release)
+			}
+			<-release
+			active.Add(-1)
+			return &acm.DescribeCertificateOutput{Certificate: &acmtypes.CertificateDetail{
+				CertificateArn: in.CertificateArn, DomainName: in.CertificateArn,
+			}}, nil
+		},
+	}
+
+	certificates, err := (&AwsRepository{ACMClient: mock}).ListCertificates(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(certificates) != certificateCount || peak.Load() != 10 {
+		t.Fatalf("expected %d certificates and 10 concurrent describes, got %d and %d", certificateCount, len(certificates), peak.Load())
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/acm"
@@ -72,33 +73,51 @@ func (r *AwsRepository) ListCertificates(ctx context.Context) ([]ACMCertificate,
 		if err != nil {
 			return nil, fmt.Errorf("failed to list ACM certificates: %w", err)
 		}
-		for _, summary := range out.CertificateSummaryList {
-			detailOut, err := r.ACMClient.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: summary.CertificateArn})
-			if err != nil {
-				return nil, fmt.Errorf("failed to describe ACM certificate %s: %w", derefString(summary.CertificateArn), err)
+		for start := 0; start < len(out.CertificateSummaryList); start += 10 {
+			end := min(start+10, len(out.CertificateSummaryList))
+			batch := out.CertificateSummaryList[start:end]
+			results := make([]*acmtypes.CertificateDetail, len(batch))
+			errs := make([]error, len(batch))
+			var wg sync.WaitGroup
+			for i, summary := range batch {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					detailOut, err := r.ACMClient.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: summary.CertificateArn})
+					if err != nil {
+						errs[i] = fmt.Errorf("failed to describe ACM certificate %s: %w", derefString(summary.CertificateArn), err)
+						return
+					}
+					results[i] = detailOut.Certificate
+				}()
 			}
-			if detailOut.Certificate == nil {
-				continue
+			wg.Wait()
+			for i, detail := range results {
+				if errs[i] != nil {
+					return nil, errs[i]
+				}
+				if detail == nil {
+					continue
+				}
+				certificate := ACMCertificate{
+					ARN:                 derefString(detail.CertificateArn),
+					DomainName:          derefString(detail.DomainName),
+					SubjectAlternatives: append([]string(nil), detail.SubjectAlternativeNames...),
+					Status:              string(detail.Status),
+					RenewalEligibility:  string(detail.RenewalEligibility),
+					InUseBy:             append([]string(nil), detail.InUseBy...),
+					Region:              r.Region,
+				}
+				if detail.NotAfter != nil {
+					certificate.NotAfter = *detail.NotAfter
+				}
+				for _, validation := range detail.DomainValidationOptions {
+					certificate.Validation = append(certificate.Validation, ACMValidation{
+						Domain: derefString(validation.DomainName), Method: string(validation.ValidationMethod), Status: string(validation.ValidationStatus),
+					})
+				}
+				certificates = append(certificates, certificate)
 			}
-			detail := detailOut.Certificate
-			certificate := ACMCertificate{
-				ARN:                 derefString(detail.CertificateArn),
-				DomainName:          derefString(detail.DomainName),
-				SubjectAlternatives: append([]string(nil), detail.SubjectAlternativeNames...),
-				Status:              string(detail.Status),
-				RenewalEligibility:  string(detail.RenewalEligibility),
-				InUseBy:             append([]string(nil), detail.InUseBy...),
-				Region:              r.Region,
-			}
-			if detail.NotAfter != nil {
-				certificate.NotAfter = *detail.NotAfter
-			}
-			for _, validation := range detail.DomainValidationOptions {
-				certificate.Validation = append(certificate.Validation, ACMValidation{
-					Domain: derefString(validation.DomainName), Method: string(validation.ValidationMethod), Status: string(validation.ValidationStatus),
-				})
-			}
-			certificates = append(certificates, certificate)
 		}
 		if out.NextToken == nil || derefString(out.NextToken) == "" {
 			break
