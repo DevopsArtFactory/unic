@@ -46,6 +46,7 @@ const (
 	filterSQSQueues
 	filterELBs
 	filterELBTargetGroups
+	filterSSMParameters
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

@@ -159,6 +159,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceParameterStore,
+			Features: []Feature{
+				{
+					Kind:        FeatureSSMParameterBrowser,
+					Description: "Browse parameters with reveal-gated SecureString values and no-print copy",
+				},
+			},
+		},
+		{
 			Name: ServiceLambda,
 			Features: []Feature{
 				{

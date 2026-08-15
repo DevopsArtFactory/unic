@@ -94,6 +94,8 @@ const (
 	screenELBList
 	screenELBTargetGroupList
 	screenELBTargetList
+	screenSSMParamList
+	screenSSMParamDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -183,6 +185,7 @@ type Model struct {
 	s3           s3Model
 	sqs          sqsModel
 	elb          elbModel
+	ssmParams    ssmParamsModel
 	lambda       lambdaModel
 	inspector    inspectorModel
 
@@ -302,6 +305,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.s3 = newS3Model()
 	model.sqs = newSQSModel()
 	model.elb = newELBModel()
+	model.ssmParams = newSSMParamsModel()
 	model.lambda = newLambdaModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
@@ -600,6 +604,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "H" && m.screen != screenServiceList && m.screen != screenContextPicker &&
 			!m.isTextEntryScreen() && m.screen != screenFISTemplateList {
 			m.deactivateFilter()
+			m.ssmParams.clearValue()
 			if m.commands != nil {
 				m.commands.CancelAll()
 			}
@@ -609,6 +614,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Global context switch — C key opens context picker (skip text-input screens)
 		if msg.String() == "C" && m.screen != screenContextPicker && !m.isTextEntryScreen() {
 			m.deactivateFilter()
+			m.ssmParams.clearValue()
 			m.ctxPrevScreen = m.screen
 			return m, m.loadContexts()
 		}
@@ -616,6 +622,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// only region-scoped AWS clients are recreated.
 		if msg.String() == "R" && m.canSwitchResourceRegion() {
 			m.deactivateFilter()
+			m.ssmParams.clearValue()
 			m.regionPrevScreen = m.screen
 			m.regionIdx = m.activeRegionIndex()
 			m.screen = screenRegionPicker
@@ -626,6 +633,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "S" && !m.filterTI.Focused() && m.screen != screenSettings &&
 			!m.isTextEntryScreen() {
 			m.deactivateFilter()
+			m.ssmParams.clearValue()
 			m.settingsPrevScreen = m.screen
 			m.screen = screenSettings
 			return m, nil
@@ -635,6 +643,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "P" && !m.filterTI.Focused() && m.screen != screenCommandPalette &&
 			!m.isTextEntryScreen() {
 			m.deactivateFilter()
+			m.ssmParams.clearValue()
 			return m.openPalette()
 		}
 		// Global saved views — V opens the saved views screen (skip
@@ -642,6 +651,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "V" && !m.filterTI.Focused() && m.screen != screenViewList &&
 			!m.isTextEntryScreen() {
 			m.deactivateFilter()
+			m.ssmParams.clearValue()
 			return m.openViews()
 		}
 
@@ -777,6 +787,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.sqs.Start(&m)
 	case domain.FeatureELBBrowser:
 		return m.elb.Start(&m)
+	case domain.FeatureSSMParameterBrowser:
+		return m.ssmParams.Start(&m)
 	case domain.FeatureSecurityGroupBrowser:
 		return m.security.Start(&m)
 	case domain.FeatureIAMUsersBrowser:

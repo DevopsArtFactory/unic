@@ -208,6 +208,20 @@ type elbTargetGroupsLoadedMsg struct {
 	groups          []awsservice.ELBTargetGroupHealth
 }
 
+type ssmParametersLoadedMsg struct {
+	parameters []awsservice.SSMParameter
+	request    int
+	err        error
+}
+
+type ssmParamValueLoadedMsg struct {
+	name     string
+	value    string
+	copyOnly bool
+	request  int
+	err      error
+}
+
 type s3BucketsLoadedMsg struct {
 	buckets []awsservice.S3Bucket
 }

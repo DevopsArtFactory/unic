@@ -124,6 +124,22 @@ var screenKeymaps = map[screen][]keyBinding{
 		{bar: "H: home"},
 	},
 
+	screenSSMParamList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between parameters"},
+		{keys: "/", bar: "/: filter", help: "Start filtering by path, type, or tier"},
+		{keys: "r", bar: "r: refresh", help: "Refresh the parameter list"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected parameter (value stays hidden)"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenSSMParamDetail: {
+		{keys: "v", bar: "v: reveal", help: "Fetch and reveal the value (decrypts SecureString)",
+			when: func(m Model) bool { return !m.ssmParams.revealed }},
+		{keys: "y", bar: "y: copy", help: "Copy the value to the clipboard without revealing it"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the parameter list"},
+		{bar: "H: home"},
+	},
+
 	screenIAMUserList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
 		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
