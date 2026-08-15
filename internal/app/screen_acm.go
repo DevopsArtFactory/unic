@@ -144,8 +144,13 @@ func (am acmModel) viewDetail(m Model) string {
 	b.WriteString("\n\n")
 	b.WriteString(m.renderEC2DetailLine("Domain", c.DomainName))
 	b.WriteString(m.renderEC2DetailLine("Status", c.Status))
-	b.WriteString(m.renderEC2DetailLine("Expires", c.NotAfter.Format("2006-01-02 15:04:05")))
-	b.WriteString(m.renderEC2DetailLine("Days Left", fmt.Sprintf("%d", c.DaysToExpiry(time.Now()))))
+	expires, daysLeft := "-", "-"
+	if !c.NotAfter.IsZero() {
+		expires = c.NotAfter.Format("2006-01-02 15:04:05")
+		daysLeft = fmt.Sprintf("%d", c.DaysToExpiry(time.Now()))
+	}
+	b.WriteString(m.renderEC2DetailLine("Expires", expires))
+	b.WriteString(m.renderEC2DetailLine("Days Left", daysLeft))
 	b.WriteString(m.renderEC2DetailLine("Renewal", ec2ValueOrDash(c.RenewalEligibility)))
 	b.WriteString(m.renderEC2DetailLine("ARN", c.ARN))
 	b.WriteString(m.renderEC2DetailLine("Region", c.Region))
