@@ -89,14 +89,18 @@ func TestListCertificatesDescribesConcurrentlyWithLimit(t *testing.T) {
 		list: func(context.Context, *acm.ListCertificatesInput, ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
 			return &acm.ListCertificatesOutput{CertificateSummaryList: summaries}, nil
 		},
-		describe: func(_ context.Context, in *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
+		describe: func(ctx context.Context, in *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
 			current := active.Add(1)
 			for current > peak.Load() && !peak.CompareAndSwap(peak.Load(), current) {
 			}
 			if current == 10 {
 				close(release)
 			}
-			<-release
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 			active.Add(-1)
 			return &acm.DescribeCertificateOutput{Certificate: &acmtypes.CertificateDetail{
 				CertificateArn: in.CertificateArn, DomainName: in.CertificateArn,
@@ -104,7 +108,9 @@ func TestListCertificatesDescribesConcurrentlyWithLimit(t *testing.T) {
 		},
 	}
 
-	certificates, err := (&AwsRepository{ACMClient: mock}).ListCertificates(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	certificates, err := (&AwsRepository{ACMClient: mock}).ListCertificates(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
