@@ -176,9 +176,6 @@ func (pm ssmParamsModel) loadParameters(m Model) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		if len(parameters) == 0 {
-			return errMsg{err: fmt.Errorf("no parameters found")}
-		}
 		return ssmParametersLoadedMsg{parameters: parameters}
 	}
 }

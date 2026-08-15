@@ -38,6 +38,16 @@ func TestSSMParametersLoadedOpensList(t *testing.T) {
 	}
 }
 
+func TestSSMParametersLoadedRendersEmptyList(t *testing.T) {
+	m := ssmParamsTestModel()
+
+	_, _, handled := m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{})
+	view, ok := m.ssmParams.View(m)
+	if !handled || !ok || m.screen != screenSSMParamList || !strings.Contains(view, "No parameters found") {
+		t.Fatalf("expected empty parameter list, screen=%v view=%q", m.screen, view)
+	}
+}
+
 func TestSSMParamDetailHidesValueUntilRevealed(t *testing.T) {
 	m := ssmParamsTestModel()
 	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
