@@ -11,10 +11,11 @@ import (
 )
 
 type acmModel struct {
-	items    []awsservice.ACMCertificate
-	filtered []awsservice.ACMCertificate
-	idx      int
-	selected *awsservice.ACMCertificate
+	items        []awsservice.ACMCertificate
+	filtered     []awsservice.ACMCertificate
+	idx          int
+	selected     *awsservice.ACMCertificate
+	detailScroll int
 }
 
 func newACMModel() acmModel { return acmModel{} }
@@ -56,13 +57,27 @@ func (am *acmModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, boo
 			if am.idx < len(am.filtered) {
 				selected := am.filtered[am.idx]
 				am.selected = &selected
+				am.detailScroll = 0
 				m.screen = screenACMCertificateDetail
 			}
 		}
 		return *m, nil, true
 	case screenACMCertificateDetail:
-		if msg.String() == "q" || msg.String() == "esc" {
+		lines := am.detailLines(*m)
+		visibleLines := max(m.height-8, 5)
+		maxOffset := max(len(lines)-visibleLines, 0)
+		switch msg.String() {
+		case "q", "esc":
+			am.detailScroll = 0
 			m.screen = screenACMCertificateList
+		case "up", "k":
+			am.detailScroll = max(am.detailScroll-1, 0)
+		case "down", "j":
+			am.detailScroll = min(am.detailScroll+1, maxOffset)
+		case "pgup":
+			am.detailScroll = max(am.detailScroll-visibleLines, 0)
+		case "pgdown":
+			am.detailScroll = min(am.detailScroll+visibleLines, maxOffset)
 		}
 		return *m, nil, true
 	}
@@ -137,33 +152,50 @@ func (am acmModel) viewDetail(m Model) string {
 	if am.selected == nil {
 		return ""
 	}
-	c := am.selected
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Certificate Detail"))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderEC2DetailLine("Domain", c.DomainName))
-	b.WriteString(m.renderEC2DetailLine("Status", c.Status))
+	lines := am.detailLines(m)
+	visibleLines := max(m.height-8, 5)
+	start := min(am.detailScroll, max(len(lines)-visibleLines, 0))
+	for _, line := range lines[start:min(start+visibleLines, len(lines))] {
+		b.WriteString(line)
+	}
+	b.WriteString("\n")
+	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • esc: back • H: home"))
+	return b.String()
+}
+
+func (am acmModel) detailLines(m Model) []string {
+	c := am.selected
+	if c == nil {
+		return nil
+	}
+	lines := []string{
+		m.renderEC2DetailLine("Domain", c.DomainName),
+		m.renderEC2DetailLine("Status", c.Status),
+	}
 	expires, daysLeft := "-", "-"
 	if !c.NotAfter.IsZero() {
 		expires = c.NotAfter.Format("2006-01-02 15:04:05")
 		daysLeft = fmt.Sprintf("%d", c.DaysToExpiry(time.Now()))
 	}
-	b.WriteString(m.renderEC2DetailLine("Expires", expires))
-	b.WriteString(m.renderEC2DetailLine("Days Left", daysLeft))
-	b.WriteString(m.renderEC2DetailLine("Renewal", ec2ValueOrDash(c.RenewalEligibility)))
-	b.WriteString(m.renderEC2DetailLine("ARN", c.ARN))
-	b.WriteString(m.renderEC2DetailLine("Region", c.Region))
+	lines = append(lines,
+		m.renderEC2DetailLine("Expires", expires),
+		m.renderEC2DetailLine("Days Left", daysLeft),
+		m.renderEC2DetailLine("Renewal", ec2ValueOrDash(c.RenewalEligibility)),
+		m.renderEC2DetailLine("ARN", c.ARN),
+		m.renderEC2DetailLine("Region", c.Region),
+	)
 	for _, san := range c.SubjectAlternatives {
-		b.WriteString(m.renderEC2DetailLine("SAN", san))
+		lines = append(lines, m.renderEC2DetailLine("SAN", san))
 	}
 	for _, validation := range c.Validation {
-		b.WriteString(m.renderEC2DetailLine("Validation", fmt.Sprintf("%s — %s / %s", validation.Domain, validation.Method, validation.Status)))
+		lines = append(lines, m.renderEC2DetailLine("Validation", fmt.Sprintf("%s — %s / %s", validation.Domain, validation.Method, validation.Status)))
 	}
 	for _, arn := range c.InUseBy {
-		b.WriteString(m.renderEC2DetailLine("In Use By", arn))
+		lines = append(lines, m.renderEC2DetailLine("In Use By", arn))
 	}
-	b.WriteString("\n")
-	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
-	return b.String()
+	return lines
 }
