@@ -35,7 +35,6 @@ func newSSMParamsModel() ssmParamsModel {
 }
 
 func (pm *ssmParamsModel) clearValue() {
-	pm.selected = nil
 	pm.revealed = false
 	pm.value = ""
 	pm.notice = ""
@@ -143,6 +142,7 @@ func (pm *ssmParamsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea
 	switch msg.String() {
 	case "q", "esc":
 		pm.clearValue()
+		pm.selected = nil
 		m.screen = screenSSMParamList
 	case "v":
 		if pm.selected != nil && !pm.revealed {

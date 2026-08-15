@@ -160,9 +160,30 @@ func TestSSMParamGlobalNavigationClearsRevealedValue(t *testing.T) {
 
 			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
 			m = updated.(Model)
-			if m.ssmParams.revealed || m.ssmParams.value != "" || m.ssmParams.selected != nil {
+			if m.ssmParams.revealed || m.ssmParams.value != "" {
 				t.Fatalf("expected %s navigation to clear revealed value, got %+v", key, m.ssmParams)
 			}
 		})
+	}
+}
+
+func TestSSMParamPaletteCancelRestoresUsableDetail(t *testing.T) {
+	m := ssmParamsTestModel()
+	m.ssmParams.HandleMessage(&m, ssmParametersLoadedMsg{parameters: testParameters()})
+	m.ssmParams.idx = 1
+	m.ssmParams.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m.ssmParams.HandleMessage(&m, ssmParamValueLoadedMsg{name: "/app/prod/db-password", value: "s3cret"})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+
+	view, ok := m.ssmParams.View(m)
+	if m.screen != screenSSMParamDetail || !ok || !strings.Contains(view, "/app/prod/db-password") {
+		t.Fatalf("expected palette cancel to restore parameter detail, screen=%v view=%q", m.screen, view)
+	}
+	if m.ssmParams.revealed || m.ssmParams.value != "" || strings.Contains(view, "s3cret") {
+		t.Fatalf("expected restored detail to keep the value cleared, got %+v", m.ssmParams)
 	}
 }
