@@ -43,9 +43,10 @@ func (r *AwsRepository) ListKMSKeys(ctx context.Context) ([]KMSKey, error) {
 				continue
 			}
 			meta := detail.KeyMetadata
+			rotationStateSupported := string(meta.KeyState) == "Enabled" || string(meta.KeyState) == "Disabled"
 			rotationEligible := string(meta.KeyManager) == "CUSTOMER" &&
 				string(meta.KeySpec) == "SYMMETRIC_DEFAULT" && string(meta.Origin) == "AWS_KMS" &&
-				awssdk.ToString(meta.CustomKeyStoreId) == "" && string(meta.KeyState) == "Enabled" &&
+				awssdk.ToString(meta.CustomKeyStoreId) == "" && rotationStateSupported &&
 				(meta.MultiRegionConfiguration == nil || string(meta.MultiRegionConfiguration.MultiRegionKeyType) == "PRIMARY")
 			rotation := false
 			if rotationEligible {
