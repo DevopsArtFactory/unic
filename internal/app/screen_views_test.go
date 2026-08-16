@@ -92,6 +92,27 @@ func TestViewsApplySameContextJumpsWithFilterPrefilled(t *testing.T) {
 	}
 }
 
+func TestViewsCaptureAndApplyKMSFilter(t *testing.T) {
+	m := viewsTestModel(t)
+	m.enterServiceForPalette(paletteItem{
+		service: domain.ServiceKMS,
+		feature: domain.FeatureKMSKeyBrowser,
+	})
+	m.storeFilterValue(filterKMSKeys, "alias/prod")
+
+	view, ok := m.captureCurrentView()
+	if !ok || view.Filter != "alias/prod" {
+		t.Fatalf("expected captured KMS filter, got %+v", view)
+	}
+
+	replayed := viewsTestModel(t)
+	next, cmd := replayed.applyView(view)
+	model := next.(Model)
+	if cmd == nil || model.filterValue(filterKMSKeys) != "alias/prod" {
+		t.Fatalf("expected replayed KMS filter, got %q", model.filterValue(filterKMSKeys))
+	}
+}
+
 func TestViewsApplyAcrossContextsDefersJumpUntilSwitch(t *testing.T) {
 	m := viewsTestModel(t)
 	view := config.ViewEntry{
