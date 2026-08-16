@@ -22,7 +22,7 @@ func runKMSRotationScan(ctx context.Context, repo *AwsRepository) ([]SecurityFin
 func inspectKMSRotation(keys []awsservice.KMSKey) []SecurityFinding {
 	var findings []SecurityFinding
 	for _, key := range keys {
-		if key.Manager != "CUSTOMER" || key.RotationEnabled {
+		if !key.RotationEligible || key.RotationEnabled {
 			continue
 		}
 		findings = append(findings, SecurityFinding{

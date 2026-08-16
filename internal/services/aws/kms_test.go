@@ -17,10 +17,12 @@ func (mockKMSClient) ListKeys(context.Context, *kms.ListKeysInput, ...func(*kms.
 func (mockKMSClient) DescribeKey(_ context.Context, in *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
 	id := awssdk.ToString(in.KeyId)
 	manager := kmstypes.KeyManagerTypeCustomer
+	keySpec := kmstypes.KeySpecSymmetricDefault
 	if id == "b" {
 		manager = kmstypes.KeyManagerTypeAws
+		keySpec = kmstypes.KeySpecRsa2048
 	}
-	return &kms.DescribeKeyOutput{KeyMetadata: &kmstypes.KeyMetadata{KeyId: in.KeyId, Arn: awssdk.String("arn:" + id), KeyState: kmstypes.KeyStateEnabled, KeyManager: manager, Origin: kmstypes.OriginTypeAwsKms}}, nil
+	return &kms.DescribeKeyOutput{KeyMetadata: &kmstypes.KeyMetadata{KeyId: in.KeyId, Arn: awssdk.String("arn:" + id), KeyState: kmstypes.KeyStateEnabled, KeyManager: manager, KeySpec: keySpec, Origin: kmstypes.OriginTypeAwsKms}}, nil
 }
 func (mockKMSClient) ListAliases(context.Context, *kms.ListAliasesInput, ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
 	return &kms.ListAliasesOutput{Aliases: []kmstypes.AliasListEntry{{AliasName: awssdk.String("alias/app"), TargetKeyId: awssdk.String("a")}}}, nil
@@ -35,7 +37,7 @@ func TestListKMSKeysMapsAliasesRotationAndSorts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(keys) != 2 || keys[0].ID != "a" || len(keys[0].Aliases) != 1 || keys[0].Aliases[0] != "alias/app" || !keys[0].RotationEnabled {
+	if len(keys) != 2 || keys[0].ID != "a" || len(keys[0].Aliases) != 1 || keys[0].Aliases[0] != "alias/app" || !keys[0].RotationEligible || !keys[0].RotationEnabled {
 		t.Fatalf("unexpected keys: %+v", keys)
 	}
 	if keys[1].Manager != "AWS" || keys[1].RotationEnabled {

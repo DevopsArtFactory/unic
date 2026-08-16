@@ -123,7 +123,7 @@ func (km kmsModel) viewList(m Model) string {
 				name = key.Aliases[0]
 			}
 			rotation := "n/a"
-			if key.Manager == "CUSTOMER" {
+			if key.RotationEligible {
 				rotation = fmt.Sprintf("%t", key.RotationEnabled)
 			}
 			row := idCol.Render(name) + " " + stateCol.Render(key.State) + " " + lipgloss.NewStyle().Width(8).Render(key.Manager) + " " + rotation
@@ -156,8 +156,8 @@ func (km kmsModel) viewDetail(m Model) string {
 	b.WriteString(m.renderEC2DetailLine("State", k.State))
 	b.WriteString(m.renderEC2DetailLine("Manager", k.Manager))
 	b.WriteString(m.renderEC2DetailLine("Origin", k.Origin))
-	rotation := "Not available for AWS managed keys"
-	if k.Manager == "CUSTOMER" {
+	rotation := "Not eligible"
+	if k.RotationEligible {
 		rotation = fmt.Sprintf("%t", k.RotationEnabled)
 	}
 	b.WriteString(m.renderEC2DetailLine("Rotation Enabled", rotation))

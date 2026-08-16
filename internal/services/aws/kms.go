@@ -14,6 +14,7 @@ type KMSKey struct {
 	ID, ARN, Description, State, Manager, Origin string
 	Aliases                                      []string
 	RotationEnabled                              bool
+	RotationEligible                             bool
 }
 
 func (k KMSKey) FilterText() string {
@@ -42,15 +43,19 @@ func (r *AwsRepository) ListKMSKeys(ctx context.Context) ([]KMSKey, error) {
 				continue
 			}
 			meta := detail.KeyMetadata
+			rotationEligible := string(meta.KeyManager) == "CUSTOMER" &&
+				string(meta.KeySpec) == "SYMMETRIC_DEFAULT" && string(meta.Origin) == "AWS_KMS" &&
+				awssdk.ToString(meta.CustomKeyStoreId) == "" && string(meta.KeyState) == "Enabled" &&
+				(meta.MultiRegionConfiguration == nil || string(meta.MultiRegionConfiguration.MultiRegionKeyType) == "PRIMARY")
 			rotation := false
-			if string(meta.KeyManager) == "CUSTOMER" {
+			if rotationEligible {
 				status, err := r.KMSClient.GetKeyRotationStatus(ctx, &kms.GetKeyRotationStatusInput{KeyId: ref.KeyId})
 				if err != nil {
 					return nil, fmt.Errorf("failed to get rotation status for KMS key %s: %w", id, err)
 				}
 				rotation = status.KeyRotationEnabled
 			}
-			keys = append(keys, KMSKey{ID: id, ARN: awssdk.ToString(meta.Arn), Description: awssdk.ToString(meta.Description), State: string(meta.KeyState), Manager: string(meta.KeyManager), Origin: string(meta.Origin), Aliases: aliases[id], RotationEnabled: rotation})
+			keys = append(keys, KMSKey{ID: id, ARN: awssdk.ToString(meta.Arn), Description: awssdk.ToString(meta.Description), State: string(meta.KeyState), Manager: string(meta.KeyManager), Origin: string(meta.Origin), Aliases: aliases[id], RotationEnabled: rotation, RotationEligible: rotationEligible})
 		}
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i].ID < keys[j].ID })

@@ -8,7 +8,7 @@ import (
 
 func TestKMSKeysLoadedRendersPostureAndDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.kms.HandleMessage(&m, kmsKeysLoadedMsg{keys: []awsservice.KMSKey{{ID: "key-1", Aliases: []string{"alias/app"}, State: "Enabled", Manager: "CUSTOMER", RotationEnabled: true}}})
+	m.kms.HandleMessage(&m, kmsKeysLoadedMsg{keys: []awsservice.KMSKey{{ID: "key-1", Aliases: []string{"alias/app"}, State: "Enabled", Manager: "CUSTOMER", RotationEligible: true, RotationEnabled: true}}})
 	view, ok := m.kms.View(m)
 	if !ok || !strings.Contains(view, "alias/app") || !strings.Contains(view, "true") {
 		t.Fatalf("unexpected list: %s", view)
