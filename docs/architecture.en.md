@@ -100,6 +100,7 @@ Current repository clients include:
 - ECR
 - FIS
 - S3
+- KMS
 
 Pattern:
 
@@ -157,6 +158,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_lambda.go`
 - `screen_bedrock.go`
 - `screen_secrets.go`
+- `screen_kms.go`
 - `screen_inspector.go`
 - `screen_context.go`
 
@@ -235,7 +237,8 @@ Current screen families include:
 - ECR repository/image/detail flows
 - FIS experiment template list/detail, safe-run preview, and experiment history/detail flows
 - S3 bucket/object/detail flows
-- Inspector mode home, checklist setup, security findings/detail, and checklist results/detail flows
+- KMS key list/detail and rotation-posture flows
+- Inspector mode home, checklist setup, security findings/detail (including KMS rotation findings), and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
 - SSO account / role selection and exit notice flows
 - loading and error screens

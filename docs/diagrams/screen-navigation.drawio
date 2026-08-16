@@ -133,7 +133,7 @@
         <mxCell id="44" value="Clusters (30)" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="43">
           <mxGeometry x="10" y="25" width="130" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="45" value="Services (31)" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="43">
+        <mxCell id="45" value="Services (32)" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="43">
           <mxGeometry x="10" y="70" width="130" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="46" value="Tasks (32)" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="43">
