@@ -24,7 +24,7 @@ func (k KMSKey) FilterText() string {
 func (r *AwsRepository) ListKMSKeys(ctx context.Context) ([]KMSKey, error) {
 	aliases, err := r.listKMSAliases(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list KMS aliases: %w", err)
 	}
 	var keys []KMSKey
 	p := kms.NewListKeysPaginator(r.KMSClient, &kms.ListKeysInput{})
