@@ -11,9 +11,12 @@ import (
 
 func TestKMSKeysLoadedRendersPostureAndDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.kms.HandleMessage(&m, kmsKeysLoadedMsg{keys: []awsservice.KMSKey{{ID: "key-1", Aliases: []string{"alias/app"}, State: "Enabled", Manager: "CUSTOMER", RotationEligible: true, RotationEnabled: true}}})
+	m.kms.HandleMessage(&m, kmsKeysLoadedMsg{keys: []awsservice.KMSKey{
+		{ID: "key-1", Aliases: []string{"alias/app"}, State: "Enabled", Manager: "CUSTOMER", RotationEligible: true, RotationEnabled: true},
+		{ID: "key-2", Aliases: []string{"alias/asymmetric"}, State: "Enabled", Manager: "CUSTOMER"},
+	}})
 	view, ok := m.kms.View(m)
-	if !ok || !strings.Contains(view, "alias/app") || !strings.Contains(view, "true") {
+	if !ok || !strings.Contains(view, "alias/app") || !strings.Contains(view, "true") || !strings.Contains(view, "alias/asymmetric") || !strings.Contains(view, "n/a") {
 		t.Fatalf("unexpected list: %s", view)
 	}
 	_, _, handled := m.kms.HandleKey(&m, tea.KeyMsg{Type: tea.KeyEnter})
@@ -31,9 +34,17 @@ func TestKMSKeysLoadedRendersPostureAndDetail(t *testing.T) {
 	if !handled || m.screen != screenKMSKeyList || m.kms.selected != nil {
 		t.Fatalf("expected esc to return to key list, got screen %v", m.screen)
 	}
+	_, _, handled = m.kms.HandleKey(&m, tea.KeyMsg{Type: tea.KeyDown})
+	if !handled {
+		t.Fatal("expected down to select the ineligible key")
+	}
 	_, _, handled = m.kms.HandleKey(&m, tea.KeyMsg{Type: tea.KeyEnter})
 	if !handled || m.screen != screenKMSKeyDetail {
 		t.Fatalf("expected enter to reopen key detail, got screen %v", m.screen)
+	}
+	view, _ = m.kms.View(m)
+	if !strings.Contains(view, "alias/asymmetric") || !strings.Contains(view, "Not eligible") {
+		t.Fatalf("ineligible detail missing rotation posture: %s", view)
 	}
 	_, _, handled = m.kms.HandleKey(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	if !handled || m.screen != screenKMSKeyList || m.kms.selected != nil {
