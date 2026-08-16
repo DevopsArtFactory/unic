@@ -47,6 +47,7 @@ const (
 	filterELBs
 	filterELBTargetGroups
 	filterSSMParameters
+	filterKMSKeys
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

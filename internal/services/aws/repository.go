@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/fis"
 	"github.com/aws/aws-sdk-go-v2/service/guardduty"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -36,6 +37,7 @@ import (
 
 // Verify *ssm.Client satisfies SSMClientAPI at compile time.
 var _ SSMClientAPI = (*ssm.Client)(nil)
+var _ KMSClientAPI = (*kms.Client)(nil)
 
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
@@ -115,6 +117,13 @@ type SSMClientAPI interface {
 	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 	StartSession(ctx context.Context, params *ssm.StartSessionInput, optFns ...func(*ssm.Options)) (*ssm.StartSessionOutput, error)
 	TerminateSession(ctx context.Context, params *ssm.TerminateSessionInput, optFns ...func(*ssm.Options)) (*ssm.TerminateSessionOutput, error)
+}
+
+type KMSClientAPI interface {
+	ListKeys(ctx context.Context, params *kms.ListKeysInput, optFns ...func(*kms.Options)) (*kms.ListKeysOutput, error)
+	DescribeKey(ctx context.Context, params *kms.DescribeKeyInput, optFns ...func(*kms.Options)) (*kms.DescribeKeyOutput, error)
+	ListAliases(ctx context.Context, params *kms.ListAliasesInput, optFns ...func(*kms.Options)) (*kms.ListAliasesOutput, error)
+	GetKeyRotationStatus(ctx context.Context, params *kms.GetKeyRotationStatusInput, optFns ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
@@ -320,6 +329,7 @@ type CallerIdentity struct {
 type AwsRepository struct {
 	EC2Client            EC2ClientAPI
 	SSMClient            SSMClientAPI
+	KMSClient            KMSClientAPI
 	SQSClient            SQSClientAPI
 	RDSClient            RDSClientAPI
 	Route53Client        Route53ClientAPI
@@ -440,6 +450,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 	return &AwsRepository{
 		EC2Client:            ec2.NewFromConfig(awsCfg),
 		SSMClient:            ssm.NewFromConfig(awsCfg),
+		KMSClient:            kms.NewFromConfig(awsCfg),
 		SQSClient:            sqs.NewFromConfig(awsCfg),
 		RDSClient:            rds.NewFromConfig(awsCfg),
 		Route53Client:        route53.NewFromConfig(awsCfg),

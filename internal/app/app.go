@@ -96,6 +96,8 @@ const (
 	screenELBTargetList
 	screenSSMParamList
 	screenSSMParamDetail
+	screenKMSKeyList
+	screenKMSKeyDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -186,6 +188,7 @@ type Model struct {
 	sqs          sqsModel
 	elb          elbModel
 	ssmParams    ssmParamsModel
+	kms          kmsModel
 	lambda       lambdaModel
 	inspector    inspectorModel
 
@@ -306,6 +309,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.sqs = newSQSModel()
 	model.elb = newELBModel()
 	model.ssmParams = newSSMParamsModel()
+	model.kms = newKMSModel()
 	model.lambda = newLambdaModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
@@ -789,6 +793,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.elb.Start(&m)
 	case domain.FeatureSSMParameterBrowser:
 		return m.ssmParams.Start(&m)
+	case domain.FeatureKMSKeyBrowser:
+		return m.kms.Start(&m)
 	case domain.FeatureSecurityGroupBrowser:
 		return m.security.Start(&m)
 	case domain.FeatureIAMUsersBrowser:
