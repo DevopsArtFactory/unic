@@ -99,6 +99,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - ECS
 - ECR
 - FIS
+- ACM
 - S3
 
 패턴:
@@ -116,6 +117,7 @@ cross-service inspector workflow와 rule pack을 담당한다.
 
 - workflow 전용 finding/report 모델은 여기서 관리
 - Security Inspector 스캔 orchestration과 rule 등록은 여기서 관리
+- ACM 만료 스캔은 repository 인증서 목록과 양수 `inspector.acm_expiry_window_days` 설정값(기본 30일)을 사용
 - Checklist Inspector YAML schema 로딩, checklist 결과 모델, readiness runner도 여기서 관리
 - rule pack은 raw SDK setup 대신 `internal/services/aws` repository 메서드와 client interface에 의존
 - Security / Checklist Inspector 이후의 후속 inspector workflow도 이 패턴으로 확장
@@ -153,6 +155,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_ecs.go`
 - `screen_eks.go`
 - `screen_ecr.go`
+- `screen_acm.go`
 - `screen_s3.go`
 - `screen_lambda.go`
 - `screen_bedrock.go`
@@ -234,6 +237,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - EKS cluster/node group/add-on status, upgrade readiness, access helper
 - ECR repository/image/detail
 - FIS experiment template list/detail, safe-run preview 및 experiment history/detail
+- ACM 인증서 list/detail
 - S3 bucket/object/detail
 - Inspector mode home, checklist setup, security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
