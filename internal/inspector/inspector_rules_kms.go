@@ -12,7 +12,7 @@ func init() {
 }
 
 func runKMSRotationScan(ctx context.Context, repo *AwsRepository) ([]SecurityFinding, error) {
-	keys, err := repo.ListKMSKeys(ctx)
+	keys, err := repo.ListKMSKeysWithoutAliases(ctx)
 	if err != nil {
 		return nil, err
 	}

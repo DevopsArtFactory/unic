@@ -23,9 +23,21 @@ func (k KMSKey) FilterText() string {
 }
 
 func (r *AwsRepository) ListKMSKeys(ctx context.Context) ([]KMSKey, error) {
-	aliases, err := r.listKMSAliases(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list KMS aliases: %w", err)
+	return r.listKMSKeys(ctx, true)
+}
+
+func (r *AwsRepository) ListKMSKeysWithoutAliases(ctx context.Context) ([]KMSKey, error) {
+	return r.listKMSKeys(ctx, false)
+}
+
+func (r *AwsRepository) listKMSKeys(ctx context.Context, includeAliases bool) ([]KMSKey, error) {
+	aliases := map[string][]string{}
+	if includeAliases {
+		var err error
+		aliases, err = r.listKMSAliases(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list KMS aliases: %w", err)
+		}
 	}
 	var keys []KMSKey
 	p := kms.NewListKeysPaginator(r.KMSClient, &kms.ListKeysInput{})
