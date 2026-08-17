@@ -72,3 +72,16 @@ func TestKMSFilterWithNoMatchesRendersEmptyState(t *testing.T) {
 		t.Fatalf("expected no-match empty state, got: %s", view)
 	}
 }
+
+func TestKMSHelpScreenTitles(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	for screen, want := range map[screen]string{
+		screenKMSKeyList:   "KMS Keys",
+		screenKMSKeyDetail: "KMS Key Detail",
+	} {
+		m.screen = screen
+		if got := m.helpScreenTitle(); got != want {
+			t.Errorf("helpScreenTitle() = %q, want %q", got, want)
+		}
+	}
+}
