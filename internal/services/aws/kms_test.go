@@ -2,8 +2,10 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,15 +21,22 @@ type mockKMSClient struct {
 	mu                  sync.Mutex
 	keys                []kmstypes.KeyListEntry
 	describe            func(context.Context, *kms.DescribeKeyInput) (*kms.DescribeKeyOutput, error)
+	errOperation        string
 }
 
 func (m *mockKMSClient) ListKeys(context.Context, *kms.ListKeysInput, ...func(*kms.Options)) (*kms.ListKeysOutput, error) {
+	if m.errOperation == "list keys" {
+		return nil, errors.New("boom")
+	}
 	if m.keys != nil {
 		return &kms.ListKeysOutput{Keys: m.keys}, nil
 	}
 	return &kms.ListKeysOutput{Keys: []kmstypes.KeyListEntry{{KeyId: awssdk.String("c")}, {KeyId: awssdk.String("b")}, {KeyId: awssdk.String("a")}}}, nil
 }
 func (m *mockKMSClient) DescribeKey(ctx context.Context, in *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
+	if m.errOperation == "describe key" {
+		return nil, errors.New("boom")
+	}
 	if m.describe != nil {
 		return m.describe(ctx, in)
 	}
@@ -42,15 +51,37 @@ func (m *mockKMSClient) DescribeKey(ctx context.Context, in *kms.DescribeKeyInpu
 	}
 	return &kms.DescribeKeyOutput{KeyMetadata: &kmstypes.KeyMetadata{KeyId: in.KeyId, Arn: awssdk.String("arn:" + id), KeyState: keyState, KeyManager: manager, KeySpec: keySpec, Origin: kmstypes.OriginTypeAwsKms}}, nil
 }
-func (*mockKMSClient) ListAliases(context.Context, *kms.ListAliasesInput, ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
+func (m *mockKMSClient) ListAliases(context.Context, *kms.ListAliasesInput, ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
+	if m.errOperation == "list aliases" {
+		return nil, errors.New("boom")
+	}
 	return &kms.ListAliasesOutput{Aliases: []kmstypes.AliasListEntry{{AliasName: awssdk.String("alias/app"), TargetKeyId: awssdk.String("a")}}}, nil
 }
 func (m *mockKMSClient) GetKeyRotationStatus(_ context.Context, in *kms.GetKeyRotationStatusInput, _ ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error) {
+	if m.errOperation == "rotation status" {
+		return nil, errors.New("boom")
+	}
 	id := awssdk.ToString(in.KeyId)
 	m.mu.Lock()
 	m.rotationStatusCalls = append(m.rotationStatusCalls, id)
 	m.mu.Unlock()
 	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: id == "a"}, nil
+}
+
+func TestListKMSKeysWrapsAPIErrors(t *testing.T) {
+	for _, test := range []struct{ operation, want string }{
+		{"list aliases", "list KMS aliases"},
+		{"list keys", "list KMS keys"},
+		{"describe key", "describe KMS key"},
+		{"rotation status", "rotation status for KMS key"},
+	} {
+		t.Run(test.operation, func(t *testing.T) {
+			_, err := (&AwsRepository{KMSClient: &mockKMSClient{errOperation: test.operation}}).ListKMSKeys(context.Background())
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q context, got %v", test.want, err)
+			}
+		})
+	}
 }
 
 func TestListKMSKeysMapsAliasesRotationAndSorts(t *testing.T) {
