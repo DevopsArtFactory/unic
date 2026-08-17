@@ -3,7 +3,11 @@ package aws
 import (
 	"context"
 	"slices"
+	"sort"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -12,12 +16,21 @@ import (
 
 type mockKMSClient struct {
 	rotationStatusCalls []string
+	mu                  sync.Mutex
+	keys                []kmstypes.KeyListEntry
+	describe            func(context.Context, *kms.DescribeKeyInput) (*kms.DescribeKeyOutput, error)
 }
 
-func (mockKMSClient) ListKeys(context.Context, *kms.ListKeysInput, ...func(*kms.Options)) (*kms.ListKeysOutput, error) {
+func (m *mockKMSClient) ListKeys(context.Context, *kms.ListKeysInput, ...func(*kms.Options)) (*kms.ListKeysOutput, error) {
+	if m.keys != nil {
+		return &kms.ListKeysOutput{Keys: m.keys}, nil
+	}
 	return &kms.ListKeysOutput{Keys: []kmstypes.KeyListEntry{{KeyId: awssdk.String("c")}, {KeyId: awssdk.String("b")}, {KeyId: awssdk.String("a")}}}, nil
 }
-func (*mockKMSClient) DescribeKey(_ context.Context, in *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
+func (m *mockKMSClient) DescribeKey(ctx context.Context, in *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
+	if m.describe != nil {
+		return m.describe(ctx, in)
+	}
 	id := awssdk.ToString(in.KeyId)
 	manager := kmstypes.KeyManagerTypeCustomer
 	keySpec := kmstypes.KeySpecSymmetricDefault
@@ -34,7 +47,9 @@ func (mockKMSClient) ListAliases(context.Context, *kms.ListAliasesInput, ...func
 }
 func (m *mockKMSClient) GetKeyRotationStatus(_ context.Context, in *kms.GetKeyRotationStatusInput, _ ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error) {
 	id := awssdk.ToString(in.KeyId)
+	m.mu.Lock()
 	m.rotationStatusCalls = append(m.rotationStatusCalls, id)
+	m.mu.Unlock()
 	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: id == "a"}, nil
 }
 
@@ -54,7 +69,47 @@ func TestListKMSKeysMapsAliasesRotationAndSorts(t *testing.T) {
 	if keys[2].State != "Disabled" || !keys[2].RotationEligible || keys[2].RotationEnabled {
 		t.Fatalf("unexpected disabled customer key: %+v", keys[2])
 	}
-	if !slices.Equal(client.rotationStatusCalls, []string{"c", "a"}) {
+	sort.Strings(client.rotationStatusCalls)
+	if !slices.Equal(client.rotationStatusCalls, []string{"a", "c"}) {
 		t.Fatalf("expected rotation status for supported keys, got calls for %v", client.rotationStatusCalls)
+	}
+}
+
+func TestListKMSKeysBoundsConcurrentDetailLoads(t *testing.T) {
+	var active, peak atomic.Int32
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	client := &mockKMSClient{}
+	client.describe = func(ctx context.Context, in *kms.DescribeKeyInput) (*kms.DescribeKeyOutput, error) {
+		current := active.Add(1)
+		defer active.Add(-1)
+		for {
+			previous := peak.Load()
+			if current <= previous || peak.CompareAndSwap(previous, current) {
+				break
+			}
+		}
+		if current == 10 {
+			releaseOnce.Do(func() { close(release) })
+		}
+		select {
+		case <-release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		return &kms.DescribeKeyOutput{KeyMetadata: &kmstypes.KeyMetadata{KeyId: in.KeyId}}, nil
+	}
+	client.keys = make([]kmstypes.KeyListEntry, 20)
+	for i := range client.keys {
+		client.keys[i].KeyId = awssdk.String(string(rune('a' + i)))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := (&AwsRepository{KMSClient: client}).ListKMSKeys(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if peak.Load() != 10 {
+		t.Fatalf("expected concurrency capped at 10, got %d", peak.Load())
 	}
 }
