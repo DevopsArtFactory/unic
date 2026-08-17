@@ -91,7 +91,7 @@ func TestListCertificatesDescribesConcurrentlyWithLimit(t *testing.T) {
 		},
 		describe: func(ctx context.Context, in *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
 			current := active.Add(1)
-			for current > peak.Load() && !peak.CompareAndSwap(peak.Load(), current) {
+			for previous := peak.Load(); current > previous && !peak.CompareAndSwap(previous, current); previous = peak.Load() {
 			}
 			if current == 10 {
 				close(release)
