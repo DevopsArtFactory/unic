@@ -34,13 +34,17 @@ func inspectACMExpiry(ctx context.Context, repo *AwsRepository, now time.Time, e
 		if days <= 7 {
 			severity = RuleSeverityHigh
 		}
+		summary := fmt.Sprintf("Certificate for %s expires in %d days.", certificate.DomainName, days)
+		if certificate.NotAfter.Before(now) {
+			summary = fmt.Sprintf("Certificate for %s has expired.", certificate.DomainName)
+		}
 		findings = append(findings, SecurityFinding{
 			RuleID:         "acm-certificate-expiry",
 			RuleName:       "ACM certificate expiring soon",
 			Severity:       severity,
 			ResourceType:   "ACM Certificate",
 			ResourceID:     certificate.ARN,
-			Summary:        fmt.Sprintf("Certificate for %s expires in %d days.", certificate.DomainName, days),
+			Summary:        summary,
 			Recommendation: "Renew or replace the certificate before expiry and verify dependent resources use the replacement.",
 		})
 	}
