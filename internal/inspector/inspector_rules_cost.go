@@ -166,7 +166,7 @@ func inspectEC2InstancesForWaste(ctx context.Context, client EC2ClientAPI) ([]Se
 					findings = append(findings, SecurityFinding{
 						RuleID:         inspectorRuleIDCostInstanceStopped,
 						RuleName:       "Stopped EC2 instance",
-						Severity:       RuleSeverityLow,
+						Severity:       RuleSeverityMedium,
 						ResourceType:   "EC2Instance",
 						ResourceID:     instanceID,
 						Summary:        fmt.Sprintf("EC2 instance %s is stopped but retains provisioned resources such as EBS storage.", instanceID),

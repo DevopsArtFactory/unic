@@ -160,7 +160,7 @@ func TestInspectCostWasteFindsWasteAndUntaggedResources(t *testing.T) {
 		inspectorRuleIDCostResourceUntagged + "/eipalloc-unused":                                                RuleSeverityLow,
 		inspectorRuleIDCostVolumeUnattached + "/vol-unused":                                                     RuleSeverityMedium,
 		inspectorRuleIDCostResourceUntagged + "/vol-unused":                                                     RuleSeverityLow,
-		inspectorRuleIDCostInstanceStopped + "/i-stopped":                                                       RuleSeverityLow,
+		inspectorRuleIDCostInstanceStopped + "/i-stopped":                                                       RuleSeverityMedium,
 		inspectorRuleIDCostResourceUntagged + "/i-stopped":                                                      RuleSeverityLow,
 		inspectorRuleIDCostSnapshotAged + "/snap-aged":                                                          RuleSeverityLow,
 		inspectorRuleIDCostResourceUntagged + "/snap-aged":                                                      RuleSeverityLow,
