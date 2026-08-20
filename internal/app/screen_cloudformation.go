@@ -10,16 +10,21 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
-const cloudFormationDriftPollDelay = 2 * time.Second
+const (
+	cloudFormationDriftPollDelay   = 2 * time.Second
+	cloudFormationDriftPollTimeout = 5 * time.Minute
+	cloudFormationDriftPollLimit   = int(cloudFormationDriftPollTimeout / cloudFormationDriftPollDelay)
+)
 
 type cloudFormationModel struct {
-	stacks           []awsservice.CloudFormationStack
-	filtered         []awsservice.CloudFormationStack
-	idx              int
-	selected         *awsservice.CloudFormationStack
-	detailScroll     int
-	driftDetectionID string
-	driftNotice      string
+	stacks            []awsservice.CloudFormationStack
+	filtered          []awsservice.CloudFormationStack
+	idx               int
+	selected          *awsservice.CloudFormationStack
+	detailScroll      int
+	driftDetectionID  string
+	driftPollAttempts int
+	driftNotice       string
 }
 
 func newCloudFormationModel() cloudFormationModel { return cloudFormationModel{} }
@@ -59,12 +64,12 @@ func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, 
 			return *m, nil, true
 		}
 		cm.driftDetectionID = msg.detectionID
+		cm.driftPollAttempts = 0
 		cm.driftNotice = "Drift detection in progress..."
 		m.screen = screenCloudFormationStackDetail
 		return *m, cm.scheduleDriftPoll(msg.stackID, msg.detectionID), true
 	case cloudFormationDriftPollTickMsg:
-		if m.screen != screenCloudFormationStackDetail || cm.selected == nil ||
-			cm.selected.ID != msg.stackID || cm.driftDetectionID != msg.detectionID {
+		if cm.selected == nil || cm.selected.ID != msg.stackID || cm.driftDetectionID != msg.detectionID {
 			return *m, nil, true
 		}
 		return *m, cm.pollDrift(*m, msg.stackID, msg.detectionID), true
@@ -75,20 +80,30 @@ func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, 
 		if msg.err != nil {
 			cm.driftNotice = fmt.Sprintf("Drift status error: %v", msg.err)
 			cm.driftDetectionID = ""
+			cm.driftPollAttempts = 0
 			return *m, nil, true
 		}
 		if msg.status == nil {
 			cm.driftNotice = "Drift detection returned no status"
 			cm.driftDetectionID = ""
+			cm.driftPollAttempts = 0
 			return *m, nil, true
 		}
 		switch msg.status.DetectionStatus {
 		case "DETECTION_IN_PROGRESS":
+			cm.driftPollAttempts++
+			if cm.driftPollAttempts >= cloudFormationDriftPollLimit {
+				cm.driftNotice = fmt.Sprintf("Drift detection timed out after %s", cloudFormationDriftPollTimeout)
+				cm.driftDetectionID = ""
+				cm.driftPollAttempts = 0
+				return *m, nil, true
+			}
 			cm.driftNotice = "Drift detection in progress..."
 			return *m, cm.scheduleDriftPoll(msg.stackID, msg.detectionID), true
 		case "DETECTION_COMPLETE":
 			cm.selected.DriftStatus = msg.status.StackDriftStatus
 			cm.selected.LastDriftCheck = msg.status.Timestamp
+			cm.applyDriftStatus(msg.stackID, msg.status.StackDriftStatus, msg.status.Timestamp)
 			cm.driftNotice = fmt.Sprintf("Drift detection complete: %s (%d drifted resources)", msg.status.StackDriftStatus, msg.status.DriftedResources)
 		default:
 			cm.driftNotice = "Drift detection failed"
@@ -97,6 +112,7 @@ func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, 
 			}
 		}
 		cm.driftDetectionID = ""
+		cm.driftPollAttempts = 0
 		return *m, nil, true
 	}
 	return *m, nil, false
@@ -263,6 +279,17 @@ func (cm cloudFormationModel) scheduleDriftPoll(stackID, detectionID string) tea
 	return tea.Tick(cloudFormationDriftPollDelay, func(time.Time) tea.Msg {
 		return cloudFormationDriftPollTickMsg{stackID: stackID, detectionID: detectionID}
 	})
+}
+
+func (cm *cloudFormationModel) applyDriftStatus(stackID, driftStatus string, checked time.Time) {
+	for _, stacks := range [][]awsservice.CloudFormationStack{cm.stacks, cm.filtered} {
+		for i := range stacks {
+			if stacks[i].ID == stackID {
+				stacks[i].DriftStatus = driftStatus
+				stacks[i].LastDriftCheck = checked
+			}
+		}
+	}
 }
 
 func (cm cloudFormationModel) viewStackList(m Model) string {

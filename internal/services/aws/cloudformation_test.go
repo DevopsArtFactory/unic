@@ -96,6 +96,7 @@ func TestGetCloudFormationStackMapsNewestThirtyEventsAndReasons(t *testing.T) {
 			ResourceStatusReason: awssdk.String("bucket name already exists"),
 		}
 	}
+	eventCalls := 0
 	client := &mockCloudFormationClient{
 		describeStacks: func(_ context.Context, input *cloudformation.DescribeStacksInput, _ ...func(*cloudformation.Options)) (*cloudformation.DescribeStacksOutput, error) {
 			if awssdk.ToString(input.StackName) != "stack-id" {
@@ -109,7 +110,22 @@ func TestGetCloudFormationStackMapsNewestThirtyEventsAndReasons(t *testing.T) {
 			if awssdk.ToString(input.StackName) != "stack-id" {
 				t.Fatalf("expected event lookup by stack ID, got %q", awssdk.ToString(input.StackName))
 			}
-			return &cloudformation.DescribeStackEventsOutput{StackEvents: events}, nil
+			eventCalls++
+			switch eventCalls {
+			case 1:
+				if input.NextToken != nil {
+					t.Fatalf("expected empty first-page token, got %q", awssdk.ToString(input.NextToken))
+				}
+				return &cloudformation.DescribeStackEventsOutput{StackEvents: events[:10], NextToken: awssdk.String("page-2")}, nil
+			case 2:
+				if awssdk.ToString(input.NextToken) != "page-2" {
+					t.Fatalf("expected second-page token, got %q", awssdk.ToString(input.NextToken))
+				}
+				return &cloudformation.DescribeStackEventsOutput{StackEvents: events[10:]}, nil
+			default:
+				t.Fatalf("unexpected event page %d", eventCalls)
+				return nil, nil
+			}
 		},
 	}
 
@@ -117,8 +133,8 @@ func TestGetCloudFormationStackMapsNewestThirtyEventsAndReasons(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stack.Events) != cloudFormationRecentEventLimit {
-		t.Fatalf("expected %d bounded recent events, got %d", cloudFormationRecentEventLimit, len(stack.Events))
+	if eventCalls != 2 || len(stack.Events) != cloudFormationRecentEventLimit {
+		t.Fatalf("expected two pages and %d bounded recent events, got calls=%d events=%d", cloudFormationRecentEventLimit, eventCalls, len(stack.Events))
 	}
 	if stack.Events[0].LogicalResourceID != "Resource0" || stack.Events[0].Reason != "bucket name already exists" || stack.Events[29].LogicalResourceID != "Resource29" {
 		t.Fatalf("unexpected mapped events: first=%+v last=%+v", stack.Events[0], stack.Events[29])

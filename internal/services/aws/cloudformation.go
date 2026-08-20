@@ -41,15 +41,18 @@ func (r *AwsRepository) GetCloudFormationStack(ctx context.Context, stackID stri
 	}
 
 	stack := mapCloudFormationStack(out.Stacks[0], r.Region)
-	events, err := r.CloudFormationClient.DescribeStackEvents(ctx, &cloudformation.DescribeStackEventsInput{StackName: awssdk.String(stackID)})
-	if err != nil {
-		return nil, fmt.Errorf("failed to describe events for CloudFormation stack %s: %w", stackID, err)
-	}
-	for _, event := range events.StackEvents {
-		if len(stack.Events) == cloudFormationRecentEventLimit {
-			break
+	paginator := cloudformation.NewDescribeStackEventsPaginator(r.CloudFormationClient, &cloudformation.DescribeStackEventsInput{StackName: awssdk.String(stackID)})
+	for paginator.HasMorePages() && len(stack.Events) < cloudFormationRecentEventLimit {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe events for CloudFormation stack %s: %w", stackID, err)
 		}
-		stack.Events = append(stack.Events, mapCloudFormationStackEvent(event))
+		for _, event := range page.StackEvents {
+			if len(stack.Events) == cloudFormationRecentEventLimit {
+				break
+			}
+			stack.Events = append(stack.Events, mapCloudFormationStackEvent(event))
+		}
 	}
 	sort.SliceStable(stack.Events, func(i, j int) bool {
 		return stack.Events[i].Timestamp.After(stack.Events[j].Timestamp)

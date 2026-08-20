@@ -150,6 +150,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_ec2_browser.go`
 - `screen_vpc.go`
 - `screen_rds.go`
+- `screen_cloudformation.go`
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`

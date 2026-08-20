@@ -150,6 +150,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_ec2_browser.go`
 - `screen_vpc.go`
 - `screen_rds.go`
+- `screen_cloudformation.go`
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
