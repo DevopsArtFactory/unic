@@ -38,10 +38,18 @@ func (am *cwAlarmsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 func (am *cwAlarmsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case cwAlarmsLoadedMsg:
+		selectedName := ""
+		if m.watch.refreshing && am.idx >= 0 && am.idx < len(am.filtered) {
+			selectedName = am.filtered[am.idx].Name
+		}
 		am.alarms = msg.alarms
 		am.applyStateAndTextFilter(m)
-		am.idx = 0
-		am.selected = nil
+		if m.watch.refreshing {
+			am.idx = indexAlarmByName(am.filtered, selectedName)
+		} else {
+			am.idx = 0
+			am.selected = nil
+		}
 		m.screen = screenCWAlarmList
 		return *m, nil, true
 	case cwAlarmHistoryLoadedMsg:
@@ -111,6 +119,7 @@ func (am *cwAlarmsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cm
 
 	switch msg.String() {
 	case "q", "esc":
+		m.stopWatch()
 		m.screen = screenFeatureList
 		m.resetFilter(filterCWAlarms)
 	case "up", "k":
@@ -288,6 +297,7 @@ func (am cwAlarmsModel) viewList(m Model) string {
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("CloudWatch Alarms"))
+	b.WriteString(m.watchBadge())
 	b.WriteString("\n")
 
 	var tabs []string
@@ -334,8 +344,17 @@ func (am cwAlarmsModel) viewList(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: navigate • tab: state filter • /: filter • r: refresh • enter: detail • esc: back"))
+	b.WriteString(m.renderHelpBar("↑/↓: navigate • tab: state filter • /: filter • W: watch • I: interval • r: refresh • enter: detail • esc: back"))
 	return b.String()
+}
+
+func indexAlarmByName(alarms []awsservice.CloudWatchAlarm, name string) int {
+	for i := range alarms {
+		if alarms[i].Name == name {
+			return i
+		}
+	}
+	return 0
 }
 
 func (am cwAlarmsModel) viewDetail(m Model) string {

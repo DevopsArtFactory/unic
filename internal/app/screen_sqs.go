@@ -36,12 +36,37 @@ func (sm *sqsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 func (sm *sqsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case sqsQueuesLoadedMsg:
+		selectedARN := ""
+		rowARN := ""
+		if m.watch.refreshing {
+			if sm.selected != nil {
+				selectedARN = sm.selected.ARN
+			}
+			if sm.idx >= 0 && sm.idx < len(sm.filtered) {
+				rowARN = sm.filtered[sm.idx].ARN
+			}
+		}
 		sm.queues = msg.queues
 		sm.regionErrors = msg.regionErrors
 		sm.filtered = applyFilter(sm.queues, m.filterValue(filterSQSQueues))
-		sm.idx = 0
-		sm.selected = nil
-		m.screen = screenSQSQueueList
+		if m.watch.refreshing {
+			sm.idx = indexQueueByARN(sm.filtered, rowARN)
+			if m.watch.target == screenSQSQueueDetail {
+				sm.selected = sm.queueByARN(selectedARN)
+				if sm.selected == nil {
+					m.stopWatch()
+					m.screen = screenSQSQueueList
+				} else {
+					m.screen = screenSQSQueueDetail
+				}
+			} else {
+				m.screen = screenSQSQueueList
+			}
+		} else {
+			sm.idx = 0
+			sm.selected = nil
+			m.screen = screenSQSQueueList
+		}
 		return *m, nil, true
 	case sqsActionDoneMsg:
 		if msg.err != nil {
@@ -101,6 +126,7 @@ func (sm *sqsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "q", "esc":
+		m.stopWatch()
 		m.screen = screenFeatureList
 		m.resetFilter(filterSQSQueues)
 	case "up", "k":
@@ -120,6 +146,7 @@ func (sm *sqsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.startLoading(sm.loadQueues(*m))
 	case "enter":
 		if len(sm.filtered) > 0 && sm.idx < len(sm.filtered) {
+			m.stopWatch()
 			selected := sm.filtered[sm.idx]
 			sm.selected = &selected
 			sm.notice = ""
@@ -132,6 +159,7 @@ func (sm *sqsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (sm *sqsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
+		m.stopWatch()
 		m.screen = screenSQSQueueList
 	case "r":
 		return m.startLoading(sm.loadQueues(*m))
@@ -153,12 +181,14 @@ func (sm *sqsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		}
 	case "x":
 		if sm.selected != nil {
+			m.stopWatch()
 			sm.action = "purge"
 			sm.confirmInput = ""
 			m.screen = screenSQSConfirm
 		}
 	case "m":
 		if sm.selected != nil && sm.selected.IsDLQ() {
+			m.stopWatch()
 			sm.action = "redrive"
 			sm.confirmInput = ""
 			m.screen = screenSQSConfirm
@@ -196,6 +226,15 @@ func (sm sqsModel) queueByARN(arn string) *awsservice.SQSQueue {
 		}
 	}
 	return nil
+}
+
+func indexQueueByARN(queues []awsservice.SQSQueue, arn string) int {
+	for i := range queues {
+		if queues[i].ARN == arn {
+			return i
+		}
+	}
+	return 0
 }
 
 func (sm sqsModel) loadQueues(m Model) tea.Cmd {
@@ -262,6 +301,7 @@ func (sm sqsModel) viewList(m Model) string {
 		title += " (all regions)"
 	}
 	b.WriteString(titleStyle.Render(title))
+	b.WriteString(m.watchBadge())
 	b.WriteString("\n")
 	b.WriteString(m.renderFilterValue(filterSQSQueues))
 	b.WriteString("\n\n")
@@ -317,6 +357,7 @@ func (sm sqsModel) viewDetail(m Model) string {
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("SQS Queue Detail"))
+	b.WriteString(m.watchBadge())
 	b.WriteString("\n\n")
 
 	b.WriteString(m.renderEC2DetailLine("Name", queue.Name))
