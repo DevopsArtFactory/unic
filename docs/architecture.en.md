@@ -98,6 +98,7 @@ Current repository clients include:
 - CloudWatch Logs
 - ECS
 - ECR
+- Auto Scaling
 - FIS
 - ElastiCache
 - ACM
@@ -147,6 +148,7 @@ Screen-specific rendering still lives in dedicated files such as:
 
 - `screen_ec2.go`
 - `screen_ec2_browser.go`
+- `screen_autoscaling.go`
 - `screen_vpc.go`
 - `screen_rds.go`
 - `screen_route53.go`
@@ -229,6 +231,7 @@ Current screen families include:
 - service list
 - feature list
 - EC2 / SSM
+- Auto Scaling group list, instance/activity detail, capacity input, and typed-confirmation flows
 - VPC / subnet / available IP detail
 - RDS list, detail, and confirm flows
 - Route53 zone, record, and mutation flows

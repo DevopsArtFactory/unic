@@ -13,6 +13,7 @@ const (
 	filterInstances
 	filterEC2BrowserInstances
 	filterEC2BrowserRelated
+	filterAutoScalingGroups
 	filterSubnetIPs
 	filterRDS
 	filterRoute53Zones
