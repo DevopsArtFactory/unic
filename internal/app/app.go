@@ -132,15 +132,16 @@ const (
 
 // Model is the root Bubbletea model.
 type Model struct {
-	cfg                *config.Config
-	awsRepo            *awsservice.AwsRepository
-	screen             screen
-	quitting           bool
-	exitMessage        string
-	exitTitle          string
-	bootFrame          int
-	settingsIdx        int
-	settingsPrevScreen screen
+	cfg                 *config.Config
+	awsRepo             *awsservice.AwsRepository
+	screen              screen
+	loadingReturnScreen screen
+	quitting            bool
+	exitMessage         string
+	exitTitle           string
+	bootFrame           int
+	settingsIdx         int
+	settingsPrevScreen  screen
 
 	// App-shell state stays root-owned because it coordinates global navigation,
 	// context/session setup, shared chrome, and cross-feature transitions.
@@ -434,6 +435,7 @@ func (m Model) startLoadingWithMessage(title string, details []string, cmd tea.C
 		cmd = m.commands.BindCmd(gen, cmd)
 	}
 	m.screen = screenLoading
+	m.loadingReturnScreen = 0
 	m.loadingSpinner = newLoadingSpinner()
 	m.loadingTitle = title
 	m.loadingDetails = append([]string(nil), details...)
@@ -441,6 +443,13 @@ func (m Model) startLoadingWithMessage(title string, details []string, cmd tea.C
 		return m, m.loadingSpinner.Tick
 	}
 	return m, tea.Batch(m.loadingSpinner.Tick, cmd)
+}
+
+func (m Model) startLoadingFor(returnScreen screen, title string, details []string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	updated, next := m.startLoadingWithMessage(title, details, cmd)
+	model := updated.(Model)
+	model.loadingReturnScreen = returnScreen
+	return model, next
 }
 
 // isTextEntryScreen reports whether the current screen captures free-form text
