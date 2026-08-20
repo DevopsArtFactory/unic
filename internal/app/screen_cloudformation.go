@@ -122,15 +122,38 @@ func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, 
 }
 
 func cloudFormationLoadActive(m Model) bool {
-	return m.screen == screenLoading || m.screen == screenSettings && m.settingsPrevScreen == screenLoading
+	current := m.screen
+	for {
+		if current == screenLoading {
+			return true
+		}
+		switch current {
+		case screenSettings:
+			current = m.settingsPrevScreen
+		case screenCommandPalette:
+			current = m.palette.prevScreen
+		case screenViewList:
+			current = m.views.prevScreen
+		case screenContextPicker:
+			current = m.ctxPrevScreen
+		default:
+			return false
+		}
+	}
 }
 
 func finishCloudFormationLoad(m *Model, next screen) {
-	if m.screen == screenSettings {
-		m.settingsPrevScreen = next
-		return
+	for _, target := range []*screen{
+		&m.screen,
+		&m.settingsPrevScreen,
+		&m.palette.prevScreen,
+		&m.views.prevScreen,
+		&m.ctxPrevScreen,
+	} {
+		if *target == screenLoading {
+			*target = next
+		}
 	}
-	m.screen = next
 }
 
 func (cm *cloudFormationModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {

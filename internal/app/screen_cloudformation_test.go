@@ -269,8 +269,8 @@ func TestCloudFormationDriftPollingSurvivesSettingsOverlay(t *testing.T) {
 	}
 }
 
-func TestCloudFormationLoadsCompleteBehindSettingsOverlay(t *testing.T) {
-	tests := []struct {
+func TestCloudFormationLoadsCompleteBehindGlobalOverlays(t *testing.T) {
+	loads := []struct {
 		name    string
 		setup   func(*Model)
 		msg     tea.Msg
@@ -316,28 +316,97 @@ func TestCloudFormationLoadsCompleteBehindSettingsOverlay(t *testing.T) {
 			},
 		},
 	}
+	overlays := []struct {
+		name     string
+		open     func(*Model)
+		previous func(Model) screen
+	}{
+		{
+			name: "settings",
+			open: func(m *Model) {
+				m.screen = screenSettings
+				m.settingsPrevScreen = screenLoading
+			},
+			previous: func(m Model) screen { return m.settingsPrevScreen },
+		},
+		{
+			name: "command palette",
+			open: func(m *Model) {
+				m.screen = screenCommandPalette
+				m.palette.prevScreen = screenLoading
+			},
+			previous: func(m Model) screen { return m.palette.prevScreen },
+		},
+		{
+			name: "saved views",
+			open: func(m *Model) {
+				m.screen = screenViewList
+				m.views.prevScreen = screenLoading
+			},
+			previous: func(m Model) screen { return m.views.prevScreen },
+		},
+		{
+			name: "context picker",
+			open: func(m *Model) {
+				m.cfg.ContextName = "dev"
+				m.screen = screenContextPicker
+				m.ctxPrevScreen = screenLoading
+			},
+			previous: func(m Model) screen { return m.ctxPrevScreen },
+		},
+	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := New(testConfig(), "", "dev")
-			m.screen = screenSettings
-			m.settingsPrevScreen = screenLoading
-			if tt.setup != nil {
-				tt.setup(&m)
-			}
+	for _, load := range loads {
+		for _, overlay := range overlays {
+			t.Run(load.name+"/"+overlay.name, func(t *testing.T) {
+				m := New(testConfig(), "", "dev")
+				overlay.open(&m)
+				if load.setup != nil {
+					load.setup(&m)
+				}
 
-			updated, cmd := m.Update(tt.msg)
-			model := updated.(Model)
-			if model.screen != screenSettings || model.settingsPrevScreen != tt.next || (cmd != nil) != tt.wantCmd {
-				t.Fatalf("expected Settings to retain completed load target %v, got screen=%v previous=%v cmd=%v", tt.next, model.screen, model.settingsPrevScreen, cmd)
-			}
-			tt.verify(t, model)
+				updated, cmd := m.Update(load.msg)
+				model := updated.(Model)
+				if model.screen != m.screen || overlay.previous(model) != load.next || (cmd != nil) != load.wantCmd {
+					t.Fatalf("expected %s to retain completed load target %v, got screen=%v previous=%v cmd=%v", overlay.name, load.next, model.screen, overlay.previous(model), cmd)
+				}
+				load.verify(t, model)
 
-			updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
-			if model = updated.(Model); model.screen != tt.next {
-				t.Fatalf("expected Settings return to %v, got %v", tt.next, model.screen)
-			}
-		})
+				updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+				if model = updated.(Model); model.screen != load.next {
+					t.Fatalf("expected %s return to %v, got %v", overlay.name, load.next, model.screen)
+				}
+			})
+		}
+	}
+}
+
+func TestCloudFormationLoadCompletesBeforeContextPickerOpens(t *testing.T) {
+	cfg := testConfig()
+	cfg.ContextName = "dev"
+	m := New(cfg, "", "dev")
+	m.screen = screenLoading
+
+	updated, contextsCmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	model := updated.(Model)
+	if contextsCmd == nil || model.screen != screenLoading || model.ctxPrevScreen != screenLoading {
+		t.Fatalf("expected context picker load over CloudFormation load, got screen=%v previous=%v cmd=%v", model.screen, model.ctxPrevScreen, contextsCmd)
+	}
+
+	updated, _ = model.Update(cloudFormationStacksLoadedMsg{stacks: []awsservice.CloudFormationStack{{ID: "stack-id"}}})
+	model = updated.(Model)
+	if model.screen != screenCloudFormationStackList || model.ctxPrevScreen != screenCloudFormationStackList {
+		t.Fatalf("expected completed load to rewrite pending context return, got screen=%v previous=%v", model.screen, model.ctxPrevScreen)
+	}
+
+	updated, _ = model.Update(contextsLoadedMsg{})
+	model = updated.(Model)
+	if model.screen != screenContextPicker || model.ctxPrevScreen != screenCloudFormationStackList {
+		t.Fatalf("expected context picker over completed stack list, got screen=%v previous=%v", model.screen, model.ctxPrevScreen)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if model = updated.(Model); model.screen != screenCloudFormationStackList {
+		t.Fatalf("expected context picker return to completed stack list, got %v", model.screen)
 	}
 }
 
