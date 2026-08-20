@@ -26,7 +26,7 @@ func (r *AwsRepository) ListCloudFormationStacks(ctx context.Context) ([]CloudFo
 			stacks = append(stacks, mapCloudFormationStack(stack, r.Region))
 		}
 	}
-	sortCloudFormationStacks(stacks)
+	SortCloudFormationStacks(stacks)
 	return stacks, nil
 }
 
@@ -147,7 +147,8 @@ func mapCloudFormationStackEvent(event cloudformationtypes.StackEvent) CloudForm
 	return mapped
 }
 
-func sortCloudFormationStacks(stacks []CloudFormationStack) {
+// SortCloudFormationStacks orders stacks for failure-first triage.
+func SortCloudFormationStacks(stacks []CloudFormationStack) {
 	sort.SliceStable(stacks, func(i, j int) bool {
 		left, right := cloudFormationStatusPriority(stacks[i].Status), cloudFormationStatusPriority(stacks[j].Status)
 		if left != right {

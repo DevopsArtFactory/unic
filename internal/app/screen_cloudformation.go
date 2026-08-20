@@ -54,6 +54,7 @@ func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, 
 			return *m, nil, true
 		}
 		cm.selected = msg.stack
+		cm.reconcileStack(*m, msg.stack)
 		cm.detailScroll = 0
 		cm.driftDetectionID = ""
 		cm.driftNotice = ""
@@ -181,8 +182,7 @@ func (cm *cloudFormationModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, t
 		case "pgdown":
 			cm.detailScroll = min(cm.detailScroll+visibleLines, maxOffset)
 		case "r":
-			if cm.selected != nil {
-				cm.driftDetectionID = ""
+			if cm.selected != nil && cm.driftDetectionID == "" {
 				newM, cmd := m.startLoadingWithMessage("Refreshing stack detail...", []string{cm.selected.Name}, cm.loadStack(*m, cm.selected.ID))
 				return newM, cmd, true
 			}
@@ -309,6 +309,24 @@ func (cm *cloudFormationModel) applyDriftStatus(stackID, driftStatus string, che
 		if cm.stacks[i].ID == stackID {
 			cm.stacks[i].DriftStatus = driftStatus
 			cm.stacks[i].LastDriftCheck = checked
+		}
+	}
+}
+
+func (cm *cloudFormationModel) reconcileStack(m Model, stack *awsservice.CloudFormationStack) {
+	for i := range cm.stacks {
+		if cm.stacks[i].ID == stack.ID {
+			cm.stacks[i] = *stack
+			break
+		}
+	}
+	awsservice.SortCloudFormationStacks(cm.stacks)
+	cm.filtered = applyFilter(cm.stacks, m.filterValue(filterCloudFormationStacks))
+	cm.idx = clampListIndex(cm.idx, len(cm.filtered))
+	for i := range cm.filtered {
+		if cm.filtered[i].ID == stack.ID {
+			cm.idx = i
+			break
 		}
 	}
 }

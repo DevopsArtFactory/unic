@@ -98,6 +98,62 @@ func TestCloudFormationDetailShowsParametersOutputsEventsAndEscapesControls(t *t
 	}
 }
 
+func TestCloudFormationDetailRefreshReconcilesStackList(t *testing.T) {
+	tests := []struct {
+		name         string
+		filter       string
+		wantFiltered int
+	}{
+		{name: "preserves selected stack after reordering", wantFiltered: 2},
+		{name: "reapplies active status filter", filter: "create_complete", wantFiltered: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m.screen = screenLoading
+			m.storeFilterValue(filterCloudFormationStacks, tt.filter)
+			m.cloudFormation.stacks = []awsservice.CloudFormationStack{
+				{ID: "other-id", Name: "other", Status: "UPDATE_IN_PROGRESS"},
+				{ID: "stack-id", Name: "prod", Status: "CREATE_COMPLETE"},
+			}
+			m.cloudFormation.filtered = applyFilter(m.cloudFormation.stacks, tt.filter)
+			m.cloudFormation.idx = len(m.cloudFormation.filtered) - 1
+			m.cloudFormation.selected = &awsservice.CloudFormationStack{ID: "stack-id", Name: "prod", Status: "CREATE_COMPLETE"}
+
+			m.cloudFormation.HandleMessage(&m, cloudFormationStackDetailLoadedMsg{stack: &awsservice.CloudFormationStack{
+				ID: "stack-id", Name: "prod", Status: "CREATE_FAILED",
+			}})
+
+			if m.cloudFormation.stacks[0].ID != "stack-id" || m.cloudFormation.stacks[0].Status != "CREATE_FAILED" {
+				t.Fatalf("expected refreshed failed stack first, got %+v", m.cloudFormation.stacks)
+			}
+			if len(m.cloudFormation.filtered) != tt.wantFiltered {
+				t.Fatalf("expected %d filtered stacks, got %+v", tt.wantFiltered, m.cloudFormation.filtered)
+			}
+			if tt.filter == "" && (m.cloudFormation.idx != 0 || m.cloudFormation.filtered[m.cloudFormation.idx].ID != "stack-id") {
+				t.Fatalf("expected cursor to follow refreshed stack, got idx=%d filtered=%+v", m.cloudFormation.idx, m.cloudFormation.filtered)
+			}
+		})
+	}
+}
+
+func TestCloudFormationDetailRefreshWaitsForActiveDriftDetection(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenCloudFormationStackDetail
+	m.cloudFormation.selected = &awsservice.CloudFormationStack{ID: "stack-id", Name: "prod"}
+	m.cloudFormation.driftDetectionID = "detect-1"
+	generation := m.commands.CurrentGen()
+
+	updated, cmd, handled := m.cloudFormation.HandleKey(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	model := updated.(Model)
+	if !handled || cmd != nil || model.screen != screenCloudFormationStackDetail || model.cloudFormation.driftDetectionID != "detect-1" {
+		t.Fatalf("expected refresh to leave active drift polling intact, got handled=%v cmd=%v screen=%v id=%q", handled, cmd, model.screen, model.cloudFormation.driftDetectionID)
+	}
+	if model.commands.CurrentGen() != generation {
+		t.Fatalf("expected refresh to preserve command generation %d, got %d", generation, model.commands.CurrentGen())
+	}
+}
+
 func TestCloudFormationDetailScrollsToOlderEvents(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.height = 10
