@@ -101,6 +101,7 @@ Current repository clients include:
 - FIS
 - ElastiCache
 - ACM
+- Step Functions
 - S3
 - KMS
 
@@ -159,6 +160,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_ecr.go`
 - `screen_elasticache.go`
 - `screen_acm.go`
+- `screen_stepfunctions.go`
 - `screen_s3.go`
 - `screen_lambda.go`
 - `screen_bedrock.go`
@@ -243,6 +245,7 @@ Current screen families include:
 - FIS experiment template list/detail, safe-run preview, and experiment history/detail flows
 - ElastiCache replication-group/cluster list, node list, and node detail flows
 - ACM certificate list/detail flows
+- Step Functions state machine list, failure-prioritized execution list, and execution detail flows
 - S3 bucket/object/detail flows
 - KMS key list/detail and rotation-posture flows
 - Inspector mode home, checklist setup, security findings/detail (including KMS rotation findings), and checklist results/detail flows

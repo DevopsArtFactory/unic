@@ -50,6 +50,8 @@ const (
 	filterElastiCacheResources
 	filterKMSKeys
 	filterACMCertificates
+	filterStepFunctionStateMachines
+	filterStepFunctionExecutions
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

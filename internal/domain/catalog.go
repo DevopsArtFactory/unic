@@ -190,6 +190,13 @@ func Catalog() []Service {
 			}},
 		},
 		{
+			Name: ServiceStepFunctions,
+			Features: []Feature{{
+				Kind:        FeatureStepFunctionsBrowser,
+				Description: "Browse state machines and triage failed executions",
+			}},
+		},
+		{
 			Name: ServiceLambda,
 			Features: []Feature{
 				{

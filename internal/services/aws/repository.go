@@ -28,6 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -41,6 +42,7 @@ var _ SSMClientAPI = (*ssm.Client)(nil)
 var _ KMSClientAPI = (*kms.Client)(nil)
 
 var _ ACMClientAPI = (*acm.Client)(nil)
+var _ StepFunctionsClientAPI = (*sfn.Client)(nil)
 
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
@@ -133,6 +135,14 @@ type KMSClientAPI interface {
 type ACMClientAPI interface {
 	ListCertificates(ctx context.Context, params *acm.ListCertificatesInput, optFns ...func(*acm.Options)) (*acm.ListCertificatesOutput, error)
 	DescribeCertificate(ctx context.Context, params *acm.DescribeCertificateInput, optFns ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error)
+}
+
+// StepFunctionsClientAPI is the interface for Step Functions browser operations.
+type StepFunctionsClientAPI interface {
+	ListStateMachines(ctx context.Context, params *sfn.ListStateMachinesInput, optFns ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error)
+	ListExecutions(ctx context.Context, params *sfn.ListExecutionsInput, optFns ...func(*sfn.Options)) (*sfn.ListExecutionsOutput, error)
+	DescribeExecution(ctx context.Context, params *sfn.DescribeExecutionInput, optFns ...func(*sfn.Options)) (*sfn.DescribeExecutionOutput, error)
+	GetExecutionHistory(ctx context.Context, params *sfn.GetExecutionHistoryInput, optFns ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
@@ -361,6 +371,7 @@ type AwsRepository struct {
 	S3Client             S3ClientAPI
 	LambdaClient         LambdaClientAPI
 	ACMClient            ACMClientAPI
+	StepFunctionsClient  StepFunctionsClientAPI
 	Region               string
 	Profile              string
 	awsCfg               aws.Config
@@ -483,6 +494,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		S3Client:             s3.NewFromConfig(awsCfg),
 		LambdaClient:         lambda.NewFromConfig(awsCfg),
 		ACMClient:            acm.NewFromConfig(awsCfg),
+		StepFunctionsClient:  sfn.NewFromConfig(awsCfg),
 		Region:               region,
 		Profile:              profile,
 		awsCfg:               awsCfg,

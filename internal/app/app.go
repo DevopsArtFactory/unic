@@ -103,6 +103,9 @@ const (
 	screenKMSKeyDetail
 	screenACMCertificateList
 	screenACMCertificateDetail
+	screenStepFunctionStateMachineList
+	screenStepFunctionExecutionList
+	screenStepFunctionExecutionDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -173,32 +176,33 @@ type Model struct {
 	selectedInstance *awsservice.EC2Instance
 
 	// Feature submodels
-	ec2Browser   ec2InstanceBrowserModel
-	ecs          ecsModel
-	eks          eksModel
-	ecr          ecrModel
-	fis          fisModel
-	vpc          vpcModel
-	reachability reachabilityModel
-	cwMetrics    cloudWatchMetricsModel
-	cwAlarms     cwAlarmsModel
-	cloudTrail   cloudTrailModel
-	cwLogs       cloudWatchLogsModel
-	rds          rdsModel
-	route53      route53Model
-	iam          iamModel
-	bedrock      bedrockModel
-	secrets      secretsModel
-	security     securityGroupModel
-	s3           s3Model
-	sqs          sqsModel
-	elb          elbModel
-	ssmParams    ssmParamsModel
-	elasticache  elasticacheModel
-	kms          kmsModel
-	acm          acmModel
-	lambda       lambdaModel
-	inspector    inspectorModel
+	ec2Browser    ec2InstanceBrowserModel
+	ecs           ecsModel
+	eks           eksModel
+	ecr           ecrModel
+	fis           fisModel
+	vpc           vpcModel
+	reachability  reachabilityModel
+	cwMetrics     cloudWatchMetricsModel
+	cwAlarms      cwAlarmsModel
+	cloudTrail    cloudTrailModel
+	cwLogs        cloudWatchLogsModel
+	rds           rdsModel
+	route53       route53Model
+	iam           iamModel
+	bedrock       bedrockModel
+	secrets       secretsModel
+	security      securityGroupModel
+	s3            s3Model
+	sqs           sqsModel
+	elb           elbModel
+	ssmParams     ssmParamsModel
+	elasticache   elasticacheModel
+	kms           kmsModel
+	acm           acmModel
+	stepFunctions stepFunctionsModel
+	lambda        lambdaModel
+	inspector     inspectorModel
 
 	// Context picker
 	configPath         string
@@ -320,6 +324,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.elasticache = newElastiCacheModel()
 	model.kms = newKMSModel()
 	model.acm = newACMModel()
+	model.stepFunctions = newStepFunctionsModel()
 	model.lambda = newLambdaModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
@@ -817,6 +822,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.kms.Start(&m)
 	case domain.FeatureACMCertificateBrowser:
 		return m.acm.Start(&m)
+	case domain.FeatureStepFunctionsBrowser:
+		return m.stepFunctions.Start(&m)
 	case domain.FeatureSecurityGroupBrowser:
 		return m.security.Start(&m)
 	case domain.FeatureIAMUsersBrowser:

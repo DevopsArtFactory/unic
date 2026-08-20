@@ -235,6 +235,19 @@ type acmCertificatesLoadedMsg struct {
 	certificates []awsservice.ACMCertificate
 }
 
+type stepFunctionStateMachinesLoadedMsg struct {
+	stateMachines []awsservice.StepFunctionStateMachine
+}
+
+type stepFunctionExecutionsLoadedMsg struct {
+	stateMachineARN string
+	executions      []awsservice.StepFunctionExecution
+}
+
+type stepFunctionExecutionDetailLoadedMsg struct {
+	detail *awsservice.StepFunctionExecutionDetail
+}
+
 type s3BucketsLoadedMsg struct {
 	buckets []awsservice.S3Bucket
 }

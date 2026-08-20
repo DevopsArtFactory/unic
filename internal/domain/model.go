@@ -26,6 +26,7 @@ const (
 	ServiceParameterStore AwsService = "Parameter Store"
 	ServiceKMS            AwsService = "KMS"
 	ServiceACM            AwsService = "ACM"
+	ServiceStepFunctions  AwsService = "Step Functions"
 	ServiceLambda         AwsService = "Lambda"
 	ServiceBedrock        AwsService = "Bedrock"
 )
@@ -61,6 +62,7 @@ const (
 	FeatureSSMParameterBrowser   FeatureKind = "Parameter Store Browser"
 	FeatureKMSKeyBrowser         FeatureKind = "KMS Key Browser"
 	FeatureACMCertificateBrowser FeatureKind = "ACM Certificate Browser"
+	FeatureStepFunctionsBrowser  FeatureKind = "Step Functions Execution Browser"
 	FeatureLambdaBrowser         FeatureKind = "Lambda Browser"
 	FeatureBedrockAPIKeys        FeatureKind = "Bedrock API Keys"
 )
