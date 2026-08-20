@@ -312,6 +312,7 @@ Context ordering:
 | SQS | Queue Browser |
 | ELB | Load Balancer Browser |
 | SSM Parameter Store | Parameter Browser |
+| KMS | Key Browser |
 | ACM | Certificate Browser |
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
@@ -327,7 +328,7 @@ Context ordering:
 | Security Inspector | Ready | Runs built-in rule packs and opens severity-filtered findings |
 | Checklist Inspector | Ready | Runs a YAML checklist and reports pass/fail per check with resource context and mismatch details |
 
-Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
+Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, KMS customer-key rotation, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
 
 Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup. Press `a` on the checklist results screen to add a check through type-specific prompts instead of editing YAML: pick one of the twelve rule types, fill the prompted fields (empty skips optional expectations), and the check is appended to the loaded checklist file — or a new `unic-checklist.yaml` when none is loaded — validated through the same `LoadChecklist` rules before anything is written, then the checklist reruns so the new result shows immediately. Currently supported types:
 
@@ -445,6 +446,7 @@ checks:
 | SQS | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` detail, detail `d` jump to DLQ, `m` redrive DLQ (type-to-confirm), `x` purge (type-to-confirm) |
 | ELB | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` target groups, target group list `Enter` per-target health |
 | Parameter Store | `/` filter, `r` refresh, `Enter` detail, detail `v` reveal value (decrypts SecureString), `y` copy value without revealing |
+| KMS | `/` filter, `r` refresh, `Enter` key detail with aliases and rotation status |
 | ACM Certificates | `/` filter, `r` refresh, `Enter` certificate detail, detail `↑`/`↓` scroll, `PgUp`/`PgDn` page |
 | Lambda | `A` toggle all-regions scope (multi-region contexts), `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
@@ -466,6 +468,7 @@ The Load Balancer Browser is a target-health-first triage view: the load balance
 
 The Parameter Store Browser lists parameter metadata (hierarchical path, type, tier, last-modified) with the shared filter matching path segments. Values are never fetched or rendered implicitly: parameter detail shows metadata with the value hidden, `v` explicitly fetches and reveals it (decrypting SecureString), and `y` fetches and copies the value straight to the clipboard without ever printing it to the terminal.
 
+The KMS Key Browser lists key state, manager, aliases, and automatic-rotation posture. Key detail shows the ARN, origin, description, aliases, and rotation status; Security Inspector reports customer-managed keys that do not have automatic rotation enabled.
 The ACM Certificate Browser sorts certificates by soonest expiry and shows status, days remaining, in-use count, renewal eligibility, domains/SANs, validation state, and attached resource ARNs. Security Inspector reports certificates expiring within 30 days by default, with certificates at seven days or less raised as high severity. Set `inspector.acm_expiry_window_days` in `config.yaml` to use a different positive-day warning window.
 
 The CloudTrail Event Lookup answers "who changed what, and when": recent API events list newest-first with mutations marked `*`, actor, call, and source service per row. Keys `1`-`5` switch the time window (1h/6h/24h/3d/7d), `m` restricts to mutations (server-side via the `ReadOnly=false` lookup attribute), and `n` runs a server-side resource-name lookup — CloudTrail accepts one lookup attribute per call, so combining both applies the mutations restriction client-side. Results are capped at 100 events per query, so narrow the window or use the resource lookup when a busy account truncates. Event detail shows actor, source, region, source IP, touched resources, and the full raw event JSON with scrolling.

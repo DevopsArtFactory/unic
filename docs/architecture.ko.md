@@ -101,6 +101,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - FIS
 - ACM
 - S3
+- KMS
 
 패턴:
 
@@ -160,6 +161,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_lambda.go`
 - `screen_bedrock.go`
 - `screen_secrets.go`
+- `screen_kms.go`
 - `screen_inspector.go`
 - `screen_context.go`
 
@@ -239,7 +241,8 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - FIS experiment template list/detail, safe-run preview 및 experiment history/detail
 - ACM 인증서 list/detail
 - S3 bucket/object/detail
-- Inspector mode home, checklist setup, security findings/detail, checklist results/detail
+- KMS key list/detail, rotation 상태
+- Inspector mode home, checklist setup, KMS rotation finding을 포함한 security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
 - SSO account / role selection, exit notice
 - loading, error

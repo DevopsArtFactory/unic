@@ -37,6 +37,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureELBBrowser:            filterELBs,
 	domain.FeatureACMCertificateBrowser: filterACMCertificates,
 	domain.FeatureSSMParameterBrowser:   filterSSMParameters,
+	domain.FeatureKMSKeyBrowser:         filterKMSKeys,
 	domain.FeatureLambdaBrowser:         filterLambdaFunctions,
 	domain.FeatureBedrockAPIKeys:        filterBedrockKeys,
 	domain.FeatureVPCBrowser:            filterVPCs,

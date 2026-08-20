@@ -139,6 +139,18 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "q / esc", bar: "esc: back", help: "Go back to the parameter list"},
 		{bar: "H: home"},
 	},
+	screenKMSKeyList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between KMS keys"},
+		{keys: "/", bar: "/: filter", help: "Filter by key ID, alias, state, or manager"},
+		{keys: "r", bar: "r: refresh", help: "Refresh KMS keys"},
+		{keys: "enter", bar: "enter: detail", help: "Open key details"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenKMSKeyDetail: {
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the KMS key list"},
+		{bar: "H: home"},
+	},
 	screenACMCertificateList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between certificates"},
 		{keys: "/", bar: "/: filter", help: "Filter domains, status, ARN, or attached resources"},

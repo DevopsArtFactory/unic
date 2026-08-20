@@ -47,6 +47,7 @@ const (
 	filterELBs
 	filterELBTargetGroups
 	filterSSMParameters
+	filterKMSKeys
 	filterACMCertificates
 )
 

@@ -21,6 +21,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/fis v1.37.21
 	github.com/aws/aws-sdk-go-v2/service/guardduty v1.75.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.53.7
+	github.com/aws/aws-sdk-go-v2/service/kms v1.55.6
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.89.0
 	github.com/aws/aws-sdk-go-v2/service/rds v1.116.3
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.62.4
