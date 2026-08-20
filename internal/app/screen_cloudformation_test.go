@@ -213,6 +213,121 @@ func TestCloudFormationDriftPollingSurvivesSettingsOverlay(t *testing.T) {
 	}
 }
 
+func TestCloudFormationLoadsCompleteBehindSettingsOverlay(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(*Model)
+		msg     tea.Msg
+		next    screen
+		wantCmd bool
+		verify  func(*testing.T, Model)
+	}{
+		{
+			name: "stack list",
+			msg:  cloudFormationStacksLoadedMsg{stacks: []awsservice.CloudFormationStack{{ID: "stack-id"}}},
+			next: screenCloudFormationStackList,
+			verify: func(t *testing.T, m Model) {
+				if len(m.cloudFormation.stacks) != 1 {
+					t.Fatalf("expected loaded stack list, got %+v", m.cloudFormation.stacks)
+				}
+			},
+		},
+		{
+			name: "stack detail",
+			setup: func(m *Model) {
+				m.cloudFormation.selected = &awsservice.CloudFormationStack{ID: "stack-id"}
+			},
+			msg:  cloudFormationStackDetailLoadedMsg{stack: &awsservice.CloudFormationStack{ID: "stack-id", Name: "prod"}},
+			next: screenCloudFormationStackDetail,
+			verify: func(t *testing.T, m Model) {
+				if m.cloudFormation.selected == nil || m.cloudFormation.selected.Name != "prod" {
+					t.Fatalf("expected loaded stack detail, got %+v", m.cloudFormation.selected)
+				}
+			},
+		},
+		{
+			name: "drift start",
+			setup: func(m *Model) {
+				m.cloudFormation.selected = &awsservice.CloudFormationStack{ID: "stack-id"}
+			},
+			msg:     cloudFormationDriftStartedMsg{stackID: "stack-id", detectionID: "detect-1"},
+			next:    screenCloudFormationStackDetail,
+			wantCmd: true,
+			verify: func(t *testing.T, m Model) {
+				if m.cloudFormation.driftDetectionID != "detect-1" {
+					t.Fatalf("expected active drift detection, got %q", m.cloudFormation.driftDetectionID)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m.screen = screenSettings
+			m.settingsPrevScreen = screenLoading
+			if tt.setup != nil {
+				tt.setup(&m)
+			}
+
+			updated, cmd := m.Update(tt.msg)
+			model := updated.(Model)
+			if model.screen != screenSettings || model.settingsPrevScreen != tt.next || (cmd != nil) != tt.wantCmd {
+				t.Fatalf("expected Settings to retain completed load target %v, got screen=%v previous=%v cmd=%v", tt.next, model.screen, model.settingsPrevScreen, cmd)
+			}
+			tt.verify(t, model)
+
+			updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			if model = updated.(Model); model.screen != tt.next {
+				t.Fatalf("expected Settings return to %v, got %v", tt.next, model.screen)
+			}
+		})
+	}
+}
+
+func TestCloudFormationDriftPollingStopsAfterHome(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+	m.cloudFormation.selected = &awsservice.CloudFormationStack{ID: "stack-id"}
+
+	_, tickCmd, _ := m.cloudFormation.HandleMessage(&m, cloudFormationDriftStartedMsg{stackID: "stack-id", detectionID: "detect-1"})
+	_, pollCmd, _ := m.cloudFormation.HandleMessage(&m, cloudFormationDriftPollTickMsg{stackID: "stack-id", detectionID: "detect-1"})
+	if tickCmd == nil || pollCmd == nil {
+		t.Fatal("expected scheduled tick and poll commands")
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'H'}})
+	model := updated.(Model)
+	if model.screen != screenServiceList {
+		t.Fatalf("expected Home navigation, got %v", model.screen)
+	}
+	for name, cmd := range map[string]tea.Cmd{"tick": tickCmd, "poll": pollCmd} {
+		if msg := cmd(); msg != nil {
+			t.Fatalf("expected abandoned %s command to be dropped, got %#v", name, msg)
+		}
+	}
+}
+
+func TestCloudFormationDriftStatusReappliesFilter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenCloudFormationStackDetail
+	m.storeFilterValue(filterCloudFormationStacks, "not_checked")
+	m.cloudFormation.selected = &awsservice.CloudFormationStack{ID: "stack-id", DriftStatus: "NOT_CHECKED"}
+	m.cloudFormation.stacks = []awsservice.CloudFormationStack{{ID: "stack-id", DriftStatus: "NOT_CHECKED"}}
+	m.cloudFormation.filtered = applyFilter(m.cloudFormation.stacks, m.filterValue(filterCloudFormationStacks))
+	m.cloudFormation.driftDetectionID = "detect-1"
+
+	m.cloudFormation.HandleMessage(&m, cloudFormationDriftStatusMsg{
+		stackID: "stack-id", detectionID: "detect-1", status: &awsservice.CloudFormationDriftDetection{
+			DetectionStatus: "DETECTION_COMPLETE", StackDriftStatus: "IN_SYNC",
+		},
+	})
+
+	if len(m.cloudFormation.filtered) != 0 {
+		t.Fatalf("expected completed stack to leave NOT_CHECKED filter, got %+v", m.cloudFormation.filtered)
+	}
+}
+
 func TestCloudFormationSavedViewAndHelpRegistration(t *testing.T) {
 	if target, ok := featurePrimaryFilter[domain.FeatureCloudFormationBrowser]; !ok || target != filterCloudFormationStacks {
 		t.Fatalf("expected CloudFormation saved-view filter, got %v %v", target, ok)
