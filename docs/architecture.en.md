@@ -99,6 +99,7 @@ Current repository clients include:
 - ECS
 - ECR
 - FIS
+- ElastiCache
 - S3
 
 Pattern:
@@ -153,6 +154,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_ecs.go`
 - `screen_eks.go`
 - `screen_ecr.go`
+- `screen_elasticache.go`
 - `screen_s3.go`
 - `screen_lambda.go`
 - `screen_bedrock.go`
@@ -234,6 +236,7 @@ Current screen families include:
 - EKS cluster/node group/add-on status, upgrade readiness, and access helper flows
 - ECR repository/image/detail flows
 - FIS experiment template list/detail, safe-run preview, and experiment history/detail flows
+- ElastiCache replication-group/cluster list, node list, and node detail flows
 - S3 bucket/object/detail flows
 - Inspector mode home, checklist setup, security findings/detail, and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows

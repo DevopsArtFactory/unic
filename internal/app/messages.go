@@ -222,6 +222,10 @@ type ssmParamValueLoadedMsg struct {
 	err      error
 }
 
+type elasticacheResourcesLoadedMsg struct {
+	resources []awsservice.ElastiCacheResource
+}
+
 type s3BucketsLoadedMsg struct {
 	buckets []awsservice.S3Bucket
 }

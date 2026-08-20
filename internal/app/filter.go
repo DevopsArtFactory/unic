@@ -47,6 +47,7 @@ const (
 	filterELBs
 	filterELBTargetGroups
 	filterSSMParameters
+	filterElastiCacheResources
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

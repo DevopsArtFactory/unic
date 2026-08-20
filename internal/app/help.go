@@ -855,6 +855,12 @@ func (m Model) helpScreenTitle() string {
 		return "RDS Instance Class Picker"
 	case screenRDSConfirm:
 		return "RDS Confirmation"
+	case screenElastiCacheResourceList:
+		return "ElastiCache Resources"
+	case screenElastiCacheNodeList:
+		return "ElastiCache Nodes"
+	case screenElastiCacheNodeDetail:
+		return "ElastiCache Node Detail"
 	case screenRoute53ZoneList:
 		return "Route53 Hosted Zones"
 	case screenRoute53RecordList:
