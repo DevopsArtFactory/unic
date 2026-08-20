@@ -94,6 +94,66 @@ func TestStepFunctionsDrillDownAndDetailPayload(t *testing.T) {
 	}
 }
 
+func TestStepFunctionsIgnoresStaleExecutionLoads(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		selected *awsservice.StepFunctionStateMachine
+	}{
+		{name: "no selected state machine"},
+		{name: "different state machine", selected: &awsservice.StepFunctionStateMachine{ARN: "arn:other"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m.screen = screenLoading
+			m.stepFunctions.selectedStateMachine = tc.selected
+			_, _, handled := m.stepFunctions.HandleMessage(&m, stepFunctionExecutionsLoadedMsg{
+				stateMachineARN: "arn:stale",
+				executions:      []awsservice.StepFunctionExecution{{ARN: "arn:execution"}},
+			})
+			if !handled || m.screen != screenLoading || len(m.stepFunctions.executions) != 0 {
+				t.Fatalf("expected stale load to be ignored, screen=%v executions=%+v handled=%v", m.screen, m.stepFunctions.executions, handled)
+			}
+		})
+	}
+}
+
+func TestStepFunctionsBackNavigation(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenStepFunctionExecutionList
+	m.stepFunctions.HandleKey(&m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.screen != screenStepFunctionStateMachineList {
+		t.Fatalf("expected execution list to return to state machines, got %v", m.screen)
+	}
+	m.screen = screenStepFunctionExecutionDetail
+	m.stepFunctions.HandleKey(&m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.screen != screenStepFunctionExecutionList {
+		t.Fatalf("expected execution detail to return to executions, got %v", m.screen)
+	}
+}
+
+func TestStepFunctionsDetailPlaceholderAndPayloadLimit(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenStepFunctionExecutionDetail
+	view := stripANSI(m.stepFunctions.viewExecutionDetail(m))
+	for _, want := range []string{"Step Functions Execution Detail", "No execution detail loaded", "esc: executions"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("expected %q in placeholder view, got:\n%s", want, view)
+		}
+	}
+
+	for name, payload := range map[string]string{
+		"json": `{"value":"` + strings.Repeat("x", stepFunctionsPayloadPreviewLimit) + `"}`,
+		"text": strings.Repeat("word ", stepFunctionsPayloadPreviewLimit),
+	} {
+		t.Run(name, func(t *testing.T) {
+			preview := stepFunctionsPayloadPreview(payload)
+			if len(preview) > stepFunctionsPayloadPreviewLimit || !strings.HasSuffix(preview, "...") {
+				t.Fatalf("expected bounded truncated preview, length=%d suffix=%q", len(preview), preview[max(len(preview)-20, 0):])
+			}
+		})
+	}
+}
+
 func TestStepFunctionsDetailScrolls(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.height = 10

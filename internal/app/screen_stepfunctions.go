@@ -331,18 +331,21 @@ func (sm stepFunctionsModel) viewExecutionList(m Model) string {
 }
 
 func (sm stepFunctionsModel) viewExecutionDetail(m Model) string {
+	var b strings.Builder
+	b.WriteString(m.renderStatusBar())
+	b.WriteString(titleStyle.Render("Step Functions Execution Detail"))
+	b.WriteString("\n\n")
 	if sm.selectedExecution == nil {
-		return ""
+		b.WriteString(dimStyle.Render("  No execution detail loaded"))
+		b.WriteString("\n\n")
+		b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
+		return b.String()
 	}
 	lines := sm.executionDetailLines(m)
 	visibleLines := max(m.height-8, 5)
 	start := min(sm.detailScroll, max(len(lines)-visibleLines, 0))
 	end := min(start+visibleLines, len(lines))
 
-	var b strings.Builder
-	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("Step Functions Execution Detail"))
-	b.WriteString("\n\n")
 	for _, line := range lines[start:end] {
 		b.WriteString(line)
 	}
@@ -391,15 +394,18 @@ func (sm stepFunctionsModel) executionDetailLines(m Model) []string {
 	return lines
 }
 
+const stepFunctionsPayloadPreviewLimit = 512
+
 func stepFunctionsPayloadPreview(payload string) string {
 	if strings.TrimSpace(payload) == "" {
 		return "-"
 	}
+	preview := strings.Join(strings.Fields(payload), " ")
 	var compact bytes.Buffer
 	if err := json.Compact(&compact, []byte(payload)); err == nil {
-		return compact.String()
+		preview = compact.String()
 	}
-	return strings.Join(strings.Fields(payload), " ")
+	return truncateEC2DetailValue(preview, stepFunctionsPayloadPreviewLimit)
 }
 
 // finishStepFunctionsLoad keeps a completed load behind a global overlay and

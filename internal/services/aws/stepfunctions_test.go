@@ -70,6 +70,17 @@ func TestListStepFunctionStateMachinesPaginatesAndSorts(t *testing.T) {
 	}
 }
 
+func TestListStepFunctionStateMachinesReturnsContextualError(t *testing.T) {
+	client := &mockStepFunctionsClient{listStateMachines: func(context.Context, *sfn.ListStateMachinesInput, ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error) {
+		return nil, errors.New("access denied")
+	}}
+
+	_, err := (&AwsRepository{StepFunctionsClient: client}).ListStepFunctionStateMachines(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "failed to list Step Functions state machines") || !strings.Contains(err.Error(), "access denied") {
+		t.Fatalf("expected contextual list error, got %v", err)
+	}
+}
+
 func TestListStepFunctionExecutionsSortsFailuresFirst(t *testing.T) {
 	now := time.Date(2026, 8, 20, 2, 0, 0, 0, time.UTC)
 	client := &mockStepFunctionsClient{listExecutions: func(_ context.Context, in *sfn.ListExecutionsInput, _ ...func(*sfn.Options)) (*sfn.ListExecutionsOutput, error) {
@@ -78,8 +89,11 @@ func TestListStepFunctionExecutionsSortsFailuresFirst(t *testing.T) {
 		}
 		return &sfn.ListExecutionsOutput{Executions: []sfntypes.ExecutionListItem{
 			{ExecutionArn: awssdk.String("arn:succeeded"), Name: awssdk.String("succeeded"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusSucceeded, StartDate: awssdk.Time(now)},
+			{ExecutionArn: awssdk.String("arn:pending-redrive"), Name: awssdk.String("pending-redrive"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusPendingRedrive, StartDate: awssdk.Time(now.Add(3 * time.Hour))},
 			{ExecutionArn: awssdk.String("arn:old-failure"), Name: awssdk.String("old-failure"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusFailed, StartDate: awssdk.Time(now.Add(-time.Hour))},
+			{ExecutionArn: awssdk.String("arn:aborted"), Name: awssdk.String("aborted"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusAborted, StartDate: awssdk.Time(now.Add(2 * time.Hour))},
 			{ExecutionArn: awssdk.String("arn:new-failure"), Name: awssdk.String("new-failure"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusFailed, StartDate: awssdk.Time(now)},
+			{ExecutionArn: awssdk.String("arn:timed-out"), Name: awssdk.String("timed-out"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusTimedOut, StartDate: awssdk.Time(now.Add(4 * time.Hour))},
 			{ExecutionArn: awssdk.String("arn:running"), Name: awssdk.String("running"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusRunning, StartDate: awssdk.Time(now.Add(time.Hour))},
 		}}, nil
 	}}
@@ -88,14 +102,30 @@ func TestListStepFunctionExecutionsSortsFailuresFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"new-failure", "old-failure", "running", "succeeded"}
+	want := []string{"new-failure", "old-failure", "timed-out", "aborted", "pending-redrive", "running", "succeeded"}
 	for i, name := range want {
 		if executions[i].Name != name {
 			t.Fatalf("expected order %v, got %+v", want, executions)
 		}
 	}
-	if !executions[0].NeedsAttention() || executions[3].NeedsAttention() || !strings.Contains(executions[0].FilterText(), "failed") {
+	for i, execution := range executions {
+		if got, wantAttention := execution.NeedsAttention(), i < 5; got != wantAttention {
+			t.Fatalf("execution %q: expected NeedsAttention=%v, got %v", execution.Name, wantAttention, got)
+		}
+	}
+	if !strings.Contains(executions[0].FilterText(), "failed") {
 		t.Fatalf("unexpected execution helpers: %+v", executions)
+	}
+}
+
+func TestListStepFunctionExecutionsReturnsContextualError(t *testing.T) {
+	client := &mockStepFunctionsClient{listExecutions: func(context.Context, *sfn.ListExecutionsInput, ...func(*sfn.Options)) (*sfn.ListExecutionsOutput, error) {
+		return nil, errors.New("throttled")
+	}}
+
+	_, err := (&AwsRepository{StepFunctionsClient: client}).ListStepFunctionExecutions(context.Background(), "arn:machine")
+	if err == nil || !strings.Contains(err.Error(), "failed to list Step Functions executions for arn:machine") || !strings.Contains(err.Error(), "throttled") {
+		t.Fatalf("expected contextual execution-list error, got %v", err)
 	}
 }
 
@@ -142,6 +172,19 @@ func TestDescribeStepFunctionExecutionFindsFailedStateAcrossHistoryPages(t *test
 	}
 }
 
+func TestStepFunctionFailedStepBoundsHistoryPages(t *testing.T) {
+	historyCalls := 0
+	client := &mockStepFunctionsClient{executionHistory: func(context.Context, *sfn.GetExecutionHistoryInput, ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error) {
+		historyCalls++
+		return &sfn.GetExecutionHistoryOutput{NextToken: awssdk.String("more")}, nil
+	}}
+
+	step, err := (&AwsRepository{StepFunctionsClient: client}).stepFunctionFailedStep(context.Background(), "arn:execution")
+	if err != nil || step != "" || historyCalls != stepFunctionMaxHistoryPages {
+		t.Fatalf("expected bounded empty failed step, calls=%d step=%q err=%v", historyCalls, step, err)
+	}
+}
+
 func TestDescribeStepFunctionExecutionSkipsHistoryForSuccess(t *testing.T) {
 	client := &mockStepFunctionsClient{
 		describeExecution: func(context.Context, *sfn.DescribeExecutionInput, ...func(*sfn.Options)) (*sfn.DescribeExecutionOutput, error) {
@@ -159,18 +202,27 @@ func TestDescribeStepFunctionExecutionSkipsHistoryForSuccess(t *testing.T) {
 	}
 }
 
-func TestDescribeStepFunctionExecutionReturnsHistoryError(t *testing.T) {
+func TestDescribeStepFunctionExecutionKeepsDetailWhenHistoryFails(t *testing.T) {
+	started := time.Date(2026, 8, 20, 2, 0, 0, 0, time.UTC)
+	stopped := started.Add(3 * time.Minute)
 	client := &mockStepFunctionsClient{
 		describeExecution: func(context.Context, *sfn.DescribeExecutionInput, ...func(*sfn.Options)) (*sfn.DescribeExecutionOutput, error) {
-			return &sfn.DescribeExecutionOutput{ExecutionArn: awssdk.String("arn:failed"), StateMachineArn: awssdk.String("arn:machine"), Name: awssdk.String("failed"), Status: sfntypes.ExecutionStatusFailed, StartDate: awssdk.Time(time.Now())}, nil
+			return &sfn.DescribeExecutionOutput{
+				ExecutionArn: awssdk.String("arn:failed"), StateMachineArn: awssdk.String("arn:machine"), Name: awssdk.String("failed"),
+				Status: sfntypes.ExecutionStatusFailed, StartDate: awssdk.Time(started), StopDate: awssdk.Time(stopped),
+				Input: awssdk.String(`{"order":42}`), Output: awssdk.String(`{"charged":false}`),
+				Error: awssdk.String("States.TaskFailed"), Cause: awssdk.String("payment rejected"),
+			}, nil
 		},
 		executionHistory: func(context.Context, *sfn.GetExecutionHistoryInput, ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error) {
 			return nil, errors.New("access denied")
 		},
 	}
 
-	_, err := (&AwsRepository{StepFunctionsClient: client}).DescribeStepFunctionExecution(context.Background(), "arn:failed")
-	if err == nil || !strings.Contains(err.Error(), "failed to get Step Functions execution history") || !strings.Contains(err.Error(), "access denied") {
-		t.Fatalf("expected contextual history error, got %v", err)
+	detail, err := (&AwsRepository{StepFunctionsClient: client}).DescribeStepFunctionExecution(context.Background(), "arn:failed")
+	if err != nil || detail == nil || detail.Status != "FAILED" || !detail.StartDate.Equal(started) || !detail.StopDate.Equal(stopped) ||
+		detail.FailedStep != "" || detail.Error != "States.TaskFailed" || detail.Cause != "payment rejected" ||
+		detail.Input != `{"order":42}` || detail.Output != `{"charged":false}` {
+		t.Fatalf("expected partial execution detail, detail=%+v err=%v", detail, err)
 	}
 }

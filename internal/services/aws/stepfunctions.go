@@ -13,7 +13,10 @@ import (
 	uniclog "unic/internal/log"
 )
 
-const stepFunctionMaxExecutions = 200
+const (
+	stepFunctionMaxExecutions   = 200
+	stepFunctionMaxHistoryPages = 5
+)
 
 // ListStepFunctionStateMachines returns every state machine in the active region.
 func (r *AwsRepository) ListStepFunctionStateMachines(ctx context.Context) ([]StepFunctionStateMachine, error) {
@@ -114,9 +117,11 @@ func (r *AwsRepository) DescribeStepFunctionExecution(ctx context.Context, execu
 		Cause:  awssdk.ToString(out.Cause),
 	}
 	if detail.NeedsAttention() {
-		detail.FailedStep, err = r.stepFunctionFailedStep(ctx, executionARN)
-		if err != nil {
-			return nil, err
+		failedStep, historyErr := r.stepFunctionFailedStep(ctx, executionARN)
+		if historyErr != nil {
+			uniclog.Debug("aws", "Step Functions failed state unavailable", "execution", executionARN, "error", historyErr.Error())
+		} else {
+			detail.FailedStep = failedStep
 		}
 	}
 	return detail, nil
@@ -156,7 +161,7 @@ func (r *AwsRepository) stepFunctionFailedStep(ctx context.Context, executionARN
 	events := make(map[int64]sfntypes.HistoryEvent)
 	var failureID int64
 	var nextToken *string
-	for {
+	for range stepFunctionMaxHistoryPages {
 		out, err := r.StepFunctionsClient.GetExecutionHistory(ctx, &sfn.GetExecutionHistoryInput{
 			ExecutionArn:         awssdk.String(executionARN),
 			IncludeExecutionData: awssdk.Bool(false),
@@ -183,6 +188,7 @@ func (r *AwsRepository) stepFunctionFailedStep(ctx context.Context, executionARN
 		}
 		nextToken = out.NextToken
 	}
+	return "", nil
 }
 
 func isStepFunctionFailureEvent(eventType sfntypes.HistoryEventType) bool {
