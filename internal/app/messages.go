@@ -214,12 +214,21 @@ type ssmParametersLoadedMsg struct {
 	err        error
 }
 
+type kmsKeysLoadedMsg struct {
+	keys []awsservice.KMSKey
+	err  error
+}
+
 type ssmParamValueLoadedMsg struct {
 	name     string
 	value    string
 	copyOnly bool
 	request  int
 	err      error
+}
+
+type elasticacheResourcesLoadedMsg struct {
+	resources []awsservice.ElastiCacheResource
 }
 
 type acmCertificatesLoadedMsg struct {

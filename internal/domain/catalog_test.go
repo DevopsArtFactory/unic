@@ -260,3 +260,19 @@ func TestCatalogContainsECRLoginHelperFeature(t *testing.T) {
 	}
 	t.Error("ECR service not found in catalog")
 }
+
+func TestCatalogContainsElastiCacheBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceElastiCache {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureElastiCacheBrowser {
+				return
+			}
+		}
+		t.Error("ElastiCache service should have ElastiCache Browser feature")
+		return
+	}
+	t.Error("ElastiCache service not found in catalog")
+}

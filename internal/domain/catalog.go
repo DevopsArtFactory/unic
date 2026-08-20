@@ -132,6 +132,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceElastiCache,
+			Features: []Feature{
+				{
+					Kind:        FeatureElastiCacheBrowser,
+					Description: "Browse replication groups, standalone clusters, nodes, and endpoints",
+				},
+			},
+		},
+		{
 			Name: ServiceS3,
 			Features: []Feature{
 				{
@@ -166,6 +175,12 @@ func Catalog() []Service {
 					Description: "Browse parameters with reveal-gated SecureString values and no-print copy",
 				},
 			},
+		},
+		{
+			Name: ServiceKMS,
+			Features: []Feature{{
+				Kind: FeatureKMSKeyBrowser, Description: "Browse KMS keys, aliases, and rotation status",
+			}},
 		},
 		{
 			Name: ServiceACM,

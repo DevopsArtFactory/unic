@@ -22,6 +22,31 @@ type keyBinding struct {
 // log viewer intentionally stays legacy: its bar labels embed live state
 // (wrap on/off, horizontal offset) that a static declaration cannot express.
 var screenKeymaps = map[screen][]keyBinding{
+	screenElastiCacheResourceList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between replication groups and standalone clusters"},
+		{keys: "/", bar: "/: filter", help: "Start filtering resources"},
+		{keys: "r", bar: "r: refresh", help: "Refresh ElastiCache resources"},
+		{keys: "enter", bar: "enter: nodes", help: "Open the selected resource's nodes"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenElastiCacheNodeList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between cache nodes"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected node"},
+		{keys: "q", bar: "q: feature list", help: "Go back to the feature list"},
+		{keys: "esc", bar: "esc: resources", help: "Go back to the resource list"},
+		{bar: "H: home"},
+	},
+	screenElastiCacheNodeDetail: {
+		{keys: "c", bar: "c: copy endpoint", help: "Copy the node endpoint",
+			when: func(m Model) bool {
+				return m.elasticache.selectedNode != nil && m.elasticache.selectedNode.Endpoint != ""
+			}},
+		{keys: "q", bar: "q: feature list", help: "Go back to the feature list"},
+		{keys: "esc", bar: "esc: nodes", help: "Go back to the node list"},
+		{bar: "H: home"},
+	},
+
 	screenRoute53ZoneList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
 		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
@@ -137,6 +162,18 @@ var screenKeymaps = map[screen][]keyBinding{
 			when: func(m Model) bool { return !m.ssmParams.revealed }},
 		{keys: "y", bar: "y: copy", help: "Copy the value to the clipboard without revealing it"},
 		{keys: "q / esc", bar: "esc: back", help: "Go back to the parameter list"},
+		{bar: "H: home"},
+	},
+	screenKMSKeyList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between KMS keys"},
+		{keys: "/", bar: "/: filter", help: "Filter by key ID, alias, state, or manager"},
+		{keys: "r", bar: "r: refresh", help: "Refresh KMS keys"},
+		{keys: "enter", bar: "enter: detail", help: "Open key details"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenKMSKeyDetail: {
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the KMS key list"},
 		{bar: "H: home"},
 	},
 	screenACMCertificateList: {

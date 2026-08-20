@@ -309,9 +309,11 @@ Context ordering:
 | ECS | ECS Browser & Exec |
 | EKS | Cluster & Node Group Browser |
 | FIS | Experiment Template Browser |
+| ElastiCache | Cluster & Replication Group Browser |
 | SQS | Queue Browser |
 | ELB | Load Balancer Browser |
 | SSM Parameter Store | Parameter Browser |
+| KMS | Key Browser |
 | ACM | Certificate Browser |
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
@@ -327,7 +329,7 @@ Context ordering:
 | Security Inspector | Ready | Runs built-in security and cost/waste rule packs and opens severity-filtered findings |
 | Checklist Inspector | Ready | Runs a YAML checklist and reports pass/fail per check with resource context and mismatch details |
 
-Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, ElastiCache for Valkey encryption/backup/access-control checks, and cost/waste checks for unattached EIPs and EBS volumes, stopped EC2 instances, empty target groups, untagged EC2-family resources, and EBS snapshots aged 90 days or more.
+Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, KMS customer-key rotation, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, ElastiCache for Valkey encryption/backup/access-control checks, and cost/waste checks for unattached EIPs and EBS volumes, stopped EC2 instances, empty target groups, untagged EC2-family resources, and EBS snapshots aged 90 days or more.
 
 Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup. Press `a` on the checklist results screen to add a check through type-specific prompts instead of editing YAML: pick one of the twelve rule types, fill the prompted fields (empty skips optional expectations), and the check is appended to the loaded checklist file — or a new `unic-checklist.yaml` when none is loaded — validated through the same `LoadChecklist` rules before anything is written, then the checklist reruns so the new result shows immediately. Currently supported types:
 
@@ -408,6 +410,7 @@ checks:
 | `R` | Switch between the active context's configured resource regions |
 | `S` | Open settings |
 | `P` | Open the command palette (fuzzy search across features, contexts, and indexed resources) |
+| `Tab` | Toggle current-context or synced-context resource scope in the command palette |
 | `V` | Open saved views (save/apply/delete repeatable feature + filter + context jumps) |
 | `/` | Toggle filter mode on supported screens |
 | `f` | Favorite/unfavorite the selected service or context on supported lists |
@@ -444,14 +447,16 @@ checks:
 | SQS | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` detail, detail `d` jump to DLQ, `m` redrive DLQ (type-to-confirm), `x` purge (type-to-confirm) |
 | ELB | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` target groups, target group list `Enter` per-target health |
 | Parameter Store | `/` filter, `r` refresh, `Enter` detail, detail `v` reveal value (decrypts SecureString), `y` copy value without revealing |
+| ElastiCache | `/` filter, `r` refresh, `Enter` nodes, node `Enter` detail, detail `c` copy endpoint |
+| KMS | `/` filter, `r` refresh, `Enter` key detail with aliases and rotation status |
 | ACM Certificates | `/` filter, `r` refresh, `Enter` certificate detail, detail `↑`/`↓` scroll, `PgUp`/`PgDn` page |
 | Lambda | `A` toggle all-regions scope (multi-region contexts), `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
-The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context; results stream in as they load, per-service failures are shown inline, and matching covers names, IDs, and ARNs where available. Selecting a resource jumps to the owning browser with the shared filter prefilled to that resource.
+The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context. Press `Tab` to opt into searching the active context plus sync-managed contexts; context fan-out is bounded, rows show context and region tags, and per-context/service failures are shown inline. Matching covers names, IDs, ARNs, contexts, and regions where available. Selecting a resource in another context switches context and then jumps to the owning browser with the shared filter prefilled to that resource.
 
 Saved views (`V`) capture repeatable operational workflows: pressing `s` on the views screen snapshots the last opened service feature, its active shared filter, and the current context under a name you type; `enter` reapplies a view in one step — switching to the view's context first when it differs — and `d` deletes one. Views persist under `views:` in `config.yaml` (fields: `name`, `context`, `service`, `feature`, `filter`); the format is additive so future fields extend it without breaking existing files.
 
-The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The context picker also supports `f`; context favorites are saved under `favorites.contexts`, displayed first in the picker, and rendered with a distinct color style while preserving the configured context order within favorite and non-favorite groups. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups/add-ons, ECR repositories/images, FIS experiment templates/history, S3 buckets/objects, SQS queues, load balancers/target groups, SSM parameters, ACM certificates, Lambda functions, Bedrock API keys, and the context picker.
+The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The context picker also supports `f`; context favorites are saved under `favorites.contexts`, displayed first in the picker, and rendered with a distinct color style while preserving the configured context order within favorite and non-favorite groups. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups/add-ons, ECR repositories/images, FIS experiment templates/history, ElastiCache replication groups/clusters, S3 buckets/objects, SQS queues, load balancers/target groups, SSM parameters, ACM certificates, Lambda functions, Bedrock API keys, and the context picker.
 
 The EKS Browser includes a managed add-on status view for each cluster. Add-on rows show the installed version, status, and health summary, with degraded or unhealthy add-ons highlighted so core components such as CoreDNS, kube-proxy, VPC CNI, and CSI drivers are easy to spot.
 
@@ -465,6 +470,8 @@ The Load Balancer Browser is a target-health-first triage view: the load balance
 
 The Parameter Store Browser lists parameter metadata (hierarchical path, type, tier, last-modified) with the shared filter matching path segments. Values are never fetched or rendered implicitly: parameter detail shows metadata with the value hidden, `v` explicitly fetches and reveals it (decrypting SecureString), and `y` fetches and copies the value straight to the clipboard without ever printing it to the terminal.
 
+The ElastiCache Browser lists Valkey/Redis replication groups and standalone cache clusters with engine, status, node count, and node type. Opening a resource shows its cache nodes with shard, role, status, and Availability Zone; node detail exposes the connection endpoint and `c` copies it to the clipboard.
+The KMS Key Browser lists key state, manager, aliases, and automatic-rotation posture. Key detail shows the ARN, origin, description, aliases, and rotation status; Security Inspector reports customer-managed keys that do not have automatic rotation enabled.
 The ACM Certificate Browser sorts certificates by soonest expiry and shows status, days remaining, in-use count, renewal eligibility, domains/SANs, validation state, and attached resource ARNs. Security Inspector reports certificates expiring within 30 days by default, with certificates at seven days or less raised as high severity. Set `inspector.acm_expiry_window_days` in `config.yaml` to use a different positive-day warning window.
 
 The CloudTrail Event Lookup answers "who changed what, and when": recent API events list newest-first with mutations marked `*`, actor, call, and source service per row. Keys `1`-`5` switch the time window (1h/6h/24h/3d/7d), `m` restricts to mutations (server-side via the `ReadOnly=false` lookup attribute), and `n` runs a server-side resource-name lookup — CloudTrail accepts one lookup attribute per call, so combining both applies the mutations restriction client-side. Results are capped at 100 events per query, so narrow the window or use the resource lookup when a busy account truncates. Event detail shows actor, source, region, source IP, touched resources, and the full raw event JSON with scrolling.
