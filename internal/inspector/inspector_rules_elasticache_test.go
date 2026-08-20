@@ -10,7 +10,15 @@ import (
 )
 
 type mockElastiCacheClient struct {
+	describeCacheClustersFunc     func(ctx context.Context, params *elasticache.DescribeCacheClustersInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error)
 	describeReplicationGroupsFunc func(ctx context.Context, params *elasticache.DescribeReplicationGroupsInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error)
+}
+
+func (m *mockElastiCacheClient) DescribeCacheClusters(ctx context.Context, params *elasticache.DescribeCacheClustersInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error) {
+	if m.describeCacheClustersFunc != nil {
+		return m.describeCacheClustersFunc(ctx, params, optFns...)
+	}
+	return &elasticache.DescribeCacheClustersOutput{}, nil
 }
 
 func (m *mockElastiCacheClient) DescribeReplicationGroups(ctx context.Context, params *elasticache.DescribeReplicationGroupsInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {

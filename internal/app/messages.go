@@ -227,6 +227,10 @@ type ssmParamValueLoadedMsg struct {
 	err      error
 }
 
+type elasticacheResourcesLoadedMsg struct {
+	resources []awsservice.ElastiCacheResource
+}
+
 type acmCertificatesLoadedMsg struct {
 	certificates []awsservice.ACMCertificate
 }

@@ -132,6 +132,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceElastiCache,
+			Features: []Feature{
+				{
+					Kind:        FeatureElastiCacheBrowser,
+					Description: "Browse replication groups, standalone clusters, nodes, and endpoints",
+				},
+			},
+		},
+		{
 			Name: ServiceS3,
 			Features: []Feature{
 				{

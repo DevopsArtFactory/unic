@@ -290,6 +290,7 @@ type S3ClientAPI interface {
 
 // ElastiCacheClientAPI is the interface for ElastiCache operations used by AwsRepository.
 type ElastiCacheClientAPI interface {
+	DescribeCacheClusters(ctx context.Context, params *elasticache.DescribeCacheClustersInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error)
 	DescribeReplicationGroups(ctx context.Context, params *elasticache.DescribeReplicationGroupsInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error)
 }
 
