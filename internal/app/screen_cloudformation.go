@@ -123,10 +123,15 @@ func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, 
 
 func cloudFormationLoadActive(m Model) bool {
 	current := m.screen
+	visited := make(map[screen]struct{}, 4)
 	for {
 		if current == screenLoading {
 			return true
 		}
+		if _, ok := visited[current]; ok {
+			return false
+		}
+		visited[current] = struct{}{}
 		switch current {
 		case screenSettings:
 			current = m.settingsPrevScreen

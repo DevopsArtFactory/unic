@@ -381,6 +381,17 @@ func TestCloudFormationLoadsCompleteBehindGlobalOverlays(t *testing.T) {
 	}
 }
 
+func TestCloudFormationLoadActiveStopsOnOverlayCycle(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenSettings
+	m.settingsPrevScreen = screenContextPicker
+	m.ctxPrevScreen = screenSettings
+
+	if cloudFormationLoadActive(m) {
+		t.Fatal("expected cyclic overlay chain not to report an active load")
+	}
+}
+
 func TestCloudFormationLoadCompletesBeforeContextPickerOpens(t *testing.T) {
 	cfg := testConfig()
 	cfg.ContextName = "dev"
