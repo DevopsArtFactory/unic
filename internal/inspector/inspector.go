@@ -9,8 +9,13 @@ import (
 )
 
 type InspectorScanner struct {
-	Name string
-	Run  func(context.Context, *AwsRepository) ([]SecurityFinding, error)
+	Name          string
+	Run           func(context.Context, *AwsRepository) ([]SecurityFinding, error)
+	RunConfigured func(context.Context, *AwsRepository, SecurityScanOptions) ([]SecurityFinding, error)
+}
+
+type SecurityScanOptions struct {
+	ACMExpiryWindowDays int
 }
 
 var (
@@ -22,7 +27,7 @@ func registerSecurityInspectorScanner(scanner InspectorScanner) {
 	if scanner.Name == "" {
 		panic("security inspector scanner name cannot be empty")
 	}
-	if scanner.Run == nil {
+	if scanner.Run == nil && scanner.RunConfigured == nil {
 		panic(fmt.Sprintf("security inspector scanner %q cannot have a nil runner", scanner.Name))
 	}
 	securityInspectorScannersMu.Lock()
@@ -44,8 +49,12 @@ func RegisteredSecurityInspectorScannerCount() int {
 	return len(listSecurityInspectorScanners())
 }
 
-func RunSecurityScan(ctx context.Context, repo *AwsRepository) (*SecurityScanReport, error) {
+func RunSecurityScan(ctx context.Context, repo *AwsRepository, options ...SecurityScanOptions) (*SecurityScanReport, error) {
 	scanners := listSecurityInspectorScanners()
+	var scanOptions SecurityScanOptions
+	if len(options) > 0 {
+		scanOptions = options[0]
+	}
 	report := &SecurityScanReport{
 		ScannerCount: len(scanners),
 		ScannedAt:    time.Now().UTC(),
@@ -58,7 +67,13 @@ func RunSecurityScan(ctx context.Context, repo *AwsRepository) (*SecurityScanRep
 		default:
 		}
 
-		findings, err := scanner.Run(ctx, repo)
+		var findings []SecurityFinding
+		var err error
+		if scanner.RunConfigured != nil {
+			findings, err = scanner.RunConfigured(ctx, repo, scanOptions)
+		} else {
+			findings, err = scanner.Run(ctx, repo)
+		}
 		if err != nil {
 			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %v", scanner.Name, err))
 			continue

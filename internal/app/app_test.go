@@ -492,8 +492,8 @@ func TestServiceListFiltersByFeatureDescription(t *testing.T) {
 func TestServiceListDefaultsToAlphabeticalOrder(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 
-	if got := m.filteredServices[0].Name; got != domain.ServiceBedrock {
-		t.Fatalf("expected Bedrock first in name sort, got %s", got)
+	if got := m.filteredServices[0].Name; got != domain.ServiceACM {
+		t.Fatalf("expected ACM first in name sort, got %s", got)
 	}
 }
 

@@ -21,12 +21,13 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 - ECS
 - ECR
 - FIS
+- ACM
 - S3
 - Lambda
 - Inspector mode
 
-애플리케이션은 이미 상호작용형 변경 작업 플로우, polling 기반 상태 확인, context helper, 서비스별 drill-down 화면을 포함한다. CloudWatch Metrics는 이제 resource-centric preset 그룹과 time-range / period / statistic control을 제공해 터미널에서 더 빠르게 triage할 수 있다. EKS는 cluster 화면에서 managed add-on 상태를 확인하고, target upgrade를 계획하기 전에 control plane, managed node group, managed add-on의 current-version alignment와 EKS upgrade insight를 함께 확인하는 upgrade readiness check와 복사 가능한 `aws eks update-kubeconfig` / `kubectl` handoff 명령을 준비하는 kubeconfig access helper를 포함한다. ECR은 repository와 image/tag 탐색을 제공하고, untagged image와 오래된 image를 cleanup 후보로 드러낸다. FIS는 experiment template 목록과 safe-run blast-radius preview, target, action, role ARN, stop condition 요약 상세 화면에 더해 최근 experiment history의 상태, 시간, failure/stop reason을 보여준다.
-Inspector mode는 이제 built-in security scan과 함께 RDS, security group, secret, Route53, VPC/subnet, CloudWatch Logs, baseline posture wrapper를 다루는 checklist 기반 readiness check도 포함한다.
+애플리케이션은 이미 상호작용형 변경 작업 플로우, polling 기반 상태 확인, context helper, 서비스별 drill-down 화면을 포함한다. CloudWatch Metrics는 이제 resource-centric preset 그룹과 time-range / period / statistic control을 제공해 터미널에서 더 빠르게 triage할 수 있다. EKS는 cluster 화면에서 managed add-on 상태를 확인하고, target upgrade를 계획하기 전에 control plane, managed node group, managed add-on의 current-version alignment와 EKS upgrade insight를 함께 확인하는 upgrade readiness check와 복사 가능한 `aws eks update-kubeconfig` / `kubectl` handoff 명령을 준비하는 kubeconfig access helper를 포함한다. ECR은 repository와 image/tag 탐색을 제공하고, untagged image와 오래된 image를 cleanup 후보로 드러낸다. FIS는 experiment template 목록과 safe-run blast-radius preview, target, action, role ARN, stop condition 요약 상세 화면에 더해 최근 experiment history의 상태, 시간, failure/stop reason을 보여준다. ACM은 만료일 순서의 인증서 목록과 validation, renewal, domain, 사용 리소스 상세 정보를 제공한다.
+Inspector mode는 이제 ACM 인증서 만료 finding을 포함한 built-in security scan과 함께 RDS, security group, secret, Route53, VPC/subnet, CloudWatch Logs, baseline posture wrapper를 다루는 checklist 기반 readiness check도 포함한다.
 
 ## 주요 사용자 흐름
 
@@ -44,6 +45,7 @@ Inspector mode는 이제 built-in security scan과 함께 RDS, security group, s
 
 - legacy flat config
 - `current`를 포함한 context 기반 config
+- 기본 30일 ACM 경고 기간을 재정의하는 양수 `inspector.acm_expiry_window_days`
 - `credential` 인증
 - AWS CLI `aws login` 기반 로컬 개발 profile을 위한 `console_login` 인증
 - `assume_role` 인증

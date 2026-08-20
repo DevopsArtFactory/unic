@@ -222,6 +222,10 @@ type ssmParamValueLoadedMsg struct {
 	err      error
 }
 
+type acmCertificatesLoadedMsg struct {
+	certificates []awsservice.ACMCertificate
+}
+
 type s3BucketsLoadedMsg struct {
 	buckets []awsservice.S3Bucket
 }
