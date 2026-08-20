@@ -226,6 +226,10 @@ type elasticacheResourcesLoadedMsg struct {
 	resources []awsservice.ElastiCacheResource
 }
 
+type acmCertificatesLoadedMsg struct {
+	certificates []awsservice.ACMCertificate
+}
+
 type s3BucketsLoadedMsg struct {
 	buckets []awsservice.S3Bucket
 }

@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	DefaultRegion = "us-east-1"
+	DefaultRegion              = "us-east-1"
+	DefaultACMExpiryWindowDays = 30
 )
 
 // fileConfig supports both the legacy flat format and the new contexts-based format.
@@ -27,6 +28,7 @@ type fileConfig struct {
 	Defaults  fileDefaults   `yaml:"defaults"`
 	Favorites fileFavorites  `yaml:"favorites,omitempty"`
 	UI        fileUI         `yaml:"ui,omitempty"`
+	Inspector fileInspector  `yaml:"inspector,omitempty"`
 	Views     []ViewEntry    `yaml:"views,omitempty"`
 	Contexts  []contextEntry `yaml:"contexts"`
 }
@@ -59,6 +61,10 @@ type fileUI struct {
 	// being collapsed into the zero value by `omitempty`.
 	BootSplash            *bool  `yaml:"boot_splash,omitempty"`
 	LastBootSplashVersion string `yaml:"last_boot_splash_version,omitempty"`
+}
+
+type fileInspector struct {
+	ACMExpiryWindowDays int `yaml:"acm_expiry_window_days,omitempty"`
 }
 
 // AuthType represents the authentication method for a context.
@@ -120,24 +126,32 @@ type ContextResources struct {
 type contextEntry = ContextEntry
 
 type Config struct {
-	Profile          string
-	Region           string
-	ContextName      string
-	AuthType         AuthType
-	RoleArn          string
-	ExternalID       string
-	MFASerial        string
-	SSOStartURL      string
-	SSORegion        string
-	SSOAccountID     string
-	SSORoleName      string
-	OktaOrgURL       string
-	OktaAppID        string
-	Regions          []string
-	FavoriteServices []string
-	FavoriteContexts []string
-	BootSplash       bool
-	BootSplashSeen   string
+	Profile             string
+	Region              string
+	ContextName         string
+	AuthType            AuthType
+	RoleArn             string
+	ExternalID          string
+	MFASerial           string
+	SSOStartURL         string
+	SSORegion           string
+	SSOAccountID        string
+	SSORoleName         string
+	OktaOrgURL          string
+	OktaAppID           string
+	Regions             []string
+	FavoriteServices    []string
+	FavoriteContexts    []string
+	BootSplash          bool
+	BootSplashSeen      string
+	ACMExpiryWindowDays int
+}
+
+func acmExpiryWindowDays(value int) int {
+	if value > 0 {
+		return value
+	}
+	return DefaultACMExpiryWindowDays
 }
 
 // EffectiveSSORegion returns the region used for SSO/portal calls
@@ -337,24 +351,25 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 	)
 
 	return &Config{
-		Profile:          profile,
-		Region:           region,
-		ContextName:      contextName,
-		AuthType:         authType,
-		RoleArn:          roleArn,
-		ExternalID:       externalID,
-		MFASerial:        mfaSerial,
-		SSOStartURL:      ssoStartURL,
-		SSORegion:        ssoRegion,
-		SSOAccountID:     ssoAccountID,
-		SSORoleName:      ssoRoleName,
-		OktaOrgURL:       oktaOrgURL,
-		OktaAppID:        oktaAppID,
-		Regions:          regions,
-		FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
-		FavoriteContexts: normalizeFavoriteContexts(fc.Favorites.Contexts),
-		BootSplash:       boolValue(fc.UI.BootSplash, false),
-		BootSplashSeen:   fc.UI.LastBootSplashVersion,
+		Profile:             profile,
+		Region:              region,
+		ContextName:         contextName,
+		AuthType:            authType,
+		RoleArn:             roleArn,
+		ExternalID:          externalID,
+		MFASerial:           mfaSerial,
+		SSOStartURL:         ssoStartURL,
+		SSORegion:           ssoRegion,
+		SSOAccountID:        ssoAccountID,
+		SSORoleName:         ssoRoleName,
+		OktaOrgURL:          oktaOrgURL,
+		OktaAppID:           oktaAppID,
+		Regions:             regions,
+		FavoriteServices:    normalizeFavoriteServices(fc.Favorites.Services),
+		FavoriteContexts:    normalizeFavoriteContexts(fc.Favorites.Contexts),
+		BootSplash:          boolValue(fc.UI.BootSplash, false),
+		BootSplashSeen:      fc.UI.LastBootSplashVersion,
+		ACMExpiryWindowDays: acmExpiryWindowDays(fc.Inspector.ACMExpiryWindowDays),
 	}, nil
 }
 
@@ -388,24 +403,25 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 		region = resolved.Region
 
 		return &Config{
-			Profile:          profile,
-			Region:           region,
-			ContextName:      ctx.Name,
-			AuthType:         normalizeAuthType(resolved.AuthType),
-			RoleArn:          resolved.RoleArn,
-			ExternalID:       resolved.ExternalID,
-			MFASerial:        resolved.MFASerial,
-			SSOStartURL:      resolved.SSOStartURL,
-			SSORegion:        resolved.SSORegion,
-			SSOAccountID:     resolved.SSOAccountID,
-			SSORoleName:      resolved.SSORoleName,
-			OktaOrgURL:       resolved.OktaOrgURL,
-			OktaAppID:        resolved.OktaAppID,
-			Regions:          resolved.Regions,
-			FavoriteServices: normalizeFavoriteServices(fc.Favorites.Services),
-			FavoriteContexts: normalizeFavoriteContexts(fc.Favorites.Contexts),
-			BootSplash:       boolValue(fc.UI.BootSplash, false),
-			BootSplashSeen:   fc.UI.LastBootSplashVersion,
+			Profile:             profile,
+			Region:              region,
+			ContextName:         ctx.Name,
+			AuthType:            normalizeAuthType(resolved.AuthType),
+			RoleArn:             resolved.RoleArn,
+			ExternalID:          resolved.ExternalID,
+			MFASerial:           resolved.MFASerial,
+			SSOStartURL:         resolved.SSOStartURL,
+			SSORegion:           resolved.SSORegion,
+			SSOAccountID:        resolved.SSOAccountID,
+			SSORoleName:         resolved.SSORoleName,
+			OktaOrgURL:          resolved.OktaOrgURL,
+			OktaAppID:           resolved.OktaAppID,
+			Regions:             resolved.Regions,
+			FavoriteServices:    normalizeFavoriteServices(fc.Favorites.Services),
+			FavoriteContexts:    normalizeFavoriteContexts(fc.Favorites.Contexts),
+			BootSplash:          boolValue(fc.UI.BootSplash, false),
+			BootSplashSeen:      fc.UI.LastBootSplashVersion,
+			ACMExpiryWindowDays: acmExpiryWindowDays(fc.Inspector.ACMExpiryWindowDays),
 		}, nil
 	}
 
