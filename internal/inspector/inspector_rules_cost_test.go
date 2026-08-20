@@ -42,6 +42,7 @@ func TestInspectCostWasteFindsWasteAndUntaggedResources(t *testing.T) {
 	now := time.Date(2026, time.August, 20, 0, 0, 0, 0, time.UTC)
 	volumeCalls := 0
 	targetGroupCalls := 0
+	targetHealthCalls := 0
 
 	ec2Client := &mockEC2Client{
 		describeAddressesFunc: func(context.Context, *ec2.DescribeAddressesInput, ...func(*ec2.Options)) (*ec2.DescribeAddressesOutput, error) {
@@ -129,6 +130,7 @@ func TestInspectCostWasteFindsWasteAndUntaggedResources(t *testing.T) {
 			}}}, nil
 		},
 		describeTargetHealthFunc: func(_ context.Context, params *elasticloadbalancingv2.DescribeTargetHealthInput, _ ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
+			targetHealthCalls++
 			if awssdk.ToString(params.TargetGroupArn) == "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/empty/1" {
 				return &elasticloadbalancingv2.DescribeTargetHealthOutput{}, nil
 			}
@@ -142,8 +144,8 @@ func TestInspectCostWasteFindsWasteAndUntaggedResources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if volumeCalls != 2 || targetGroupCalls != 2 {
-		t.Fatalf("expected paginator coverage, got volume calls %d and target group calls %d", volumeCalls, targetGroupCalls)
+	if volumeCalls != 2 || targetGroupCalls != 2 || targetHealthCalls != 2 {
+		t.Fatalf("expected paginator and sequential health coverage, got volume calls %d, target group calls %d, and target health calls %d", volumeCalls, targetGroupCalls, targetHealthCalls)
 	}
 	if len(findings) != 9 {
 		t.Fatalf("expected 9 findings, got %d: %+v", len(findings), findings)

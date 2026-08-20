@@ -242,6 +242,8 @@ func inspectEmptyTargetGroups(ctx context.Context, client ELBv2ClientAPI) ([]Sec
 				continue
 			}
 
+			// ELBv2 accepts one required target-group ARN per health request;
+			// keep these unavoidable lookups sequential to avoid request bursts.
 			health, err := client.DescribeTargetHealth(ctx, &elasticloadbalancingv2.DescribeTargetHealthInput{
 				TargetGroupArn: targetGroup.TargetGroupArn,
 			})
