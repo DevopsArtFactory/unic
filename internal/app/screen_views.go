@@ -20,6 +20,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureEC2InstanceBrowser:    filterEC2BrowserInstances,
 	domain.FeatureSSMSession:            filterInstances,
 	domain.FeatureRDSBrowser:            filterRDS,
+	domain.FeatureCloudFormationBrowser: filterCloudFormationStacks,
 	domain.FeatureRoute53Browser:        filterRoute53Zones,
 	domain.FeatureSecretsBrowser:        filterSecrets,
 	domain.FeatureSecurityGroupBrowser:  filterSecurityGroups,

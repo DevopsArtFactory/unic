@@ -40,6 +40,8 @@ const (
 	screenRDSDetail
 	screenRDSClassPicker
 	screenRDSConfirm
+	screenCloudFormationStackList
+	screenCloudFormationStackDetail
 	screenRoute53ZoneList
 	screenRoute53RecordList
 	screenRoute53RecordDetail
@@ -173,32 +175,33 @@ type Model struct {
 	selectedInstance *awsservice.EC2Instance
 
 	// Feature submodels
-	ec2Browser   ec2InstanceBrowserModel
-	ecs          ecsModel
-	eks          eksModel
-	ecr          ecrModel
-	fis          fisModel
-	vpc          vpcModel
-	reachability reachabilityModel
-	cwMetrics    cloudWatchMetricsModel
-	cwAlarms     cwAlarmsModel
-	cloudTrail   cloudTrailModel
-	cwLogs       cloudWatchLogsModel
-	rds          rdsModel
-	route53      route53Model
-	iam          iamModel
-	bedrock      bedrockModel
-	secrets      secretsModel
-	security     securityGroupModel
-	s3           s3Model
-	sqs          sqsModel
-	elb          elbModel
-	ssmParams    ssmParamsModel
-	elasticache  elasticacheModel
-	kms          kmsModel
-	acm          acmModel
-	lambda       lambdaModel
-	inspector    inspectorModel
+	ec2Browser     ec2InstanceBrowserModel
+	ecs            ecsModel
+	eks            eksModel
+	ecr            ecrModel
+	fis            fisModel
+	vpc            vpcModel
+	reachability   reachabilityModel
+	cwMetrics      cloudWatchMetricsModel
+	cwAlarms       cwAlarmsModel
+	cloudTrail     cloudTrailModel
+	cwLogs         cloudWatchLogsModel
+	rds            rdsModel
+	cloudFormation cloudFormationModel
+	route53        route53Model
+	iam            iamModel
+	bedrock        bedrockModel
+	secrets        secretsModel
+	security       securityGroupModel
+	s3             s3Model
+	sqs            sqsModel
+	elb            elbModel
+	ssmParams      ssmParamsModel
+	elasticache    elasticacheModel
+	kms            kmsModel
+	acm            acmModel
+	lambda         lambdaModel
+	inspector      inspectorModel
 
 	// Context picker
 	configPath         string
@@ -308,6 +311,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.cloudTrail = newCloudTrailModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
+	model.cloudFormation = newCloudFormationModel()
 	model.route53 = newRoute53Model()
 	model.iam = newIAMModel()
 	model.bedrock = newBedrockModel()
@@ -791,6 +795,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.reachability.Start(&m)
 	case domain.FeatureRDSBrowser:
 		return m.rds.Start(&m)
+	case domain.FeatureCloudFormationBrowser:
+		return m.cloudFormation.Start(&m)
 	case domain.FeatureRoute53Browser:
 		return m.route53.Start(&m)
 	case domain.FeatureSecretsBrowser:

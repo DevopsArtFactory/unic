@@ -90,6 +90,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - EC2
 - SSM
 - RDS
+- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
@@ -231,6 +232,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - EC2 / SSM
 - VPC / subnet / available IP detail
 - RDS list, detail, confirm
+- CloudFormation stack list/detail, 최근 event, drift detection
 - Route53 zone, record, mutation
 - Secrets Manager list/detail
 - Security Group list/detail/edit

@@ -22,6 +22,24 @@ type keyBinding struct {
 // log viewer intentionally stays legacy: its bar labels embed live state
 // (wrap on/off, horizontal offset) that a static declaration cannot express.
 var screenKeymaps = map[screen][]keyBinding{
+	screenCloudFormationStackList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between stacks"},
+		{keys: "/", bar: "/: filter", help: "Filter by stack name, status, ID, or drift"},
+		{keys: "r", bar: "r: refresh", help: "Refresh the stack list"},
+		{keys: "enter", bar: "enter: detail", help: "Open stack details and recent events"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenCloudFormationStackDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll stack details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll stack details by one page"},
+		{keys: "d", bar: "d: detect drift", help: "Start stack drift detection",
+			when: func(m Model) bool { return m.cloudFormation.selected != nil && m.cloudFormation.driftDetectionID == "" }},
+		{keys: "r", bar: "r: refresh", help: "Refresh stack details and events"},
+		{keys: "q", bar: "q: feature list", help: "Go back to the feature list"},
+		{keys: "esc", bar: "esc: stacks", help: "Go back to the stack list"},
+		{bar: "H: home"},
+	},
 	screenElastiCacheResourceList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between replication groups and standalone clusters"},
 		{keys: "/", bar: "/: filter", help: "Start filtering resources"},

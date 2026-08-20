@@ -50,6 +50,7 @@ const (
 	filterElastiCacheResources
 	filterKMSKeys
 	filterACMCertificates
+	filterCloudFormationStacks
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

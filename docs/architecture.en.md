@@ -90,6 +90,7 @@ Current repository clients include:
 - EC2
 - SSM
 - RDS
+- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
@@ -231,6 +232,7 @@ Current screen families include:
 - EC2 / SSM
 - VPC / subnet / available IP detail
 - RDS list, detail, and confirm flows
+- CloudFormation stack list/detail, recent-event, and drift-detection flows
 - Route53 zone, record, and mutation flows
 - Secrets Manager list/detail
 - Security Group list/detail/edit flows
