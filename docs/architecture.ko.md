@@ -118,6 +118,7 @@ cross-service inspector workflow와 rule pack을 담당한다.
 - Security Inspector 스캔 orchestration과 rule 등록은 여기서 관리
 - Checklist Inspector YAML schema 로딩, checklist 결과 모델, readiness runner도 여기서 관리
 - rule pack은 raw SDK setup 대신 `internal/services/aws` repository 메서드와 client interface에 의존
+- cost/waste rule pack은 EC2 및 ELBv2 client interface를 재사용해 resource state, tag, snapshot age, target 등록 상태를 점검
 - Security / Checklist Inspector 이후의 후속 inspector workflow도 이 패턴으로 확장
 
 ### `internal/app/`

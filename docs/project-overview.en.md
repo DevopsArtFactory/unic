@@ -26,7 +26,7 @@ Implemented service areas currently include:
 - Inspector mode
 
 The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens. CloudWatch Metrics now includes resource-centric preset groups plus time-range, period, and statistic controls for faster terminal triage. EKS includes managed add-on status review, current-version upgrade readiness checks that compare control plane, managed node group, managed add-on version alignment, and EKS upgrade insights before a target upgrade is planned, plus a kubeconfig access helper that prepares copyable `aws eks update-kubeconfig` and `kubectl` handoff commands. ECR includes repository and image/tag browsing with cleanup-oriented untagged and stale image signals. FIS includes experiment template browsing with safe-run blast-radius preview, targets, actions, role ARN, stop condition summaries, and recent experiment history with status, timing, and failure/stop reasons.
-Inspector mode now includes built-in security scans plus checklist-driven readiness checks for RDS, security groups, secrets, Route53, VPCs/subnets, CloudWatch Logs, and baseline posture wrappers.
+Inspector mode now includes built-in security and cost/waste scans plus checklist-driven readiness checks for RDS, security groups, secrets, Route53, VPCs/subnets, CloudWatch Logs, and baseline posture wrappers. The cost/waste pack surfaces unattached EIPs and EBS volumes, stopped EC2 instances, empty target groups, untagged EC2-family resources, and EBS snapshots aged 90 days or more.
 
 ## Primary User Flows
 

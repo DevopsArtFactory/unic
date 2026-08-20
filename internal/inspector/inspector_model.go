@@ -36,7 +36,7 @@ func Workflows(checklistPath string) []Workflow {
 		{
 			Kind:        WorkflowSecurity,
 			Title:       "Security Inspector",
-			Description: "Cross-service security findings for network exposure, identity, storage, logging, and baseline posture.",
+			Description: "Cross-service security and cost hygiene findings for exposure, identity, storage, logging, baselines, and resource waste.",
 			Available:   true,
 		},
 		{
@@ -67,6 +67,7 @@ type ConfigServiceClientAPI = awsservice.ConfigServiceClientAPI
 type DNSRecord = awsservice.DNSRecord
 type EC2ClientAPI = awsservice.EC2ClientAPI
 type ElastiCacheClientAPI = awsservice.ElastiCacheClientAPI
+type ELBv2ClientAPI = awsservice.ELBv2ClientAPI
 type GuardDutyClientAPI = awsservice.GuardDutyClientAPI
 type HostedZone = awsservice.HostedZone
 type IAMClientAPI = awsservice.IAMClientAPI

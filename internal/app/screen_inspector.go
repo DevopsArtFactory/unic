@@ -636,7 +636,7 @@ func (im inspectorModel) viewHome(m Model) string {
 	panel.WriteString("\n")
 	switch selected.Kind {
 	case inspector.WorkflowSecurity:
-		panel.WriteString(normalStyle.Render("  Run the built-in security rule packs across the active AWS context."))
+		panel.WriteString(normalStyle.Render("  Run the built-in security and cost/waste rule packs across the active AWS context."))
 		panel.WriteString("\n")
 		panel.WriteString(dimStyle.Render(fmt.Sprintf("  Registered rule packs: %d", inspector.RegisteredSecurityInspectorScannerCount())))
 		panel.WriteString("\n")
@@ -797,7 +797,7 @@ func (im inspectorModel) viewScanning(m Model) string {
 		description = "  Verifying RDS instances, security groups, and secrets against the supplied checklist YAML."
 	default:
 		title = "Inspector Mode — Security Scan"
-		description = "  Checking network exposure, backups, key age, secret rotation, logging baselines, and bucket posture."
+		description = "  Checking network exposure, backups, key age, logging baselines, bucket posture, and resource waste."
 	}
 
 	var b strings.Builder
