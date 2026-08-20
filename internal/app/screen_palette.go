@@ -146,14 +146,7 @@ func (m Model) updatePalette(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.indexPaletteResources()
 	case "esc":
 		m.palette.stopIndex()
-		if m.palette.prevScreen == screenLoading && m.ssmParams.loading {
-			return m.ssmParams.Start(&m)
-		}
-		if m.palette.prevScreen == screenLoading && m.ssmParams.selected != nil {
-			m.screen = screenSSMParamDetail
-			return m, nil
-		}
-		m.screen = m.palette.prevScreen
+		return m.restoreScreenAfterOverlay(m.palette.prevScreen)
 	case "up":
 		m.palette.idx = previousListIndex(m.palette.idx, len(m.palette.filtered))
 	case "down":
