@@ -167,9 +167,6 @@ func (em elasticacheModel) loadResources(m Model) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		if len(resources) == 0 {
-			return errMsg{err: fmt.Errorf("no ElastiCache replication groups or clusters found")}
-		}
 		return elasticacheResourcesLoadedMsg{resources: resources}
 	}
 }

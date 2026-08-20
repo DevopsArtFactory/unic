@@ -130,14 +130,18 @@ func mapElastiCacheCluster(cluster elasticachetypes.CacheCluster) ElastiCacheRes
 		} else if awssdk.ToString(cacheNode.SourceCacheNodeId) != "" {
 			role = "replica"
 		}
-		resource.Nodes = append(resource.Nodes, ElastiCacheNode{
+		node := ElastiCacheNode{
 			ID:        awssdk.ToString(cacheNode.CacheNodeId),
 			ClusterID: resource.ID,
 			Role:      role,
 			Status:    awssdk.ToString(cacheNode.CacheNodeStatus),
 			AZ:        awssdk.ToString(cacheNode.CustomerAvailabilityZone),
 			Endpoint:  formatElastiCacheEndpoint(cacheNode.Endpoint),
-		})
+		}
+		resource.Nodes = append(resource.Nodes, node)
+		if resource.Endpoint == "" && node.Endpoint != "" {
+			resource.Endpoint = node.Endpoint
+		}
 	}
 	sortElastiCacheNodes(resource.Nodes)
 	return resource

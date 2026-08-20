@@ -57,6 +57,16 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 						Endpoint:                 endpoint("memcached-1.cache.amazonaws.com", 11211),
 					}},
 				},
+				{
+					CacheClusterId:     awssdk.String("redis-standalone"),
+					CacheClusterStatus: awssdk.String("available"),
+					Engine:             awssdk.String("redis"),
+					EngineVersion:      awssdk.String("7.1"),
+					CacheNodes: []elasticachetypes.CacheNode{{
+						CacheNodeId: awssdk.String("0001"),
+						Endpoint:    endpoint("redis-standalone.cache.amazonaws.com", 6379),
+					}},
+				},
 			}}, nil
 		},
 		describeReplicationGroupsFunc: func(context.Context, *elasticache.DescribeReplicationGroupsInput, ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
@@ -86,8 +96,8 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(resources) != 2 {
-		t.Fatalf("expected replication group and standalone cluster, got %+v", resources)
+	if len(resources) != 3 {
+		t.Fatalf("expected replication group and standalone clusters, got %+v", resources)
 	}
 	standalone, group := resources[0], resources[1]
 	if standalone.ID != "memcached-dev" || standalone.Kind != "cluster" || standalone.Endpoint != "memcached.cfg.cache.amazonaws.com:11211" {
@@ -101,6 +111,9 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 	}
 	if len(group.Nodes) != 1 || group.Nodes[0].Status != "available" || group.Nodes[0].Endpoint != "prod-node.cache.amazonaws.com:6379" {
 		t.Fatalf("unexpected replication-group nodes: %+v", group.Nodes)
+	}
+	if resources[2].ID != "redis-standalone" || resources[2].Endpoint != "redis-standalone.cache.amazonaws.com:6379" {
+		t.Fatalf("expected standalone Redis endpoint from its first node, got %+v", resources[2])
 	}
 }
 

@@ -38,6 +38,13 @@ func TestElastiCacheResourcesLoadedRendersAndFilters(t *testing.T) {
 	if len(m.elasticache.filtered) != 1 || m.elasticache.filtered[0].ID != "prod-rg" {
 		t.Fatalf("expected Valkey filter result, got %+v", m.elasticache.filtered)
 	}
+
+	empty := New(testConfig(), "", "dev")
+	empty.elasticache.HandleMessage(&empty, elasticacheResourcesLoadedMsg{})
+	emptyView, _ := empty.elasticache.View(empty)
+	if !strings.Contains(emptyView, "No ElastiCache resources found") {
+		t.Fatalf("expected empty resource view, got:\n%s", emptyView)
+	}
 }
 
 func TestElastiCacheNodeDrillDownAndEndpointCopy(t *testing.T) {
