@@ -177,6 +177,12 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceKMS,
+			Features: []Feature{{
+				Kind: FeatureKMSKeyBrowser, Description: "Browse KMS keys, aliases, and rotation status",
+			}},
+		},
+		{
 			Name: ServiceACM,
 			Features: []Feature{{
 				Kind:        FeatureACMCertificateBrowser,

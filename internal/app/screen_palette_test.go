@@ -1,8 +1,11 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -178,5 +181,106 @@ func TestPaletteBackspaceIsRuneSafe(t *testing.T) {
 	m = next.(Model)
 	if m.palette.query != "한" {
 		t.Fatalf("expected backspace to remove one rune, got %q", m.palette.query)
+	}
+}
+
+func TestPaletteCrossContextIndexIncludesSyncedContextsAndFailures(t *testing.T) {
+	originalLoad := paletteLoadNamedContextFn
+	originalIndex := paletteIndexContextFn
+	t.Cleanup(func() {
+		paletteLoadNamedContextFn = originalLoad
+		paletteIndexContextFn = originalIndex
+	})
+
+	m := paletteTestModel()
+	m.ctxList = []config.ContextInfo{
+		{Name: "dev", Current: true},
+		{Name: "prod-admin", SyncSource: "company-sso"},
+		{Name: "manual"},
+	}
+	paletteLoadNamedContextFn = func(_ string, name string) (*config.Config, error) {
+		return &config.Config{ContextName: name, Region: "eu-west-1"}, nil
+	}
+	paletteIndexContextFn = func(_ context.Context, cfg *config.Config, name string) ([]paletteItem, []string) {
+		if name == "prod-admin" {
+			return nil, []string{fmt.Sprintf("%s/%s: access denied", name, cfg.Region)}
+		}
+		item := paletteResourceItem("EC2", "web", "web", domain.FeatureEC2InstanceBrowser,
+			domain.ServiceEC2, filterEC2BrowserInstances, "i-123")
+		item.contextName = name
+		return []paletteItem{item}, nil
+	}
+
+	updated, _ := m.openPalette()
+	m = updated.(Model)
+	next, cmd := m.updatePalette(tea.KeyMsg{Type: tea.KeyTab})
+	m = next.(Model)
+	msg := cmd()
+	next, _ = m.Update(msg)
+	m = next.(Model)
+
+	if !m.palette.crossContext || m.palette.indexing {
+		t.Fatalf("expected completed cross-context index, state=%+v", m.palette)
+	}
+	if len(m.palette.resources) != 1 || m.palette.resources[0].contextName != "dev" {
+		t.Fatalf("expected only active-context resource, got %+v", m.palette.resources)
+	}
+	if got := strings.Join(m.palette.indexErrs, "\n"); !strings.Contains(got, "prod-admin/eu-west-1: access denied") {
+		t.Fatalf("expected synced-context failure, got %q", got)
+	}
+}
+
+func TestPaletteScopeToggleCancelsSupersededIndex(t *testing.T) {
+	originalIndex := paletteIndexContextFn
+	t.Cleanup(func() { paletteIndexContextFn = originalIndex })
+
+	started := make(chan struct{})
+	canceled := make(chan struct{})
+	paletteIndexContextFn = func(ctx context.Context, _ *config.Config, _ string) ([]paletteItem, []string) {
+		close(started)
+		<-ctx.Done()
+		close(canceled)
+		return nil, nil
+	}
+
+	m := paletteTestModel()
+	updated, firstCmd := m.openPalette()
+	m = updated.(Model)
+	firstDone := make(chan struct{})
+	go func() {
+		firstCmd()
+		close(firstDone)
+	}()
+	<-started
+
+	next, replacementCmd := m.updatePalette(tea.KeyMsg{Type: tea.KeyTab})
+	m = next.(Model)
+	select {
+	case <-canceled:
+	case <-time.After(time.Second):
+		t.Fatal("expected scope toggle to cancel the superseded index")
+	}
+	<-firstDone
+	if replacementCmd == nil || m.palette.indexCtx == nil {
+		t.Fatal("expected a replacement index with a fresh context")
+	}
+}
+
+func TestPaletteCrossContextResourceJumpSwitchesThenAppliesView(t *testing.T) {
+	m := paletteTestModel()
+	item := paletteResourceItem("RDS", "prod-db", "prod-db", domain.FeatureRDSBrowser,
+		domain.ServiceRDS, filterRDS, "prod-db")
+	item.contextName = "prod-admin"
+
+	next, cmd := m.executePaletteItem(item)
+	model := next.(Model)
+	if cmd == nil || model.pendingView == nil {
+		t.Fatal("expected context switch with a deferred resource jump")
+	}
+	if model.pendingView.Context != "prod-admin" || model.pendingView.Filter != "prod-db" {
+		t.Fatalf("unexpected deferred jump: %+v", model.pendingView)
+	}
+	if model.screen != screenLoading {
+		t.Fatalf("expected loading screen during context switch, got %v", model.screen)
 	}
 }

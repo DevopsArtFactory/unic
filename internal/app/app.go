@@ -99,6 +99,8 @@ const (
 	screenElastiCacheResourceList
 	screenElastiCacheNodeList
 	screenElastiCacheNodeDetail
+	screenKMSKeyList
+	screenKMSKeyDetail
 	screenACMCertificateList
 	screenACMCertificateDetail
 	screenS3BucketList
@@ -193,6 +195,7 @@ type Model struct {
 	elb          elbModel
 	ssmParams    ssmParamsModel
 	elasticache  elasticacheModel
+	kms          kmsModel
 	acm          acmModel
 	lambda       lambdaModel
 	inspector    inspectorModel
@@ -315,6 +318,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.elb = newELBModel()
 	model.ssmParams = newSSMParamsModel()
 	model.elasticache = newElastiCacheModel()
+	model.kms = newKMSModel()
 	model.acm = newACMModel()
 	model.lambda = newLambdaModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
@@ -809,6 +813,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.ssmParams.Start(&m)
 	case domain.FeatureElastiCacheBrowser:
 		return m.elasticache.Start(&m)
+	case domain.FeatureKMSKeyBrowser:
+		return m.kms.Start(&m)
 	case domain.FeatureACMCertificateBrowser:
 		return m.acm.Start(&m)
 	case domain.FeatureSecurityGroupBrowser:

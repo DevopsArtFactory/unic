@@ -48,6 +48,7 @@ const (
 	filterELBTargetGroups
 	filterSSMParameters
 	filterElastiCacheResources
+	filterKMSKeys
 	filterACMCertificates
 )
 
