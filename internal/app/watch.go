@@ -116,7 +116,10 @@ func (m Model) handleWatchRefresh(msg watchRefreshMsg) (tea.Model, tea.Cmd) {
 	}
 	m.watch.refreshing = true
 	updated, cmd := m.Update(msg.msg)
-	model := updated.(Model)
+	model, ok := updated.(Model)
+	if !ok {
+		return updated, cmd
+	}
 	model.watch.refreshing = false
 	return model, cmd
 }

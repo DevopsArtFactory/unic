@@ -66,7 +66,8 @@ func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		previousScroll := em.detailScroll
 		em.selectedDetail = msg.detail
 		if refreshing {
-			em.detailScroll = previousScroll
+			visibleLines := max(m.height-9, 5)
+			em.detailScroll = min(previousScroll, max(len(em.serviceDetailLines())-visibleLines, 0))
 		} else {
 			em.detailScroll = 0
 		}

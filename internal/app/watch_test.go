@@ -114,6 +114,38 @@ func TestECSWatchRefreshPreservesDetailScroll(t *testing.T) {
 	}
 }
 
+func TestECSWatchRefreshClampsDetailScrollAfterShrink(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 14
+	m.ecs.services = []awsservice.ECSService{{Name: "api", ARN: "arn:svc/api"}}
+	m.ecs.selectedService = &m.ecs.services[0]
+	events := make([]awsservice.ECSServiceEvent, 20)
+	for i := range events {
+		events[i].Message = "deployment event"
+	}
+	m.ecs.HandleMessage(&m, ecsServiceDetailLoadedMsg{detail: &awsservice.ECSServiceDetail{
+		Name: "api", ARN: "arn:svc/api", Events: events,
+	}})
+	visibleLines := max(m.height-9, 5)
+	m.ecs.detailScroll = max(len(m.ecs.serviceDetailLines())-visibleLines, 0)
+	previousScroll := m.ecs.detailScroll
+	updated, _ := m.toggleWatch()
+	m = updated.(Model)
+
+	updated, _ = m.Update(watchRefreshMsg{
+		target: screenECSServiceDetail,
+		msg:    ecsServiceDetailLoadedMsg{detail: &awsservice.ECSServiceDetail{Name: "api", ARN: "arn:svc/api"}},
+	})
+	m = updated.(Model)
+	want := max(len(m.ecs.serviceDetailLines())-visibleLines, 0)
+	if previousScroll <= want {
+		t.Fatalf("expected test detail to shrink below the previous scroll, before=%d afterMax=%d", previousScroll, want)
+	}
+	if m.ecs.detailScroll != want {
+		t.Fatalf("expected rollout scroll to clamp after refresh, got %d want %d", m.ecs.detailScroll, want)
+	}
+}
+
 func TestSQSWatchRefreshKeepsSelectedQueueDetail(t *testing.T) {
 	m := sqsTestModel()
 	m.sqs.HandleMessage(&m, sqsQueuesLoadedMsg{queues: testQueues()})
