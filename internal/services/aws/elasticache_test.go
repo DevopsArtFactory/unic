@@ -44,6 +44,18 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 					}},
 				},
 				{
+					CacheClusterId:     awssdk.String("prod-cache-002"),
+					ReplicationGroupId: awssdk.String("prod-rg"),
+					Engine:             awssdk.String("valkey"),
+					EngineVersion:      awssdk.String("8.0"),
+					CacheNodes: []elasticachetypes.CacheNode{{
+						CacheNodeId:       awssdk.String("0001"),
+						CacheNodeStatus:   awssdk.String("available"),
+						SourceCacheNodeId: awssdk.String("0001"),
+						Endpoint:          endpoint("prod-replica.cache.amazonaws.com", 6379),
+					}},
+				},
+				{
 					CacheClusterId:        awssdk.String("memcached-dev"),
 					CacheClusterStatus:    awssdk.String("available"),
 					Engine:                awssdk.String("memcached"),
@@ -76,6 +88,7 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 				Engine:             awssdk.String("valkey"),
 				Status:             awssdk.String("available"),
 				CacheNodeType:      awssdk.String("cache.r7g.large"),
+				ClusterEnabled:     awssdk.Bool(true),
 				NodeGroups: []elasticachetypes.NodeGroup{{
 					NodeGroupId:     awssdk.String("0001"),
 					PrimaryEndpoint: endpoint("prod.cache.amazonaws.com", 6379),
@@ -83,8 +96,11 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 					NodeGroupMembers: []elasticachetypes.NodeGroupMember{{
 						CacheClusterId:            awssdk.String("prod-cache-001"),
 						CacheNodeId:               awssdk.String("0001"),
-						CurrentRole:               awssdk.String("primary"),
 						PreferredAvailabilityZone: awssdk.String("us-east-1a"),
+					}, {
+						CacheClusterId:            awssdk.String("prod-cache-002"),
+						CacheNodeId:               awssdk.String("0001"),
+						PreferredAvailabilityZone: awssdk.String("us-east-1b"),
 					}},
 				}},
 			}}}, nil
@@ -109,8 +125,11 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 	if group.ID != "prod-rg" || group.Kind != "replication group" || group.EngineVersion != "8.0" || group.Endpoint != "prod.cache.amazonaws.com:6379" {
 		t.Fatalf("unexpected replication group: %+v", group)
 	}
-	if len(group.Nodes) != 1 || group.Nodes[0].Status != "available" || group.Nodes[0].Endpoint != "prod-node.cache.amazonaws.com:6379" {
+	if len(group.Nodes) != 2 || group.Nodes[0].Status != "available" || group.Nodes[0].Endpoint != "prod-node.cache.amazonaws.com:6379" {
 		t.Fatalf("unexpected replication-group nodes: %+v", group.Nodes)
+	}
+	if group.Nodes[0].Role != "primary" || group.Nodes[1].Role != "replica" {
+		t.Fatalf("expected cluster-mode node roles from cache-node source metadata, got %+v", group.Nodes)
 	}
 	if resources[2].ID != "redis-standalone" || resources[2].Endpoint != "redis-standalone.cache.amazonaws.com:6379" {
 		t.Fatalf("expected standalone Redis endpoint from its first node, got %+v", resources[2])

@@ -161,6 +161,12 @@ func enrichElastiCacheNode(node *ElastiCacheNode, cluster elasticachetypes.Cache
 		if endpoint := formatElastiCacheEndpoint(cacheNode.Endpoint); endpoint != "" {
 			node.Endpoint = endpoint
 		}
+		if node.Role == "" {
+			node.Role = "primary"
+			if awssdk.ToString(cacheNode.SourceCacheNodeId) != "" {
+				node.Role = "replica"
+			}
+		}
 		return
 	}
 }
