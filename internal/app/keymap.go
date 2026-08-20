@@ -151,6 +151,20 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "q / esc", bar: "esc: back", help: "Go back to the KMS key list"},
 		{bar: "H: home"},
 	},
+	screenACMCertificateList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between certificates"},
+		{keys: "/", bar: "/: filter", help: "Filter domains, status, ARN, or attached resources"},
+		{keys: "r", bar: "r: refresh", help: "Refresh the certificate list"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected certificate"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenACMCertificateDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll certificate details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll certificate details by one page"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the certificate list"},
+		{bar: "H: home"},
+	},
 
 	screenIAMUserList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},

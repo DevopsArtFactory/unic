@@ -21,13 +21,14 @@ Implemented service areas currently include:
 - ECS
 - ECR
 - FIS
+- ACM
 - S3
 - Lambda
 - KMS
 - Inspector mode
 
-The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens. CloudWatch Metrics now includes resource-centric preset groups plus time-range, period, and statistic controls for faster terminal triage. EKS includes managed add-on status review, current-version upgrade readiness checks that compare control plane, managed node group, managed add-on version alignment, and EKS upgrade insights before a target upgrade is planned, plus a kubeconfig access helper that prepares copyable `aws eks update-kubeconfig` and `kubectl` handoff commands. ECR includes repository and image/tag browsing with cleanup-oriented untagged and stale image signals. FIS includes experiment template browsing with safe-run blast-radius preview, targets, actions, role ARN, stop condition summaries, and recent experiment history with status, timing, and failure/stop reasons. KMS includes key browsing with aliases, state, manager, and automatic-rotation posture.
-Inspector mode now includes built-in security scans, including customer-managed KMS key rotation checks, plus checklist-driven readiness checks for RDS, security groups, secrets, Route53, VPCs/subnets, CloudWatch Logs, and baseline posture wrappers.
+The application already includes interactive mutation flows, polling-based status flows, context helpers, and per-service drill-down screens. CloudWatch Metrics now includes resource-centric preset groups plus time-range, period, and statistic controls for faster terminal triage. EKS includes managed add-on status review, current-version upgrade readiness checks that compare control plane, managed node group, managed add-on version alignment, and EKS upgrade insights before a target upgrade is planned, plus a kubeconfig access helper that prepares copyable `aws eks update-kubeconfig` and `kubectl` handoff commands. ECR includes repository and image/tag browsing with cleanup-oriented untagged and stale image signals. FIS includes experiment template browsing with safe-run blast-radius preview, targets, actions, role ARN, stop condition summaries, and recent experiment history with status, timing, and failure/stop reasons. ACM includes an expiry-sorted certificate browser with validation, renewal, domain, and in-use details. KMS includes key browsing with aliases, state, manager, and automatic-rotation posture.
+Inspector mode now includes built-in security scans, including customer-managed KMS key rotation checks and ACM certificate expiry findings, plus checklist-driven readiness checks for RDS, security groups, secrets, Route53, VPCs/subnets, CloudWatch Logs, and baseline posture wrappers.
 
 ## Primary User Flows
 
@@ -45,6 +46,7 @@ The app supports:
 
 - legacy flat config
 - context-based config with `current`
+- a positive `inspector.acm_expiry_window_days` override for the default 30-day ACM warning window
 - `credential` auth
 - `console_login` auth for AWS CLI `aws login`-backed local development profiles
 - `assume_role` auth

@@ -24,6 +24,7 @@ const (
 	ServiceELB            AwsService = "ELB"
 	ServiceParameterStore AwsService = "Parameter Store"
 	ServiceKMS            AwsService = "KMS"
+	ServiceACM            AwsService = "ACM"
 	ServiceLambda         AwsService = "Lambda"
 	ServiceBedrock        AwsService = "Bedrock"
 )
@@ -57,6 +58,7 @@ const (
 	FeatureELBBrowser            FeatureKind = "Load Balancer Browser"
 	FeatureSSMParameterBrowser   FeatureKind = "Parameter Store Browser"
 	FeatureKMSKeyBrowser         FeatureKind = "KMS Key Browser"
+	FeatureACMCertificateBrowser FeatureKind = "ACM Certificate Browser"
 	FeatureLambdaBrowser         FeatureKind = "Lambda Browser"
 	FeatureBedrockAPIKeys        FeatureKind = "Bedrock API Keys"
 )

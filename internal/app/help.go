@@ -963,6 +963,10 @@ func (m Model) helpScreenTitle() string {
 		return "KMS Key Detail"
 	case screenS3BucketList:
 		return "S3 Buckets"
+	case screenACMCertificateList:
+		return "ACM Certificates"
+	case screenACMCertificateDetail:
+		return "ACM Certificate Detail"
 	case screenS3ObjectList:
 		return "S3 Objects"
 	case screenS3ObjectDetail:

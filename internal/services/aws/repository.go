@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
@@ -38,6 +39,8 @@ import (
 // Verify *ssm.Client satisfies SSMClientAPI at compile time.
 var _ SSMClientAPI = (*ssm.Client)(nil)
 var _ KMSClientAPI = (*kms.Client)(nil)
+
+var _ ACMClientAPI = (*acm.Client)(nil)
 
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
@@ -124,6 +127,12 @@ type KMSClientAPI interface {
 	DescribeKey(ctx context.Context, params *kms.DescribeKeyInput, optFns ...func(*kms.Options)) (*kms.DescribeKeyOutput, error)
 	ListAliases(ctx context.Context, params *kms.ListAliasesInput, optFns ...func(*kms.Options)) (*kms.ListAliasesOutput, error)
 	GetKeyRotationStatus(ctx context.Context, params *kms.GetKeyRotationStatusInput, optFns ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error)
+}
+
+// ACMClientAPI is the interface for certificate operations used by AwsRepository.
+type ACMClientAPI interface {
+	ListCertificates(ctx context.Context, params *acm.ListCertificatesInput, optFns ...func(*acm.Options)) (*acm.ListCertificatesOutput, error)
+	DescribeCertificate(ctx context.Context, params *acm.DescribeCertificateInput, optFns ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
@@ -350,6 +359,7 @@ type AwsRepository struct {
 	ELBv2Client          ELBv2ClientAPI
 	S3Client             S3ClientAPI
 	LambdaClient         LambdaClientAPI
+	ACMClient            ACMClientAPI
 	Region               string
 	Profile              string
 	awsCfg               aws.Config
@@ -471,6 +481,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		ELBv2Client:          elasticloadbalancingv2.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),
 		LambdaClient:         lambda.NewFromConfig(awsCfg),
+		ACMClient:            acm.NewFromConfig(awsCfg),
 		Region:               region,
 		Profile:              profile,
 		awsCfg:               awsCfg,
