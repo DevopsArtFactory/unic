@@ -44,10 +44,22 @@ func (pm *ssmParamsModel) clearValue() {
 	pm.notice = ""
 }
 
+func (m Model) restoreScreenAfterOverlay(previous screen) (tea.Model, tea.Cmd) {
+	if previous == screenLoading && m.loadingReturnScreen == screenSSMParamList {
+		return m.ssmParams.Start(&m)
+	}
+	if previous == screenLoading && m.loadingReturnScreen == screenSSMParamDetail {
+		m.screen = screenSSMParamDetail
+		return m, nil
+	}
+	m.screen = previous
+	return m, nil
+}
+
 func (pm *ssmParamsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	pm.request++
 	pm.loading = true
-	return m.startLoading(pm.loadParameters(*m, pm.request))
+	return m.startLoadingFor(screenSSMParamList, "Loading...", nil, pm.loadParameters(*m, pm.request))
 }
 
 func (pm *ssmParamsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -146,7 +158,7 @@ func (pm *ssmParamsModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.C
 		m.resetFilter(filterSSMParameters)
 		pm.request++
 		pm.loading = true
-		return m.startLoading(pm.loadParameters(*m, pm.request))
+		return m.startLoadingFor(screenSSMParamList, "Loading...", nil, pm.loadParameters(*m, pm.request))
 	case "enter":
 		if len(pm.filtered) > 0 && pm.idx < len(pm.filtered) {
 			selected := pm.filtered[pm.idx]
@@ -169,12 +181,12 @@ func (pm *ssmParamsModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea
 	case "v":
 		if pm.selected != nil && !pm.revealed {
 			pm.request++
-			return m.startLoadingWithMessage("Fetching value...", []string{pm.selected.Name}, pm.loadValue(*m, pm.selected.Name, false, pm.request))
+			return m.startLoadingFor(screenSSMParamDetail, "Fetching value...", []string{pm.selected.Name}, pm.loadValue(*m, pm.selected.Name, false, pm.request))
 		}
 	case "y":
 		if pm.selected != nil {
 			pm.request++
-			return m.startLoadingWithMessage("Copying value...", []string{pm.selected.Name}, pm.loadValue(*m, pm.selected.Name, true, pm.request))
+			return m.startLoadingFor(screenSSMParamDetail, "Copying value...", []string{pm.selected.Name}, pm.loadValue(*m, pm.selected.Name, true, pm.request))
 		}
 	}
 	return *m, nil

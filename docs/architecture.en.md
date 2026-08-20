@@ -99,6 +99,7 @@ Current repository clients include:
 - ECS
 - ECR
 - FIS
+- ACM
 - S3
 
 Pattern:
@@ -116,6 +117,7 @@ Pattern:
 
 - workflow-local finding/report models live here
 - Security Inspector scan orchestration and rule registration live here
+- ACM expiry scanning uses the repository certificate list and the configured positive `inspector.acm_expiry_window_days` threshold (30 days by default)
 - Checklist Inspector YAML schema loading, checklist result models, and readiness runners live here
 - rule packs still depend on `internal/services/aws` repository methods and client interfaces rather than raw SDK setup
 - the cost/waste rule pack reuses the EC2 and ELBv2 client interfaces for resource-state, tag, snapshot-age, and target-registration checks
@@ -154,6 +156,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_ecs.go`
 - `screen_eks.go`
 - `screen_ecr.go`
+- `screen_acm.go`
 - `screen_s3.go`
 - `screen_lambda.go`
 - `screen_bedrock.go`
@@ -235,6 +238,7 @@ Current screen families include:
 - EKS cluster/node group/add-on status, upgrade readiness, and access helper flows
 - ECR repository/image/detail flows
 - FIS experiment template list/detail, safe-run preview, and experiment history/detail flows
+- ACM certificate list/detail flows
 - S3 bucket/object/detail flows
 - Inspector mode home, checklist setup, security findings/detail, and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
