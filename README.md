@@ -427,7 +427,7 @@ checks:
 | Security Groups | `a` add rule, `d` delete rule, `Tab` switch ingress/egress |
 | Reachability Analyzer | Region select first, `←`/`→` or `Tab` change type, `/` filter, `Enter` advance, `Tab`/`↑`/`↓` move config fields, `←`/`→` protocol, `r` rerun |
 | RDS | `A` toggle all-regions scope (multi-region contexts), `s` start, `x` stop, `f` failover, `m` modify instance class (filterable class picker, `Tab` apply-immediately toggle, type-to-confirm), `r` refresh |
-| CloudFormation | `/` filter, `r` refresh, `Enter` stack detail with parameters/outputs/recent events, detail `d` detect drift, `↑`/`↓` scroll, `PgUp`/`PgDn` page |
+| CloudFormation | `/` filter, `r` refresh, `Enter` stack detail with parameters/outputs/recent events, detail `d` detect drift, detail `r` refresh when drift detection is idle, `↑`/`↓` scroll, `PgUp`/`PgDn` page |
 | Route53 | `c` create, `e` edit, `d` delete |
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
