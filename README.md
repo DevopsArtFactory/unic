@@ -408,6 +408,7 @@ checks:
 | `R` | Switch between the active context's configured resource regions |
 | `S` | Open settings |
 | `P` | Open the command palette (fuzzy search across features, contexts, and indexed resources) |
+| `Tab` | Toggle current-context or synced-context resource scope in the command palette |
 | `V` | Open saved views (save/apply/delete repeatable feature + filter + context jumps) |
 | `/` | Toggle filter mode on supported screens |
 | `f` | Favorite/unfavorite the selected service or context on supported lists |
@@ -447,7 +448,7 @@ checks:
 | ACM Certificates | `/` filter, `r` refresh, `Enter` certificate detail, detail `↑`/`↓` scroll, `PgUp`/`PgDn` page |
 | Lambda | `A` toggle all-regions scope (multi-region contexts), `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 
-The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context; results stream in as they load, per-service failures are shown inline, and matching covers names, IDs, and ARNs where available. Selecting a resource jumps to the owning browser with the shared filter prefilled to that resource.
+The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context. Press `Tab` to opt into searching the active context plus sync-managed contexts; context fan-out is bounded, rows show context and region tags, and per-context/service failures are shown inline. Matching covers names, IDs, ARNs, contexts, and regions where available. Selecting a resource in another context switches context and then jumps to the owning browser with the shared filter prefilled to that resource.
 
 Saved views (`V`) capture repeatable operational workflows: pressing `s` on the views screen snapshots the last opened service feature, its active shared filter, and the current context under a name you type; `enter` reapplies a view in one step — switching to the view's context first when it differs — and `d` deletes one. Views persist under `views:` in `config.yaml` (fields: `name`, `context`, `service`, `feature`, `filter`); the format is additive so future fields extend it without breaking existing files.
 
