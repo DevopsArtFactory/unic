@@ -45,9 +45,9 @@ var screenKeymaps = map[screen][]keyBinding{
 		{bar: "H: home"},
 	},
 	screenEventBridgeRuleConfirm: {
-		{keys: "type", help: "Enter the rule name to confirm the state change"},
+		{keys: "type", help: "Enter event-bus/rule to confirm the state change"},
 		{keys: "backspace", help: "Delete the previous character"},
-		{keys: "enter", bar: "enter: confirm", help: "Change rule state when the typed name matches"},
+		{keys: "enter", bar: "enter: confirm", help: "Change rule state when the typed identity matches"},
 		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to rule detail"},
 	},
 

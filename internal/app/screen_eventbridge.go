@@ -39,7 +39,7 @@ func eventBridgeRuleIdentity(rule awsservice.EventBridgeRule) string {
 }
 
 func (em *eventBridgeModel) Start(m *Model) (tea.Model, tea.Cmd) {
-	return m.startLoading(em.load(*m))
+	return m.startLoadingFor(screenEventBridgeRuleList, "Loading...", nil, em.load(*m))
 }
 
 func (em eventBridgeModel) load(m Model) tea.Cmd {
@@ -58,6 +58,13 @@ func (em *eventBridgeModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea
 	switch msg := msg.(type) {
 	case eventBridgeRulesLoadedMsg:
 		if msg.err != nil {
+			if em.preserveOverlay(m, screenError) {
+				m.errMsg = msg.err.Error()
+				m.loadingTitle = ""
+				m.loadingDetails = nil
+				return *m, nil, true
+			}
+			m.loadingReturnScreen = 0
 			updated, cmd := m.Update(errMsg{err: msg.err})
 			return updated, cmd, true
 		}
@@ -67,10 +74,20 @@ func (em *eventBridgeModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea
 		em.selected = nil
 		em.notice = ""
 		em.detailScroll = 0
-		m.screen = screenEventBridgeRuleList
+		if !em.preserveOverlay(m, screenEventBridgeRuleList) {
+			m.loadingReturnScreen = 0
+			m.screen = screenEventBridgeRuleList
+		}
 		return *m, nil, true
 	case eventBridgeActionDoneMsg:
 		if msg.err != nil {
+			if em.preserveOverlay(m, screenError) {
+				m.errMsg = msg.err.Error()
+				m.loadingTitle = ""
+				m.loadingDetails = nil
+				return *m, nil, true
+			}
+			m.loadingReturnScreen = 0
 			updated, cmd := m.Update(errMsg{err: msg.err})
 			return updated, cmd, true
 		}
@@ -81,10 +98,35 @@ func (em *eventBridgeModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea
 		}
 		em.notice = fmt.Sprintf("Rule %s", action)
 		em.confirmInput = ""
-		m.screen = screenEventBridgeRuleDetail
+		if !em.preserveOverlay(m, screenEventBridgeRuleDetail) {
+			m.loadingReturnScreen = 0
+			m.screen = screenEventBridgeRuleDetail
+		}
 		return *m, nil, true
 	}
 	return *m, nil, false
+}
+
+func (em *eventBridgeModel) preserveOverlay(m *Model, target screen) bool {
+	switch m.screen {
+	case screenSettings, screenCommandPalette, screenViewList, screenContextPicker:
+	default:
+		return false
+	}
+	if !isEventBridgeScreen(m.loadingReturnScreen) {
+		return false
+	}
+	preserved := false
+	for _, previous := range []*screen{&m.settingsPrevScreen, &m.palette.prevScreen, &m.views.prevScreen, &m.ctxPrevScreen} {
+		if *previous == screenLoading {
+			*previous = target
+			preserved = true
+		}
+	}
+	if preserved {
+		m.loadingReturnScreen = 0
+	}
+	return preserved
 }
 
 func (em *eventBridgeModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
@@ -139,7 +181,7 @@ func (em *eventBridgeModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea
 		return *m, m.activateFilter(filterEventBridgeRules)
 	case "r":
 		m.resetFilter(filterEventBridgeRules)
-		return m.startLoading(em.load(*m))
+		return m.startLoadingFor(screenEventBridgeRuleList, "Loading...", nil, em.load(*m))
 	case "enter":
 		if len(em.filtered) > 0 && em.idx < len(em.filtered) {
 			selected := em.filtered[em.idx]
@@ -200,7 +242,7 @@ func (em *eventBridgeModel) updateConfirm(m *Model, msg tea.KeyMsg) (tea.Model, 
 				action = "Enabling"
 			}
 			m.screen = screenEventBridgeRuleDetail
-			return m.startLoadingWithMessage(action+" EventBridge rule...", []string{rule.Name, rule.EventBusName}, em.setEnabled(*m, rule, enabled))
+			return m.startLoadingFor(screenEventBridgeRuleDetail, action+" EventBridge rule...", []string{rule.Name, rule.EventBusName}, em.setEnabled(*m, rule, enabled))
 		}
 	case "backspace":
 		em.confirmInput = trimLastRune(em.confirmInput)

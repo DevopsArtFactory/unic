@@ -215,6 +215,82 @@ func TestEventBridgeContextSwitchThroughSettingsDropsStaleActionState(t *testing
 	}
 }
 
+func TestEventBridgeListLoadCompletesBehindSettings(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	started, _ := m.eventBridge.Start(&m)
+	m = started.(Model)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m = updated.(Model)
+	updated, _ = m.Update(eventBridgeRulesLoadedMsg{rules: eventBridgeTestRules()})
+	m = updated.(Model)
+
+	if m.screen != screenSettings || m.settingsPrevScreen != screenEventBridgeRuleList {
+		t.Fatalf("expected settings to remain open over the loaded rule list, screen=%v previous=%v", m.screen, m.settingsPrevScreen)
+	}
+	if len(m.eventBridge.rules) != len(eventBridgeTestRules()) {
+		t.Fatalf("expected loaded rules retained behind settings, got %d", len(m.eventBridge.rules))
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenEventBridgeRuleList {
+		t.Fatalf("expected settings exit to reveal the rule list, got %v", m.screen)
+	}
+}
+
+func TestEventBridgeActionCompletionStaysBehindPalette(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.eventBridge.HandleMessage(&m, eventBridgeRulesLoadedMsg{rules: eventBridgeTestRules()})
+	selected := m.eventBridge.rules[0]
+	m.eventBridge.selected = &selected
+	m.eventBridge.desiredEnabled = true
+	m.eventBridge.confirmInput = eventBridgeRuleIdentity(selected)
+	m.screen = screenEventBridgeRuleConfirm
+
+	updated, _ := m.eventBridge.updateConfirm(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	m = updated.(Model)
+	updated, _ = m.Update(eventBridgeActionDoneMsg{ruleName: selected.Name, busName: selected.EventBusName, enabled: true})
+	m = updated.(Model)
+
+	if m.screen != screenCommandPalette || m.palette.prevScreen != screenEventBridgeRuleDetail {
+		t.Fatalf("expected palette to remain open over updated detail, screen=%v previous=%v", m.screen, m.palette.prevScreen)
+	}
+	if m.eventBridge.selected == nil || m.eventBridge.selected.State != "ENABLED" {
+		t.Fatalf("expected completed action retained behind palette, got %+v", m.eventBridge.selected)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenEventBridgeRuleDetail {
+		t.Fatalf("expected palette exit to reveal updated detail, got %v", m.screen)
+	}
+}
+
+func TestEventBridgeContextSwitchCommitDropsLoadingReturn(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	started, _ := m.eventBridge.Start(&m)
+	m = started.(Model)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+
+	if cmd == nil || m.screen != screenLoading {
+		t.Fatalf("expected committed context switch to start loading, screen=%v cmd=%v", m.screen, cmd)
+	}
+	if m.ctxPrevScreen != screenSettings || m.settingsPrevScreen != screenFeatureList {
+		t.Fatalf("expected committed switch to discard the nested EventBridge loading return, ctx=%v settings=%v", m.ctxPrevScreen, m.settingsPrevScreen)
+	}
+}
+
 func TestEventBridgeDetailScrollIsBounded(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.height = 12
