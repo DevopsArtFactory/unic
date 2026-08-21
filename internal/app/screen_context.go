@@ -60,8 +60,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
 		m.dynamodb = newDynamoDBModel()
-		switch m.ctxPrevScreen {
-		case screenDynamoDBTableList, screenDynamoDBTableDetail, screenDynamoDBLookupInput, screenDynamoDBLookupResult:
+		if isDynamoDBScreen(m.ctxPrevScreen) {
 			m.ctxPrevScreen = screenServiceList
 		}
 		if m.pendingView != nil {

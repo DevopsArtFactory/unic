@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	awsservice "unic/internal/services/aws"
 )
@@ -93,6 +94,42 @@ func TestDynamoDBTableListRendersSummaryColumns(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected %q in table list:\n%s", want, view)
 		}
+	}
+}
+
+func TestDynamoDBTableListKeepsLongRowsWithinNarrowPanel(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 64
+	m.height = 30
+	m.screen = screenDynamoDBTableList
+	table := dynamoDBTestTable()
+	table.Name = "customer-orders-with-an-extraordinarily-long-table-name"
+	table.Status = "INACCESSIBLE_ENCRYPTION_CREDENTIALS"
+	table.GSICount = 987
+	m.dynamodb.tables = []awsservice.DynamoDBTable{table}
+	m.dynamodb.filtered = m.dynamodb.tables
+
+	plain := ansiEscapePattern.ReplaceAllString(m.dynamodb.viewTableList(m), "")
+	var selected string
+	for _, line := range strings.Split(plain, "\n") {
+		if strings.Contains(line, "> ") {
+			selected = line
+			break
+		}
+	}
+	if selected == "" {
+		t.Fatalf("expected a selected table row:\n%s", plain)
+	}
+	for _, want := range []string{"5R/2W", "42", "2.0 KB", "987"} {
+		if !strings.Contains(selected, want) {
+			t.Fatalf("expected summary %q on the selected row %q", want, selected)
+		}
+	}
+	if !strings.Contains(selected, "...") || strings.Contains(selected, table.Name) || strings.Contains(selected, table.Status) {
+		t.Fatalf("expected long cells to be truncated on one row, got %q", selected)
+	}
+	if width := lipgloss.Width(selected); width > m.width {
+		t.Fatalf("selected row width %d exceeds terminal width %d: %q", width, m.width, selected)
 	}
 }
 
@@ -258,6 +295,39 @@ func TestDynamoDBContextSwitchClearsPreviousAccountState(t *testing.T) {
 	}
 	if view := model.View(); strings.Contains(view, "old-account") {
 		t.Fatalf("previous account item leaked after context switch:\n%s", view)
+	}
+}
+
+func TestDynamoDBContextSwitchDuringLoadDoesNotRestoreLoadingScreen(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	table := dynamoDBTestTable()
+	m.dynamodb.tables = []awsservice.DynamoDBTable{table}
+	m.dynamodb.filtered = m.dynamodb.tables
+	m.dynamodb.selected = &table
+
+	loading, _ := m.dynamodb.Start(&m)
+	m = loading.(Model)
+	if m.screen != screenLoading || m.loadingReturnScreen != screenDynamoDBTableList {
+		t.Fatalf("expected an owned DynamoDB list load, screen=%v return=%v", m.screen, m.loadingReturnScreen)
+	}
+
+	opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = opened.(Model)
+	if m.ctxPrevScreen != screenDynamoDBTableList {
+		t.Fatalf("expected context picker to preserve the DynamoDB load owner, got %v", m.ctxPrevScreen)
+	}
+
+	switching, _ := m.startLoading(func() tea.Msg { return nil })
+	m = switching.(Model)
+	nextCfg := *m.cfg
+	nextCfg.ContextName = "next-account"
+	updated, _ := m.Update(contextSwitchedMsg{cfg: &nextCfg})
+	model := updated.(Model)
+	if model.screen != screenServiceList {
+		t.Fatalf("expected a usable service list after switching context, got %v", model.screen)
+	}
+	if len(model.dynamodb.tables) != 0 || model.dynamodb.selected != nil {
+		t.Fatalf("expected context-scoped DynamoDB state to be cleared, got %+v", model.dynamodb)
 	}
 }
 

@@ -647,6 +647,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			m.ctxPrevScreen = m.screen
+			if m.screen == screenLoading && isDynamoDBScreen(m.loadingReturnScreen) {
+				m.ctxPrevScreen = m.loadingReturnScreen
+			}
 			return m, m.loadContexts()
 		}
 		// Global resource-region switch. Authentication identity remains unchanged;

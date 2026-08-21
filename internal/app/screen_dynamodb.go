@@ -29,7 +29,16 @@ func newDynamoDBModel() dynamoDBModel {
 }
 
 func (dm *dynamoDBModel) Start(m *Model) (tea.Model, tea.Cmd) {
-	return m.startLoading(dm.loadTables(*m))
+	return m.startLoadingFor(screenDynamoDBTableList, "Loading...", nil, dm.loadTables(*m))
+}
+
+func isDynamoDBScreen(value screen) bool {
+	switch value {
+	case screenDynamoDBTableList, screenDynamoDBTableDetail, screenDynamoDBLookupInput, screenDynamoDBLookupResult:
+		return true
+	default:
+		return false
+	}
 }
 
 func (dm *dynamoDBModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -113,12 +122,12 @@ func (dm *dynamoDBModel) updateTableList(m *Model, msg tea.KeyMsg) (tea.Model, t
 	case "/":
 		return *m, m.activateFilter(filterDynamoDBTables)
 	case "r":
-		return m.startLoading(dm.loadTables(*m))
+		return m.startLoadingFor(screenDynamoDBTableList, "Loading...", nil, dm.loadTables(*m))
 	case "enter":
 		if len(dm.filtered) > 0 && dm.tableIdx < len(dm.filtered) {
 			selected := dm.filtered[dm.tableIdx]
 			dm.selected = &selected
-			return m.startLoadingWithMessage("Loading DynamoDB table...", []string{selected.Name}, dm.loadTableDetail(*m))
+			return m.startLoadingFor(screenDynamoDBTableDetail, "Loading DynamoDB table...", []string{selected.Name}, dm.loadTableDetail(*m))
 		}
 	}
 	return *m, nil
@@ -144,7 +153,7 @@ func (dm *dynamoDBModel) updateTableDetail(m *Model, msg tea.KeyMsg) (tea.Model,
 		}
 	case "r":
 		if dm.selected != nil {
-			return m.startLoadingWithMessage("Refreshing DynamoDB table...", []string{dm.selected.Name}, dm.loadTableDetail(*m))
+			return m.startLoadingFor(screenDynamoDBTableDetail, "Refreshing DynamoDB table...", []string{dm.selected.Name}, dm.loadTableDetail(*m))
 		}
 	}
 	return *m, nil
@@ -164,7 +173,7 @@ func (dm *dynamoDBModel) updateLookupInput(m *Model, msg tea.KeyMsg) (tea.Model,
 			dm.lookupInput = dm.lookupValues[dm.lookupField]
 			return *m, nil
 		}
-		return m.startLoadingWithMessage("Looking up DynamoDB item...", []string{dm.selected.Name}, dm.lookupItem(*m))
+		return m.startLoadingFor(screenDynamoDBLookupResult, "Looking up DynamoDB item...", []string{dm.selected.Name}, dm.lookupItem(*m))
 	case "backspace":
 		dm.lookupInput = trimLastRune(dm.lookupInput)
 	default:
@@ -283,14 +292,18 @@ func (dm dynamoDBModel) viewTableList(m Model) string {
 		panel.WriteString(dimStyle.Render("  No matching tables"))
 		panel.WriteString("\n")
 	} else {
-		nameCol := lipgloss.NewStyle().Width(32)
-		statusCol := lipgloss.NewStyle().Width(11)
-		billingCol := lipgloss.NewStyle().Width(18)
-		capacityCol := lipgloss.NewStyle().Width(15)
-		itemsCol := lipgloss.NewStyle().Width(12)
-		sizeCol := lipgloss.NewStyle().Width(11)
-		gsiCol := lipgloss.NewStyle().Width(5)
-		panel.WriteString(dimStyle.Render("  " + nameCol.Render("TABLE") + statusCol.Render("STATUS") + billingCol.Render("BILLING") + capacityCol.Render("CAPACITY") + itemsCol.Render("ITEMS") + sizeCol.Render("SIZE") + gsiCol.Render("GSIS")))
+		widths := dynamoDBTableColumnWidths(m)
+		columns := make([]lipgloss.Style, len(widths))
+		for i, width := range widths {
+			columns[i] = lipgloss.NewStyle().Width(width).MaxWidth(width)
+		}
+		cell := func(index int, style lipgloss.Style, value string) string {
+			return columns[index].Inherit(style).Render(truncateEC2DetailValue(value, widths[index]))
+		}
+		panel.WriteString(dimStyle.Render("  "))
+		for i, heading := range []string{"TABLE", "STATUS", "BILLING", "CAPACITY", "ITEMS", "SIZE", "GSIS"} {
+			panel.WriteString(cell(i, dimStyle, heading))
+		}
 		panel.WriteString("\n")
 
 		visibleLines := max(m.height-12, 5)
@@ -308,13 +321,14 @@ func (dm dynamoDBModel) viewTableList(m Model) string {
 				style = selectedStyle
 			}
 			panel.WriteString(style.Render(cursor))
-			panel.WriteString(nameCol.Inherit(style).Render(m.renderHighlightedValue(filterDynamoDBTables, table.Name)))
-			panel.WriteString(statusCol.Inherit(style).Render(table.Status))
-			panel.WriteString(billingCol.Inherit(style).Render(table.BillingMode))
-			panel.WriteString(capacityCol.Inherit(style).Render(table.CapacityLabel()))
-			panel.WriteString(itemsCol.Inherit(style).Render(fmt.Sprintf("%d", table.ItemCount)))
-			panel.WriteString(sizeCol.Inherit(style).Render(formatBytes(table.SizeBytes)))
-			panel.WriteString(gsiCol.Inherit(style).Render(fmt.Sprintf("%d", table.GSICount)))
+			name := truncateEC2DetailValue(table.Name, widths[0])
+			panel.WriteString(columns[0].Inherit(style).Render(m.renderHighlightedValue(filterDynamoDBTables, name)))
+			panel.WriteString(cell(1, style, table.Status))
+			panel.WriteString(cell(2, style, table.BillingMode))
+			panel.WriteString(cell(3, style, table.CapacityLabel()))
+			panel.WriteString(cell(4, style, fmt.Sprintf("%d", table.ItemCount)))
+			panel.WriteString(cell(5, style, formatBytes(table.SizeBytes)))
+			panel.WriteString(cell(6, style, fmt.Sprintf("%d", table.GSICount)))
 			panel.WriteString("\n")
 		}
 		panel.WriteString("\n")
@@ -325,6 +339,48 @@ func (dm dynamoDBModel) viewTableList(m Model) string {
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
+}
+
+func dynamoDBTableColumnWidths(m Model) []int {
+	desired := []int{32, 11, 18, 15, 12, 11, 5}
+	if m.width <= 0 {
+		return desired
+	}
+
+	widths := []int{8, 7, 8, 9, 6, 5, 4}
+	available := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize()-2, len(widths))
+	total := 0
+	for _, width := range widths {
+		total += width
+	}
+	for total > available {
+		for i := range widths {
+			if total <= available {
+				break
+			}
+			if widths[i] > 1 {
+				widths[i]--
+				total--
+			}
+		}
+	}
+	for total < available {
+		grew := false
+		for i := range widths {
+			if total >= available {
+				break
+			}
+			if widths[i] < desired[i] {
+				widths[i]++
+				total++
+				grew = true
+			}
+		}
+		if !grew {
+			break
+		}
+	}
+	return widths
 }
 
 func (dm dynamoDBModel) viewTableDetail(m Model) string {
