@@ -60,22 +60,30 @@ func TestEventBridgeRuleDetailShowsPatternTargetsAndActivitySource(t *testing.T)
 	}
 }
 
-func TestEventBridgeStateChangeRequiresTypedRuleName(t *testing.T) {
+func TestEventBridgeStateChangeRequiresBusQualifiedIdentity(t *testing.T) {
 	m := New(testConfig(), "", "dev")
-	m.eventBridge.HandleMessage(&m, eventBridgeRulesLoadedMsg{rules: eventBridgeTestRules()})
+	rules := eventBridgeTestRules()
+	duplicate := rules[0]
+	duplicate.EventBusName = "orders"
+	m.eventBridge.HandleMessage(&m, eventBridgeRulesLoadedMsg{rules: append(rules, duplicate)})
 	m.eventBridge.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
 	m.eventBridge.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
 	if m.screen != screenEventBridgeRuleConfirm || !m.eventBridge.desiredEnabled || !m.isTextEntryScreen() {
 		t.Fatalf("expected enable confirmation text entry, screen=%v desired=%v", m.screen, m.eventBridge.desiredEnabled)
 	}
 
-	m.eventBridge.confirmInput = "wrong"
-	_, cmd := m.eventBridge.updateConfirm(&m, tea.KeyMsg{Type: tea.KeyEnter})
-	if cmd != nil || m.screen != screenEventBridgeRuleConfirm {
-		t.Fatal("expected mismatched rule name to reject the action")
+	view, _ := m.eventBridge.View(m)
+	if !strings.Contains(view, "default/nightly") || !strings.Contains(view, "event-bus/rule") {
+		t.Fatalf("expected confirmation to identify the event bus and rule, got:\n%s", view)
 	}
 
-	m.eventBridge.confirmInput = "nightly"
+	m.eventBridge.confirmInput = "orders/nightly"
+	_, cmd := m.eventBridge.updateConfirm(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil || m.screen != screenEventBridgeRuleConfirm {
+		t.Fatal("expected same-named rule on another bus to reject the action")
+	}
+
+	m.eventBridge.confirmInput = "default/nightly"
 	updated, cmd := m.eventBridge.updateConfirm(&m, tea.KeyMsg{Type: tea.KeyEnter})
 	got := updated.(Model)
 	if cmd == nil || got.screen != screenLoading {
@@ -171,6 +179,39 @@ func TestEventBridgeContextSwitchDropsStaleActionState(t *testing.T) {
 	}
 	if got.eventBridge.selected != nil || len(got.eventBridge.rules) != 0 {
 		t.Fatalf("expected stale EventBridge action state cleared, got %+v", got.eventBridge)
+	}
+}
+
+func TestEventBridgeContextSwitchThroughSettingsDropsStaleActionState(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.eventBridge.rules = eventBridgeTestRules()
+	selected := m.eventBridge.rules[0]
+	m.eventBridge.selected = &selected
+	m.screen = screenEventBridgeRuleDetail
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	if m.ctxPrevScreen != screenSettings || m.settingsPrevScreen != screenEventBridgeRuleDetail {
+		t.Fatalf("expected context switch to remember Settings over EventBridge detail, ctx=%v settings=%v", m.ctxPrevScreen, m.settingsPrevScreen)
+	}
+
+	nextConfig := testConfig()
+	nextConfig.ContextName = "prod"
+	updated, _ = m.Update(contextSwitchedMsg{cfg: nextConfig})
+	m = updated.(Model)
+	if m.screen != screenSettings || m.settingsPrevScreen != screenFeatureList {
+		t.Fatalf("expected switched Settings to return safely, screen=%v previous=%v", m.screen, m.settingsPrevScreen)
+	}
+	if m.eventBridge.selected != nil || len(m.eventBridge.rules) != 0 {
+		t.Fatalf("expected stale EventBridge action state cleared, got %+v", m.eventBridge)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenFeatureList {
+		t.Fatalf("expected Settings exit to return to feature list, got %v", m.screen)
 	}
 }
 

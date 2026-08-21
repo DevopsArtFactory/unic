@@ -59,6 +59,19 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
+		m.eventBridge = newEventBridgeModel()
+		if isEventBridgeScreen(m.ctxPrevScreen) {
+			m.ctxPrevScreen = screenFeatureList
+		}
+		if isEventBridgeScreen(m.settingsPrevScreen) {
+			m.settingsPrevScreen = screenFeatureList
+		}
+		if isEventBridgeScreen(m.views.prevScreen) {
+			m.views.prevScreen = screenFeatureList
+		}
+		if isEventBridgeScreen(m.regionPrevScreen) {
+			m.regionPrevScreen = screenFeatureList
+		}
 		if m.pendingView != nil {
 			// A saved view triggered this switch: continue the jump now that
 			// the new context is active.
@@ -67,13 +80,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			newM, cmd := m.jumpToView(view)
 			return newM, tea.Batch(tea.ClearScreen, cmd), true
 		}
-		switch m.ctxPrevScreen {
-		case screenEventBridgeRuleList, screenEventBridgeRuleDetail, screenEventBridgeRuleConfirm:
-			m.eventBridge = newEventBridgeModel()
-			m.screen = screenFeatureList
-		default:
-			m.screen = m.ctxPrevScreen
-		}
+		m.screen = m.ctxPrevScreen
 		return m, tea.ClearScreen, true
 
 	case regionSwitchedMsg:

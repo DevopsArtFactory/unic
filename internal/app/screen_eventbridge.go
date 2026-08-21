@@ -25,6 +25,19 @@ type eventBridgeModel struct {
 
 func newEventBridgeModel() eventBridgeModel { return eventBridgeModel{} }
 
+func isEventBridgeScreen(value screen) bool {
+	switch value {
+	case screenEventBridgeRuleList, screenEventBridgeRuleDetail, screenEventBridgeRuleConfirm:
+		return true
+	default:
+		return false
+	}
+}
+
+func eventBridgeRuleIdentity(rule awsservice.EventBridgeRule) string {
+	return rule.EventBusName + "/" + rule.Name
+}
+
 func (em *eventBridgeModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	return m.startLoading(em.load(*m))
 }
@@ -179,7 +192,7 @@ func (em *eventBridgeModel) updateConfirm(m *Model, msg tea.KeyMsg) (tea.Model, 
 		em.confirmInput = ""
 		m.screen = screenEventBridgeRuleDetail
 	case "enter":
-		if em.selected != nil && em.confirmInput == em.selected.Name {
+		if em.selected != nil && em.confirmInput == eventBridgeRuleIdentity(*em.selected) {
 			rule := *em.selected
 			enabled := em.desiredEnabled
 			action := "Disabling"
@@ -443,9 +456,9 @@ func (em eventBridgeModel) viewConfirm(m Model) string {
 	b.WriteString("\n\n")
 	b.WriteString(normalStyle.Render(fmt.Sprintf("  You are about to %s rule:", action)))
 	b.WriteString("\n")
-	b.WriteString(selectedStyle.Render("  " + escapeTerminalControls(em.selected.Name)))
+	b.WriteString(selectedStyle.Render("  " + escapeTerminalControls(eventBridgeRuleIdentity(*em.selected))))
 	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render("  Type the rule name to confirm:"))
+	b.WriteString(normalStyle.Render("  Type event-bus/rule to confirm:"))
 	b.WriteString("\n")
 	b.WriteString(filterStyle.Render(fmt.Sprintf("  %s▏", escapeTerminalControls(em.confirmInput))))
 	b.WriteString("\n\n")
