@@ -28,6 +28,7 @@ const (
 	ServiceACM            AwsService = "ACM"
 	ServiceLambda         AwsService = "Lambda"
 	ServiceBedrock        AwsService = "Bedrock"
+	ServiceDynamoDB       AwsService = "DynamoDB"
 )
 
 // FeatureKind represents a specific feature within a service.
@@ -63,6 +64,7 @@ const (
 	FeatureACMCertificateBrowser FeatureKind = "ACM Certificate Browser"
 	FeatureLambdaBrowser         FeatureKind = "Lambda Browser"
 	FeatureBedrockAPIKeys        FeatureKind = "Bedrock API Keys"
+	FeatureDynamoDBBrowser       FeatureKind = "DynamoDB Table Browser"
 )
 
 // Feature describes a selectable feature under an AWS service.

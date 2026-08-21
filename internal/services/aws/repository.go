@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/configservice"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -41,6 +42,7 @@ var _ SSMClientAPI = (*ssm.Client)(nil)
 var _ KMSClientAPI = (*kms.Client)(nil)
 
 var _ ACMClientAPI = (*acm.Client)(nil)
+var _ DynamoDBClientAPI = (*dynamodb.Client)(nil)
 
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
@@ -133,6 +135,14 @@ type KMSClientAPI interface {
 type ACMClientAPI interface {
 	ListCertificates(ctx context.Context, params *acm.ListCertificatesInput, optFns ...func(*acm.Options)) (*acm.ListCertificatesOutput, error)
 	DescribeCertificate(ctx context.Context, params *acm.DescribeCertificateInput, optFns ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error)
+}
+
+// DynamoDBClientAPI is the interface for table and item lookup operations used by AwsRepository.
+type DynamoDBClientAPI interface {
+	ListTables(ctx context.Context, params *dynamodb.ListTablesInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error)
+	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+	DescribeTimeToLive(ctx context.Context, params *dynamodb.DescribeTimeToLiveInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTimeToLiveOutput, error)
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
@@ -361,6 +371,7 @@ type AwsRepository struct {
 	S3Client             S3ClientAPI
 	LambdaClient         LambdaClientAPI
 	ACMClient            ACMClientAPI
+	DynamoDBClient       DynamoDBClientAPI
 	Region               string
 	Profile              string
 	awsCfg               aws.Config
@@ -483,6 +494,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		S3Client:             s3.NewFromConfig(awsCfg),
 		LambdaClient:         lambda.NewFromConfig(awsCfg),
 		ACMClient:            acm.NewFromConfig(awsCfg),
+		DynamoDBClient:       dynamodb.NewFromConfig(awsCfg),
 		Region:               region,
 		Profile:              profile,
 		awsCfg:               awsCfg,

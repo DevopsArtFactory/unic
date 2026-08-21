@@ -103,6 +103,7 @@ Current repository clients include:
 - ACM
 - S3
 - KMS
+- DynamoDB
 
 Pattern:
 
@@ -161,6 +162,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_acm.go`
 - `screen_s3.go`
 - `screen_lambda.go`
+- `screen_dynamodb.go`
 - `screen_bedrock.go`
 - `screen_secrets.go`
 - `screen_kms.go`
@@ -245,6 +247,7 @@ Current screen families include:
 - ACM certificate list/detail flows
 - S3 bucket/object/detail flows
 - KMS key list/detail and rotation-posture flows
+- DynamoDB table list/detail and complete-primary-key `GetItem` flows
 - Inspector mode home, checklist setup, security findings/detail (including KMS rotation findings), and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
 - SSO account / role selection and exit notice flows

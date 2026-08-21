@@ -199,6 +199,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceDynamoDB,
+			Features: []Feature{
+				{
+					Kind:        FeatureDynamoDBBrowser,
+					Description: "Browse tables and inspect one item by its primary key",
+				},
+			},
+		},
+		{
 			Name: ServiceBedrock,
 			Features: []Feature{
 				{

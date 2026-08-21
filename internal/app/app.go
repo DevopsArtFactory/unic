@@ -110,6 +110,10 @@ const (
 	screenLambdaFunctionDetail
 	screenLambdaInvokeInput
 	screenLambdaInvokeResult
+	screenDynamoDBTableList
+	screenDynamoDBTableDetail
+	screenDynamoDBLookupInput
+	screenDynamoDBLookupResult
 	screenBedrockKeyList
 	screenBedrockKeyDetail
 	screenBedrockKeyCreate
@@ -198,6 +202,7 @@ type Model struct {
 	kms          kmsModel
 	acm          acmModel
 	lambda       lambdaModel
+	dynamodb     dynamoDBModel
 	inspector    inspectorModel
 
 	// Context picker
@@ -321,6 +326,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.kms = newKMSModel()
 	model.acm = newACMModel()
 	model.lambda = newLambdaModel()
+	model.dynamodb = newDynamoDBModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
 	return model
@@ -481,6 +487,9 @@ func (m Model) isTextEntryScreen() bool {
 		return true
 	}
 	if m.screen == screenInspectorChecklistAdd && m.inspector.addStep > 0 {
+		return true
+	}
+	if m.screen == screenDynamoDBLookupInput {
 		return true
 	}
 	if m.screen == screenSQSConfirm {
@@ -837,6 +846,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.fis.Start(&m)
 	case domain.FeatureLambdaBrowser:
 		return m.lambda.Start(&m)
+	case domain.FeatureDynamoDBBrowser:
+		return m.dynamodb.Start(&m)
 	case domain.FeatureBedrockAPIKeys:
 		return m.bedrock.Start(&m)
 	}
