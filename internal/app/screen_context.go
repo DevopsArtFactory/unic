@@ -59,6 +59,11 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
+		m.dynamodb = newDynamoDBModel()
+		switch m.ctxPrevScreen {
+		case screenDynamoDBTableList, screenDynamoDBTableDetail, screenDynamoDBLookupInput, screenDynamoDBLookupResult:
+			m.ctxPrevScreen = screenServiceList
+		}
 		if m.pendingView != nil {
 			// A saved view triggered this switch: continue the jump now that
 			// the new context is active.

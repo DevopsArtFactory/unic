@@ -212,6 +212,55 @@ func TestDynamoDBLookupResultSupportsScrollingAndNotFound(t *testing.T) {
 	}
 }
 
+func TestDynamoDBLookupResultWrapsLongValuesIntoScrollableLines(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 32
+	m.height = 12
+	m.screen = screenDynamoDBLookupResult
+	m.dynamodb.item = &awsservice.DynamoDBItem{
+		Found: true,
+		JSON:  fmt.Sprintf("{\n  \"payload\": \"%sTAIL\"\n}", strings.Repeat("x", 240)),
+	}
+
+	lines := m.dynamodb.itemLines(m)
+	if len(lines) <= max(m.height-8, 5) {
+		t.Fatalf("expected long JSON to wrap beyond one page, got %d lines", len(lines))
+	}
+	for range len(lines) {
+		m.dynamodb.updateLookupResult(&m, tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if view := m.dynamodb.viewLookupResult(m); !strings.Contains(view, "TAIL") {
+		t.Fatalf("expected wrapped suffix to be reachable after scrolling:\n%s", view)
+	}
+}
+
+func TestDynamoDBContextSwitchClearsPreviousAccountState(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 100
+	m.height = 20
+	m.screen = screenLoading
+	m.ctxPrevScreen = screenDynamoDBLookupResult
+	table := dynamoDBTestTable()
+	m.dynamodb.tables = []awsservice.DynamoDBTable{table}
+	m.dynamodb.filtered = m.dynamodb.tables
+	m.dynamodb.selected = &table
+	m.dynamodb.item = &awsservice.DynamoDBItem{Found: true, JSON: `{"secret":"old-account"}`}
+	nextCfg := *m.cfg
+	nextCfg.ContextName = "next-account"
+
+	updated, _ := m.Update(contextSwitchedMsg{cfg: &nextCfg})
+	model := updated.(Model)
+	if model.screen != screenServiceList {
+		t.Fatalf("expected context switch to leave DynamoDB screens, got %v", model.screen)
+	}
+	if len(model.dynamodb.tables) != 0 || len(model.dynamodb.filtered) != 0 || model.dynamodb.selected != nil || model.dynamodb.item != nil {
+		t.Fatalf("expected context-scoped DynamoDB state to be cleared, got %+v", model.dynamodb)
+	}
+	if view := model.View(); strings.Contains(view, "old-account") {
+		t.Fatalf("previous account item leaked after context switch:\n%s", view)
+	}
+}
+
 func TestDynamoDBLoadCommandsRequireSelectedTable(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	for name, cmd := range map[string]tea.Cmd{

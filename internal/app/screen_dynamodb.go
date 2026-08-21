@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	awsservice "unic/internal/services/aws"
 )
@@ -173,7 +174,7 @@ func (dm *dynamoDBModel) updateLookupInput(m *Model, msg tea.KeyMsg) (tea.Model,
 }
 
 func (dm *dynamoDBModel) updateLookupResult(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	lines := dm.itemLines()
+	lines := dm.itemLines(*m)
 	page := max(m.height-8, 5)
 	switch msg.String() {
 	case "q", "esc":
@@ -436,7 +437,7 @@ func (dm dynamoDBModel) viewLookupResult(m Model) string {
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("DynamoDB Item — %s", tableName)))
 	b.WriteString("\n\n")
-	lines := dm.itemLines()
+	lines := dm.itemLines(m)
 	visibleLines := max(m.height-8, 5)
 	start := dynamoDBScroll(dm.itemScroll, len(lines), visibleLines)
 	end := min(start+visibleLines, len(lines))
@@ -451,11 +452,21 @@ func (dm dynamoDBModel) viewLookupResult(m Model) string {
 	return b.String()
 }
 
-func (dm dynamoDBModel) itemLines() []string {
+func (dm dynamoDBModel) itemLines(m Model) []string {
 	if dm.item == nil || !dm.item.Found {
 		return []string{"No item found for that primary key."}
 	}
-	return strings.Split(dm.item.JSON, "\n")
+	lines := strings.Split(dm.item.JSON, "\n")
+	if m.width <= 0 {
+		return lines
+	}
+
+	width := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize()-2, 1)
+	wrapped := make([]string, 0, len(lines))
+	for _, line := range lines {
+		wrapped = append(wrapped, strings.Split(ansi.Hardwrap(line, width, true), "\n")...)
+	}
+	return wrapped
 }
 
 func dynamoDBScroll(offset, total, visible int) int {
