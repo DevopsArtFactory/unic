@@ -489,14 +489,21 @@ func (dm dynamoDBModel) viewLookupInput(m Model) string {
 	b.WriteString("\n\n")
 	b.WriteString(dimStyle.Render("  This performs one GetItem request. It never scans the table."))
 	b.WriteString("\n\n")
+	detailValueWidth, inputValueWidth := 0, 0
+	if m.width > 0 {
+		detailValueWidth = max(m.width-2-detailLabelStyle.GetWidth(), 1)
+		inputValueWidth = max(m.width-3, 1)
+	}
 	for i := 0; i < dm.lookupField; i++ {
 		previous := table.Keys[i]
-		b.WriteString(renderDetailLine(previous.Role, fmt.Sprintf("%s = %s", escapeTerminalControls(previous.Name), dm.lookupValues[i])))
+		value := fmt.Sprintf("%s = %s", escapeTerminalControls(previous.Name), escapeTerminalControls(dm.lookupValues[i]))
+		b.WriteString(renderDetailLine(previous.Role, truncateEC2DetailValue(value, detailValueWidth)))
 		b.WriteString("\n")
 	}
 	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s key %s (%s):", key.Role, escapeTerminalControls(key.Name), key.AttributeType)))
 	b.WriteString("\n")
-	b.WriteString(filterStyle.Render("  " + dm.lookupInput + "▏"))
+	input := truncateEC2DetailValue(escapeTerminalControls(dm.lookupInput), inputValueWidth)
+	b.WriteString(filterStyle.Render("  " + input + "▏"))
 	b.WriteString("\n")
 	if key.AttributeType == "B" {
 		b.WriteString(dimStyle.Render("  Enter binary keys as base64."))

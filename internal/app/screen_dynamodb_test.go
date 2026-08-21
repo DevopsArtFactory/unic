@@ -259,6 +259,58 @@ func TestDynamoDBLookupPromptsForCompletePrimaryKey(t *testing.T) {
 	}
 }
 
+func TestDynamoDBLookupEscapesPastedValuesWithoutChangingRequest(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 48
+	m.screen = screenDynamoDBTableDetail
+	table := dynamoDBTestTable()
+	table.Keys[1].AttributeType = "S"
+	m.dynamodb.selected = &table
+	m.dynamodb.beginLookup(&m)
+
+	partition := "acme\n\x1b]52;c;payload\a" + strings.Repeat("x", 64)
+	sortKey := "order\n\x1b]52;c;payload\a" + strings.Repeat("y", 64)
+	assertSafeView := func(view string) {
+		t.Helper()
+		if strings.Contains(view, "\x1b]52;c;payload") || strings.ContainsRune(view, '\a') {
+			t.Fatalf("lookup view contains pasted terminal controls: %q", view)
+		}
+		plain := ansiEscapePattern.ReplaceAllString(view, "")
+		for _, line := range strings.Split(plain, "\n") {
+			if strings.Contains(line, `\n`) && lipgloss.Width(line) > m.width {
+				t.Fatalf("lookup value line width %d exceeds terminal width %d: %q", lipgloss.Width(line), m.width, line)
+			}
+		}
+	}
+
+	m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(partition), Paste: true})
+	if m.dynamodb.lookupInput != partition {
+		t.Fatalf("expected raw partition key to remain unchanged, got %q", m.dynamodb.lookupInput)
+	}
+	assertSafeView(m.dynamodb.viewLookupInput(m))
+	m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(sortKey), Paste: true})
+	view := m.dynamodb.viewLookupInput(m)
+	assertSafeView(view)
+	if !strings.Contains(view, `tenant = acme\n`) || !strings.Contains(view, `order\n`) {
+		t.Fatalf("expected visibly escaped pasted values: %q", view)
+	}
+
+	m.commands = nil
+	m.awsRepo = &awsservice.AwsRepository{DynamoDBClient: &appDynamoDBClient{getItemFunc: func(_ context.Context, input *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+		partitionValue, partitionOK := input.Key["tenant"].(*dynamodbtypes.AttributeValueMemberS)
+		sortValue, sortOK := input.Key["order"].(*dynamodbtypes.AttributeValueMemberS)
+		if !partitionOK || partitionValue.Value != partition || !sortOK || sortValue.Value != sortKey {
+			t.Fatalf("expected original pasted key bytes, got %#v", input.Key)
+		}
+		return &dynamodb.GetItemOutput{}, nil
+	}}}
+	_, cmd := m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	if _, ok := runDynamoDBLookupBatch(t, cmd).(dynamoDBItemLoadedMsg); !ok {
+		t.Fatal("expected pasted keys to reach GetItem")
+	}
+}
+
 func TestDynamoDBLookupCommandReturnsAPIErrMsg(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.commands = nil
