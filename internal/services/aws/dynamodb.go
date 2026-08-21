@@ -216,7 +216,7 @@ func newDynamoDBKeys(schema []dynamodbtypes.KeySchemaElement, attributeTypes map
 
 func newDynamoDBKeyValue(key DynamoDBKey, value string) (dynamodbtypes.AttributeValue, error) {
 	if value == "" {
-		return nil, fmt.Errorf("%s key %s cannot be empty", strings.ToLower(key.Role), key.Name)
+		return nil, fmt.Errorf("%s key cannot be empty", strings.ToLower(key.Role))
 	}
 	switch key.AttributeType {
 	case string(dynamodbtypes.ScalarAttributeTypeS):
@@ -224,17 +224,17 @@ func newDynamoDBKeyValue(key DynamoDBKey, value string) (dynamodbtypes.Attribute
 	case string(dynamodbtypes.ScalarAttributeTypeN):
 		number := strings.TrimSpace(value)
 		if !validDynamoDBNumber(number) {
-			return nil, fmt.Errorf("%s key %s must be a number", strings.ToLower(key.Role), key.Name)
+			return nil, fmt.Errorf("%s key must be a number", strings.ToLower(key.Role))
 		}
 		return &dynamodbtypes.AttributeValueMemberN{Value: number}, nil
 	case string(dynamodbtypes.ScalarAttributeTypeB):
 		binary, err := base64.StdEncoding.DecodeString(strings.TrimSpace(value))
 		if err != nil || len(binary) == 0 {
-			return nil, fmt.Errorf("%s key %s must be non-empty base64", strings.ToLower(key.Role), key.Name)
+			return nil, fmt.Errorf("%s key must be non-empty base64", strings.ToLower(key.Role))
 		}
 		return &dynamodbtypes.AttributeValueMemberB{Value: binary}, nil
 	default:
-		return nil, fmt.Errorf("unsupported DynamoDB key type %q for %s", key.AttributeType, key.Name)
+		return nil, fmt.Errorf("unsupported DynamoDB %s key type %q", strings.ToLower(key.Role), key.AttributeType)
 	}
 }
 

@@ -330,6 +330,48 @@ func TestDynamoDBLookupCommandReturnsAPIErrMsg(t *testing.T) {
 	}
 }
 
+func TestDynamoDBValidationErrorsDoNotRenderControlBearingKeyNames(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		attributeType string
+		input         string
+		want          string
+	}{
+		{name: "number", attributeType: "N", input: "not-a-number", want: "partition key must be a number"},
+		{name: "binary", attributeType: "B", input: "not-base64", want: "partition key must be non-empty base64"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m.commands = nil
+			table := dynamoDBTestTable()
+			table.Keys = []awsservice.DynamoDBKey{{
+				Name:          "id\n\x1b]52;c;payload\a",
+				Role:          "PARTITION",
+				AttributeType: tc.attributeType,
+			}}
+			m.dynamodb.selected = &table
+			m.dynamodb.beginLookup(&m)
+			m.awsRepo = &awsservice.AwsRepository{DynamoDBClient: &appDynamoDBClient{getItemFunc: func(context.Context, *dynamodb.GetItemInput, ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+				t.Fatal("validation error must not call GetItem")
+				return nil, nil
+			}}}
+
+			m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tc.input)})
+			next, cmd := m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyEnter})
+			model := next.(Model)
+			msg := runDynamoDBLookupBatch(t, cmd)
+			updated, _ := model.Update(msg)
+			view := updated.(Model).View()
+			if !strings.Contains(view, tc.want) {
+				t.Fatalf("expected validation error %q: %q", tc.want, view)
+			}
+			if strings.Contains(view, "\x1b]52;c;payload") || strings.ContainsRune(view, '\a') {
+				t.Fatalf("validation error rendered key-name terminal controls: %q", view)
+			}
+		})
+	}
+}
+
 func TestDynamoDBLookupResultSupportsScrollingAndNotFound(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 100
