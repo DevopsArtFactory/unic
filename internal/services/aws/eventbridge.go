@@ -14,11 +14,13 @@ import (
 )
 
 const (
-	eventBridgeDefaultBus       = "default"
-	eventBridgeActivityWindow   = 7 * 24 * time.Hour
-	eventBridgeActivityPeriod   = 30 * time.Minute
-	eventBridgeMetricBatchSize  = 250
-	eventBridgeNoActivityStatus = "No activity in last 7 days"
+	eventBridgeDefaultBus        = "default"
+	eventBridgeActivityWindow    = 7 * 24 * time.Hour
+	eventBridgeActivityPeriod    = 30 * time.Minute
+	eventBridgeMetricBatchSize   = 250
+	eventBridgeNoActivityStatus  = "No activity in last 7 days"
+	eventBridgeUnavailableStatus = "Unavailable (CloudWatch)"
+	cloudWatchCompleteStatus     = "Complete"
 )
 
 // ListEventBridgeRules returns rules from every event bus with targets and
@@ -224,12 +226,17 @@ func (r *AwsRepository) hydrateEventBridgeActivity(ctx context.Context, rules []
 			continue
 		}
 		for i, item := range series {
+			observed := false
 			for j := len(item.Datapoints) - 1; j >= 0; j-- {
 				if item.Datapoints[j].Value > 0 {
 					rules[start+i].LastTriggeredAt = item.Datapoints[j].Timestamp
 					rules[start+i].LastTriggerStatus = "Observed via CloudWatch"
+					observed = true
 					break
 				}
+			}
+			if !observed && item.StatusCode != cloudWatchCompleteStatus {
+				rules[start+i].LastTriggerStatus = eventBridgeUnavailableStatus
 			}
 		}
 	}
@@ -237,7 +244,7 @@ func (r *AwsRepository) hydrateEventBridgeActivity(ctx context.Context, rules []
 
 func markEventBridgeActivityUnavailable(rules []EventBridgeRule) {
 	for i := range rules {
-		rules[i].LastTriggerStatus = "Unavailable (CloudWatch)"
+		rules[i].LastTriggerStatus = eventBridgeUnavailableStatus
 	}
 }
 

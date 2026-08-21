@@ -128,9 +128,11 @@ func TestListEventBridgeRulesHydratesTargetsAndActivity(t *testing.T) {
 			if len(customMetric.Metric.Dimensions) != 2 || awssdk.ToString(customMetric.Metric.Dimensions[0].Value) != "orders" {
 				t.Fatalf("unexpected custom-bus metric dimensions: %+v", customMetric.Metric.Dimensions)
 			}
-			return &cloudwatch.GetMetricDataOutput{MetricDataResults: []cloudwatchtypes.MetricDataResult{{
-				Id: awssdk.String("m1"), Timestamps: []time.Time{triggeredAt}, Values: []float64{1},
-			}}}, nil
+			return &cloudwatch.GetMetricDataOutput{MetricDataResults: []cloudwatchtypes.MetricDataResult{
+				{Id: awssdk.String("m3"), StatusCode: cloudwatchtypes.StatusCodeComplete},
+				{Id: awssdk.String("m1"), StatusCode: cloudwatchtypes.StatusCodeComplete, Timestamps: []time.Time{triggeredAt}, Values: []float64{1}},
+				{Id: awssdk.String("m2"), StatusCode: cloudwatchtypes.StatusCodeComplete},
+			}}, nil
 		},
 	}
 
@@ -210,8 +212,31 @@ func TestListEventBridgeRulesKeepsRulesWhenActivityIsUnavailable(t *testing.T) {
 		return nil, errors.New("cloudwatch denied")
 	}}
 	rules, err := (&AwsRepository{EventBridgeClient: client, CloudWatchClient: cw}).ListEventBridgeRules(context.Background())
-	if err != nil || len(rules) != 1 || rules[0].LastTriggerStatus != "Unavailable (CloudWatch)" {
+	if err != nil || len(rules) != 1 || rules[0].LastTriggerStatus != eventBridgeUnavailableStatus {
 		t.Fatalf("expected rule data with optional activity unavailable, rules=%+v err=%v", rules, err)
+	}
+}
+
+func TestEventBridgeActivityMarksOnlyUnobservedIncompleteSeriesUnavailable(t *testing.T) {
+	triggeredAt := time.Date(2026, 8, 20, 12, 30, 0, 0, time.UTC)
+	rules := []EventBridgeRule{
+		newEventBridgeRule(eventbridgetypes.Rule{Name: awssdk.String("missing")}, "default"),
+		newEventBridgeRule(eventbridgetypes.Rule{Name: awssdk.String("observed")}, "default"),
+	}
+	cw := &mockCloudWatchClient{getMetricDataFunc: func(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+		return &cloudwatch.GetMetricDataOutput{MetricDataResults: []cloudwatchtypes.MetricDataResult{
+			{Id: awssdk.String("m2"), StatusCode: cloudwatchtypes.StatusCodePartialData, Timestamps: []time.Time{triggeredAt}, Values: []float64{1}},
+			{Id: awssdk.String("m1"), StatusCode: cloudwatchtypes.StatusCodeInternalError},
+		}}, nil
+	}}
+
+	(&AwsRepository{CloudWatchClient: cw}).hydrateEventBridgeActivity(context.Background(), rules)
+
+	if rules[0].LastTriggerStatus != eventBridgeUnavailableStatus {
+		t.Fatalf("expected incomplete empty series to be unavailable, got %+v", rules[0])
+	}
+	if !rules[1].LastTriggeredAt.Equal(triggeredAt) || rules[1].LastTriggerStatus != "Observed via CloudWatch" {
+		t.Fatalf("expected partial series with activity to preserve the observation, got %+v", rules[1])
 	}
 }
 
