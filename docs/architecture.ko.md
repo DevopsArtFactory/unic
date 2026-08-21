@@ -246,7 +246,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - ACM 인증서 list/detail
 - S3 bucket/object/detail
 - KMS key list/detail, rotation 상태
-- EventBridge rule list/detail, type-to-confirm 상태 변경 flow
+- EventBridge rule list/detail, 스크롤 가능한 전체 event pattern, 변경 가능한 rule mode의 type-to-confirm 상태 변경 flow
 - Inspector mode home, checklist setup, KMS rotation finding을 포함한 security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
 - SSO account / role selection, exit notice

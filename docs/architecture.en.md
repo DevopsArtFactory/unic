@@ -246,7 +246,7 @@ Current screen families include:
 - ACM certificate list/detail flows
 - S3 bucket/object/detail flows
 - KMS key list/detail and rotation-posture flows
-- EventBridge rule list/detail and type-to-confirm state-change flows
+- EventBridge rule list/detail, scrollable complete event patterns, and type-to-confirm state changes for eligible rule modes
 - Inspector mode home, checklist setup, security findings/detail (including KMS rotation findings), and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
 - SSO account / role selection and exit notice flows

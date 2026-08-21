@@ -53,7 +53,7 @@ func TestEventBridgeRuleDetailShowsPatternTargetsAndActivitySource(t *testing.T)
 		t.Fatalf("expected selected rule detail, got screen=%v selected=%+v", m.screen, m.eventBridge.selected)
 	}
 	view, _ := m.eventBridge.View(m)
-	for _, want := range []string{"orders", `{"detail-type":["Order"]}`, "No activity in last 7 days", "TriggeredRules"} {
+	for _, want := range []string{"orders", `"detail-type"`, `"Order"`, "No activity in last 7 days", "TriggeredRules"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected detail to contain %q, got:\n%s", want, view)
 		}
@@ -95,6 +95,28 @@ func TestEventBridgeManagedRuleCannotOpenStateConfirmation(t *testing.T) {
 	}
 	if strings.Contains(m.keymapHelpBar(), "disable") {
 		t.Fatalf("expected managed rule mutation hidden from help, got %q", m.keymapHelpBar())
+	}
+}
+
+func TestEventBridgeAllManagementEventsRuleIsReadOnly(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width, m.height = 120, 60
+	rule := eventBridgeTestRules()[1]
+	rule.State = "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS"
+	m.eventBridge.selected = &rule
+	m.screen = screenEventBridgeRuleDetail
+
+	m.eventBridge.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+
+	if m.screen != screenEventBridgeRuleDetail {
+		t.Fatalf("expected all-management-events rule to remain read-only, got screen %v", m.screen)
+	}
+	if strings.Contains(m.keymapHelpBar(), "disable") {
+		t.Fatalf("expected state mutation hidden from help, got %q", m.keymapHelpBar())
+	}
+	view, _ := m.eventBridge.View(m)
+	if !strings.Contains(view, "read-only to preserve that matching mode") {
+		t.Fatalf("expected read-only explanation, got:\n%s", view)
 	}
 }
 
@@ -173,6 +195,32 @@ func TestEventBridgeDetailScrollIsBounded(t *testing.T) {
 	maxOffset := max(len(m.eventBridge.detailLines(m))-visibleLines, 0)
 	if m.eventBridge.detailScroll != maxOffset {
 		t.Fatalf("expected scroll clamped to %d, got %d", maxOffset, m.eventBridge.detailScroll)
+	}
+}
+
+func TestEventBridgeDetailKeepsLongEventPatternReachable(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width, m.height = 42, 12
+	rule := eventBridgeTestRules()[1]
+	rule.EventPattern = `{"source":["aws.ec2"],"detail":{"eventName":[{"prefix":"Describe"}],"tail":["tail-marker"]}}`
+	m.eventBridge.selected = &rule
+	m.screen = screenEventBridgeRuleDetail
+
+	lines := m.eventBridge.detailLines(m)
+	tailLine := -1
+	for i, line := range lines {
+		if strings.Contains(line, "tail-marker") {
+			tailLine = i
+			break
+		}
+	}
+	if tailLine < 0 {
+		t.Fatalf("expected complete event pattern in detail lines, got %#v", lines)
+	}
+	m.eventBridge.detailScroll = tailLine
+	view, _ := m.eventBridge.View(m)
+	if !strings.Contains(view, "tail-marker") {
+		t.Fatalf("expected pattern tail reachable by vertical scrolling, got:\n%s", view)
 	}
 }
 

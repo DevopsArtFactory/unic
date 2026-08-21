@@ -1,6 +1,8 @@
 package app
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -156,13 +158,13 @@ func (em *eventBridgeModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, t
 	case "pgdown":
 		em.detailScroll = min(em.detailScroll+visibleLines, maxOffset)
 	case "e":
-		if em.selected != nil && !em.selected.IsEnabled() && !em.selected.IsManaged() {
+		if em.selected != nil && !em.selected.IsEnabled() && em.selected.CanChangeState() {
 			em.desiredEnabled = true
 			em.confirmInput = ""
 			m.screen = screenEventBridgeRuleConfirm
 		}
 	case "d":
-		if em.selected != nil && em.selected.IsEnabled() && !em.selected.IsManaged() {
+		if em.selected != nil && em.selected.IsEnabled() && em.selected.CanChangeState() {
 			em.desiredEnabled = false
 			em.confirmInput = ""
 			m.screen = screenEventBridgeRuleConfirm
@@ -348,7 +350,9 @@ func (em eventBridgeModel) detailLines(m Model) []string {
 	lines = append(lines,
 		m.renderEC2DetailLine("ARN", rule.ARN),
 		m.renderEC2DetailLine("Schedule", ec2ValueOrDash(rule.ScheduleExpression)),
-		m.renderEC2DetailLine("Event Pattern", ec2ValueOrDash(rule.CompactEventPattern())),
+	)
+	lines = append(lines, eventBridgePatternDetailLines(m, rule.EventPattern)...)
+	lines = append(lines,
 		m.renderEC2DetailLine("Last Seen", rule.LastTriggerDisplay()),
 		m.renderEC2DetailLine("Description", ec2ValueOrDash(rule.Description)),
 		m.renderEC2DetailLine("Role ARN", ec2ValueOrDash(rule.RoleARN)),
@@ -372,10 +376,56 @@ func (em eventBridgeModel) detailLines(m Model) []string {
 	lines = append(lines, "\n", dimStyle.Render("  Last Seen uses best-effort CloudWatch TriggeredRules data (7-day, 30-minute window).")+"\n")
 	if rule.IsManaged() {
 		lines = append(lines, dimStyle.Render("  AWS-managed rule state cannot be changed here.")+"\n")
+	} else if rule.IncludesAllCloudTrailManagementEvents() {
+		lines = append(lines, dimStyle.Render("  Rules that include all CloudTrail management events are read-only to preserve that matching mode.")+"\n")
 	}
 	if em.notice != "" {
 		lines = append(lines, selectedStyle.Render("  "+em.notice)+"\n")
 	}
+	return lines
+}
+
+func eventBridgePatternDetailLines(m Model, pattern string) []string {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return []string{m.renderEC2DetailLine("Event Pattern", "-")}
+	}
+
+	var pretty bytes.Buffer
+	if json.Indent(&pretty, []byte(pattern), "", "  ") == nil {
+		pattern = pretty.String()
+	}
+	width := m.ec2DetailValueWidth(ec2DetailLabelWidth)
+	label := "Event Pattern"
+	var lines []string
+	for _, sourceLine := range strings.Split(pattern, "\n") {
+		sourceLine = escapeTerminalControls(sourceLine)
+		for _, wrapped := range wrapEventBridgeDetailValue(sourceLine, width) {
+			lines = append(lines, m.renderEC2StyledDetailLine(label, normalStyle.Render(wrapped)))
+			label = ""
+		}
+	}
+	return lines
+}
+
+func wrapEventBridgeDetailValue(value string, width int) []string {
+	if width <= 0 || lipgloss.Width(value) <= width {
+		return []string{value}
+	}
+	var lines []string
+	var line strings.Builder
+	lineWidth := 0
+	for _, r := range value {
+		runeWidth := lipgloss.Width(string(r))
+		if lineWidth+runeWidth > width && line.Len() > 0 {
+			lines = append(lines, line.String())
+			line.Reset()
+			lineWidth = 0
+		}
+		line.WriteRune(r)
+		lineWidth += runeWidth
+	}
+	lines = append(lines, line.String())
 	return lines
 }
 

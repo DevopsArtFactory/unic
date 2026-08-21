@@ -35,11 +35,11 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll details by one page"},
 		{keys: "e", bar: "e: enable", help: "Enable the selected rule after confirmation",
 			when: func(m Model) bool {
-				return m.eventBridge.selected != nil && !m.eventBridge.selected.IsEnabled() && !m.eventBridge.selected.IsManaged()
+				return m.eventBridge.selected != nil && !m.eventBridge.selected.IsEnabled() && m.eventBridge.selected.CanChangeState()
 			}},
 		{keys: "d", bar: "d: disable", help: "Disable the selected rule after confirmation",
 			when: func(m Model) bool {
-				return m.eventBridge.selected != nil && m.eventBridge.selected.IsEnabled() && !m.eventBridge.selected.IsManaged()
+				return m.eventBridge.selected != nil && m.eventBridge.selected.IsEnabled() && m.eventBridge.selected.CanChangeState()
 			}},
 		{keys: "q / esc", bar: "esc: back", help: "Go back to the EventBridge rule list"},
 		{bar: "H: home"},

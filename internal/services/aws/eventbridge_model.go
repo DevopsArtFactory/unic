@@ -42,6 +42,17 @@ func (r EventBridgeRule) IsManaged() bool {
 	return r.ManagedBy != ""
 }
 
+// CanChangeState reports whether unic can preserve the rule's enabled mode.
+func (r EventBridgeRule) CanChangeState() bool {
+	return !r.IsManaged() && (r.State == "ENABLED" || r.State == "DISABLED")
+}
+
+// IncludesAllCloudTrailManagementEvents reports whether the rule uses the
+// EventBridge enabled mode that EnableRule cannot restore after a disable.
+func (r EventBridgeRule) IncludesAllCloudTrailManagementEvents() bool {
+	return r.State == "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS"
+}
+
 // TriggerSummary returns a compact description suitable for the rule list.
 func (r EventBridgeRule) TriggerSummary() string {
 	if r.ScheduleExpression != "" {
