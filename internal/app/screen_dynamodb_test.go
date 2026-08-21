@@ -1,14 +1,55 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	tea "github.com/charmbracelet/bubbletea"
 
 	awsservice "unic/internal/services/aws"
 )
+
+type appDynamoDBClient struct {
+	getItemFunc func(context.Context, *dynamodb.GetItemInput, ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+}
+
+func (*appDynamoDBClient) ListTables(context.Context, *dynamodb.ListTablesInput, ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
+	return &dynamodb.ListTablesOutput{}, nil
+}
+
+func (*appDynamoDBClient) DescribeTable(context.Context, *dynamodb.DescribeTableInput, ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+	return &dynamodb.DescribeTableOutput{}, nil
+}
+
+func (*appDynamoDBClient) DescribeTimeToLive(context.Context, *dynamodb.DescribeTimeToLiveInput, ...func(*dynamodb.Options)) (*dynamodb.DescribeTimeToLiveOutput, error) {
+	return &dynamodb.DescribeTimeToLiveOutput{}, nil
+}
+
+func (c *appDynamoDBClient) GetItem(ctx context.Context, input *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	return c.getItemFunc(ctx, input, opts...)
+}
+
+func runDynamoDBLookupBatch(t *testing.T, cmd tea.Cmd) tea.Msg {
+	t.Helper()
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected lookup command batch")
+	}
+	for _, batched := range batch {
+		msg := batched()
+		switch msg.(type) {
+		case dynamoDBItemLoadedMsg, errMsg:
+			return msg
+		}
+	}
+	t.Fatal("lookup batch did not return a result")
+	return nil
+}
 
 func dynamoDBTestTable() awsservice.DynamoDBTable {
 	return awsservice.DynamoDBTable{
@@ -101,10 +142,44 @@ func TestDynamoDBLookupPromptsForCompletePrimaryKey(t *testing.T) {
 		t.Fatalf("expected partition key to advance to sort key, field=%d values=%v", m.dynamodb.lookupField, m.dynamodb.lookupValues)
 	}
 	m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("42")})
+	m.commands = nil
+	m.awsRepo = &awsservice.AwsRepository{DynamoDBClient: &appDynamoDBClient{getItemFunc: func(_ context.Context, input *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+		partition, partitionOK := input.Key["tenant"].(*dynamodbtypes.AttributeValueMemberS)
+		sortKey, sortOK := input.Key["order"].(*dynamodbtypes.AttributeValueMemberN)
+		if !partitionOK || partition.Value != "acme" || !sortOK || sortKey.Value != "42" {
+			t.Fatalf("unexpected typed key: %#v", input.Key)
+		}
+		return &dynamodb.GetItemOutput{Item: map[string]dynamodbtypes.AttributeValue{
+			"tenant": &dynamodbtypes.AttributeValueMemberS{Value: "acme"},
+		}}, nil
+	}}}
 	next, cmd := m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyEnter})
 	model := next.(Model)
 	if cmd == nil || model.screen != screenLoading || model.dynamodb.lookupValues[1] != "42" {
 		t.Fatalf("expected complete key to run GetItem, screen=%v values=%v cmd=%v", model.screen, model.dynamodb.lookupValues, cmd)
+	}
+	result, ok := runDynamoDBLookupBatch(t, cmd).(dynamoDBItemLoadedMsg)
+	if !ok || result.item == nil || !result.item.Found || !strings.Contains(result.item.JSON, `"tenant": "acme"`) {
+		t.Fatalf("expected loaded item result, got %#v", result)
+	}
+}
+
+func TestDynamoDBLookupCommandReturnsAPIErrMsg(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.commands = nil
+	table := dynamoDBTestTable()
+	m.dynamodb.selected = &table
+	m.dynamodb.lookupValues = []string{"acme", "42"}
+	m.dynamodb.lookupField = 1
+	m.dynamodb.lookupInput = "42"
+	m.awsRepo = &awsservice.AwsRepository{DynamoDBClient: &appDynamoDBClient{getItemFunc: func(context.Context, *dynamodb.GetItemInput, ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+		return nil, errors.New("access denied")
+	}}}
+
+	_, cmd := m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	msg, ok := runDynamoDBLookupBatch(t, cmd).(errMsg)
+	if !ok || msg.err == nil || !strings.Contains(msg.err.Error(), "failed to get item") {
+		t.Fatalf("expected wrapped API error message, got %#v", msg)
 	}
 }
 
@@ -147,5 +222,14 @@ func TestDynamoDBLoadCommandsRequireSelectedTable(t *testing.T) {
 		if !ok || msg.err == nil || !strings.Contains(msg.err.Error(), "no DynamoDB table selected") {
 			t.Fatalf("%s: expected missing-selection error, got %#v", name, msg)
 		}
+	}
+}
+
+func TestDynamoDBBeginLookupWithoutSelectionIsNoop(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenDynamoDBLookupResult
+	m.dynamodb.beginLookup(&m)
+	if m.screen != screenDynamoDBLookupResult {
+		t.Fatalf("expected screen to remain unchanged, got %v", m.screen)
 	}
 }

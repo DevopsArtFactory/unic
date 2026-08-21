@@ -108,6 +108,39 @@ func TestListDynamoDBTablesPaginatesSortsAndMapsSummaries(t *testing.T) {
 	}
 }
 
+func TestDynamoDBMetadataOrderingUsesRawNameTieBreakers(t *testing.T) {
+	var described []string
+	mock := &mockDynamoDBClient{
+		listTablesFunc: func(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
+			return &dynamodb.ListTablesOutput{TableNames: []string{"alpha", "Alpha"}}, nil
+		},
+		describeTableFunc: func(_ context.Context, input *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			name := awssdk.ToString(input.TableName)
+			described = append(described, name)
+			return &dynamodb.DescribeTableOutput{Table: &dynamodbtypes.TableDescription{
+				TableName: awssdk.String(name),
+				GlobalSecondaryIndexes: []dynamodbtypes.GlobalSecondaryIndexDescription{
+					{IndexName: awssdk.String("beta")},
+					{IndexName: awssdk.String("alpha")},
+					{IndexName: awssdk.String("Alpha")},
+				},
+			}}, nil
+		},
+	}
+
+	tables, err := (&AwsRepository{DynamoDBClient: mock}).ListDynamoDBTables(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Join(described, ",") != "Alpha,alpha" {
+		t.Fatalf("expected deterministic table order, got %v", described)
+	}
+	gotIndexes := []string{tables[0].GSIs[0].Name, tables[0].GSIs[1].Name, tables[0].GSIs[2].Name}
+	if strings.Join(gotIndexes, ",") != "Alpha,alpha,beta" {
+		t.Fatalf("expected deterministic GSI order, got %v", gotIndexes)
+	}
+}
+
 func TestDescribeDynamoDBTableAddsTTLAndStreamDetails(t *testing.T) {
 	mock := &mockDynamoDBClient{
 		describeTableFunc: func(_ context.Context, _ *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
@@ -188,6 +221,29 @@ func TestGetDynamoDBItemRejectsInvalidNumberBeforeAPI(t *testing.T) {
 	}
 }
 
+func TestDynamoDBNumberValidationEnforcesServiceLimits(t *testing.T) {
+	key := DynamoDBKey{Name: "id", Role: "PARTITION", AttributeType: "N"}
+	for _, value := range []string{
+		"0",
+		"1e-130",
+		"9." + strings.Repeat("9", 37) + "e125",
+		"-1e-130",
+	} {
+		if _, err := newDynamoDBKeyValue(key, value); err != nil {
+			t.Errorf("expected %q to be valid: %v", value, err)
+		}
+	}
+	for _, value := range []string{
+		"1e-131",
+		"1e126",
+		strings.Repeat("9", 39),
+	} {
+		if _, err := newDynamoDBKeyValue(key, value); err == nil {
+			t.Errorf("expected %q to be rejected", value)
+		}
+	}
+}
+
 func TestGetDynamoDBItemReturnsNotFound(t *testing.T) {
 	mock := &mockDynamoDBClient{getItemFunc: func(_ context.Context, _ *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
 		return &dynamodb.GetItemOutput{}, nil
@@ -207,5 +263,65 @@ func TestListDynamoDBTablesWrapsListError(t *testing.T) {
 	_, err := (&AwsRepository{DynamoDBClient: mock}).ListDynamoDBTables(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "failed to list DynamoDB tables") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDynamoDBOperationsWrapAPIErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+		run  func(*AwsRepository) error
+		mock *mockDynamoDBClient
+	}{
+		{
+			name: "describe table",
+			want: "failed to describe DynamoDB table orders",
+			mock: &mockDynamoDBClient{describeTableFunc: func(context.Context, *dynamodb.DescribeTableInput, ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+				return nil, errors.New("access denied")
+			}},
+			run: func(repo *AwsRepository) error {
+				_, err := repo.DescribeDynamoDBTable(context.Background(), "orders")
+				return err
+			},
+		},
+		{
+			name: "describe TTL",
+			want: "failed to describe TTL for DynamoDB table orders",
+			mock: &mockDynamoDBClient{
+				describeTableFunc: func(context.Context, *dynamodb.DescribeTableInput, ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+					return &dynamodb.DescribeTableOutput{Table: &dynamodbtypes.TableDescription{TableName: awssdk.String("orders")}}, nil
+				},
+				describeTimeToLiveFunc: func(context.Context, *dynamodb.DescribeTimeToLiveInput, ...func(*dynamodb.Options)) (*dynamodb.DescribeTimeToLiveOutput, error) {
+					return nil, errors.New("access denied")
+				},
+			},
+			run: func(repo *AwsRepository) error {
+				_, err := repo.DescribeDynamoDBTable(context.Background(), "orders")
+				return err
+			},
+		},
+		{
+			name: "get item",
+			want: "failed to get item from DynamoDB table orders",
+			mock: &mockDynamoDBClient{getItemFunc: func(context.Context, *dynamodb.GetItemInput, ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+				return nil, errors.New("access denied")
+			}},
+			run: func(repo *AwsRepository) error {
+				_, err := repo.GetDynamoDBItem(context.Background(), DynamoDBTable{
+					Name: "orders",
+					Keys: []DynamoDBKey{{Name: "id", Role: "PARTITION", AttributeType: "S"}},
+				}, []string{"42"})
+				return err
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.run(&AwsRepository{DynamoDBClient: test.mock})
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected wrapped error containing %q, got %v", test.want, err)
+			}
+		})
 	}
 }

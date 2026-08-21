@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"sort"
+	"strconv"
 	"strings"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -30,7 +30,11 @@ func (r *AwsRepository) ListDynamoDBTables(ctx context.Context) ([]DynamoDBTable
 		names = append(names, page.TableNames...)
 	}
 	sort.Slice(names, func(i, j int) bool {
-		return normalizedSortKey(names[i]) < normalizedSortKey(names[j])
+		left, right := normalizedSortKey(names[i]), normalizedSortKey(names[j])
+		if left == right {
+			return names[i] < names[j]
+		}
+		return left < right
 	})
 
 	tables := make([]DynamoDBTable, 0, len(names))
@@ -152,6 +156,13 @@ func newDynamoDBTable(desc dynamodbtypes.TableDescription, region string) Dynamo
 		}
 		table.GSIs = append(table.GSIs, gsi)
 	}
+	sort.Slice(table.GSIs, func(i, j int) bool {
+		left, right := normalizedSortKey(table.GSIs[i].Name), normalizedSortKey(table.GSIs[j].Name)
+		if left == right {
+			return table.GSIs[i].Name < table.GSIs[j].Name
+		}
+		return left < right
+	})
 	return table
 }
 
@@ -178,10 +189,7 @@ func newDynamoDBKeyValue(key DynamoDBKey, value string) (dynamodbtypes.Attribute
 		return &dynamodbtypes.AttributeValueMemberS{Value: value}, nil
 	case string(dynamodbtypes.ScalarAttributeTypeN):
 		number := strings.TrimSpace(value)
-		if strings.EqualFold(number, "inf") || strings.EqualFold(number, "+inf") || strings.EqualFold(number, "-inf") || strings.EqualFold(number, "nan") {
-			return nil, fmt.Errorf("%s key %s must be a number", strings.ToLower(key.Role), key.Name)
-		}
-		if _, _, err := big.ParseFloat(number, 10, 256, big.ToNearestEven); err != nil {
+		if !validDynamoDBNumber(number) {
 			return nil, fmt.Errorf("%s key %s must be a number", strings.ToLower(key.Role), key.Name)
 		}
 		return &dynamodbtypes.AttributeValueMemberN{Value: number}, nil
@@ -194,6 +202,62 @@ func newDynamoDBKeyValue(key DynamoDBKey, value string) (dynamodbtypes.Attribute
 	default:
 		return nil, fmt.Errorf("unsupported DynamoDB key type %q for %s", key.AttributeType, key.Name)
 	}
+}
+
+func validDynamoDBNumber(number string) bool {
+	if number == "" {
+		return false
+	}
+	if number[0] == '+' || number[0] == '-' {
+		number = number[1:]
+		if number == "" {
+			return false
+		}
+	}
+
+	mantissa, exponentText, hasExponent := number, "", false
+	if index := strings.IndexAny(number, "eE"); index >= 0 {
+		if strings.IndexAny(number[index+1:], "eE") >= 0 {
+			return false
+		}
+		mantissa, exponentText, hasExponent = number[:index], number[index+1:], true
+	}
+	exponent := int64(0)
+	if hasExponent {
+		var err error
+		exponent, err = strconv.ParseInt(exponentText, 10, 64)
+		if err != nil {
+			return false
+		}
+	}
+
+	integer, fraction := mantissa, ""
+	if index := strings.IndexByte(mantissa, '.'); index >= 0 {
+		if strings.IndexByte(mantissa[index+1:], '.') >= 0 {
+			return false
+		}
+		integer, fraction = mantissa[:index], mantissa[index+1:]
+	}
+	digits := integer + fraction
+	if digits == "" {
+		return false
+	}
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+
+	firstNonZero := strings.IndexAny(digits, "123456789")
+	if firstNonZero < 0 {
+		return true
+	}
+	significant := strings.TrimRight(digits[firstNonZero:], "0")
+	if len(significant) > 38 {
+		return false
+	}
+	adjustment := int64(len(integer) - firstNonZero - 1)
+	return exponent >= -130-adjustment && exponent <= 125-adjustment
 }
 
 func dynamoDBAttributeValue(value dynamodbtypes.AttributeValue) any {

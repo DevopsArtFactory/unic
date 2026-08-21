@@ -193,6 +193,9 @@ func (dm *dynamoDBModel) updateLookupResult(m *Model, msg tea.KeyMsg) (tea.Model
 }
 
 func (dm *dynamoDBModel) beginLookup(m *Model) {
+	if dm.selected == nil {
+		return
+	}
 	dm.lookupValues = make([]string, len(dm.selected.Keys))
 	dm.lookupField = 0
 	dm.lookupInput = ""
