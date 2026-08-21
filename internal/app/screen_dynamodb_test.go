@@ -136,3 +136,16 @@ func TestDynamoDBLookupResultSupportsScrollingAndNotFound(t *testing.T) {
 		t.Fatalf("expected not-found result:\n%s", view)
 	}
 }
+
+func TestDynamoDBLoadCommandsRequireSelectedTable(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	for name, cmd := range map[string]tea.Cmd{
+		"detail": m.dynamodb.loadTableDetail(m),
+		"item":   m.dynamodb.lookupItem(m),
+	} {
+		msg, ok := cmd().(errMsg)
+		if !ok || msg.err == nil || !strings.Contains(msg.err.Error(), "no DynamoDB table selected") {
+			t.Fatalf("%s: expected missing-selection error, got %#v", name, msg)
+		}
+	}
+}

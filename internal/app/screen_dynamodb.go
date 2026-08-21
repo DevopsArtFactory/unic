@@ -220,6 +220,9 @@ func (dm dynamoDBModel) loadTables(m Model) tea.Cmd {
 }
 
 func (dm dynamoDBModel) loadTableDetail(m Model) tea.Cmd {
+	if dm.selected == nil {
+		return func() tea.Msg { return errMsg{err: fmt.Errorf("no DynamoDB table selected")} }
+	}
 	tableName := dm.selected.Name
 	return func() tea.Msg {
 		ctx := m.commandContext()
@@ -240,6 +243,9 @@ func (dm dynamoDBModel) loadTableDetail(m Model) tea.Cmd {
 }
 
 func (dm dynamoDBModel) lookupItem(m Model) tea.Cmd {
+	if dm.selected == nil {
+		return func() tea.Msg { return errMsg{err: fmt.Errorf("no DynamoDB table selected")} }
+	}
 	table := *dm.selected
 	values := append([]string(nil), dm.lookupValues...)
 	return func() tea.Msg {
