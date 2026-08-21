@@ -367,6 +367,43 @@ func TestDynamoDBContextPickerDropsInterruptedResultAndRestartsOnCancel(t *testi
 	}
 }
 
+func TestDynamoDBGlobalOverlaysDropInterruptedResultAndRestartOnCancel(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		key    rune
+		screen screen
+	}{
+		{name: "settings", key: 'S', screen: screenSettings},
+		{name: "palette", key: 'P', screen: screenCommandPalette},
+		{name: "views", key: 'V', screen: screenViewList},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			loading, _ := m.dynamodb.Start(&m)
+			m = loading.(Model)
+			staleGeneration := m.commands.CurrentGen()
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
+			m = opened.(Model)
+			if m.screen != tc.screen {
+				t.Fatalf("expected %s overlay, got %v", tc.name, m.screen)
+			}
+
+			stale, _ := m.Update(genBoundMsg{gen: staleGeneration, msg: dynamoDBTablesLoadedMsg{tables: []awsservice.DynamoDBTable{dynamoDBTestTable()}}})
+			m = stale.(Model)
+			if m.screen != tc.screen || len(m.dynamodb.tables) != 0 {
+				t.Fatalf("expected stale DynamoDB result to leave %s active, screen=%v tables=%d", tc.name, m.screen, len(m.dynamodb.tables))
+			}
+
+			resumed, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			model := resumed.(Model)
+			if model.screen != screenLoading || model.loadingReturnScreen != screenDynamoDBTableList || cmd == nil {
+				t.Fatalf("expected %s cancel to restart the list load, screen=%v return=%v cmd=%v", tc.name, model.screen, model.loadingReturnScreen, cmd)
+			}
+		})
+	}
+}
+
 func TestDynamoDBLoadCommandsRequireSelectedTable(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	for name, cmd := range map[string]tea.Cmd{

@@ -58,6 +58,12 @@ func isDynamoDBScreen(value screen) bool {
 	}
 }
 
+func (m *Model) cancelDynamoDBLoadForOverlay() {
+	if m.screen == screenLoading && isDynamoDBScreen(m.loadingReturnScreen) && m.commands != nil {
+		m.commands.CancelAll()
+	}
+}
+
 func (dm *dynamoDBModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case dynamoDBTablesLoadedMsg:

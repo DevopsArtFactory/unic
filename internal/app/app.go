@@ -675,6 +675,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			m.settingsPrevScreen = m.screen
+			m.cancelDynamoDBLoadForOverlay()
 			m.screen = screenSettings
 			return m, nil
 		}
@@ -684,6 +685,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			!m.isTextEntryScreen() {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
+			m.cancelDynamoDBLoadForOverlay()
 			return m.openPalette()
 		}
 		// Global saved views — V opens the saved views screen (skip
@@ -692,6 +694,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			!m.isTextEntryScreen() {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
+			m.cancelDynamoDBLoadForOverlay()
 			return m.openViews()
 		}
 
