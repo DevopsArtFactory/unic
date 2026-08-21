@@ -213,6 +213,7 @@ type Model struct {
 	contextTable       table.Model
 	favoriteContexts   map[string]struct{}
 	ctxPrevScreen      screen
+	ctxPrevWasLoading  bool
 	pendingContextName string
 	envContextName     string
 	envContextSource   string
@@ -647,8 +648,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			m.ctxPrevScreen = m.screen
+			m.ctxPrevWasLoading = false
 			if m.screen == screenLoading && isDynamoDBScreen(m.loadingReturnScreen) {
 				m.ctxPrevScreen = m.loadingReturnScreen
+				m.ctxPrevWasLoading = true
+				if m.commands != nil {
+					m.commands.CancelAll()
+				}
 			}
 			return m, m.loadContexts()
 		}

@@ -307,14 +307,18 @@ func TestDynamoDBContextSwitchDuringLoadDoesNotRestoreLoadingScreen(t *testing.T
 
 	loading, _ := m.dynamodb.Start(&m)
 	m = loading.(Model)
+	inFlight := m.commands.Current()
 	if m.screen != screenLoading || m.loadingReturnScreen != screenDynamoDBTableList {
 		t.Fatalf("expected an owned DynamoDB list load, screen=%v return=%v", m.screen, m.loadingReturnScreen)
 	}
 
 	opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
 	m = opened.(Model)
-	if m.ctxPrevScreen != screenDynamoDBTableList {
-		t.Fatalf("expected context picker to preserve the DynamoDB load owner, got %v", m.ctxPrevScreen)
+	if m.ctxPrevScreen != screenDynamoDBTableList || !m.ctxPrevWasLoading {
+		t.Fatalf("expected context picker to preserve the DynamoDB load owner, screen=%v loading=%v", m.ctxPrevScreen, m.ctxPrevWasLoading)
+	}
+	if inFlight.Err() == nil {
+		t.Fatal("expected opening the context picker to cancel the DynamoDB load")
 	}
 
 	switching, _ := m.startLoading(func() tea.Msg { return nil })
@@ -328,6 +332,34 @@ func TestDynamoDBContextSwitchDuringLoadDoesNotRestoreLoadingScreen(t *testing.T
 	}
 	if len(model.dynamodb.tables) != 0 || model.dynamodb.selected != nil {
 		t.Fatalf("expected context-scoped DynamoDB state to be cleared, got %+v", model.dynamodb)
+	}
+}
+
+func TestDynamoDBContextPickerDropsInterruptedResultAndRestartsOnCancel(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "dev"
+	loading, _ := m.dynamodb.Start(&m)
+	m = loading.(Model)
+	staleGeneration := m.commands.CurrentGen()
+
+	opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = opened.(Model)
+	loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = loaded.(Model)
+	if m.screen != screenContextPicker {
+		t.Fatalf("expected context picker, got %v", m.screen)
+	}
+
+	stale, _ := m.Update(genBoundMsg{gen: staleGeneration, msg: dynamoDBTablesLoadedMsg{tables: []awsservice.DynamoDBTable{dynamoDBTestTable()}}})
+	m = stale.(Model)
+	if m.screen != screenContextPicker || len(m.dynamodb.tables) != 0 {
+		t.Fatalf("expected stale DynamoDB result to leave the picker unchanged, screen=%v tables=%d", m.screen, len(m.dynamodb.tables))
+	}
+
+	resumed, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := resumed.(Model)
+	if model.screen != screenLoading || model.loadingReturnScreen != screenDynamoDBTableList || cmd == nil {
+		t.Fatalf("expected cancel to restart the interrupted list load, screen=%v return=%v cmd=%v", model.screen, model.loadingReturnScreen, cmd)
 	}
 }
 

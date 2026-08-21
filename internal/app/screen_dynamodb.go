@@ -32,6 +32,23 @@ func (dm *dynamoDBModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	return m.startLoadingFor(screenDynamoDBTableList, "Loading...", nil, dm.loadTables(*m))
 }
 
+func (dm *dynamoDBModel) resumeLoading(m *Model, target screen) (tea.Model, tea.Cmd) {
+	switch target {
+	case screenDynamoDBTableList:
+		return dm.Start(m)
+	case screenDynamoDBTableDetail:
+		if dm.selected != nil {
+			return m.startLoadingFor(target, "Loading DynamoDB table...", []string{dm.selected.Name}, dm.loadTableDetail(*m))
+		}
+	case screenDynamoDBLookupResult:
+		if dm.selected != nil {
+			return m.startLoadingFor(target, "Looking up DynamoDB item...", []string{dm.selected.Name}, dm.lookupItem(*m))
+		}
+	}
+	m.screen = screenDynamoDBTableList
+	return *m, nil
+}
+
 func isDynamoDBScreen(value screen) bool {
 	switch value {
 	case screenDynamoDBTableList, screenDynamoDBTableDetail, screenDynamoDBLookupInput, screenDynamoDBLookupResult:

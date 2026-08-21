@@ -60,6 +60,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
 		m.dynamodb = newDynamoDBModel()
+		m.ctxPrevWasLoading = false
 		if isDynamoDBScreen(m.ctxPrevScreen) {
 			m.ctxPrevScreen = screenServiceList
 		}
@@ -175,8 +176,12 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If we have a valid config (mid-session C key), go back.
 		// If initial launch, quit.
 		if m.cfg.ContextName != "" {
-			m.screen = m.ctxPrevScreen
 			m.resetFilter(filterContexts)
+			if m.ctxPrevWasLoading {
+				m.ctxPrevWasLoading = false
+				return m.dynamodb.resumeLoading(&m, m.ctxPrevScreen)
+			}
+			m.screen = m.ctxPrevScreen
 		} else {
 			m.quitting = true
 			return m, tea.Quit
