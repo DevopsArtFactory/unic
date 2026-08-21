@@ -181,7 +181,7 @@ func (dm *dynamoDBModel) updateLookupInput(m *Model, msg tea.KeyMsg) (tea.Model,
 	case "esc":
 		m.screen = screenDynamoDBTableDetail
 	case "enter":
-		if dm.selected == nil || dm.lookupField >= len(dm.selected.Keys) || dm.lookupInput == "" {
+		if dm.selected == nil || len(dm.lookupValues) != len(dm.selected.Keys) || dm.lookupField >= len(dm.selected.Keys) || dm.lookupInput == "" {
 			return *m, nil
 		}
 		dm.lookupValues[dm.lookupField] = dm.lookupInput

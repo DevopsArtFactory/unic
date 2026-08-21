@@ -282,6 +282,7 @@ func TestDynamoDBContextSwitchClearsPreviousAccountState(t *testing.T) {
 	m.dynamodb.filtered = m.dynamodb.tables
 	m.dynamodb.selected = &table
 	m.dynamodb.item = &awsservice.DynamoDBItem{Found: true, JSON: `{"secret":"old-account"}`}
+	m.storeFilterValue(filterDynamoDBTables, "orders")
 	nextCfg := *m.cfg
 	nextCfg.ContextName = "next-account"
 
@@ -292,6 +293,9 @@ func TestDynamoDBContextSwitchClearsPreviousAccountState(t *testing.T) {
 	}
 	if len(model.dynamodb.tables) != 0 || len(model.dynamodb.filtered) != 0 || model.dynamodb.selected != nil || model.dynamodb.item != nil {
 		t.Fatalf("expected context-scoped DynamoDB state to be cleared, got %+v", model.dynamodb)
+	}
+	if filter := model.filterValue(filterDynamoDBTables); filter != "" {
+		t.Fatalf("expected context-scoped DynamoDB filter to be cleared, got %q", filter)
 	}
 	if view := model.View(); strings.Contains(view, "old-account") {
 		t.Fatalf("previous account item leaked after context switch:\n%s", view)
@@ -382,5 +386,19 @@ func TestDynamoDBBeginLookupWithoutSelectionIsNoop(t *testing.T) {
 	m.dynamodb.beginLookup(&m)
 	if m.screen != screenDynamoDBLookupResult {
 		t.Fatalf("expected screen to remain unchanged, got %v", m.screen)
+	}
+}
+
+func TestDynamoDBLookupInputIgnoresIncompleteState(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenDynamoDBLookupInput
+	table := dynamoDBTestTable()
+	m.dynamodb.selected = &table
+	m.dynamodb.lookupInput = "acme"
+
+	updated, cmd := m.dynamodb.updateLookupInput(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+	if cmd != nil || model.screen != screenDynamoDBLookupInput {
+		t.Fatalf("expected incomplete lookup state to remain idle, screen=%v cmd=%v", model.screen, cmd)
 	}
 }

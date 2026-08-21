@@ -60,6 +60,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
 		m.dynamodb = newDynamoDBModel()
+		m.resetFilter(filterDynamoDBTables)
 		m.ctxPrevWasLoading = false
 		if isDynamoDBScreen(m.ctxPrevScreen) {
 			m.ctxPrevScreen = screenServiceList

@@ -178,6 +178,26 @@ func TestListDynamoDBTablesDescribesTablesConcurrently(t *testing.T) {
 	}
 }
 
+func TestListDynamoDBTablesStopsDescriptionsWhenContextCanceled(t *testing.T) {
+	describeCalled := false
+	mock := &mockDynamoDBClient{
+		listTablesFunc: func(context.Context, *dynamodb.ListTablesInput, ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
+			return &dynamodb.ListTablesOutput{TableNames: []string{"orders"}}, nil
+		},
+		describeTableFunc: func(context.Context, *dynamodb.DescribeTableInput, ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			describeCalled = true
+			return &dynamodb.DescribeTableOutput{}, nil
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := (&AwsRepository{DynamoDBClient: mock}).ListDynamoDBTables(ctx)
+	if !errors.Is(err, context.Canceled) || describeCalled {
+		t.Fatalf("expected cancellation before table descriptions, err=%v called=%v", err, describeCalled)
+	}
+}
+
 func TestDescribeDynamoDBTableAddsTTLAndStreamDetails(t *testing.T) {
 	mock := &mockDynamoDBClient{
 		describeTableFunc: func(_ context.Context, _ *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {

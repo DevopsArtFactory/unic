@@ -52,6 +52,9 @@ func (r *AwsRepository) ListDynamoDBTables(ctx context.Context) ([]DynamoDBTable
 		go func() {
 			defer workers.Done()
 			for index := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
 				name := names[index]
 				out, err := r.DynamoDBClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: awssdk.String(name)})
 				if err != nil {
@@ -66,6 +69,9 @@ func (r *AwsRepository) ListDynamoDBTables(ctx context.Context) ([]DynamoDBTable
 		}()
 	}
 	workers.Wait()
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("failed to describe DynamoDB tables: %w", err)
+	}
 
 	tables := make([]DynamoDBTable, 0, len(names))
 	for index := range names {
