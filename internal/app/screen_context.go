@@ -204,6 +204,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
 			m.pendingContextName = selected.Name
+			m.ctxPrevWasLoading = false
 			return m.startLoading(m.switchContext(selected.Name))
 		}
 	case "s":

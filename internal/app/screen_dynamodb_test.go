@@ -519,6 +519,48 @@ func TestDynamoDBContextPickerDropsInterruptedResultAndRestartsOnCancel(t *testi
 	}
 }
 
+func TestDynamoDBFailedContextSwitchDoesNotResumeInterruptedLoad(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "dev"
+	loading, _ := m.dynamodb.Start(&m)
+	m = loading.(Model)
+
+	opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = opened.(Model)
+	loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = loaded.(Model)
+	if !m.ctxPrevWasLoading {
+		t.Fatal("expected context picker to remember the interrupted DynamoDB load")
+	}
+
+	switching, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = switching.(Model)
+	if m.screen != screenLoading || cmd == nil {
+		t.Fatalf("expected selected context switch to start loading, screen=%v cmd=%v", m.screen, cmd)
+	}
+	if m.ctxPrevWasLoading {
+		t.Fatal("expected committed context switch to clear the interrupted-load resume flag")
+	}
+
+	failed, _ := m.Update(errMsg{err: errors.New("switch failed")})
+	m = failed.(Model)
+	dismissed, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = dismissed.(Model)
+	if m.screen != screenServiceList {
+		t.Fatalf("expected switch error dismissal to return to service list, got %v", m.screen)
+	}
+
+	reopened, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = reopened.(Model)
+	reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = reloaded.(Model)
+	canceled, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := canceled.(Model)
+	if model.screen != screenServiceList || cmd != nil {
+		t.Fatalf("expected later picker cancel to return to service list, screen=%v cmd=%v", model.screen, cmd)
+	}
+}
+
 func TestDynamoDBGlobalOverlaysDropInterruptedResultAndRestartOnCancel(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
