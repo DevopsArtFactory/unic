@@ -12,6 +12,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"unic/internal/config"
+	"unic/internal/domain"
 	awsservice "unic/internal/services/aws"
 )
 
@@ -594,6 +596,101 @@ func TestDynamoDBFailedContextSwitchDoesNotResumeInterruptedLoad(t *testing.T) {
 	model := canceled.(Model)
 	if model.screen != screenServiceList || cmd != nil {
 		t.Fatalf("expected later picker cancel to return to service list, screen=%v cmd=%v", model.screen, cmd)
+	}
+}
+
+func TestDynamoDBContextPickerCommittedOverlaysClearInterruptedLoad(t *testing.T) {
+	tests := []struct {
+		name        string
+		key         rune
+		prepare     func(*Model)
+		switchFails bool
+	}{
+		{
+			name: "palette feature",
+			key:  'P',
+			prepare: func(m *Model) {
+				m.palette.filtered = []paletteItem{{
+					kind: paletteItemFeature, service: domain.ServiceRDS, feature: domain.FeatureRDSBrowser,
+				}}
+			},
+		},
+		{
+			name: "saved view feature",
+			key:  'V',
+			prepare: func(m *Model) {
+				m.views.views = []config.ViewEntry{{
+					Context: "dev", Service: string(domain.ServiceRDS), Feature: string(domain.FeatureRDSBrowser),
+				}}
+			},
+		},
+		{
+			name: "palette context",
+			key:  'P',
+			prepare: func(m *Model) {
+				m.palette.filtered = []paletteItem{{kind: paletteItemContext, contextName: "next-account"}}
+			},
+			switchFails: true,
+		},
+		{
+			name: "saved view context",
+			key:  'V',
+			prepare: func(m *Model) {
+				m.views.views = []config.ViewEntry{{
+					Context: "next-account", Service: string(domain.ServiceRDS), Feature: string(domain.FeatureRDSBrowser),
+				}}
+			},
+			switchFails: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			m.cfg.ContextName = "dev"
+			loading, _ := m.dynamodb.Start(&m)
+			m = loading.(Model)
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = opened.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+			if !m.ctxPrevWasLoading {
+				t.Fatal("expected context picker to remember the interrupted DynamoDB load")
+			}
+
+			overlay, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{test.key}})
+			m = overlay.(Model)
+			test.prepare(&m)
+			committed, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			m = committed.(Model)
+			if m.ctxPrevWasLoading {
+				t.Fatal("expected committed overlay action to clear the interrupted-load resume flag")
+			}
+			if m.screen != screenLoading || cmd == nil {
+				t.Fatalf("expected committed overlay action to start loading, screen=%v cmd=%v", m.screen, cmd)
+			}
+
+			if test.switchFails {
+				failed, _ := m.Update(errMsg{err: errors.New("switch failed")})
+				m = failed.(Model)
+				dismissed, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+				m = dismissed.(Model)
+			} else {
+				home, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'H'}})
+				m = home.(Model)
+			}
+
+			reopened, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = reopened.(Model)
+			reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = reloaded.(Model)
+			canceled, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			model := canceled.(Model)
+			if model.screen != screenServiceList || cmd != nil {
+				t.Fatalf("expected later picker cancel to stay on service list, screen=%v cmd=%v", model.screen, cmd)
+			}
+		})
 	}
 }
 
