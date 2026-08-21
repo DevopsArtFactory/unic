@@ -62,6 +62,9 @@ const (
 	screenCWMetricDetail
 	screenCloudTrailEventList
 	screenCloudTrailEventDetail
+	screenEventBridgeRuleList
+	screenEventBridgeRuleDetail
+	screenEventBridgeRuleConfirm
 	screenCWAlarmList
 	screenCWAlarmDetail
 	screenCWLogGroupList
@@ -183,6 +186,7 @@ type Model struct {
 	cwMetrics    cloudWatchMetricsModel
 	cwAlarms     cwAlarmsModel
 	cloudTrail   cloudTrailModel
+	eventBridge  eventBridgeModel
 	cwLogs       cloudWatchLogsModel
 	rds          rdsModel
 	route53      route53Model
@@ -306,6 +310,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwAlarms = newCWAlarmsModel()
 	model.cloudTrail = newCloudTrailModel()
+	model.eventBridge = newEventBridgeModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
 	model.route53 = newRoute53Model()
@@ -484,6 +489,9 @@ func (m Model) isTextEntryScreen() bool {
 		return true
 	}
 	if m.screen == screenSQSConfirm {
+		return true
+	}
+	if m.screen == screenEventBridgeRuleConfirm {
 		return true
 	}
 	switch m.screen {
@@ -801,6 +809,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.cwAlarms.Start(&m)
 	case domain.FeatureCloudTrailEvents:
 		return m.cloudTrail.Start(&m)
+	case domain.FeatureEventBridgeRules:
+		return m.eventBridge.Start(&m)
 	case domain.FeatureCloudWatchLogsBrowser:
 		return m.cwLogs.Start(&m)
 	case domain.FeatureS3Browser:

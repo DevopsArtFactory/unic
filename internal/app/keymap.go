@@ -22,6 +22,35 @@ type keyBinding struct {
 // log viewer intentionally stays legacy: its bar labels embed live state
 // (wrap on/off, horizontal offset) that a static declaration cannot express.
 var screenKeymaps = map[screen][]keyBinding{
+	screenEventBridgeRuleList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between EventBridge rules"},
+		{keys: "/", bar: "/: filter", help: "Filter by rule, bus, state, trigger, or target"},
+		{keys: "r", bar: "r: refresh", help: "Refresh rules, targets, and recent activity"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected rule"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenEventBridgeRuleDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll rule and target details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll details by one page"},
+		{keys: "e", bar: "e: enable", help: "Enable the selected rule after confirmation",
+			when: func(m Model) bool {
+				return m.eventBridge.selected != nil && !m.eventBridge.selected.IsEnabled() && !m.eventBridge.selected.IsManaged()
+			}},
+		{keys: "d", bar: "d: disable", help: "Disable the selected rule after confirmation",
+			when: func(m Model) bool {
+				return m.eventBridge.selected != nil && m.eventBridge.selected.IsEnabled() && !m.eventBridge.selected.IsManaged()
+			}},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the EventBridge rule list"},
+		{bar: "H: home"},
+	},
+	screenEventBridgeRuleConfirm: {
+		{keys: "type", help: "Enter the rule name to confirm the state change"},
+		{keys: "backspace", help: "Delete the previous character"},
+		{keys: "enter", bar: "enter: confirm", help: "Change rule state when the typed name matches"},
+		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to rule detail"},
+	},
+
 	screenElastiCacheResourceList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between replication groups and standalone clusters"},
 		{keys: "/", bar: "/: filter", help: "Start filtering resources"},

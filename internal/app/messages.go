@@ -154,6 +154,18 @@ type cloudTrailEventsLoadedMsg struct {
 	events []awsservice.CloudTrailEvent
 }
 
+type eventBridgeRulesLoadedMsg struct {
+	rules []awsservice.EventBridgeRule
+	err   error
+}
+
+type eventBridgeActionDoneMsg struct {
+	ruleName string
+	busName  string
+	enabled  bool
+	err      error
+}
+
 type cwAlarmsLoadedMsg struct {
 	alarms []awsservice.CloudWatchAlarm
 }

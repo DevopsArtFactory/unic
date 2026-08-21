@@ -94,6 +94,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - Secrets Manager
 - IAM
 - CloudWatch Metrics
+- EventBridge
 - STS
 - CloudWatch Logs
 - ECS
@@ -245,6 +246,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - ACM 인증서 list/detail
 - S3 bucket/object/detail
 - KMS key list/detail, rotation 상태
+- EventBridge rule list/detail, type-to-confirm 상태 변경 flow
 - Inspector mode home, checklist setup, KMS rotation finding을 포함한 security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
 - SSO account / role selection, exit notice

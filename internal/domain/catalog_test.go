@@ -276,3 +276,19 @@ func TestCatalogContainsElastiCacheBrowserFeature(t *testing.T) {
 	}
 	t.Error("ElastiCache service not found in catalog")
 }
+
+func TestCatalogContainsEventBridgeRulesFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceEventBridge {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureEventBridgeRules {
+				return
+			}
+		}
+		t.Error("EventBridge service should have EventBridge Rules Browser feature")
+		return
+	}
+	t.Error("EventBridge service not found in catalog")
+}
