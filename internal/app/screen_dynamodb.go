@@ -157,7 +157,7 @@ func (dm *dynamoDBModel) updateTableList(m *Model, msg tea.KeyMsg) (tea.Model, t
 }
 
 func (dm *dynamoDBModel) updateTableDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	lines := dm.tableDetailLines()
+	lines := dm.tableDetailLines(*m)
 	page := max(m.height-8, 5)
 	switch msg.String() {
 	case "q", "esc":
@@ -415,7 +415,7 @@ func (dm dynamoDBModel) viewTableDetail(m Model) string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf("DynamoDB — %s", dm.selected.Name)))
 	b.WriteString("\n\n")
 
-	lines := dm.tableDetailLines()
+	lines := dm.tableDetailLines(m)
 	visibleLines := max(m.height-8, 5)
 	start := dynamoDBScroll(dm.detailScroll, len(lines), visibleLines)
 	end := min(start+visibleLines, len(lines))
@@ -425,7 +425,7 @@ func (dm dynamoDBModel) viewTableDetail(m Model) string {
 	return b.String()
 }
 
-func (dm dynamoDBModel) tableDetailLines() []string {
+func (dm dynamoDBModel) tableDetailLines(m Model) []string {
 	if dm.selected == nil {
 		return nil
 	}
@@ -474,7 +474,7 @@ func (dm dynamoDBModel) tableDetailLines() []string {
 			lines = append(lines, renderDetailLine(key.Role, fmt.Sprintf("%s (%s)", key.Name, key.AttributeType)))
 		}
 	}
-	return lines
+	return wrapDynamoDBLines(m, lines)
 }
 
 func (dm dynamoDBModel) viewLookupInput(m Model) string {
@@ -535,7 +535,10 @@ func (dm dynamoDBModel) itemLines(m Model) []string {
 	if dm.item == nil || !dm.item.Found {
 		return []string{"No item found for that primary key."}
 	}
-	lines := strings.Split(dm.item.JSON, "\n")
+	return wrapDynamoDBLines(m, strings.Split(dm.item.JSON, "\n"))
+}
+
+func wrapDynamoDBLines(m Model, lines []string) []string {
 	if m.width <= 0 {
 		return lines
 	}

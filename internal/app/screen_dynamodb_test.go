@@ -163,6 +163,32 @@ func TestDynamoDBDetailRendersKeysTTLStreamsAndGSI(t *testing.T) {
 	}
 }
 
+func TestDynamoDBDetailWrapsLongValuesIntoScrollableLines(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 32
+	m.height = 12
+	m.screen = screenDynamoDBTableDetail
+	table := dynamoDBTestTable()
+	table.ARN = "arn:aws:dynamodb:" + strings.Repeat("x", 240) + "TAIL"
+	m.dynamodb.selected = &table
+
+	lines := m.dynamodb.tableDetailLines(m)
+	if len(lines) <= max(m.height-8, 5) {
+		t.Fatalf("expected long detail values to wrap beyond one page, got %d lines", len(lines))
+	}
+	found := false
+	for range len(lines) {
+		if strings.Contains(m.dynamodb.viewTableDetail(m), "TAIL") {
+			found = true
+			break
+		}
+		m.dynamodb.updateTableDetail(&m, tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if !found {
+		t.Fatal("expected wrapped detail suffix to be reachable by scrolling")
+	}
+}
+
 func TestDynamoDBLookupPromptsForCompletePrimaryKey(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenDynamoDBTableDetail
@@ -399,6 +425,53 @@ func TestDynamoDBGlobalOverlaysDropInterruptedResultAndRestartOnCancel(t *testin
 			model := resumed.(Model)
 			if model.screen != screenLoading || model.loadingReturnScreen != screenDynamoDBTableList || cmd == nil {
 				t.Fatalf("expected %s cancel to restart the list load, screen=%v return=%v cmd=%v", tc.name, model.screen, model.loadingReturnScreen, cmd)
+			}
+		})
+	}
+}
+
+func TestDynamoDBOverlayContextSwitchInvalidatesLoadingReturn(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		key    rune
+		screen screen
+	}{
+		{name: "settings", key: 'S', screen: screenSettings},
+		{name: "views", key: 'V', screen: screenViewList},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			loading, _ := m.dynamodb.Start(&m)
+			m = loading.(Model)
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
+			m = opened.(Model)
+			if m.screen != tc.screen {
+				t.Fatalf("expected %s overlay, got %v", tc.name, m.screen)
+			}
+
+			openingPicker, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = openingPicker.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+			if m.screen != screenContextPicker {
+				t.Fatalf("expected context picker from %s, got %v", tc.name, m.screen)
+			}
+
+			switching, _ := m.startLoading(func() tea.Msg { return nil })
+			m = switching.(Model)
+			nextCfg := *m.cfg
+			nextCfg.ContextName = "next-account"
+			switched, _ := m.Update(contextSwitchedMsg{cfg: &nextCfg})
+			m = switched.(Model)
+			if m.screen != tc.screen {
+				t.Fatalf("expected context switch to return to %s, got %v", tc.name, m.screen)
+			}
+
+			closed, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			model := closed.(Model)
+			if model.screen != screenServiceList {
+				t.Fatalf("expected %s to discard the old loading return, got %v", tc.name, model.screen)
 			}
 		})
 	}
