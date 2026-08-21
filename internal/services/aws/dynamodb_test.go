@@ -3,8 +3,10 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -109,14 +111,12 @@ func TestListDynamoDBTablesPaginatesSortsAndMapsSummaries(t *testing.T) {
 }
 
 func TestDynamoDBMetadataOrderingUsesRawNameTieBreakers(t *testing.T) {
-	var described []string
 	mock := &mockDynamoDBClient{
 		listTablesFunc: func(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
 			return &dynamodb.ListTablesOutput{TableNames: []string{"alpha", "Alpha"}}, nil
 		},
 		describeTableFunc: func(_ context.Context, input *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
 			name := awssdk.ToString(input.TableName)
-			described = append(described, name)
 			return &dynamodb.DescribeTableOutput{Table: &dynamodbtypes.TableDescription{
 				TableName: awssdk.String(name),
 				GlobalSecondaryIndexes: []dynamodbtypes.GlobalSecondaryIndexDescription{
@@ -132,12 +132,49 @@ func TestDynamoDBMetadataOrderingUsesRawNameTieBreakers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if strings.Join(described, ",") != "Alpha,alpha" {
-		t.Fatalf("expected deterministic table order, got %v", described)
+	if tables[0].Name != "Alpha" || tables[1].Name != "alpha" {
+		t.Fatalf("expected deterministic table order, got %q then %q", tables[0].Name, tables[1].Name)
 	}
 	gotIndexes := []string{tables[0].GSIs[0].Name, tables[0].GSIs[1].Name, tables[0].GSIs[2].Name}
 	if strings.Join(gotIndexes, ",") != "Alpha,alpha,beta" {
 		t.Fatalf("expected deterministic GSI order, got %v", gotIndexes)
+	}
+}
+
+func TestListDynamoDBTablesDescribesTablesConcurrently(t *testing.T) {
+	names := make([]string, 9)
+	for index := range names {
+		names[index] = fmt.Sprintf("table-%02d", index)
+	}
+	started := make(chan struct{}, len(names))
+	release := make(chan struct{})
+	mock := &mockDynamoDBClient{
+		listTablesFunc: func(context.Context, *dynamodb.ListTablesInput, ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
+			return &dynamodb.ListTablesOutput{TableNames: names}, nil
+		},
+		describeTableFunc: func(_ context.Context, input *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			started <- struct{}{}
+			<-release
+			return &dynamodb.DescribeTableOutput{Table: &dynamodbtypes.TableDescription{TableName: input.TableName}}, nil
+		},
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := (&AwsRepository{DynamoDBClient: mock}).ListDynamoDBTables(context.Background())
+		done <- err
+	}()
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			close(release)
+			t.Fatal("expected at least two concurrent DescribeTable calls")
+		}
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

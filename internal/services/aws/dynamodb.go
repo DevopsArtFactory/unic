@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -37,16 +38,43 @@ func (r *AwsRepository) ListDynamoDBTables(ctx context.Context) ([]DynamoDBTable
 		return left < right
 	})
 
+	described := make([]*DynamoDBTable, len(names))
+	describeErrors := make([]error, len(names))
+	jobs := make(chan int, len(names))
+	for index := range names {
+		jobs <- index
+	}
+	close(jobs)
+
+	var workers sync.WaitGroup
+	for range min(len(names), 8) {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				name := names[index]
+				out, err := r.DynamoDBClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: awssdk.String(name)})
+				if err != nil {
+					describeErrors[index] = fmt.Errorf("failed to describe DynamoDB table %s: %w", name, err)
+					continue
+				}
+				if out.Table != nil {
+					table := newDynamoDBTable(*out.Table, r.Region)
+					described[index] = &table
+				}
+			}
+		}()
+	}
+	workers.Wait()
+
 	tables := make([]DynamoDBTable, 0, len(names))
-	for _, name := range names {
-		out, err := r.DynamoDBClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: awssdk.String(name)})
-		if err != nil {
-			return nil, fmt.Errorf("failed to describe DynamoDB table %s: %w", name, err)
+	for index := range names {
+		if describeErrors[index] != nil {
+			return nil, describeErrors[index]
 		}
-		if out.Table == nil {
-			continue
+		if described[index] != nil {
+			tables = append(tables, *described[index])
 		}
-		tables = append(tables, newDynamoDBTable(*out.Table, r.Region))
 	}
 	return tables, nil
 }
