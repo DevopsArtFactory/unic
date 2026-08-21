@@ -71,6 +71,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if isDynamoDBScreen(m.ctxPrevScreen) {
 			m.ctxPrevScreen = screenServiceList
 		}
+		m.regionPrevScreen = screenServiceList
 		if m.pendingView != nil {
 			// A saved view triggered this switch: continue the jump now that
 			// the new context is active.

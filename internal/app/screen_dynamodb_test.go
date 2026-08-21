@@ -491,6 +491,42 @@ func TestDynamoDBContextSwitchDuringLoadDoesNotRestoreLoadingScreen(t *testing.T
 	}
 }
 
+func TestDynamoDBRegionPickerContextSwitchInvalidatesReturn(t *testing.T) {
+	m := multiRegionTestModel()
+	table := dynamoDBTestTable()
+	m.dynamodb.selected = &table
+	m.screen = screenDynamoDBTableDetail
+
+	opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m = opened.(Model)
+	if m.screen != screenRegionPicker || m.regionPrevScreen != screenDynamoDBTableDetail {
+		t.Fatalf("expected region picker to remember DynamoDB detail, screen=%v return=%v", m.screen, m.regionPrevScreen)
+	}
+
+	openingContexts, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = openingContexts.(Model)
+	loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = loaded.(Model)
+	if m.screen != screenContextPicker || m.ctxPrevScreen != screenRegionPicker {
+		t.Fatalf("expected context picker to remember the region picker, screen=%v return=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	switching, _ := m.startLoading(func() tea.Msg { return nil })
+	m = switching.(Model)
+	nextCfg := *m.cfg
+	nextCfg.ContextName = "next-account"
+	nextCfg.Region = "us-east-1"
+	nextCfg.Regions = []string{"us-east-1"}
+	switched, _ := m.Update(contextSwitchedMsg{cfg: &nextCfg})
+	m = switched.(Model)
+
+	closed, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := closed.(Model)
+	if model.screen != screenServiceList {
+		t.Fatalf("expected region picker cancel to discard the old DynamoDB return, got %v", model.screen)
+	}
+}
+
 func TestDynamoDBContextPickerDropsInterruptedResultAndRestartsOnCancel(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cfg.ContextName = "dev"
