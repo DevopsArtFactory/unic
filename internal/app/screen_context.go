@@ -67,7 +67,13 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			newM, cmd := m.jumpToView(view)
 			return newM, tea.Batch(tea.ClearScreen, cmd), true
 		}
-		m.screen = m.ctxPrevScreen
+		switch m.ctxPrevScreen {
+		case screenEventBridgeRuleList, screenEventBridgeRuleDetail, screenEventBridgeRuleConfirm:
+			m.eventBridge = newEventBridgeModel()
+			m.screen = screenFeatureList
+		default:
+			m.screen = m.ctxPrevScreen
+		}
 		return m, tea.ClearScreen, true
 
 	case regionSwitchedMsg:

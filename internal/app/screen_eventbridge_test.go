@@ -114,6 +114,44 @@ func TestEventBridgeActionDoneUpdatesListAndDetailState(t *testing.T) {
 	}
 }
 
+func TestEventBridgeActionDoneReappliesActiveFilter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.storeFilterValue(filterEventBridgeRules, "disabled")
+	m.eventBridge.HandleMessage(&m, eventBridgeRulesLoadedMsg{rules: eventBridgeTestRules()})
+	selected := m.eventBridge.filtered[0]
+	m.eventBridge.selected = &selected
+
+	m.eventBridge.HandleMessage(&m, eventBridgeActionDoneMsg{ruleName: "nightly", busName: "default", enabled: true})
+
+	if len(m.eventBridge.filtered) != 0 || m.eventBridge.idx != 0 {
+		t.Fatalf("expected enabled rule removed from disabled filter, filtered=%+v idx=%d", m.eventBridge.filtered, m.eventBridge.idx)
+	}
+	if m.eventBridge.selected == nil || m.eventBridge.selected.State != "ENABLED" {
+		t.Fatalf("expected detail selection to retain updated state, got %+v", m.eventBridge.selected)
+	}
+}
+
+func TestEventBridgeContextSwitchDropsStaleActionState(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.eventBridge.rules = eventBridgeTestRules()
+	selected := m.eventBridge.rules[0]
+	m.eventBridge.selected = &selected
+	m.ctxPrevScreen = screenEventBridgeRuleDetail
+	m.screen = screenLoading
+	nextConfig := testConfig()
+	nextConfig.ContextName = "prod"
+
+	updated, _ := m.Update(contextSwitchedMsg{cfg: nextConfig})
+	got := updated.(Model)
+
+	if got.screen != screenFeatureList {
+		t.Fatalf("expected context switch to return to non-actionable feature list, got %v", got.screen)
+	}
+	if got.eventBridge.selected != nil || len(got.eventBridge.rules) != 0 {
+		t.Fatalf("expected stale EventBridge action state cleared, got %+v", got.eventBridge)
+	}
+}
+
 func TestEventBridgeDetailScrollIsBounded(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.height = 12

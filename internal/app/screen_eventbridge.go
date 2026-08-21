@@ -59,7 +59,7 @@ func (em *eventBridgeModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea
 			updated, cmd := m.Update(errMsg{err: msg.err})
 			return updated, cmd, true
 		}
-		em.updateRuleState(msg.ruleName, msg.busName, msg.enabled)
+		em.updateRuleState(msg.ruleName, msg.busName, msg.enabled, m.filterValue(filterEventBridgeRules))
 		action := "disabled"
 		if msg.enabled {
 			action = "enabled"
@@ -206,7 +206,7 @@ func (em eventBridgeModel) setEnabled(m Model, rule awsservice.EventBridgeRule, 
 	}
 }
 
-func (em *eventBridgeModel) updateRuleState(name, bus string, enabled bool) {
+func (em *eventBridgeModel) updateRuleState(name, bus string, enabled bool, filter string) {
 	state := "DISABLED"
 	if enabled {
 		state = "ENABLED"
@@ -216,16 +216,12 @@ func (em *eventBridgeModel) updateRuleState(name, bus string, enabled bool) {
 			em.rules[i].State = state
 		}
 	}
-	for i := range em.filtered {
-		if em.filtered[i].Name == name && em.filtered[i].EventBusName == bus {
-			em.filtered[i].State = state
-		}
-	}
 	if em.selected != nil && em.selected.Name == name && em.selected.EventBusName == bus {
 		em.selected.State = state
 	}
 	sortEventBridgeRuleRows(em.rules)
-	sortEventBridgeRuleRows(em.filtered)
+	em.filtered = applyFilter(em.rules, filter)
+	em.idx = min(em.idx, max(len(em.filtered)-1, 0))
 	for i := range em.filtered {
 		if em.filtered[i].Name == name && em.filtered[i].EventBusName == bus {
 			em.idx = i
