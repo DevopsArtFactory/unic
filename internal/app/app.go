@@ -212,6 +212,7 @@ type Model struct {
 	contextTable       table.Model
 	favoriteContexts   map[string]struct{}
 	ctxPrevScreen      screen
+	ctxPickerPending   bool
 	pendingContextName string
 	envContextName     string
 	envContextSource   string
@@ -646,6 +647,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			m.ctxPrevScreen = m.screen
+			m.ctxPickerPending = true
 			return m, m.loadContexts()
 		}
 		// Global resource-region switch. Authentication identity remains unchanged;

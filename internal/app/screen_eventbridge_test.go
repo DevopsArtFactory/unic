@@ -239,6 +239,37 @@ func TestEventBridgeListLoadCompletesBehindSettings(t *testing.T) {
 	}
 }
 
+func TestEventBridgeListLoadCompletesBeforeContextPickerOpens(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "dev"
+	started, _ := m.eventBridge.Start(&m)
+	m = started.(Model)
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	if cmd == nil || !m.ctxPickerPending || m.ctxPrevScreen != screenLoading {
+		t.Fatalf("expected a pending picker over the EventBridge load, pending=%v previous=%v cmd=%v", m.ctxPickerPending, m.ctxPrevScreen, cmd)
+	}
+
+	updated, _ = m.Update(eventBridgeRulesLoadedMsg{rules: eventBridgeTestRules()})
+	m = updated.(Model)
+	if m.screen != screenLoading || m.ctxPrevScreen != screenEventBridgeRuleList {
+		t.Fatalf("expected the result preserved until the picker opens, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	updated, _ = m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = updated.(Model)
+	if m.screen != screenContextPicker || m.ctxPickerPending {
+		t.Fatalf("expected the loaded context picker, screen=%v pending=%v", m.screen, m.ctxPickerPending)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenEventBridgeRuleList {
+		t.Fatalf("expected picker cancel to reveal the loaded rules, got %v", m.screen)
+	}
+}
+
 func TestEventBridgeActionCompletionStaysBehindPalette(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.eventBridge.HandleMessage(&m, eventBridgeRulesLoadedMsg{rules: eventBridgeTestRules()})

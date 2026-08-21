@@ -15,6 +15,9 @@ import (
 func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case contextsLoadedMsg:
+		if !msg.startup {
+			m.ctxPickerPending = false
+		}
 		m.ctxList = m.contextsWithFavoriteState(msg.contexts)
 		m.filteredCtxList = append([]config.ContextInfo(nil), m.ctxList...)
 		m.sortFavoriteContextsFirst(m.filteredCtxList)
