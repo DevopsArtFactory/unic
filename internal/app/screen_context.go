@@ -62,10 +62,10 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.dynamodb = newDynamoDBModel()
 		m.resetFilter(filterDynamoDBTables)
 		m.ctxPrevWasLoading = false
-		if m.settingsPrevScreen == screenLoading {
+		if m.settingsPrevScreen == screenLoading || isDynamoDBScreen(m.settingsPrevScreen) {
 			m.settingsPrevScreen = screenServiceList
 		}
-		if m.views.prevScreen == screenLoading {
+		if m.views.prevScreen == screenLoading || isDynamoDBScreen(m.views.prevScreen) {
 			m.views.prevScreen = screenServiceList
 		}
 		if isDynamoDBScreen(m.ctxPrevScreen) {

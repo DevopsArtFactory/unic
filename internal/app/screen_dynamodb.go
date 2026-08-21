@@ -443,14 +443,14 @@ func (dm dynamoDBModel) tableDetailLines(m Model) []string {
 	}
 	lines = append(lines, "", titleStyle.Render("  Primary Key"))
 	for _, key := range table.Keys {
-		lines = append(lines, renderDetailLine(key.Role, fmt.Sprintf("%s (%s)", key.Name, key.AttributeType)))
+		lines = append(lines, renderDetailLine(key.Role, fmt.Sprintf("%s (%s)", escapeTerminalControls(key.Name), key.AttributeType)))
 	}
 	ttl := table.TTLStatus
 	if ttl == "" {
 		ttl = "UNKNOWN"
 	}
 	if table.TTLAttribute != "" {
-		ttl += " on " + table.TTLAttribute
+		ttl += " on " + escapeTerminalControls(table.TTLAttribute)
 	}
 	lines = append(lines, "", renderDetailLine("TTL", ttl))
 	stream := "Disabled"
@@ -471,7 +471,7 @@ func (dm dynamoDBModel) tableDetailLines(m Model) []string {
 			lines = append(lines, renderDetailLine("Capacity", fmt.Sprintf("%dR/%dW", index.ReadCapacity, index.WriteCapacity)))
 		}
 		for _, key := range index.Keys {
-			lines = append(lines, renderDetailLine(key.Role, fmt.Sprintf("%s (%s)", key.Name, key.AttributeType)))
+			lines = append(lines, renderDetailLine(key.Role, fmt.Sprintf("%s (%s)", escapeTerminalControls(key.Name), key.AttributeType)))
 		}
 	}
 	return wrapDynamoDBLines(m, lines)
@@ -491,10 +491,10 @@ func (dm dynamoDBModel) viewLookupInput(m Model) string {
 	b.WriteString("\n\n")
 	for i := 0; i < dm.lookupField; i++ {
 		previous := table.Keys[i]
-		b.WriteString(renderDetailLine(previous.Role, fmt.Sprintf("%s = %s", previous.Name, dm.lookupValues[i])))
+		b.WriteString(renderDetailLine(previous.Role, fmt.Sprintf("%s = %s", escapeTerminalControls(previous.Name), dm.lookupValues[i])))
 		b.WriteString("\n")
 	}
-	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s key %s (%s):", key.Role, key.Name, key.AttributeType)))
+	b.WriteString(normalStyle.Render(fmt.Sprintf("  %s key %s (%s):", key.Role, escapeTerminalControls(key.Name), key.AttributeType)))
 	b.WriteString("\n")
 	b.WriteString(filterStyle.Render("  " + dm.lookupInput + "▏"))
 	b.WriteString("\n")

@@ -163,6 +163,38 @@ func TestDynamoDBDetailRendersKeysTTLStreamsAndGSI(t *testing.T) {
 	}
 }
 
+func TestDynamoDBDetailAndLookupEscapeTerminalControlsInMetadata(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 120
+	m.height = 40
+	table := dynamoDBTestTable()
+	table.Keys[0].Name = "tenant\n\x1b[31m\a"
+	table.TTLAttribute = "expires\x1b]52;c;payload\a"
+	m.dynamodb.selected = &table
+	m.screen = screenDynamoDBTableDetail
+
+	detail := m.dynamodb.viewTableDetail(m)
+	for _, raw := range []string{table.Keys[0].Name, table.TTLAttribute, "\x1b]52;c;payload", "\a"} {
+		if strings.Contains(detail, raw) {
+			t.Fatalf("detail metadata must not contain active terminal controls %q: %q", raw, detail)
+		}
+	}
+	for _, escaped := range []string{`tenant\n\x1b[31m\a`, `expires\x1b]52;c;payload\a`} {
+		if !strings.Contains(detail, escaped) {
+			t.Fatalf("expected visibly escaped metadata %q: %q", escaped, detail)
+		}
+	}
+
+	m.dynamodb.beginLookup(&m)
+	lookup := m.dynamodb.viewLookupInput(m)
+	if strings.Contains(lookup, table.Keys[0].Name) || strings.Contains(lookup, "\a") {
+		t.Fatalf("lookup metadata must not contain active terminal controls: %q", lookup)
+	}
+	if !strings.Contains(lookup, `tenant\n\x1b[31m\a`) {
+		t.Fatalf("expected visibly escaped lookup key metadata: %q", lookup)
+	}
+}
+
 func TestDynamoDBDetailWrapsLongValuesIntoScrollableLines(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 32
@@ -472,6 +504,50 @@ func TestDynamoDBOverlayContextSwitchInvalidatesLoadingReturn(t *testing.T) {
 			model := closed.(Model)
 			if model.screen != screenServiceList {
 				t.Fatalf("expected %s to discard the old loading return, got %v", tc.name, model.screen)
+			}
+		})
+	}
+}
+
+func TestDynamoDBOverlayContextSwitchInvalidatesNonLoadingReturn(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		key    rune
+		screen screen
+	}{
+		{name: "settings", key: 'S', screen: screenSettings},
+		{name: "views", key: 'V', screen: screenViewList},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			table := dynamoDBTestTable()
+			m.dynamodb.selected = &table
+			m.screen = screenDynamoDBTableDetail
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
+			m = opened.(Model)
+			if m.screen != tc.screen {
+				t.Fatalf("expected %s overlay, got %v", tc.name, m.screen)
+			}
+
+			openingPicker, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = openingPicker.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+			switching, _ := m.startLoading(func() tea.Msg { return nil })
+			m = switching.(Model)
+			nextCfg := *m.cfg
+			nextCfg.ContextName = "next-account"
+			switched, _ := m.Update(contextSwitchedMsg{cfg: &nextCfg})
+			m = switched.(Model)
+			if m.screen != tc.screen {
+				t.Fatalf("expected context switch to return to %s, got %v", tc.name, m.screen)
+			}
+
+			closed, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			model := closed.(Model)
+			if model.screen != screenServiceList {
+				t.Fatalf("expected %s to discard the old DynamoDB return, got %v", tc.name, model.screen)
 			}
 		})
 	}
