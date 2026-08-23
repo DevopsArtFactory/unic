@@ -37,23 +37,35 @@ func isStepFunctionsScreen(value screen) bool {
 }
 
 func normalizeStepFunctionsContextReturn(m *Model) {
+	if previous := stepFunctionsContextReturn(m); previous != nil {
+		*previous = screenServiceList
+	}
+}
+
+func preservePendingStepFunctionsContextReturn(m *Model) {
+	if previous := stepFunctionsContextReturn(m); previous != nil && *previous == screenLoading {
+		*previous = m.loadingReturnScreen
+	}
+}
+
+func stepFunctionsContextReturn(m *Model) *screen {
 	previous := &m.ctxPrevScreen
 	seen := make(map[screen]struct{})
 	for range 8 {
 		current := *previous
 		if _, ok := seen[current]; ok {
-			return
+			return nil
 		}
 		seen[current] = struct{}{}
 		if isStepFunctionsScreen(current) || current == screenLoading && isStepFunctionsScreen(m.loadingReturnScreen) {
-			*previous = screenServiceList
-			return
+			return previous
 		}
 		previous = stepFunctionsOverlayPrevious(m, current)
 		if previous == nil {
-			return
+			return nil
 		}
 	}
+	return nil
 }
 
 func stepFunctionsOverlayPrevious(m *Model, current screen) *screen {

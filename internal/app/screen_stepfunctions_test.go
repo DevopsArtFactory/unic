@@ -355,6 +355,37 @@ func TestStepFunctionsSameContextRefreshPreservesState(t *testing.T) {
 	}
 }
 
+func TestStepFunctionsSameContextRefreshPreservesPendingLoadReturn(t *testing.T) {
+	cfg := testConfig()
+	cfg.ContextName = "account-a"
+	m := New(cfg, "", "dev")
+	updated, _ := m.startLoadingFor(screenStepFunctionExecutionList, "Loading executions...", nil, func() tea.Msg { return nil })
+	m = updated.(Model)
+	oldGeneration := m.commands.CurrentGen()
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-a", Current: true}}})
+	m = updated.(Model)
+	if m.screen != screenContextPicker || m.ctxPrevScreen != screenLoading {
+		t.Fatalf("expected picker over the pending load, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd == nil || m.screen != screenLoading || m.commands.CurrentGen() <= oldGeneration {
+		t.Fatalf("expected context refresh to supersede the pending load, screen=%v generation=%d command=%v", m.screen, m.commands.CurrentGen(), cmd)
+	}
+
+	nextCfg := testConfig()
+	nextCfg.ContextName = "account-a"
+	updated, _ = m.Update(contextSwitchedMsg{cfg: nextCfg})
+	m = updated.(Model)
+	if m.screen != screenStepFunctionExecutionList {
+		t.Fatalf("expected same-context refresh to restore the pending load target, got %v", m.screen)
+	}
+}
+
 func TestStepFunctionsSavedViewAndHelpTitles(t *testing.T) {
 	if target, ok := featurePrimaryFilter["Step Functions Execution Browser"]; !ok || target != filterStepFunctionStateMachines {
 		t.Fatalf("expected Step Functions saved-view filter, got %v %v", target, ok)
