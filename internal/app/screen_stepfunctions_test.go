@@ -192,6 +192,45 @@ func TestStepFunctionsLoadCompletionStaysBehindSettings(t *testing.T) {
 	}
 }
 
+func TestStepFunctionsContextSwitchNormalizesNestedSettingsReturn(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+	m.loadingReturnScreen = screenStepFunctionStateMachineList
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m = updated.(Model)
+	if m.screen != screenSettings || m.settingsPrevScreen != screenLoading {
+		t.Fatalf("expected Settings over the Step Functions load, screen=%v previous=%v", m.screen, m.settingsPrevScreen)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-b", Current: true}}})
+	m = updated.(Model)
+	if m.screen != screenContextPicker || m.ctxPrevScreen != screenSettings {
+		t.Fatalf("expected context picker over Settings, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd == nil || m.screen != screenLoading || m.settingsPrevScreen != screenServiceList {
+		t.Fatalf("expected the context switch to replace the abandoned load return, screen=%v settings previous=%v command=%v", m.screen, m.settingsPrevScreen, cmd)
+	}
+
+	nextCfg := testConfig()
+	nextCfg.ContextName = "account-b"
+	updated, _ = m.Update(contextSwitchedMsg{cfg: nextCfg})
+	m = updated.(Model)
+	if m.screen != screenSettings {
+		t.Fatalf("expected context switch to preserve Settings, got %v", m.screen)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenServiceList {
+		t.Fatalf("expected Settings to return to the service list, got %v", m.screen)
+	}
+}
+
 func TestStepFunctionsContextSwitchClearsAccountState(t *testing.T) {
 	for _, tc := range []struct {
 		name                 string

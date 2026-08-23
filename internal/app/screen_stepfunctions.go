@@ -36,6 +36,41 @@ func isStepFunctionsScreen(value screen) bool {
 	}
 }
 
+func normalizeStepFunctionsContextReturn(m *Model) {
+	previous := &m.ctxPrevScreen
+	seen := make(map[screen]struct{})
+	for range 8 {
+		current := *previous
+		if _, ok := seen[current]; ok {
+			return
+		}
+		seen[current] = struct{}{}
+		if isStepFunctionsScreen(current) || current == screenLoading && isStepFunctionsScreen(m.loadingReturnScreen) {
+			*previous = screenServiceList
+			return
+		}
+		previous = stepFunctionsOverlayPrevious(m, current)
+		if previous == nil {
+			return
+		}
+	}
+}
+
+func stepFunctionsOverlayPrevious(m *Model, current screen) *screen {
+	switch current {
+	case screenSettings:
+		return &m.settingsPrevScreen
+	case screenCommandPalette:
+		return &m.palette.prevScreen
+	case screenViewList:
+		return &m.views.prevScreen
+	case screenContextPicker:
+		return &m.ctxPrevScreen
+	default:
+		return nil
+	}
+}
+
 func (sm *stepFunctionsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	return m.startLoadingFor(screenStepFunctionStateMachineList, "Loading Step Functions state machines...", nil, sm.loadStateMachines(*m))
 }
@@ -431,33 +466,14 @@ func finishStepFunctionsLoad(m *Model, target screen) {
 			return
 		}
 		seen[current] = struct{}{}
-		switch current {
-		case screenSettings:
-			if m.settingsPrevScreen == screenLoading {
-				m.settingsPrevScreen = target
-				return
-			}
-			current = m.settingsPrevScreen
-		case screenCommandPalette:
-			if m.palette.prevScreen == screenLoading {
-				m.palette.prevScreen = target
-				return
-			}
-			current = m.palette.prevScreen
-		case screenViewList:
-			if m.views.prevScreen == screenLoading {
-				m.views.prevScreen = target
-				return
-			}
-			current = m.views.prevScreen
-		case screenContextPicker:
-			if m.ctxPrevScreen == screenLoading {
-				m.ctxPrevScreen = target
-				return
-			}
-			current = m.ctxPrevScreen
-		default:
+		previous := stepFunctionsOverlayPrevious(m, current)
+		if previous == nil {
 			return
 		}
+		if *previous == screenLoading {
+			*previous = target
+			return
+		}
+		current = *previous
 	}
 }
