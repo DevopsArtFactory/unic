@@ -59,6 +59,8 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
+		m.cloudFormation = newCloudFormationModel()
+		m.resetFilter(filterCloudFormationStacks)
 		if m.pendingView != nil {
 			// A saved view triggered this switch: continue the jump now that
 			// the new context is active.
