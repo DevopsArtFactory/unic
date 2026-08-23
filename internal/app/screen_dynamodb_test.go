@@ -599,6 +599,64 @@ func TestDynamoDBFailedContextSwitchDoesNotResumeInterruptedLoad(t *testing.T) {
 	}
 }
 
+func TestDynamoDBFailedContextTerminalActionDoesNotResumeInterruptedLoad(t *testing.T) {
+	origLoadNamed := contextLoadNamedContextFn
+	origBuildEnv := contextBuildEnvExportsFn
+	origCopy := contextCopyClipboardFn
+	t.Cleanup(func() {
+		contextLoadNamedContextFn = origLoadNamed
+		contextBuildEnvExportsFn = origBuildEnv
+		contextCopyClipboardFn = origCopy
+	})
+	contextLoadNamedContextFn = func(_ string, name string) (*config.Config, error) {
+		return &config.Config{ContextName: name}, nil
+	}
+	contextBuildEnvExportsFn = func(context.Context, *config.Config) (string, error) {
+		return "exports", nil
+	}
+	contextCopyClipboardFn = func(string) error { return errors.New("clipboard failed") }
+
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "dev"
+	loading, _ := m.dynamodb.Start(&m)
+	m = loading.(Model)
+
+	opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = opened.(Model)
+	loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = loaded.(Model)
+	if !m.ctxPrevWasLoading {
+		t.Fatal("expected context picker to remember the interrupted DynamoDB load")
+	}
+
+	copying, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m = copying.(Model)
+	if m.screen != screenLoading || cmd == nil {
+		t.Fatalf("expected terminal export to start loading, screen=%v cmd=%v", m.screen, cmd)
+	}
+	selected, ok := m.selectedContextInfo()
+	if !ok {
+		t.Fatal("expected a selected context")
+	}
+	failed, _ := m.Update(m.copySelectedContextExports(selected.Name)())
+	m = failed.(Model)
+	if m.screen != screenError || !strings.Contains(m.errMsg, "clipboard failed") {
+		t.Fatalf("expected clipboard failure, screen=%v error=%q", m.screen, m.errMsg)
+	}
+
+	dismissed, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = dismissed.(Model)
+	reopened, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = reopened.(Model)
+	reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = reloaded.(Model)
+	canceled, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := canceled.(Model)
+	if model.screen != screenServiceList || cmd != nil {
+		t.Fatalf("expected later picker cancel to stay on service list, screen=%v cmd=%v", model.screen, cmd)
+	}
+}
+
 func TestDynamoDBContextPickerCommittedOverlaysClearInterruptedLoad(t *testing.T) {
 	tests := []struct {
 		name        string

@@ -576,8 +576,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case errMsg:
 		// A failed view-triggered context switch must not leave its deferred
-		// jump armed for the next unrelated switch.
+		// jump or interrupted context-picker load armed for later navigation.
 		m.pendingView = nil
+		m.ctxPrevWasLoading = false
 		m.errMsg = msg.err.Error()
 		m.loadingTitle = ""
 		m.loadingDetails = nil
