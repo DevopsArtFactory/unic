@@ -73,6 +73,9 @@ func (dm *dynamoDBModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cm
 		m.screen = screenDynamoDBTableList
 		return *m, nil, true
 	case dynamoDBTableDetailLoadedMsg:
+		if msg.table != nil {
+			dm.reconcileTable(*msg.table, m.filterValue(filterDynamoDBTables))
+		}
 		dm.selected = msg.table
 		dm.detailScroll = 0
 		m.screen = screenDynamoDBTableDetail
@@ -127,6 +130,24 @@ func (dm *dynamoDBModel) ApplyFilter(m *Model, target filterTarget) bool {
 	dm.filtered = applyFilter(dm.tables, m.filterValue(target))
 	dm.tableIdx = 0
 	return true
+}
+
+func (dm *dynamoDBModel) reconcileTable(table awsservice.DynamoDBTable, query string) {
+	for i := range dm.tables {
+		if dm.tables[i].Name != table.Name {
+			continue
+		}
+		dm.tables[i] = table
+		dm.filtered = applyFilter(dm.tables, query)
+		dm.tableIdx = clampListIndex(dm.tableIdx, len(dm.filtered))
+		for i := range dm.filtered {
+			if dm.filtered[i].Name == table.Name {
+				dm.tableIdx = i
+				break
+			}
+		}
+		return
+	}
 }
 
 func (dm *dynamoDBModel) updateTableList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {

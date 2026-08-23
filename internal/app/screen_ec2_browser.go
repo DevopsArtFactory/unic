@@ -579,7 +579,7 @@ func (m Model) renderEC2DetailLineWithLabelWidth(label, value string, labelWidth
 func escapeTerminalControls(value string) string {
 	var b strings.Builder
 	for _, r := range value {
-		if unicode.IsControl(r) {
+		if unicode.IsControl(r) || unicode.Is(unicode.Bidi_Control, r) {
 			quoted := strconv.QuoteRuneToGraphic(r)
 			b.WriteString(quoted[1 : len(quoted)-1])
 			continue

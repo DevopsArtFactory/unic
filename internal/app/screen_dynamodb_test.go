@@ -165,6 +165,42 @@ func TestDynamoDBDetailRendersKeysTTLStreamsAndGSI(t *testing.T) {
 	}
 }
 
+func TestDynamoDBDetailRefreshReconcilesTableListAndFilter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 140
+	other := dynamoDBTestTable()
+	other.Name = "a"
+	other.ARN = "arn:aws:dynamodb:ap-northeast-2:123456789012:table/a"
+	selected := dynamoDBTestTable()
+	m.dynamodb.tables = []awsservice.DynamoDBTable{other, selected}
+	m.storeFilterValue(filterDynamoDBTables, "active")
+	m.dynamodb.filtered = applyFilter(m.dynamodb.tables, m.filterValue(filterDynamoDBTables))
+	if len(m.dynamodb.filtered) != 2 || m.dynamodb.filtered[1].Name != selected.Name {
+		t.Fatalf("expected selected table at filtered index 1, got %+v", m.dynamodb.filtered)
+	}
+	m.dynamodb.tableIdx = 1
+
+	refreshed := selected
+	refreshed.BillingMode = "PAY_PER_REQUEST"
+	refreshed.ItemCount = 99
+	refreshed.SizeBytes = 4096
+	m.dynamodb.HandleMessage(&m, dynamoDBTableDetailLoadedMsg{table: &refreshed})
+	if m.dynamodb.filtered[m.dynamodb.tableIdx].Name != selected.Name {
+		t.Fatalf("expected refresh to preserve selected table, filtered=%+v index=%d", m.dynamodb.filtered, m.dynamodb.tableIdx)
+	}
+
+	refreshed.Status = "UPDATING"
+	m.dynamodb.HandleMessage(&m, dynamoDBTableDetailLoadedMsg{table: &refreshed})
+
+	got := m.dynamodb.tables[1]
+	if got.Status != "UPDATING" || got.BillingMode != "PAY_PER_REQUEST" || got.ItemCount != 99 || got.SizeBytes != 4096 {
+		t.Fatalf("expected refreshed metadata in canonical list, got %+v", got)
+	}
+	if len(m.dynamodb.filtered) != 1 || m.dynamodb.filtered[0].Name != "a" || m.dynamodb.tableIdx != 0 {
+		t.Fatalf("expected active filter to remove refreshed table and clamp selection, filtered=%+v index=%d", m.dynamodb.filtered, m.dynamodb.tableIdx)
+	}
+}
+
 func TestDynamoDBDetailAndLookupEscapeTerminalControlsInMetadata(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 120
@@ -425,25 +461,28 @@ func TestDynamoDBLookupResultWrapsLongValuesIntoScrollableLines(t *testing.T) {
 	}
 }
 
-func TestDynamoDBLookupResultEscapesC1TerminalControls(t *testing.T) {
+func TestDynamoDBLookupResultEscapesTerminalControls(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 100
 	m.screen = screenDynamoDBLookupResult
 	m.dynamodb.item = &awsservice.DynamoDBItem{
 		Found: true,
-		JSON:  "{\n  \"payload\": \"\u009d52;c;payload\u009c\u009b31m\"\n}",
+		JSON:  "{\n  \"payload\": \"\u009d52;c;payload\u009c\u009b31m\u202ereversed\u2066isolated 한글\"\n}",
 	}
 
 	view := m.dynamodb.viewLookupResult(m)
-	for _, control := range []rune{'\u009b', '\u009c', '\u009d'} {
+	for _, control := range []rune{'\u009b', '\u009c', '\u009d', '\u202e', '\u2066'} {
 		if strings.ContainsRune(view, control) {
-			t.Fatalf("item view contains raw C1 terminal control %U: %q", control, view)
+			t.Fatalf("item view contains raw terminal control %U: %q", control, view)
 		}
 	}
-	for _, escaped := range []string{`\u009b`, `\u009c`, `\u009d`} {
+	for _, escaped := range []string{`\u009b`, `\u009c`, `\u009d`, `\u202e`, `\u2066`} {
 		if !strings.Contains(view, escaped) {
 			t.Fatalf("expected item view to visibly escape %s: %q", escaped, view)
 		}
+	}
+	if !strings.Contains(view, "한글") {
+		t.Fatalf("expected ordinary Unicode to remain unchanged: %q", view)
 	}
 }
 
