@@ -638,6 +638,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			!m.isTextEntryScreen() && m.screen != screenFISTemplateList {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
+			m.ctxPrevWasLoading = false
 			if m.commands != nil {
 				m.commands.CancelAll()
 			}

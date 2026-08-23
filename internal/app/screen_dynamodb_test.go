@@ -425,6 +425,28 @@ func TestDynamoDBLookupResultWrapsLongValuesIntoScrollableLines(t *testing.T) {
 	}
 }
 
+func TestDynamoDBLookupResultEscapesC1TerminalControls(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 100
+	m.screen = screenDynamoDBLookupResult
+	m.dynamodb.item = &awsservice.DynamoDBItem{
+		Found: true,
+		JSON:  "{\n  \"payload\": \"\u009d52;c;payload\u009c\u009b31m\"\n}",
+	}
+
+	view := m.dynamodb.viewLookupResult(m)
+	for _, control := range []rune{'\u009b', '\u009c', '\u009d'} {
+		if strings.ContainsRune(view, control) {
+			t.Fatalf("item view contains raw C1 terminal control %U: %q", control, view)
+		}
+	}
+	for _, escaped := range []string{`\u009b`, `\u009c`, `\u009d`} {
+		if !strings.Contains(view, escaped) {
+			t.Fatalf("expected item view to visibly escape %s: %q", escaped, view)
+		}
+	}
+}
+
 func TestDynamoDBContextSwitchClearsPreviousAccountState(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width = 100
@@ -699,6 +721,71 @@ func TestDynamoDBContextFavoriteErrorDoesNotResumeInterruptedLoad(t *testing.T) 
 	model := canceled.(Model)
 	if model.screen != screenServiceList || cmd != nil {
 		t.Fatalf("expected later picker cancel to stay on service list, screen=%v cmd=%v", model.screen, cmd)
+	}
+}
+
+func TestDynamoDBGlobalHomeClearsInterruptedContextLoad(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		prepare func(*testing.T, *Model)
+	}{
+		{
+			name: "settings",
+			prepare: func(t *testing.T, m *Model) {
+				t.Helper()
+				opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+				*m = opened.(Model)
+				if m.screen != screenSettings {
+					t.Fatalf("expected settings screen, got %v", m.screen)
+				}
+			},
+		},
+		{
+			name: "error",
+			prepare: func(t *testing.T, m *Model) {
+				t.Helper()
+				originalSetFavoriteContextsFn := configSetFavoriteContextsFn
+				t.Cleanup(func() { configSetFavoriteContextsFn = originalSetFavoriteContextsFn })
+				configSetFavoriteContextsFn = func(string, []string) error { return errors.New("write failed") }
+				failed, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+				*m = failed.(Model)
+				if m.screen != screenError {
+					t.Fatalf("expected context favorite error, got %v", m.screen)
+				}
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			m.cfg.ContextName = "dev"
+			loading, _ := m.dynamodb.Start(&m)
+			m = loading.(Model)
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = opened.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+			if !m.ctxPrevWasLoading {
+				t.Fatal("expected context picker to remember the interrupted DynamoDB load")
+			}
+
+			test.prepare(t, &m)
+			home, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'H'}})
+			m = home.(Model)
+			if m.screen != screenServiceList || m.ctxPrevWasLoading {
+				t.Fatalf("expected Home to clear interrupted context state, screen=%v loading=%v", m.screen, m.ctxPrevWasLoading)
+			}
+
+			reopened, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = reopened.(Model)
+			reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = reloaded.(Model)
+			canceled, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			model := canceled.(Model)
+			if model.screen != screenServiceList || cmd != nil {
+				t.Fatalf("expected later picker cancel to stay on service list, screen=%v cmd=%v", model.screen, cmd)
+			}
+		})
 	}
 }
 

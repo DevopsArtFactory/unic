@@ -542,7 +542,11 @@ func (dm dynamoDBModel) itemLines(m Model) []string {
 	if dm.item == nil || !dm.item.Found {
 		return []string{"No item found for that primary key."}
 	}
-	return wrapDynamoDBLines(m, strings.Split(dm.item.JSON, "\n"))
+	lines := strings.Split(dm.item.JSON, "\n")
+	for i := range lines {
+		lines[i] = escapeTerminalControls(lines[i])
+	}
+	return wrapDynamoDBLines(m, lines)
 }
 
 func wrapDynamoDBLines(m Model, lines []string) []string {
