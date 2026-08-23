@@ -270,6 +270,37 @@ func TestEventBridgeListLoadCompletesBeforeContextPickerOpens(t *testing.T) {
 	}
 }
 
+func TestEventBridgeListLoadCompletesBehindContextAdd(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "dev"
+	started, _ := m.eventBridge.Start(&m)
+	m = started.(Model)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	m = updated.(Model)
+
+	updated, _ = m.Update(eventBridgeRulesLoadedMsg{rules: eventBridgeTestRules()})
+	m = updated.(Model)
+
+	if m.screen != screenContextAdd || m.ctxPrevScreen != screenEventBridgeRuleList {
+		t.Fatalf("expected context add to remain open over the loaded rule list, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+	if m.addStep != 1 || m.addInput != "p" {
+		t.Fatalf("expected context add input preserved, step=%d input=%q", m.addStep, m.addInput)
+	}
+	if len(m.eventBridge.rules) != len(eventBridgeTestRules()) {
+		t.Fatalf("expected loaded rules retained behind context add, got %d", len(m.eventBridge.rules))
+	}
+}
+
 func TestEventBridgeActionCompletionStaysBehindPalette(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.eventBridge.HandleMessage(&m, eventBridgeRulesLoadedMsg{rules: eventBridgeTestRules()})

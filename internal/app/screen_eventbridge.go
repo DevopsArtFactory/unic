@@ -110,7 +110,7 @@ func (em *eventBridgeModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea
 func (em *eventBridgeModel) preserveOverlay(m *Model, target screen) bool {
 	pendingContextPicker := m.ctxPickerPending && m.screen == screenLoading && m.ctxPrevScreen == screenLoading
 	switch m.screen {
-	case screenSettings, screenCommandPalette, screenViewList, screenContextPicker:
+	case screenSettings, screenCommandPalette, screenViewList, screenContextPicker, screenContextAdd:
 	default:
 		if !pendingContextPicker {
 			return false
