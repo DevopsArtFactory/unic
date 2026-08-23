@@ -90,9 +90,9 @@ func TestListStepFunctionExecutionsSortsFailuresFirst(t *testing.T) {
 		return &sfn.ListExecutionsOutput{Executions: []sfntypes.ExecutionListItem{
 			{ExecutionArn: awssdk.String("arn:succeeded"), Name: awssdk.String("succeeded"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusSucceeded, StartDate: awssdk.Time(now)},
 			{ExecutionArn: awssdk.String("arn:pending-redrive"), Name: awssdk.String("pending-redrive"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusPendingRedrive, StartDate: awssdk.Time(now.Add(3 * time.Hour))},
-			{ExecutionArn: awssdk.String("arn:old-failure"), Name: awssdk.String("old-failure"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusFailed, StartDate: awssdk.Time(now.Add(-time.Hour))},
+			{ExecutionArn: awssdk.String("arn:recent-failure"), Name: awssdk.String("recent-failure"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusFailed, StartDate: awssdk.Time(now.Add(-time.Hour)), StopDate: awssdk.Time(now)},
 			{ExecutionArn: awssdk.String("arn:aborted"), Name: awssdk.String("aborted"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusAborted, StartDate: awssdk.Time(now.Add(2 * time.Hour))},
-			{ExecutionArn: awssdk.String("arn:new-failure"), Name: awssdk.String("new-failure"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusFailed, StartDate: awssdk.Time(now)},
+			{ExecutionArn: awssdk.String("arn:older-failure"), Name: awssdk.String("older-failure"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusFailed, StartDate: awssdk.Time(now), StopDate: awssdk.Time(now.Add(-time.Minute))},
 			{ExecutionArn: awssdk.String("arn:timed-out"), Name: awssdk.String("timed-out"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusTimedOut, StartDate: awssdk.Time(now.Add(4 * time.Hour))},
 			{ExecutionArn: awssdk.String("arn:running"), Name: awssdk.String("running"), StateMachineArn: in.StateMachineArn, Status: sfntypes.ExecutionStatusRunning, StartDate: awssdk.Time(now.Add(time.Hour))},
 		}}, nil
@@ -102,7 +102,7 @@ func TestListStepFunctionExecutionsSortsFailuresFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"new-failure", "old-failure", "timed-out", "aborted", "pending-redrive", "running", "succeeded"}
+	want := []string{"recent-failure", "older-failure", "timed-out", "aborted", "pending-redrive", "running", "succeeded"}
 	for i, name := range want {
 		if executions[i].Name != name {
 			t.Fatalf("expected order %v, got %+v", want, executions)

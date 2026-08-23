@@ -27,6 +27,15 @@ type stepFunctionsModel struct {
 
 func newStepFunctionsModel() stepFunctionsModel { return stepFunctionsModel{} }
 
+func isStepFunctionsScreen(value screen) bool {
+	switch value {
+	case screenStepFunctionStateMachineList, screenStepFunctionExecutionList, screenStepFunctionExecutionDetail:
+		return true
+	default:
+		return false
+	}
+}
+
 func (sm *stepFunctionsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	return m.startLoadingFor(screenStepFunctionStateMachineList, "Loading Step Functions state machines...", nil, sm.loadStateMachines(*m))
 }

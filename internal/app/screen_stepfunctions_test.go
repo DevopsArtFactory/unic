@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"unic/internal/config"
 	awsservice "unic/internal/services/aws"
 )
 
@@ -188,6 +189,77 @@ func TestStepFunctionsLoadCompletionStaysBehindSettings(t *testing.T) {
 	m.stepFunctions.HandleMessage(&m, stepFunctionStateMachinesLoadedMsg{stateMachines: stepFunctionsTestStateMachines()})
 	if m.screen != screenSettings || m.settingsPrevScreen != screenStepFunctionStateMachineList {
 		t.Fatalf("expected completed load behind Settings, screen=%v previous=%v", m.screen, m.settingsPrevScreen)
+	}
+}
+
+func TestStepFunctionsContextSwitchClearsAccountState(t *testing.T) {
+	for _, tc := range []struct {
+		name                 string
+		startScreen          screen
+		loadingReturnScreen  screen
+		completeBeforeSwitch bool
+	}{
+		{name: "pending load completes before switch", startScreen: screenLoading, loadingReturnScreen: screenStepFunctionStateMachineList, completeBeforeSwitch: true},
+		{name: "pending load completes after switch", startScreen: screenLoading, loadingReturnScreen: screenStepFunctionStateMachineList},
+		{name: "execution detail", startScreen: screenStepFunctionExecutionDetail},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m.screen = tc.startScreen
+			m.loadingReturnScreen = tc.loadingReturnScreen
+			m.stepFunctions.stateMachines = stepFunctionsTestStateMachines()
+			m.stepFunctions.selectedStateMachine = &m.stepFunctions.stateMachines[0]
+			m.stepFunctions.selectedExecution = &awsservice.StepFunctionExecutionDetail{
+				StepFunctionExecution: awsservice.StepFunctionExecution{ARN: "arn:account-a", Name: "account-a-run"},
+			}
+			m.storeFilterValue(filterStepFunctionStateMachines, "account-a")
+			m.storeFilterValue(filterStepFunctionExecutions, "failed")
+
+			oldGeneration := m.commands.CurrentGen()
+			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = updated.(Model)
+			updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-b", Current: true}}})
+			m = updated.(Model)
+			if m.screen != screenContextPicker {
+				t.Fatalf("expected context picker, got %v", m.screen)
+			}
+			if tc.completeBeforeSwitch {
+				updated, _ = m.Update(stepFunctionStateMachinesLoadedMsg{stateMachines: stepFunctionsTestStateMachines()})
+				m = updated.(Model)
+				if m.screen != screenContextPicker || m.ctxPrevScreen != screenStepFunctionStateMachineList {
+					t.Fatalf("expected completed load to stay behind the picker, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+				}
+			}
+
+			updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			m = updated.(Model)
+			if cmd == nil || m.screen != screenLoading || m.commands.CurrentGen() <= oldGeneration {
+				t.Fatalf("expected context switch to supersede the old load, screen=%v generation=%d command=%v", m.screen, m.commands.CurrentGen(), cmd)
+			}
+			if !tc.completeBeforeSwitch {
+				updated, _ = m.Update(genBoundMsg{gen: oldGeneration, msg: stepFunctionStateMachinesLoadedMsg{
+					stateMachines: []awsservice.StepFunctionStateMachine{{ARN: "arn:stale-result", Name: "stale-result"}},
+				}})
+				m = updated.(Model)
+				if len(m.stepFunctions.stateMachines) != 2 || m.stepFunctions.stateMachines[0].ARN != "arn:standard" {
+					t.Fatalf("expected the superseded account-A result to be dropped, got %+v", m.stepFunctions.stateMachines)
+				}
+			}
+
+			nextCfg := testConfig()
+			nextCfg.ContextName = "account-b"
+			updated, _ = m.Update(contextSwitchedMsg{cfg: nextCfg})
+			m = updated.(Model)
+			if m.screen != screenServiceList {
+				t.Fatalf("expected service list after context switch, got %v", m.screen)
+			}
+			if len(m.stepFunctions.stateMachines) != 0 || m.stepFunctions.selectedStateMachine != nil || m.stepFunctions.selectedExecution != nil {
+				t.Fatalf("expected Step Functions state to be cleared, got %+v", m.stepFunctions)
+			}
+			if m.filterValue(filterStepFunctionStateMachines) != "" || m.filterValue(filterStepFunctionExecutions) != "" {
+				t.Fatalf("expected Step Functions filters to be cleared")
+			}
+		})
 	}
 }
 

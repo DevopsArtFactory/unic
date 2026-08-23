@@ -59,6 +59,12 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
+		m.stepFunctions = newStepFunctionsModel()
+		m.resetFilter(filterStepFunctionStateMachines)
+		m.resetFilter(filterStepFunctionExecutions)
+		if isStepFunctionsScreen(m.ctxPrevScreen) {
+			m.ctxPrevScreen = screenServiceList
+		}
 		if m.pendingView != nil {
 			// A saved view triggered this switch: continue the jump now that
 			// the new context is active.
@@ -188,6 +194,9 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
 			m.pendingContextName = selected.Name
+			if m.ctxPrevScreen == screenLoading && isStepFunctionsScreen(m.loadingReturnScreen) {
+				m.ctxPrevScreen = m.loadingReturnScreen
+			}
 			return m.startLoading(m.switchContext(selected.Name))
 		}
 	case "s":

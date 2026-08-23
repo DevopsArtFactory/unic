@@ -83,13 +83,7 @@ func (r *AwsRepository) ListStepFunctionExecutions(ctx context.Context, stateMac
 
 	sort.SliceStable(executions, func(i, j int) bool {
 		left, right := stepFunctionStatusRank(executions[i].Status), stepFunctionStatusRank(executions[j].Status)
-		if left != right {
-			return left < right
-		}
-		if executions[i].StartDate.Equal(executions[j].StartDate) {
-			return normalizedSortKey(executions[i].Name) < normalizedSortKey(executions[j].Name)
-		}
-		return executions[i].StartDate.After(executions[j].StartDate)
+		return left < right
 	})
 	return executions, nil
 }
