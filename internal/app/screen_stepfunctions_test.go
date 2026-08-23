@@ -192,7 +192,7 @@ func TestStepFunctionsLoadCompletionStaysBehindSettings(t *testing.T) {
 	}
 }
 
-func TestStepFunctionsLoadCompletionUpdatesPendingContextPickerReturn(t *testing.T) {
+func TestStepFunctionsLoadCompletionsUpdatePendingContextPickerReturn(t *testing.T) {
 	cfg := testConfig()
 	cfg.ContextName = "account-a"
 	m := New(cfg, "", "dev")
@@ -211,11 +211,22 @@ func TestStepFunctionsLoadCompletionUpdatesPendingContextPickerReturn(t *testing
 		t.Fatalf("expected load completion to update the picker return, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
 	}
 
+	updated, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd == nil || m.screen != screenLoading {
+		t.Fatalf("expected execution load before the picker opens, screen=%v command=%v", m.screen, cmd)
+	}
+	updated, _ = m.Update(stepFunctionExecutionsLoadedMsg{stateMachineARN: "arn:standard"})
+	m = updated.(Model)
+	if m.screen != screenStepFunctionExecutionList || m.ctxPrevScreen != screenStepFunctionExecutionList {
+		t.Fatalf("expected the later drill-down to update the picker return, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
 	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-a", Current: true}}})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = updated.(Model)
-	if m.screen != screenStepFunctionStateMachineList {
+	if m.screen != screenStepFunctionExecutionList {
 		t.Fatalf("expected picker cancel to return to the completed load, got %v", m.screen)
 	}
 }

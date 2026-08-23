@@ -479,10 +479,10 @@ func stepFunctionsPayloadPreview(payload string) string {
 // finishStepFunctionsLoad keeps a completed load behind a global overlay and
 // rewrites that overlay's return target instead of stealing the screen.
 func finishStepFunctionsLoad(m *Model, target screen) {
+	if m.ctxPrevScreen == screenLoading || isStepFunctionsScreen(m.ctxPrevScreen) {
+		m.ctxPrevScreen = target
+	}
 	if m.screen == screenLoading {
-		if m.ctxPrevScreen == screenLoading {
-			m.ctxPrevScreen = target
-		}
 		m.screen = target
 		return
 	}
