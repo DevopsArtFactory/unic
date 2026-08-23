@@ -218,14 +218,15 @@ func TestListEventBridgeRulesKeepsRulesWhenActivityIsUnavailable(t *testing.T) {
 }
 
 func TestEventBridgeActivityMarksOnlyUnobservedIncompleteSeriesUnavailable(t *testing.T) {
-	triggeredAt := time.Date(2026, 8, 20, 12, 30, 0, 0, time.UTC)
+	newerTrigger := time.Date(2026, 8, 20, 12, 30, 0, 0, time.UTC)
+	olderTrigger := newerTrigger.Add(-30 * time.Minute)
 	rules := []EventBridgeRule{
 		newEventBridgeRule(eventbridgetypes.Rule{Name: awssdk.String("missing")}, "default"),
 		newEventBridgeRule(eventbridgetypes.Rule{Name: awssdk.String("observed")}, "default"),
 	}
 	cw := &mockCloudWatchClient{getMetricDataFunc: func(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
 		return &cloudwatch.GetMetricDataOutput{MetricDataResults: []cloudwatchtypes.MetricDataResult{
-			{Id: awssdk.String("m2"), StatusCode: cloudwatchtypes.StatusCodePartialData, Timestamps: []time.Time{triggeredAt}, Values: []float64{1}},
+			{Id: awssdk.String("m2"), StatusCode: cloudwatchtypes.StatusCodePartialData, Timestamps: []time.Time{newerTrigger, olderTrigger}, Values: []float64{1, 1}},
 			{Id: awssdk.String("m1"), StatusCode: cloudwatchtypes.StatusCodeInternalError},
 		}}, nil
 	}}
@@ -235,8 +236,8 @@ func TestEventBridgeActivityMarksOnlyUnobservedIncompleteSeriesUnavailable(t *te
 	if rules[0].LastTriggerStatus != eventBridgeUnavailableStatus {
 		t.Fatalf("expected incomplete empty series to be unavailable, got %+v", rules[0])
 	}
-	if !rules[1].LastTriggeredAt.Equal(triggeredAt) || rules[1].LastTriggerStatus != "Observed via CloudWatch" {
-		t.Fatalf("expected partial series with activity to preserve the observation, got %+v", rules[1])
+	if !rules[1].LastTriggeredAt.Equal(newerTrigger) || rules[1].LastTriggerStatus != "Observed via CloudWatch" {
+		t.Fatalf("expected partial series with activity to preserve the newest observation, got %+v", rules[1])
 	}
 }
 
