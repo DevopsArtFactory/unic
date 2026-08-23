@@ -423,32 +423,38 @@ func TestCloudFormationLoadCompletesBeforeContextPickerOpens(t *testing.T) {
 }
 
 func TestCloudFormationStateClearsAfterContextSwitch(t *testing.T) {
-	m := New(testConfig(), "", "dev")
-	m.screen = screenContextPicker
-	m.ctxPrevScreen = screenCloudFormationStackList
-	m.storeFilterValue(filterCloudFormationStacks, "failed")
-	m.cloudFormation.stacks = []awsservice.CloudFormationStack{{ID: "old-stack", Name: "old"}}
-	m.cloudFormation.filtered = append([]awsservice.CloudFormationStack(nil), m.cloudFormation.stacks...)
-	m.cloudFormation.selected = &m.cloudFormation.stacks[0]
-	m.cloudFormation.driftDetectionID = "old-detection"
+	for _, tt := range []struct {
+		name     string
+		previous screen
+	}{
+		{name: "list", previous: screenCloudFormationStackList},
+		{name: "detail", previous: screenCloudFormationStackDetail},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m.screen = screenContextPicker
+			m.ctxPrevScreen = tt.previous
+			m.storeFilterValue(filterCloudFormationStacks, "failed")
+			m.cloudFormation.stacks = []awsservice.CloudFormationStack{{ID: "old-stack", Name: "old"}}
+			m.cloudFormation.filtered = append([]awsservice.CloudFormationStack(nil), m.cloudFormation.stacks...)
+			m.cloudFormation.selected = &m.cloudFormation.stacks[0]
+			m.cloudFormation.driftDetectionID = "old-detection"
 
-	updated, _, handled := m.handleContextMsg(contextSwitchedMsg{
-		cfg: &config.Config{ContextName: "new", Region: "us-west-2"},
-	})
-	model := updated.(Model)
-	if !handled || model.screen != screenCloudFormationStackList {
-		t.Fatalf("expected context switch to return to the stack list, got handled=%v screen=%v", handled, model.screen)
-	}
-	if len(model.cloudFormation.stacks) != 0 || len(model.cloudFormation.filtered) != 0 ||
-		model.cloudFormation.selected != nil || model.cloudFormation.driftDetectionID != "" {
-		t.Fatalf("expected context-scoped CloudFormation state to clear, got %+v", model.cloudFormation)
-	}
-	if got := model.filterValue(filterCloudFormationStacks); got != "" {
-		t.Fatalf("expected CloudFormation filter to clear, got %q", got)
-	}
-	_, cmd, _ := model.cloudFormation.HandleKey(&model, tea.KeyMsg{Type: tea.KeyEnter})
-	if cmd != nil {
-		t.Fatal("expected Enter not to load a stack from the previous context")
+			updated, _, handled := m.handleContextMsg(contextSwitchedMsg{
+				cfg: &config.Config{ContextName: "new", Region: "us-west-2"},
+			})
+			model := updated.(Model)
+			if !handled || model.screen != screenFeatureList {
+				t.Fatalf("expected context switch to return to the CloudFormation feature list, got handled=%v screen=%v", handled, model.screen)
+			}
+			if len(model.cloudFormation.stacks) != 0 || len(model.cloudFormation.filtered) != 0 ||
+				model.cloudFormation.selected != nil || model.cloudFormation.driftDetectionID != "" {
+				t.Fatalf("expected context-scoped CloudFormation state to clear, got %+v", model.cloudFormation)
+			}
+			if got := model.filterValue(filterCloudFormationStacks); got != "" {
+				t.Fatalf("expected CloudFormation filter to clear, got %q", got)
+			}
+		})
 	}
 }
 

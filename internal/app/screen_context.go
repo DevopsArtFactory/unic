@@ -69,6 +69,9 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			newM, cmd := m.jumpToView(view)
 			return newM, tea.Batch(tea.ClearScreen, cmd), true
 		}
+		if m.ctxPrevScreen == screenCloudFormationStackList || m.ctxPrevScreen == screenCloudFormationStackDetail {
+			m.ctxPrevScreen = screenFeatureList
+		}
 		m.screen = m.ctxPrevScreen
 		return m, tea.ClearScreen, true
 
