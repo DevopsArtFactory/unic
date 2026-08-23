@@ -339,6 +339,20 @@ func TestStepFunctionsSameContextRefreshPreservesState(t *testing.T) {
 	if m.filterValue(filterStepFunctionStateMachines) != "orders" || m.filterValue(filterStepFunctionExecutions) != "failed" {
 		t.Fatalf("expected same-context refresh to preserve Step Functions filters")
 	}
+
+	changedRegionCfg := *nextCfg
+	changedRegionCfg.Region = "us-west-2"
+	updated, _ = m.Update(contextSwitchedMsg{cfg: &changedRegionCfg})
+	m = updated.(Model)
+	if m.screen != screenServiceList {
+		t.Fatalf("expected service list after same-context region change, got %v", m.screen)
+	}
+	if len(m.stepFunctions.stateMachines) != 0 || m.stepFunctions.selectedStateMachine != nil || m.stepFunctions.selectedExecution != nil {
+		t.Fatalf("expected Step Functions state to be cleared after region change, got %+v", m.stepFunctions)
+	}
+	if m.filterValue(filterStepFunctionStateMachines) != "" || m.filterValue(filterStepFunctionExecutions) != "" {
+		t.Fatalf("expected Step Functions filters to be cleared after region change")
+	}
 }
 
 func TestStepFunctionsSavedViewAndHelpTitles(t *testing.T) {

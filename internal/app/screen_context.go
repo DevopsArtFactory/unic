@@ -56,7 +56,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, m.finalizeContextSwitch(), true
 
 	case contextSwitchedMsg:
-		contextChanged := m.cfg == nil || msg.cfg == nil || m.cfg.ContextName != msg.cfg.ContextName
+		contextChanged := m.cfg == nil || msg.cfg == nil || m.cfg.ContextName != msg.cfg.ContextName || m.cfg.Region != msg.cfg.Region
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
