@@ -480,6 +480,9 @@ func stepFunctionsPayloadPreview(payload string) string {
 // rewrites that overlay's return target instead of stealing the screen.
 func finishStepFunctionsLoad(m *Model, target screen) {
 	if m.screen == screenLoading {
+		if m.ctxPrevScreen == screenLoading {
+			m.ctxPrevScreen = target
+		}
 		m.screen = target
 		return
 	}

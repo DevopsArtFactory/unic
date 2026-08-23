@@ -192,6 +192,34 @@ func TestStepFunctionsLoadCompletionStaysBehindSettings(t *testing.T) {
 	}
 }
 
+func TestStepFunctionsLoadCompletionUpdatesPendingContextPickerReturn(t *testing.T) {
+	cfg := testConfig()
+	cfg.ContextName = "account-a"
+	m := New(cfg, "", "dev")
+	updated, _ := m.startLoadingFor(screenStepFunctionStateMachineList, "Loading state machines...", nil, nil)
+	m = updated.(Model)
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	if cmd == nil || m.ctxPrevScreen != screenLoading {
+		t.Fatalf("expected pending context picker over the load, previous=%v command=%v", m.ctxPrevScreen, cmd)
+	}
+
+	updated, _ = m.Update(stepFunctionStateMachinesLoadedMsg{stateMachines: stepFunctionsTestStateMachines()})
+	m = updated.(Model)
+	if m.screen != screenStepFunctionStateMachineList || m.ctxPrevScreen != screenStepFunctionStateMachineList {
+		t.Fatalf("expected load completion to update the picker return, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-a", Current: true}}})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenStepFunctionStateMachineList {
+		t.Fatalf("expected picker cancel to return to the completed load, got %v", m.screen)
+	}
+}
+
 func TestStepFunctionsContextSwitchNormalizesNestedSettingsReturn(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenLoading
