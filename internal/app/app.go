@@ -873,6 +873,7 @@ func (m Model) updateError(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.quitting = true
 		return m, tea.Quit
 	case "esc", "enter":
+		m.ctxPrevWasLoading = false
 		m.screen = screenServiceList
 	}
 	return m, nil

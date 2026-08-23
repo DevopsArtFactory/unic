@@ -657,6 +657,51 @@ func TestDynamoDBFailedContextTerminalActionDoesNotResumeInterruptedLoad(t *test
 	}
 }
 
+func TestDynamoDBContextFavoriteErrorDoesNotResumeInterruptedLoad(t *testing.T) {
+	originalSetFavoriteContextsFn := configSetFavoriteContextsFn
+	t.Cleanup(func() {
+		configSetFavoriteContextsFn = originalSetFavoriteContextsFn
+	})
+	configSetFavoriteContextsFn = func(string, []string) error {
+		return errors.New("write failed")
+	}
+
+	m := New(testConfig(), "/tmp/unic-test-config.yaml", "dev")
+	m.cfg.ContextName = "dev"
+	loading, _ := m.dynamodb.Start(&m)
+	m = loading.(Model)
+
+	opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = opened.(Model)
+	loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = loaded.(Model)
+	if !m.ctxPrevWasLoading {
+		t.Fatal("expected context picker to remember the interrupted DynamoDB load")
+	}
+
+	failed, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	m = failed.(Model)
+	if m.screen != screenError || !strings.Contains(m.errMsg, "write failed") {
+		t.Fatalf("expected favorite persistence error, screen=%v error=%q", m.screen, m.errMsg)
+	}
+
+	dismissed, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = dismissed.(Model)
+	if m.ctxPrevWasLoading {
+		t.Fatal("expected error dismissal to clear the interrupted-load resume flag")
+	}
+
+	reopened, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = reopened.(Model)
+	reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = reloaded.(Model)
+	canceled, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := canceled.(Model)
+	if model.screen != screenServiceList || cmd != nil {
+		t.Fatalf("expected later picker cancel to stay on service list, screen=%v cmd=%v", model.screen, cmd)
+	}
+}
+
 func TestDynamoDBContextPickerCommittedOverlaysClearInterruptedLoad(t *testing.T) {
 	tests := []struct {
 		name        string
