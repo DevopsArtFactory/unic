@@ -199,6 +199,10 @@ func (sm *stepFunctionsModel) updateStateMachineList(m *Model, msg tea.KeyMsg) (
 			break
 		}
 		sm.selectedStateMachine = &selected
+		sm.executions = nil
+		sm.filteredExecutions = nil
+		sm.executionIdx = 0
+		sm.selectedExecution = nil
 		return m.startLoadingFor(screenStepFunctionExecutionList, "Loading Step Functions executions...", []string{selected.Name}, sm.loadExecutions(*m, selected.ARN))
 	}
 	return *m, nil
@@ -228,6 +232,8 @@ func (sm *stepFunctionsModel) updateExecutionList(m *Model, msg tea.KeyMsg) (tea
 	case "enter":
 		if sm.executionIdx < len(sm.filteredExecutions) {
 			execution := sm.filteredExecutions[sm.executionIdx]
+			sm.selectedExecution = nil
+			sm.detailScroll = 0
 			return m.startLoadingFor(screenStepFunctionExecutionDetail, "Loading Step Functions execution detail...", []string{execution.Name}, sm.loadExecutionDetail(*m, execution.ARN))
 		}
 	}

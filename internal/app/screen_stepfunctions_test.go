@@ -386,6 +386,76 @@ func TestStepFunctionsSameContextRefreshPreservesPendingLoadReturn(t *testing.T)
 	}
 }
 
+func TestStepFunctionsSameContextRefreshDoesNotRestoreStaleDrillDownData(t *testing.T) {
+	refreshContext := func(t *testing.T, m Model) Model {
+		t.Helper()
+		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+		m = updated.(Model)
+		updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-a", Current: true}}})
+		m = updated.(Model)
+		updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		m = updated.(Model)
+		if cmd == nil || m.screen != screenLoading {
+			t.Fatalf("expected same-context refresh load, screen=%v command=%v", m.screen, cmd)
+		}
+		updated, _ = m.Update(contextSwitchedMsg{cfg: m.cfg})
+		return updated.(Model)
+	}
+
+	t.Run("execution list", func(t *testing.T) {
+		cfg := testConfig()
+		cfg.ContextName = "account-a"
+		m := New(cfg, "", "dev")
+		m.screen = screenStepFunctionStateMachineList
+		m.stepFunctions.stateMachines = []awsservice.StepFunctionStateMachine{
+			{ARN: "arn:machine-a", Name: "machine-a", Type: "STANDARD"},
+			{ARN: "arn:machine-b", Name: "machine-b", Type: "STANDARD"},
+		}
+		m.stepFunctions.filteredStateMachines = append([]awsservice.StepFunctionStateMachine(nil), m.stepFunctions.stateMachines...)
+		m.stepFunctions.stateMachineIdx = 1
+		m.stepFunctions.selectedStateMachine = &m.stepFunctions.stateMachines[0]
+		m.stepFunctions.executions = []awsservice.StepFunctionExecution{{ARN: "arn:execution-a", Name: "account-a-run"}}
+		m.stepFunctions.filteredExecutions = append([]awsservice.StepFunctionExecution(nil), m.stepFunctions.executions...)
+
+		updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		m = updated.(Model)
+		if cmd == nil || m.screen != screenLoading || m.stepFunctions.selectedStateMachine == nil || m.stepFunctions.selectedStateMachine.Name != "machine-b" {
+			t.Fatalf("expected machine-b execution load, screen=%v selected=%+v command=%v", m.screen, m.stepFunctions.selectedStateMachine, cmd)
+		}
+
+		m = refreshContext(t, m)
+		view := stripANSI(m.stepFunctions.viewExecutionList(m))
+		if m.screen != screenStepFunctionExecutionList || strings.Contains(view, "account-a-run") {
+			t.Fatalf("expected an empty machine-b execution list after refresh, screen=%v view:\n%s", m.screen, view)
+		}
+	})
+
+	t.Run("execution detail", func(t *testing.T) {
+		cfg := testConfig()
+		cfg.ContextName = "account-a"
+		m := New(cfg, "", "dev")
+		m.screen = screenStepFunctionExecutionList
+		m.stepFunctions.selectedStateMachine = &awsservice.StepFunctionStateMachine{ARN: "arn:machine-b", Name: "machine-b", Type: "STANDARD"}
+		m.stepFunctions.executions = []awsservice.StepFunctionExecution{{ARN: "arn:execution-b", Name: "account-b-run"}}
+		m.stepFunctions.filteredExecutions = append([]awsservice.StepFunctionExecution(nil), m.stepFunctions.executions...)
+		m.stepFunctions.selectedExecution = &awsservice.StepFunctionExecutionDetail{
+			StepFunctionExecution: awsservice.StepFunctionExecution{ARN: "arn:execution-a", Name: "account-a-run"},
+		}
+
+		updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		m = updated.(Model)
+		if cmd == nil || m.screen != screenLoading {
+			t.Fatalf("expected execution-b detail load, screen=%v command=%v", m.screen, cmd)
+		}
+
+		m = refreshContext(t, m)
+		view := stripANSI(m.stepFunctions.viewExecutionDetail(m))
+		if m.screen != screenStepFunctionExecutionDetail || strings.Contains(view, "account-a-run") || !strings.Contains(view, "No execution detail loaded") {
+			t.Fatalf("expected an empty execution-b detail after refresh, screen=%v view:\n%s", m.screen, view)
+		}
+	})
+}
+
 func TestStepFunctionsRegionSwitchClearsState(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.stepFunctions.stateMachines = stepFunctionsTestStateMachines()
