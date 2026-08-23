@@ -302,6 +302,45 @@ func TestStepFunctionsContextSwitchClearsAccountState(t *testing.T) {
 	}
 }
 
+func TestStepFunctionsSameContextRefreshPreservesState(t *testing.T) {
+	cfg := testConfig()
+	cfg.ContextName = "account-a"
+	m := New(cfg, "", "dev")
+	m.screen = screenStepFunctionExecutionDetail
+	m.stepFunctions.stateMachines = stepFunctionsTestStateMachines()
+	m.stepFunctions.selectedStateMachine = &m.stepFunctions.stateMachines[0]
+	m.stepFunctions.selectedExecution = &awsservice.StepFunctionExecutionDetail{
+		StepFunctionExecution: awsservice.StepFunctionExecution{ARN: "arn:account-a", Name: "account-a-run"},
+	}
+	m.storeFilterValue(filterStepFunctionStateMachines, "orders")
+	m.storeFilterValue(filterStepFunctionExecutions, "failed")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-a", Current: true}}})
+	m = updated.(Model)
+	if m.screen != screenContextPicker || m.ctxPrevScreen != screenStepFunctionExecutionDetail {
+		t.Fatalf("expected picker over the execution detail, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd == nil || m.screen != screenLoading || m.ctxPrevScreen != screenStepFunctionExecutionDetail {
+		t.Fatalf("expected same-context refresh to preserve the return screen, screen=%v previous=%v command=%v", m.screen, m.ctxPrevScreen, cmd)
+	}
+
+	nextCfg := testConfig()
+	nextCfg.ContextName = "account-a"
+	updated, _ = m.Update(contextSwitchedMsg{cfg: nextCfg})
+	m = updated.(Model)
+	if m.screen != screenStepFunctionExecutionDetail || m.stepFunctions.selectedExecution == nil || m.stepFunctions.selectedExecution.ARN != "arn:account-a" {
+		t.Fatalf("expected same-context refresh to preserve Step Functions detail, screen=%v state=%+v", m.screen, m.stepFunctions)
+	}
+	if m.filterValue(filterStepFunctionStateMachines) != "orders" || m.filterValue(filterStepFunctionExecutions) != "failed" {
+		t.Fatalf("expected same-context refresh to preserve Step Functions filters")
+	}
+}
+
 func TestStepFunctionsSavedViewAndHelpTitles(t *testing.T) {
 	if target, ok := featurePrimaryFilter["Step Functions Execution Browser"]; !ok || target != filterStepFunctionStateMachines {
 		t.Fatalf("expected Step Functions saved-view filter, got %v %v", target, ok)
