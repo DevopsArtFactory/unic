@@ -386,6 +386,29 @@ func TestStepFunctionsSameContextRefreshPreservesPendingLoadReturn(t *testing.T)
 	}
 }
 
+func TestStepFunctionsRegionSwitchClearsState(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.stepFunctions.stateMachines = stepFunctionsTestStateMachines()
+	m.stepFunctions.selectedStateMachine = &m.stepFunctions.stateMachines[0]
+	m.stepFunctions.selectedExecution = &awsservice.StepFunctionExecutionDetail{
+		StepFunctionExecution: awsservice.StepFunctionExecution{ARN: "arn:old-region", Name: "old-region-run"},
+	}
+	m.storeFilterValue(filterStepFunctionStateMachines, "orders")
+	m.storeFilterValue(filterStepFunctionExecutions, "failed")
+
+	updated, _ := m.Update(regionSwitchedMsg{region: "us-west-2"})
+	m = updated.(Model)
+	if m.screen != screenServiceList || m.cfg.Region != "us-west-2" {
+		t.Fatalf("expected service list in the new region, screen=%v region=%q", m.screen, m.cfg.Region)
+	}
+	if len(m.stepFunctions.stateMachines) != 0 || m.stepFunctions.selectedStateMachine != nil || m.stepFunctions.selectedExecution != nil {
+		t.Fatalf("expected Step Functions state to be cleared after region switch, got %+v", m.stepFunctions)
+	}
+	if m.filterValue(filterStepFunctionStateMachines) != "" || m.filterValue(filterStepFunctionExecutions) != "" {
+		t.Fatalf("expected Step Functions filters to be cleared after region switch")
+	}
+}
+
 func TestStepFunctionsSavedViewAndHelpTitles(t *testing.T) {
 	if target, ok := featurePrimaryFilter["Step Functions Execution Browser"]; !ok || target != filterStepFunctionStateMachines {
 		t.Fatalf("expected Step Functions saved-view filter, got %v %v", target, ok)

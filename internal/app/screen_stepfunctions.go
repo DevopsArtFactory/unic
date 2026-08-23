@@ -36,6 +36,12 @@ func isStepFunctionsScreen(value screen) bool {
 	}
 }
 
+func resetStepFunctionsContextState(m *Model) {
+	m.stepFunctions = newStepFunctionsModel()
+	m.resetFilter(filterStepFunctionStateMachines)
+	m.resetFilter(filterStepFunctionExecutions)
+}
+
 func normalizeStepFunctionsContextReturn(m *Model) {
 	if previous := stepFunctionsContextReturn(m); previous != nil {
 		*previous = screenServiceList

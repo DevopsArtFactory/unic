@@ -61,9 +61,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
 		if contextChanged {
-			m.stepFunctions = newStepFunctionsModel()
-			m.resetFilter(filterStepFunctionStateMachines)
-			m.resetFilter(filterStepFunctionExecutions)
+			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
 		}
 		if m.pendingView != nil {
@@ -80,6 +78,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case regionSwitchedMsg:
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
+		resetStepFunctionsContextState(&m)
 		// Region-scoped feature state may contain resources from the previous
 		// region, so return to the service catalog after switching.
 		m.screen = screenServiceList
