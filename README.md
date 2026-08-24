@@ -168,6 +168,13 @@ ui:
   boot_splash: false
   last_boot_splash_version: 0.1.3
 
+inspector:
+  acm_expiry_window_days: 30
+  required_tags:
+    - Owner
+    - Environment
+    - CostCenter
+
 contexts:
   - name: dev-sso
     order: 10
@@ -334,7 +341,7 @@ Context ordering:
 | Security Inspector | Ready | Runs built-in security and cost/waste rule packs and opens severity-filtered findings |
 | Checklist Inspector | Ready | Runs a YAML checklist and reports pass/fail per check with resource context and mismatch details |
 
-Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, KMS customer-key rotation, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, ElastiCache for Valkey encryption/backup/access-control checks, and cost/waste checks for unattached EIPs and EBS volumes, stopped EC2 instances, empty target groups, untagged EC2-family resources, and EBS snapshots aged 90 days or more.
+Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, KMS customer-key rotation, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, ElastiCache for Valkey encryption/backup/access-control checks, and cost/waste checks for unattached EIPs and EBS volumes, stopped EC2 instances, empty target groups, resources missing configured required tags, and EBS snapshots aged 90 days or more. The required-tag rule is disabled unless `inspector.required_tags` contains at least one tag key; when enabled, each finding names only the required keys missing from that resource.
 
 Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup. Press `a` on the checklist results screen to add a check through type-specific prompts instead of editing YAML: pick one of the twelve rule types, fill the prompted fields (empty skips optional expectations), and the check is appended to the loaded checklist file — or a new `unic-checklist.yaml` when none is loaded — validated through the same `LoadChecklist` rules before anything is written, then the checklist reruns so the new result shows immediately. Currently supported types:
 

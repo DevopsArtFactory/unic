@@ -58,6 +58,7 @@ cmd/unic/main.go
 - current context 전환
 - context upsert / unset helper
 - auth type 정규화
+- ACM 만료 기준과 선택적 필수 tag 정책을 포함한 전역 Inspector 설정
 
 ### `internal/auth/`
 
@@ -127,7 +128,7 @@ cross-service inspector workflow와 rule pack을 담당한다.
 - ACM 만료 스캔은 repository 인증서 목록과 양수 `inspector.acm_expiry_window_days` 설정값(기본 30일)을 사용
 - Checklist Inspector YAML schema 로딩, checklist 결과 모델, readiness runner도 여기서 관리
 - rule pack은 raw SDK setup 대신 `internal/services/aws` repository 메서드와 client interface에 의존
-- cost/waste rule pack은 EC2 및 ELBv2 client interface를 재사용해 resource state, tag, snapshot age, target 등록 상태를 점검
+- cost/waste rule pack은 EC2 및 ELBv2 client interface를 재사용해 resource state, tag, snapshot age, target 등록 상태를 점검하며, missing-tag rule은 `inspector.required_tags`에 정책이 정의된 경우에만 실행
 - Security / Checklist Inspector 이후의 후속 inspector workflow도 이 패턴으로 확장
 
 ### `internal/app/`

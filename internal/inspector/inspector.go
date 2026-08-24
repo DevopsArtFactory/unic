@@ -16,6 +16,7 @@ type InspectorScanner struct {
 
 type SecurityScanOptions struct {
 	ACMExpiryWindowDays int
+	RequiredTags        []string
 }
 
 var (

@@ -64,7 +64,8 @@ type fileUI struct {
 }
 
 type fileInspector struct {
-	ACMExpiryWindowDays int `yaml:"acm_expiry_window_days,omitempty"`
+	ACMExpiryWindowDays int      `yaml:"acm_expiry_window_days,omitempty"`
+	RequiredTags        []string `yaml:"required_tags,omitempty"`
 }
 
 // AuthType represents the authentication method for a context.
@@ -145,6 +146,7 @@ type Config struct {
 	BootSplash          bool
 	BootSplashSeen      string
 	ACMExpiryWindowDays int
+	RequiredTags        []string
 }
 
 func acmExpiryWindowDays(value int) int {
@@ -370,6 +372,7 @@ func Load(cliProfile, cliRegion *string, configPath string) (*Config, error) {
 		BootSplash:          boolValue(fc.UI.BootSplash, false),
 		BootSplashSeen:      fc.UI.LastBootSplashVersion,
 		ACMExpiryWindowDays: acmExpiryWindowDays(fc.Inspector.ACMExpiryWindowDays),
+		RequiredTags:        append([]string(nil), fc.Inspector.RequiredTags...),
 	}, nil
 }
 
@@ -422,6 +425,7 @@ func LoadNamedContext(configPath, name string) (*Config, error) {
 			BootSplash:          boolValue(fc.UI.BootSplash, false),
 			BootSplashSeen:      fc.UI.LastBootSplashVersion,
 			ACMExpiryWindowDays: acmExpiryWindowDays(fc.Inspector.ACMExpiryWindowDays),
+			RequiredTags:        append([]string(nil), fc.Inspector.RequiredTags...),
 		}, nil
 	}
 

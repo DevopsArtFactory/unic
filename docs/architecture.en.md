@@ -58,6 +58,7 @@ Owns `~/.config/unic/config.yaml` handling:
 - current-context switching
 - context upsert / unset helpers
 - auth-type normalization
+- global Inspector settings, including ACM expiry thresholds and optional required-tag policies
 
 ### `internal/auth/`
 
@@ -127,7 +128,7 @@ Pattern:
 - ACM expiry scanning uses the repository certificate list and the configured positive `inspector.acm_expiry_window_days` threshold (30 days by default)
 - Checklist Inspector YAML schema loading, checklist result models, and readiness runners live here
 - rule packs still depend on `internal/services/aws` repository methods and client interfaces rather than raw SDK setup
-- the cost/waste rule pack reuses the EC2 and ELBv2 client interfaces for resource-state, tag, snapshot-age, and target-registration checks
+- the cost/waste rule pack reuses the EC2 and ELBv2 client interfaces for resource-state, tag, snapshot-age, and target-registration checks; its missing-tag rule runs only when `inspector.required_tags` defines a policy
 - this package remains the growth path for future inspector workflows beyond Security and Checklist Inspector
 
 ### `internal/app/`

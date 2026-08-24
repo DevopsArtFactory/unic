@@ -551,6 +551,7 @@ func (im *inspectorModel) loadSecurityScan(m Model) tea.Cmd {
 
 		report, err := inspector.RunSecurityScan(ctx, repo, inspector.SecurityScanOptions{
 			ACMExpiryWindowDays: m.cfg.ACMExpiryWindowDays,
+			RequiredTags:        m.cfg.RequiredTags,
 		})
 		if err != nil {
 			return errMsg{err: err}
