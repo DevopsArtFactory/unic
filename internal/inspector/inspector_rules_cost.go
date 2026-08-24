@@ -275,7 +275,7 @@ func untaggedCostFinding(resourceType, resourceID string, tags []ec2types.Tag, r
 
 	present := make(map[string]struct{}, len(tags))
 	for _, tag := range tags {
-		key := strings.TrimSpace(awssdk.ToString(tag.Key))
+		key := awssdk.ToString(tag.Key)
 		if key != "" {
 			present[key] = struct{}{}
 		}

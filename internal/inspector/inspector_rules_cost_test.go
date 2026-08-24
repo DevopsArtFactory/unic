@@ -199,6 +199,11 @@ func TestUntaggedCostFindingUsesConfiguredRequiredTags(t *testing.T) {
 	if _, ok := untaggedCostFinding("EC2Instance", "i-123", nil, nil); ok {
 		t.Fatal("expected an empty required-tag policy to disable the rule")
 	}
+
+	whitespaceTag := []ec2types.Tag{{Key: awssdk.String(" Owner ")}}
+	if finding, ok := untaggedCostFinding("EC2Instance", "i-123", whitespaceTag, []string{"Owner"}); !ok || finding.Summary != "EC2Instance i-123 is missing required tags: Owner." {
+		t.Fatalf("expected exact AWS tag-key matching, got finding %+v, ok %t", finding, ok)
+	}
 }
 
 func TestInspectCostWasteReturnsContextualEC2Error(t *testing.T) {
