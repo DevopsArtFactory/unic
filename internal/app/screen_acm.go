@@ -16,6 +16,7 @@ type acmModel struct {
 	idx          int
 	selected     *awsservice.ACMCertificate
 	detailScroll int
+	warnings     []error
 }
 
 func newACMModel() acmModel { return acmModel{} }
@@ -28,6 +29,7 @@ func (am *acmModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		return *m, nil, false
 	}
 	am.items = loaded.certificates
+	am.warnings = loaded.warnings
 	am.filtered = applyFilter(am.items, m.filterValue(filterACMCertificates))
 	am.idx, am.selected, m.screen = 0, nil, screenACMCertificateList
 	return *m, nil, true
@@ -108,11 +110,11 @@ func (am acmModel) load(m Model) tea.Cmd {
 		if err != nil {
 			return errMsg{err: err}
 		}
-		certificates, err := repo.ListCertificates(m.commandContext())
+		certificates, warnings, err := repo.ListCertificates(m.commandContext())
 		if err != nil {
 			return errMsg{err: err}
 		}
-		return acmCertificatesLoadedMsg{certificates: certificates}
+		return acmCertificatesLoadedMsg{certificates: certificates, warnings: warnings}
 	}
 }
 
@@ -122,14 +124,19 @@ func (am acmModel) viewList(m Model) string {
 	b.WriteString(titleStyle.Render("ACM Certificates — soonest expiry first"))
 	b.WriteString("\n")
 	b.WriteString(m.renderFilterValue(filterACMCertificates))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+	for _, warning := range am.warnings {
+		b.WriteString(errorStyle.Render("  " + warning.Error()))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
 	if len(am.filtered) == 0 {
 		panel.WriteString(dimStyle.Render("  No certificates found"))
 		panel.WriteString("\n")
 	} else {
 		panel.WriteString(dimStyle.Render("  DOMAIN                                     STATUS         EXPIRES IN USE  RENEWAL"))
 		panel.WriteString("\n")
-		visibleLines := max(m.height-11, 5)
+		visibleLines := max(m.height-11-len(am.warnings), 5)
 		start := max(am.idx-visibleLines+1, 0)
 		for i := start; i < min(start+visibleLines, len(am.filtered)); i++ {
 			cursor, style := "  ", normalStyle

@@ -68,17 +68,43 @@ func (m *mockKMSClient) GetKeyRotationStatus(_ context.Context, in *kms.GetKeyRo
 	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: id == "a"}, nil
 }
 
-func TestListKMSKeysWrapsAPIErrors(t *testing.T) {
+func TestListKMSKeysWrapsFatalAPIErrors(t *testing.T) {
 	for _, test := range []struct{ operation, want string }{
 		{"list aliases", "list KMS aliases"},
 		{"list keys", "list KMS keys"},
-		{"describe key", "describe KMS key"},
-		{"rotation status", "rotation status for KMS key"},
 	} {
 		t.Run(test.operation, func(t *testing.T) {
-			_, err := (&AwsRepository{KMSClient: &mockKMSClient{errOperation: test.operation}}).ListKMSKeys(context.Background())
+			_, _, err := (&AwsRepository{KMSClient: &mockKMSClient{errOperation: test.operation}}).ListKMSKeys(context.Background())
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("expected %q context, got %v", test.want, err)
+			}
+		})
+	}
+}
+
+func TestListKMSKeysReportsPerKeyFailures(t *testing.T) {
+	for _, test := range []struct {
+		operation    string
+		wantKeys     int
+		wantWarnings int
+		wantWarning  string
+	}{
+		{operation: "describe key", wantWarnings: 3, wantWarning: "describe KMS key"},
+		{operation: "rotation status", wantKeys: 3, wantWarnings: 2, wantWarning: "rotation status for KMS key"},
+	} {
+		t.Run(test.operation, func(t *testing.T) {
+			keys, warnings, err := (&AwsRepository{KMSClient: &mockKMSClient{errOperation: test.operation}}).ListKMSKeys(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(keys) != test.wantKeys || len(warnings) != test.wantWarnings {
+				t.Fatalf("expected %d keys and %d warnings, got %d and %d", test.wantKeys, test.wantWarnings, len(keys), len(warnings))
+			}
+			if len(warnings) == 0 || !strings.Contains(warnings[0].Error(), test.wantWarning) {
+				t.Fatalf("expected %q warning, got %v", test.wantWarning, warnings)
+			}
+			if test.operation == "rotation status" && (!keys[0].RotationEligible || keys[0].RotationKnown) {
+				t.Fatalf("expected eligible key rotation to remain unknown, got %+v", keys[0])
 			}
 		})
 	}
@@ -87,11 +113,14 @@ func TestListKMSKeysWrapsAPIErrors(t *testing.T) {
 func TestListKMSKeysMapsAliasesRotationAndSorts(t *testing.T) {
 	client := &mockKMSClient{}
 	repo := &AwsRepository{KMSClient: client}
-	keys, err := repo.ListKMSKeys(context.Background())
+	keys, warnings, err := repo.ListKMSKeys(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(keys) != 3 || keys[0].ID != "a" || len(keys[0].Aliases) != 1 || keys[0].Aliases[0] != "alias/app" || !keys[0].RotationEligible || !keys[0].RotationEnabled {
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(keys) != 3 || keys[0].ID != "a" || len(keys[0].Aliases) != 1 || keys[0].Aliases[0] != "alias/app" || !keys[0].RotationEligible || !keys[0].RotationKnown || !keys[0].RotationEnabled {
 		t.Fatalf("unexpected keys: %+v", keys)
 	}
 	if keys[1].Manager != "CUSTOMER" || keys[1].RotationEligible || keys[1].RotationEnabled {
@@ -137,7 +166,7 @@ func TestListKMSKeysBoundsConcurrentDetailLoads(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if _, err := (&AwsRepository{KMSClient: client}).ListKMSKeys(ctx); err != nil {
+	if _, _, err := (&AwsRepository{KMSClient: client}).ListKMSKeys(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if peak.Load() != 10 {

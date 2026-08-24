@@ -2,6 +2,7 @@ package inspector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -60,7 +61,7 @@ func inspectCostWaste(ctx context.Context, repo *AwsRepository, now time.Time) (
 	}
 	findings = append(findings, snapshotFindings...)
 
-	targetGroupFindings, err := inspectEmptyTargetGroups(ctx, repo.ELBv2Client)
+	targetGroupFindings, warnings, err := inspectEmptyTargetGroups(ctx, repo.ELBv2Client)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +76,7 @@ func inspectCostWaste(ctx context.Context, repo *AwsRepository, now time.Time) (
 		return left < right
 	})
 
-	return findings, nil
+	return findings, errors.Join(warnings...)
 }
 
 func inspectElasticIPs(ctx context.Context, client EC2ClientAPI) ([]SecurityFinding, error) {
@@ -227,13 +228,14 @@ func inspectEBSSnapshotsForWaste(ctx context.Context, client EC2ClientAPI, now t
 	return findings, nil
 }
 
-func inspectEmptyTargetGroups(ctx context.Context, client ELBv2ClientAPI) ([]SecurityFinding, error) {
+func inspectEmptyTargetGroups(ctx context.Context, client ELBv2ClientAPI) ([]SecurityFinding, []error, error) {
 	var findings []SecurityFinding
+	var warnings []error
 	paginator := elasticloadbalancingv2.NewDescribeTargetGroupsPaginator(client, &elasticloadbalancingv2.DescribeTargetGroupsInput{})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to inspect target groups: %w", err)
+			return nil, nil, fmt.Errorf("failed to inspect target groups: %w", err)
 		}
 		for _, targetGroup := range page.TargetGroups {
 			targetGroupARN := awssdk.ToString(targetGroup.TargetGroupArn)
@@ -248,7 +250,8 @@ func inspectEmptyTargetGroups(ctx context.Context, client ELBv2ClientAPI) ([]Sec
 				TargetGroupArn: targetGroup.TargetGroupArn,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("failed to inspect target health for %s: %w", resourceID, err)
+				warnings = append(warnings, fmt.Errorf("failed to inspect target health for %s: %w", resourceID, err))
+				continue
 			}
 			if len(health.TargetHealthDescriptions) != 0 {
 				continue
@@ -265,7 +268,7 @@ func inspectEmptyTargetGroups(ctx context.Context, client ELBv2ClientAPI) ([]Sec
 			})
 		}
 	}
-	return findings, nil
+	return findings, warnings, nil
 }
 
 func untaggedCostFinding(resourceType, resourceID string, tags []ec2types.Tag) (SecurityFinding, bool) {

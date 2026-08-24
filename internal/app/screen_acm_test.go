@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -8,6 +9,19 @@ import (
 
 	awsservice "unic/internal/services/aws"
 )
+
+func TestACMPartialWarningKeepsSuccessfulCertificates(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.acm.HandleMessage(&m, acmCertificatesLoadedMsg{
+		certificates: []awsservice.ACMCertificate{{ARN: "visible", DomainName: "visible.example.com"}},
+		warnings:     []error{errors.New("failed to describe ACM certificate denied: access denied")},
+	})
+
+	view := stripANSI(m.acm.viewList(m))
+	if m.screen != screenACMCertificateList || !strings.Contains(view, "visible.example.com") || !strings.Contains(view, "access denied") {
+		t.Fatalf("expected partial certificate and warning, got screen %v:\n%s", m.screen, view)
+	}
+}
 
 func TestACMDetailShowsUnavailableExpiry(t *testing.T) {
 	m := New(testConfig(), "", "dev")

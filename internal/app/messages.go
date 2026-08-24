@@ -253,8 +253,9 @@ type ssmParametersLoadedMsg struct {
 }
 
 type kmsKeysLoadedMsg struct {
-	keys []awsservice.KMSKey
-	err  error
+	keys     []awsservice.KMSKey
+	warnings []error
+	err      error
 }
 
 type ssmParamValueLoadedMsg struct {
@@ -289,6 +290,7 @@ type autoScalingCapacityUpdatedMsg struct {
 
 type acmCertificatesLoadedMsg struct {
 	certificates []awsservice.ACMCertificate
+	warnings     []error
 }
 
 type stepFunctionStateMachinesLoadedMsg struct {

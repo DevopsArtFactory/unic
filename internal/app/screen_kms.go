@@ -13,6 +13,7 @@ type kmsModel struct {
 	items, filtered []awsservice.KMSKey
 	idx             int
 	selected        *awsservice.KMSKey
+	warnings        []error
 }
 
 func newKMSModel() kmsModel                              { return kmsModel{} }
@@ -24,8 +25,8 @@ func (km kmsModel) load(m Model) tea.Cmd {
 		if err != nil {
 			return kmsKeysLoadedMsg{err: err}
 		}
-		keys, err := repo.ListKMSKeys(ctx)
-		return kmsKeysLoadedMsg{keys: keys, err: err}
+		keys, warnings, err := repo.ListKMSKeys(ctx)
+		return kmsKeysLoadedMsg{keys: keys, warnings: warnings, err: err}
 	}
 }
 func (km *kmsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -38,6 +39,7 @@ func (km *kmsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		return nm, cmd, true
 	}
 	km.items = loaded.keys
+	km.warnings = loaded.warnings
 	km.filtered = applyFilter(km.items, m.filterValue(filterKMSKeys))
 	km.idx = 0
 	km.selected = nil
@@ -103,14 +105,19 @@ func (km kmsModel) viewList(m Model) string {
 	b.WriteString(titleStyle.Render("KMS Keys"))
 	b.WriteString("\n")
 	b.WriteString(m.renderFilterValue(filterKMSKeys))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+	for _, warning := range km.warnings {
+		b.WriteString(errorStyle.Render("  " + warning.Error()))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
 	if len(km.filtered) == 0 {
 		p.WriteString(dimStyle.Render("  No KMS keys found\n"))
 	} else {
 		idCol := lipgloss.NewStyle().Width(38).MaxWidth(38)
 		stateCol := lipgloss.NewStyle().Width(16).MaxWidth(16)
 		p.WriteString(dimStyle.Render("  " + idCol.Render("KEY ID / ALIAS") + " " + stateCol.Render("STATE") + " MANAGER  ROTATION\n"))
-		visibleLines := max(m.height-11, 5)
+		visibleLines := max(m.height-11-len(km.warnings), 5)
 		start := 0
 		if km.idx >= visibleLines {
 			start = km.idx - visibleLines + 1
@@ -124,7 +131,10 @@ func (km kmsModel) viewList(m Model) string {
 			}
 			rotation := "n/a"
 			if key.RotationEligible {
-				rotation = fmt.Sprintf("%t", key.RotationEnabled)
+				rotation = "unknown"
+				if key.RotationKnown {
+					rotation = fmt.Sprintf("%t", key.RotationEnabled)
+				}
 			}
 			row := idCol.Render(name) + " " + stateCol.Render(key.State) + " " + lipgloss.NewStyle().Width(8).Render(key.Manager) + " " + rotation
 			cursor := "  "
@@ -158,7 +168,10 @@ func (km kmsModel) viewDetail(m Model) string {
 	b.WriteString(m.renderEC2DetailLine("Origin", k.Origin))
 	rotation := "Not eligible"
 	if k.RotationEligible {
-		rotation = fmt.Sprintf("%t", k.RotationEnabled)
+		rotation = "Unknown"
+		if k.RotationKnown {
+			rotation = fmt.Sprintf("%t", k.RotationEnabled)
+		}
 	}
 	b.WriteString(m.renderEC2DetailLine("Rotation Enabled", rotation))
 	b.WriteString(m.renderEC2DetailLine("Aliases", ec2ValueOrDash(strings.Join(k.Aliases, ", "))))
