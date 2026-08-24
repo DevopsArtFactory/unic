@@ -12,7 +12,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as EC2 inventory inspection, SSM sessions, RDS control, Route53 record changes, ECS rollout inspection/exec, EKS cluster and node group review, IAM access key rotation, and Bedrock API key management
-- Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
+- Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in security and cost/waste findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
 ## Documentation Map
 
@@ -327,10 +327,10 @@ Context ordering:
 
 | Workflow | Status | Notes |
 |---|---|---|
-| Security Inspector | Ready | Runs built-in rule packs and opens severity-filtered findings |
+| Security Inspector | Ready | Runs built-in security and cost/waste rule packs and opens severity-filtered findings |
 | Checklist Inspector | Ready | Runs a YAML checklist and reports pass/fail per check with resource context and mismatch details |
 
-Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, KMS customer-key rotation, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
+Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, KMS customer-key rotation, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, ElastiCache for Valkey encryption/backup/access-control checks, and cost/waste checks for unattached EIPs and EBS volumes, stopped EC2 instances, empty target groups, untagged EC2-family resources, and EBS snapshots aged 90 days or more.
 
 Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup. Press `a` on the checklist results screen to add a check through type-specific prompts instead of editing YAML: pick one of the twelve rule types, fill the prompted fields (empty skips optional expectations), and the check is appended to the loaded checklist file — or a new `unic-checklist.yaml` when none is loaded — validated through the same `LoadChecklist` rules before anything is written, then the checklist reruns so the new result shows immediately. Currently supported types:
 
@@ -432,12 +432,12 @@ checks:
 | IAM Key Rotation | `r` rotate, `c` copy exports, `a` apply and verify, `d` deactivate old key, `x` delete old key |
 | Bedrock API Keys | `c` create, choose current IAM user or another user, `r` rotate secret, `d` delete, type the IAM user/key ID to confirm, `c` copy one-time key without printing it, `e` copy `AWS_BEARER_TOKEN_BEDROCK` export |
 | CloudTrail Events | `1`-`5` time window (1h/6h/24h/3d/7d), `m` mutations-only toggle, `n` server-side resource-name lookup, `/` filter, `r` refresh, `Enter` detail with scrollable raw event |
-| CloudWatch Alarms | `tab` cycle state filter (ALL/ALARM/INSUFFICIENT_DATA/OK), `/` filter, `r` refresh, `Enter` detail with recent transitions, detail `g` jump to related resource (RDS/EC2/ECS/Lambda dimensions), `l` jump to logs when derivable |
+| CloudWatch Alarms | `tab` cycle state filter (ALL/ALARM/INSUFFICIENT_DATA/OK), `/` filter, `W` watch, `I` watch interval, `r` refresh, `Enter` detail with recent transitions, detail `g` jump to related resource (RDS/EC2/ECS/Lambda dimensions), `l` jump to logs when derivable |
 | CloudWatch Metrics | preset-driven metric list/detail flow, `/` filter, `space` select related series, `g` preset cycle, `t/p/s` range-period-stat controls, `r` refresh, in-terminal single-series and comparison charts |
 | CloudWatch Logs | log groups/streams load 10 at a time, `n` load more, `1`-`6` time presets, `t` live tail, `f` filter pattern, `w` wrap toggle, `h/l` horizontal scroll |
-| ECR Login Helper | `c` copy Docker login command, `p` copy Podman login command, `r` refresh; CLI helper for scripting: `unic ecr login [--runtime docker|podman] [--copy]` |
+| ECR Login Helper | `c` copy Docker login command, `p` copy Podman login command, `r` refresh; CLI helper for scripting: `unic ecr login [--runtime docker\|podman] [--copy]` |
 | ECS Exec | `r` refresh, `Enter` drill down / exec |
-| ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `Enter` continues into tasks and exec |
+| ECS Rollout / Exec | cluster/service lists support refresh and drill-down, service detail shows deployments/task definition images/events, `W` watches rollout state, `I` changes the watch interval, `Enter` continues into tasks and exec |
 | EKS Browser | cluster/node group/add-on lists support `/` filter and `r` refresh, cluster view shows version/status/endpoint visibility/ARN summary, `a` opens managed add-ons, `U` opens current-version upgrade readiness, `u` opens kubeconfig access helper, node group detail shows desired/min/max scaling plus health issues |
 | FIS | `Enter` template detail/run detail, `/` filter, `h` selected-template history, `H` all experiment history, `r` refresh, template detail includes safe-run preview and detail scrolls through targets/actions/stop conditions |
 | Inspector Mode | `i` open mode from the service list, `Enter` open the selected workflow, `l` open the checklist file picker |
@@ -446,8 +446,8 @@ checks:
 | Settings | `Enter`/`Space` toggle selected setting, `Esc`/`q` back |
 | Context Picker | `a` add context, `f` favorite/unfavorite selected context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
-| SQS | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` detail, detail `d` jump to DLQ, `m` redrive DLQ (type-to-confirm), `x` purge (type-to-confirm) |
-| ELB | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` target groups, target group list `Enter` per-target health |
+| SQS | `A` toggle all-regions scope, `/` filter, `W` watch queue depth, `I` watch interval, `r` refresh, `Enter` detail, detail `d` jump to DLQ, `m` redrive DLQ (type-to-confirm), `x` purge (type-to-confirm) |
+| ELB | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` target groups, target health screens support `W` watch and `I` watch interval, target group list `Enter` per-target health |
 | Parameter Store | `/` filter, `r` refresh, `Enter` detail, detail `v` reveal value (decrypts SecureString), `y` copy value without revealing |
 | ElastiCache | `/` filter, `r` refresh, `Enter` nodes, node `Enter` detail, detail `c` copy endpoint |
 | KMS | `/` filter, `r` refresh, `Enter` key detail with aliases and rotation status |
@@ -459,6 +459,8 @@ The command palette (`P`) fuzzy-searches three kinds of items from anywhere outs
 Saved views (`V`) capture repeatable operational workflows: pressing `s` on the views screen snapshots the last opened service feature, its active shared filter, and the current context under a name you type; `enter` reapplies a view in one step — switching to the view's context first when it differs — and `d` deletes one. Views persist under `views:` in `config.yaml` (fields: `name`, `context`, `service`, `feature`, `filter`); the format is additive so future fields extend it without breaking existing files.
 
 The service list defaults to favorites first, then alphabetical order. Press `f` to favorite or unfavorite the selected service; favorites are saved under `favorites.services` in `config.yaml` and rendered with a distinct marker/style. The context picker also supports `f`; context favorites are saved under `favorites.contexts`, displayed first in the picker, and rendered with a distinct color style while preserving the configured context order within favorite and non-favorite groups. The service list supports `/` filtering across service names, feature names, and feature descriptions. Shared list filters use fuzzy matching with inline match highlighting. While filter mode stays active, `↑`/`↓` continue to move through the filtered results without requiring an extra Enter first. Filtering is currently available on the service list, EC2 SSM instances, EC2 inventory instances, Auto Scaling groups, IAM users, VPCs, subnets, RDS instances, Route53 zones/records, CloudWatch metrics, CloudWatch log groups/streams, Secrets Manager resources, ECS clusters/services, EKS clusters/node groups/add-ons, ECR repositories/images, FIS experiment templates/history, ElastiCache replication groups/clusters, S3 buckets/objects, SQS queues, load balancers/target groups, SSM parameters, ACM certificates, Lambda functions, Bedrock API keys, and the context picker.
+
+Watch mode is available on the CloudWatch alarm list, ECS rollout detail, SQS queue list/detail, and ELB target-group/target-health screens. Press `W` to toggle opt-in background refresh and `I` to cycle the 5s, 15s, and 30s presets. The active screen keeps its selection or scroll position while data changes; leaving the screen or starting an explicit refresh stops watch mode and cancels any in-flight watch request.
 
 The EKS Browser includes a managed add-on status view for each cluster. Add-on rows show the installed version, status, and health summary, with degraded or unhealthy add-ons highlighted so core components such as CoreDNS, kube-proxy, VPC CNI, and CSI drivers are easy to spot.
 

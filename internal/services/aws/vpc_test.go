@@ -20,6 +20,8 @@ type mockEC2Client struct {
 	describeVpcsFunc                    func(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
 	describeSubnetsFunc                 func(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
 	describeInstancesFunc               func(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
+	describeAddressesFunc               func(ctx context.Context, params *ec2.DescribeAddressesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeAddressesOutput, error)
+	describeVolumesFunc                 func(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error)
 	describeSnapshotsFunc               func(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error)
 	describeSnapshotAttributeFunc       func(ctx context.Context, params *ec2.DescribeSnapshotAttributeInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotAttributeOutput, error)
 	describeNetworkInterfacesFunc       func(ctx context.Context, params *ec2.DescribeNetworkInterfacesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error)
@@ -55,6 +57,20 @@ func (m *mockEC2Client) DescribeInstances(ctx context.Context, params *ec2.Descr
 		return m.describeInstancesFunc(ctx, params, optFns...)
 	}
 	return &ec2.DescribeInstancesOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeAddresses(ctx context.Context, params *ec2.DescribeAddressesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeAddressesOutput, error) {
+	if m.describeAddressesFunc != nil {
+		return m.describeAddressesFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeAddressesOutput{}, nil
+}
+
+func (m *mockEC2Client) DescribeVolumes(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error) {
+	if m.describeVolumesFunc != nil {
+		return m.describeVolumesFunc(ctx, params, optFns...)
+	}
+	return &ec2.DescribeVolumesOutput{}, nil
 }
 
 func (m *mockEC2Client) DescribeSnapshots(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error) {

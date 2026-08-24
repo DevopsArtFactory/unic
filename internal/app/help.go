@@ -368,7 +368,11 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		}
 	case screenCWAlarmList:
 		shortcuts := listScreenShortcuts("open the selected alarm", "go back to the feature list", true, true)
-		return append(shortcuts, helpShortcut{"tab", "Cycle the alarm state filter"})
+		return append(shortcuts,
+			helpShortcut{"tab", "Cycle the alarm state filter"},
+			helpShortcut{"W", "Toggle automatic alarm refresh"},
+			helpShortcut{"I", "Cycle the watch interval (5s/15s/30s)"},
+		)
 	case screenCWAlarmDetail:
 		return []helpShortcut{
 			{"g", "Jump to the related resource browser"},
@@ -400,6 +404,8 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"↑/↓, j/k", "Scroll the service rollout detail"},
 			{"pgup / pgdn", "Scroll by one page"},
 			{"r", "Refresh the service rollout detail"},
+			{"W", "Toggle automatic rollout refresh"},
+			{"I", "Cycle the watch interval (5s/15s/30s)"},
 			{"enter", "Open running tasks for the selected service"},
 			{"q / esc", "Go back to the service list"},
 		}
