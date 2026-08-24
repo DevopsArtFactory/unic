@@ -90,6 +90,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - EC2
 - SSM
 - RDS
+- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
@@ -152,6 +153,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_autoscaling.go`
 - `screen_vpc.go`
 - `screen_rds.go`
+- `screen_cloudformation.go`
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
@@ -237,6 +239,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - Auto Scaling group list, instance/activity detail, capacity input, type-to-confirm
 - VPC / subnet / available IP detail
 - RDS list, detail, confirm
+- CloudFormation stack list/detail, 최근 event, drift detection
 - Route53 zone, record, mutation
 - Secrets Manager list/detail
 - Security Group list/detail/edit

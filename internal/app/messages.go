@@ -123,6 +123,32 @@ type rdsTickMsg struct {
 	instanceID string
 }
 
+type cloudFormationStacksLoadedMsg struct {
+	stacks []awsservice.CloudFormationStack
+	repo   *awsservice.AwsRepository
+}
+
+type cloudFormationStackDetailLoadedMsg struct {
+	stack *awsservice.CloudFormationStack
+}
+
+type cloudFormationDriftStartedMsg struct {
+	stackID     string
+	detectionID string
+}
+
+type cloudFormationDriftPollTickMsg struct {
+	stackID     string
+	detectionID string
+}
+
+type cloudFormationDriftStatusMsg struct {
+	stackID     string
+	detectionID string
+	status      *awsservice.CloudFormationDriftDetection
+	err         error
+}
+
 type route53ZonesLoadedMsg struct {
 	zones []awsservice.HostedZone
 }

@@ -874,6 +874,10 @@ func (m Model) helpScreenTitle() string {
 		return "RDS Confirmation"
 	case screenElastiCacheResourceList:
 		return "ElastiCache Resources"
+	case screenCloudFormationStackList:
+		return "CloudFormation Stacks"
+	case screenCloudFormationStackDetail:
+		return "CloudFormation Stack Detail"
 	case screenElastiCacheNodeList:
 		return "ElastiCache Nodes"
 	case screenElastiCacheNodeDetail:

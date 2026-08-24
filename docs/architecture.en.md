@@ -90,6 +90,7 @@ Current repository clients include:
 - EC2
 - SSM
 - RDS
+- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
@@ -152,6 +153,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_autoscaling.go`
 - `screen_vpc.go`
 - `screen_rds.go`
+- `screen_cloudformation.go`
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
@@ -237,6 +239,7 @@ Current screen families include:
 - Auto Scaling group list, instance/activity detail, capacity input, and typed-confirmation flows
 - VPC / subnet / available IP detail
 - RDS list, detail, and confirm flows
+- CloudFormation stack list/detail, recent-event, and drift-detection flows
 - Route53 zone, record, and mutation flows
 - Secrets Manager list/detail
 - Security Group list/detail/edit flows

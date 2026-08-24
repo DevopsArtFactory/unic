@@ -59,6 +59,8 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
+		m.cloudFormation = newCloudFormationModel()
+		m.resetFilter(filterCloudFormationStacks)
 		if m.pendingView != nil {
 			// A saved view triggered this switch: continue the jump now that
 			// the new context is active.
@@ -66,6 +68,9 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			m.pendingView = nil
 			newM, cmd := m.jumpToView(view)
 			return newM, tea.Batch(tea.ClearScreen, cmd), true
+		}
+		if cloudFormationContextReturnActive(m) {
+			m.ctxPrevScreen = screenFeatureList
 		}
 		m.screen = m.ctxPrevScreen
 		return m, tea.ClearScreen, true
@@ -187,6 +192,9 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cursor := m.contextTable.Cursor()
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
+			if cloudFormationContextReturnActive(m) {
+				m.ctxPrevScreen = screenFeatureList
+			}
 			m.pendingContextName = selected.Name
 			return m.startLoading(m.switchContext(selected.Name))
 		}

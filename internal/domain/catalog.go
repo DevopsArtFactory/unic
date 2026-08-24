@@ -212,6 +212,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceCloudFormation,
+			Features: []Feature{
+				{
+					Kind:        FeatureCloudFormationBrowser,
+					Description: "Triage stacks, recent events, outputs, parameters, and drift",
+				},
+			},
+		},
+		{
 			Name: ServiceIAM,
 			Features: []Feature{
 				{

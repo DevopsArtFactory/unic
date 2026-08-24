@@ -21,6 +21,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureAutoScalingBrowser:    filterAutoScalingGroups,
 	domain.FeatureSSMSession:            filterInstances,
 	domain.FeatureRDSBrowser:            filterRDS,
+	domain.FeatureCloudFormationBrowser: filterCloudFormationStacks,
 	domain.FeatureRoute53Browser:        filterRoute53Zones,
 	domain.FeatureSecretsBrowser:        filterSecrets,
 	domain.FeatureSecurityGroupBrowser:  filterSecurityGroups,

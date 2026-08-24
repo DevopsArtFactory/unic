@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -68,6 +69,9 @@ var _ CloudWatchClientAPI = (*cloudwatch.Client)(nil)
 
 // Verify *cloudtrail.Client satisfies CloudTrailClientAPI at compile time.
 var _ CloudTrailClientAPI = (*cloudtrail.Client)(nil)
+
+// Verify *cloudformation.Client satisfies CloudFormationClientAPI at compile time.
+var _ CloudFormationClientAPI = (*cloudformation.Client)(nil)
 
 // Verify *guardduty.Client satisfies GuardDutyClientAPI at compile time.
 var _ GuardDutyClientAPI = (*guardduty.Client)(nil)
@@ -212,6 +216,14 @@ type CloudTrailClientAPI interface {
 	LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error)
 }
 
+// CloudFormationClientAPI is the interface for stack browser operations.
+type CloudFormationClientAPI interface {
+	cloudformation.DescribeStacksAPIClient
+	cloudformation.DescribeStackEventsAPIClient
+	DetectStackDrift(ctx context.Context, params *cloudformation.DetectStackDriftInput, optFns ...func(*cloudformation.Options)) (*cloudformation.DetectStackDriftOutput, error)
+	DescribeStackDriftDetectionStatus(ctx context.Context, params *cloudformation.DescribeStackDriftDetectionStatusInput, optFns ...func(*cloudformation.Options)) (*cloudformation.DescribeStackDriftDetectionStatusOutput, error)
+}
+
 // GuardDutyClientAPI is the interface for GuardDuty operations used by AwsRepository.
 type GuardDutyClientAPI interface {
 	ListDetectors(ctx context.Context, params *guardduty.ListDetectorsInput, optFns ...func(*guardduty.Options)) (*guardduty.ListDetectorsOutput, error)
@@ -353,6 +365,7 @@ type AwsRepository struct {
 	CloudWatchClient     CloudWatchClientAPI
 	CloudWatchLogsClient CloudWatchLogsClientAPI
 	CloudTrailClient     CloudTrailClientAPI
+	CloudFormationClient CloudFormationClientAPI
 	GuardDutyClient      GuardDutyClientAPI
 	ConfigServiceClient  ConfigServiceClientAPI
 	ECSClient            ECSClientAPI
@@ -475,6 +488,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		CloudWatchClient:     cloudwatch.NewFromConfig(awsCfg),
 		CloudWatchLogsClient: cloudwatchlogs.NewFromConfig(awsCfg),
 		CloudTrailClient:     cloudtrail.NewFromConfig(awsCfg),
+		CloudFormationClient: cloudformation.NewFromConfig(awsCfg),
 		GuardDutyClient:      guardduty.NewFromConfig(awsCfg),
 		ConfigServiceClient:  configservice.NewFromConfig(awsCfg),
 		ECSClient:            ecs.NewFromConfig(awsCfg),
