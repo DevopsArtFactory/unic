@@ -122,6 +122,7 @@ Pattern:
 - ACM expiry scanning uses the repository certificate list and the configured positive `inspector.acm_expiry_window_days` threshold (30 days by default)
 - Checklist Inspector YAML schema loading, checklist result models, and readiness runners live here
 - rule packs still depend on `internal/services/aws` repository methods and client interfaces rather than raw SDK setup
+- the cost/waste rule pack reuses the EC2 and ELBv2 client interfaces for resource-state, tag, snapshot-age, and target-registration checks
 - this package remains the growth path for future inspector workflows beyond Security and Checklist Inspector
 
 ### `internal/app/`

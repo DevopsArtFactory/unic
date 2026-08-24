@@ -12,7 +12,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
 - Perform operational workflows such as EC2 inventory inspection, SSM sessions, RDS control, Route53 record changes, ECS rollout inspection/exec, EKS cluster and node group review, IAM access key rotation, and Bedrock API key management
-- Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
+- Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in security and cost/waste findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
 ## Documentation Map
 
@@ -326,10 +326,10 @@ Context ordering:
 
 | Workflow | Status | Notes |
 |---|---|---|
-| Security Inspector | Ready | Runs built-in rule packs and opens severity-filtered findings |
+| Security Inspector | Ready | Runs built-in security and cost/waste rule packs and opens severity-filtered findings |
 | Checklist Inspector | Ready | Runs a YAML checklist and reports pass/fail per check with resource context and mismatch details |
 
-Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, KMS customer-key rotation, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, and ElastiCache for Valkey encryption/backup/access-control checks.
+Security Inspector ships built-in rule packs for Security Group exposure, RDS encryption/public access/backups and public snapshot sharing, IAM access key age/root-account hardening/wildcard policies, Secrets Manager rotation age, KMS customer-key rotation, S3 public access/Block Public Access/versioning, CloudTrail baseline coverage, GuardDuty and AWS Config baseline controls, ElastiCache for Valkey encryption/backup/access-control checks, and cost/waste checks for unattached EIPs and EBS volumes, stopped EC2 instances, empty target groups, untagged EC2-family resources, and EBS snapshots aged 90 days or more.
 
 Checklist Inspector can load a YAML file either from the Inspector-mode file picker or from `--checklist` at startup. Press `a` on the checklist results screen to add a check through type-specific prompts instead of editing YAML: pick one of the twelve rule types, fill the prompted fields (empty skips optional expectations), and the check is appended to the loaded checklist file — or a new `unic-checklist.yaml` when none is loaded — validated through the same `LoadChecklist` rules before anything is written, then the checklist reruns so the new result shows immediately. Currently supported types:
 

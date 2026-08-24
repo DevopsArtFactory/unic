@@ -122,6 +122,7 @@ cross-service inspector workflow와 rule pack을 담당한다.
 - ACM 만료 스캔은 repository 인증서 목록과 양수 `inspector.acm_expiry_window_days` 설정값(기본 30일)을 사용
 - Checklist Inspector YAML schema 로딩, checklist 결과 모델, readiness runner도 여기서 관리
 - rule pack은 raw SDK setup 대신 `internal/services/aws` repository 메서드와 client interface에 의존
+- cost/waste rule pack은 EC2 및 ELBv2 client interface를 재사용해 resource state, tag, snapshot age, target 등록 상태를 점검
 - Security / Checklist Inspector 이후의 후속 inspector workflow도 이 패턴으로 확장
 
 ### `internal/app/`
