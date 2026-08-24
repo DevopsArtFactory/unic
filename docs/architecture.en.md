@@ -171,6 +171,8 @@ Screen-specific rendering still lives in dedicated files such as:
 Supporting files include `styles.go`, `filter.go`, and `messages.go`.
 `filter.go` and `filter_match.go` now centralize shared list filtering, fuzzy match ordering, and inline match highlighting across common list screens, including the VPC and subnet lists. When a shared filter is active, arrow-key navigation still flows through to the current list selection so users can move through filtered results without closing filter mode first.
 
+`command_lifecycle.go` owns deadline-bound command contexts and generation IDs. `watch.go` uses that shared lifecycle for opt-in 5s/15s/30s refreshes on the alarm list, ECS rollout detail, SQS depth views, and ELB target-health views. Every tick renews and binds a generation so superseded results are dropped; leaving the watched screen invalidates its timer and cancels any in-flight refresh. Feature submodels apply successful watch results in place so list selection and detail scroll state remain stable.
+
 ## Authentication Model
 
 UNIC supports five main auth modes.

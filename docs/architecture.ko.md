@@ -171,6 +171,8 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 보조 파일로 `styles.go`, `filter.go`, `messages.go` 등이 있다.
 `filter.go`와 `filter_match.go`는 공통 리스트 화면의 필터링, fuzzy match 정렬, inline match highlighting을 중앙에서 처리하며 VPC / subnet 리스트에도 같은 흐름을 적용한다. shared filter가 활성화된 상태에서도 방향키 이동은 현재 리스트 선택으로 전달되어, filter mode를 먼저 닫지 않아도 필터링된 결과를 바로 탐색할 수 있다.
 
+`command_lifecycle.go`는 deadline이 있는 command context와 generation ID를 관리한다. `watch.go`는 이 공통 lifecycle을 사용해 alarm 목록, ECS rollout 상세, SQS depth 화면, ELB target-health 화면을 5초/15초/30초 간격으로 선택적으로 새로 고친다. 각 tick은 새 generation에 command를 묶어 이전 결과를 버리고, 감시 중인 화면을 벗어나면 timer를 무효화하고 진행 중인 refresh도 취소한다. Feature submodel은 성공한 watch 결과를 현재 화면에 적용해 목록 선택과 상세 scroll 위치를 유지한다.
+
 ## 인증 모델
 
 UNIC은 현재 다섯 가지 인증 모드를 지원한다.
