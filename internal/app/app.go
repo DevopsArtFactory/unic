@@ -750,7 +750,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			m.settingsPrevScreen = m.screen
+			if !overlayChainMatches(m, m.screen, func(current screen) bool {
+				return current == screenSettings
+			}) {
+				m.settingsPrevScreen = m.screen
+			}
 			m.cancelDynamoDBLoadForOverlay()
 			m.screen = screenSettings
 			return m, nil

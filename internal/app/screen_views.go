@@ -70,7 +70,11 @@ func (m Model) openViews() (tea.Model, tea.Cmd) {
 	m.views.naming = false
 	m.views.nameInput = ""
 	m.views.notice = ""
-	m.views.prevScreen = m.screen
+	if !overlayChainMatches(m, m.screen, func(current screen) bool {
+		return current == screenViewList
+	}) {
+		m.views.prevScreen = m.screen
+	}
 	m.screen = screenViewList
 	return m, nil
 }

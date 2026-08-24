@@ -372,6 +372,8 @@ func TestContextPickerStackedOverlaysPreserveReturnScreen(t *testing.T) {
 	}{
 		{name: "settings then views", keys: "SV"},
 		{name: "views then settings", keys: "VS"},
+		{name: "settings views settings", keys: "SVS"},
+		{name: "views settings views", keys: "VSV"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
