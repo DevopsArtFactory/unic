@@ -87,7 +87,11 @@ var (
 // openPalette builds the instantly-available items (features, contexts) and
 // starts the async resource index for the current context.
 func (m Model) openPalette() (tea.Model, tea.Cmd) {
-	m.palette.prevScreen = m.screen
+	if !overlayChainMatches(m, m.screen, func(current screen) bool {
+		return current == screenCommandPalette
+	}) {
+		m.palette.prevScreen = m.screen
+	}
 	m.palette.query = ""
 	m.palette.idx = 0
 	m.palette.resources = nil
