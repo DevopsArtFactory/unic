@@ -690,11 +690,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			if m.screen != screenSettings || m.settingsPrevScreen != screenContextPicker {
+			returnsToContextPicker :=
+				(m.screen == screenSettings && m.settingsPrevScreen == screenContextPicker) ||
+					(m.screen == screenViewList && m.views.prevScreen == screenContextPicker)
+			if !returnsToContextPicker {
 				m.ctxPrevScreen = m.screen
+				m.ctxPrevWasLoading = false
 			}
 			m.ctxPickerPending = true
-			m.ctxPrevWasLoading = false
 			if m.screen == screenLoading && isDynamoDBScreen(m.loadingReturnScreen) {
 				m.ctxPrevScreen = m.loadingReturnScreen
 				m.ctxPrevWasLoading = true

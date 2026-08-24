@@ -923,6 +923,62 @@ func TestDynamoDBContextPickerCommittedOverlaysClearInterruptedLoad(t *testing.T
 	}
 }
 
+func TestDynamoDBContextPickerOverlaysPreserveInterruptedLoad(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		key    rune
+		screen screen
+	}{
+		{name: "settings", key: 'S', screen: screenSettings},
+		{name: "views", key: 'V', screen: screenViewList},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			m.cfg.ContextName = "dev"
+			loading, _ := m.dynamodb.Start(&m)
+			m = loading.(Model)
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = opened.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+
+			overlay, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
+			m = overlay.(Model)
+			if m.screen != tc.screen || !m.ctxPrevWasLoading {
+				t.Fatalf("expected %s over the interrupted context picker, screen=%v loading=%v", tc.name, m.screen, m.ctxPrevWasLoading)
+			}
+
+			reopened, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = reopened.(Model)
+			if cmd == nil {
+				t.Fatal("expected context reload command")
+			}
+			reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = reloaded.(Model)
+			if m.screen != screenContextPicker || m.ctxPrevScreen != screenDynamoDBTableList || !m.ctxPrevWasLoading {
+				t.Fatalf("expected %s to preserve the interrupted load owner, screen=%v return=%v loading=%v", tc.name, m.screen, m.ctxPrevScreen, m.ctxPrevWasLoading)
+			}
+
+			generation := m.commands.CurrentGen()
+			resumed, resumeCmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = resumed.(Model)
+			if m.screen != screenLoading || m.loadingReturnScreen != screenDynamoDBTableList || resumeCmd == nil {
+				t.Fatalf("expected %s cancel to restart the list load, screen=%v return=%v cmd=%v", tc.name, m.screen, m.loadingReturnScreen, resumeCmd)
+			}
+			if got := m.commands.CurrentGen(); got != generation+1 {
+				t.Fatalf("expected exactly one resumed command generation, got %d after %d", got, generation)
+			}
+
+			stillLoading, duplicateCmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = stillLoading.(Model)
+			if duplicateCmd != nil || m.screen != screenLoading || m.commands.CurrentGen() != generation+1 {
+				t.Fatalf("expected repeated cancel to leave the single resumed load unchanged, screen=%v cmd=%v generation=%d", m.screen, duplicateCmd, m.commands.CurrentGen())
+			}
+		})
+	}
+}
+
 func TestDynamoDBGlobalOverlaysDropInterruptedResultAndRestartOnCancel(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
