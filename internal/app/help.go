@@ -69,21 +69,21 @@ func (m Model) globalHelpShortcuts() []helpShortcut {
 	if m.screen != screenServiceList && m.screen != screenContextPicker &&
 		m.screen != screenAutoScalingCapacityInput && m.screen != screenAutoScalingConfirm &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+		m.screen != screenLambdaInvokeInput && m.screen != screenDynamoDBLookupInput && m.screen != screenBedrockKeyCreate &&
 		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"H", "Jump to the service list"})
 	}
 	if m.screen != screenContextPicker &&
 		m.screen != screenAutoScalingCapacityInput && m.screen != screenAutoScalingConfirm &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+		m.screen != screenLambdaInvokeInput && m.screen != screenDynamoDBLookupInput && m.screen != screenBedrockKeyCreate &&
 		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"C", "Open the context picker"})
 	}
 	if m.screen != screenSettings &&
 		m.screen != screenAutoScalingCapacityInput && m.screen != screenAutoScalingConfirm &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
-		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
+		m.screen != screenLambdaInvokeInput && m.screen != screenDynamoDBLookupInput && m.screen != screenBedrockKeyCreate &&
 		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"S", "Open settings"})
 	}
@@ -1018,6 +1018,14 @@ func (m Model) helpScreenTitle() string {
 		return "Lambda Invoke"
 	case screenLambdaInvokeResult:
 		return "Lambda Invoke Result"
+	case screenDynamoDBTableList:
+		return "DynamoDB Tables"
+	case screenDynamoDBTableDetail:
+		return "DynamoDB Table Detail"
+	case screenDynamoDBLookupInput:
+		return "DynamoDB Key Lookup"
+	case screenDynamoDBLookupResult:
+		return "DynamoDB Item"
 	case screenBedrockKeyList:
 		return "Bedrock API Keys"
 	case screenBedrockKeyDetail:

@@ -292,6 +292,22 @@ func TestCatalogContainsElastiCacheBrowserFeature(t *testing.T) {
 	t.Error("ElastiCache service not found in catalog")
 }
 
+func TestCatalogContainsDynamoDBBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceDynamoDB {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureDynamoDBBrowser {
+				return
+			}
+		}
+		t.Error("DynamoDB service should have DynamoDB Table Browser feature")
+		return
+	}
+	t.Error("DynamoDB service not found in catalog")
+}
+
 func TestCatalogContainsEventBridgeRulesFeature(t *testing.T) {
 	for _, svc := range Catalog() {
 		if svc.Name != ServiceEventBridge {

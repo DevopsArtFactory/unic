@@ -172,6 +172,7 @@ func (m Model) updatePalette(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) executePaletteItem(item paletteItem) (tea.Model, tea.Cmd) {
 	m.palette.stopIndex()
+	m.ctxPrevWasLoading = false
 	switch item.kind {
 	case paletteItemContext:
 		return m.startLoading(m.switchContext(item.contextName))

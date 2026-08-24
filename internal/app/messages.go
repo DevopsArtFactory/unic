@@ -473,3 +473,15 @@ type lambdaFunctionsLoadedMsg struct {
 type lambdaInvokeResultMsg struct {
 	result *awsservice.LambdaInvokeResult
 }
+
+type dynamoDBTablesLoadedMsg struct {
+	tables []awsservice.DynamoDBTable
+}
+
+type dynamoDBTableDetailLoadedMsg struct {
+	table *awsservice.DynamoDBTable
+}
+
+type dynamoDBItemLoadedMsg struct {
+	item *awsservice.DynamoDBItem
+}

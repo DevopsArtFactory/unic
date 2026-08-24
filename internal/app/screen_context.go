@@ -82,6 +82,19 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if isEventBridgeScreen(m.regionPrevScreen) {
 			m.regionPrevScreen = screenFeatureList
 		}
+		m.dynamodb = newDynamoDBModel()
+		m.resetFilter(filterDynamoDBTables)
+		m.ctxPrevWasLoading = false
+		if m.settingsPrevScreen == screenLoading || isDynamoDBScreen(m.settingsPrevScreen) {
+			m.settingsPrevScreen = screenServiceList
+		}
+		if m.views.prevScreen == screenLoading || isDynamoDBScreen(m.views.prevScreen) {
+			m.views.prevScreen = screenServiceList
+		}
+		if isDynamoDBScreen(m.ctxPrevScreen) {
+			m.ctxPrevScreen = screenServiceList
+		}
+		m.regionPrevScreen = screenServiceList
 		if m.pendingView != nil {
 			// A saved view triggered this switch: continue the jump now that
 			// the new context is active.
@@ -198,8 +211,12 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If we have a valid config (mid-session C key), go back.
 		// If initial launch, quit.
 		if m.cfg.ContextName != "" {
-			m.screen = m.ctxPrevScreen
 			m.resetFilter(filterContexts)
+			if m.ctxPrevWasLoading {
+				m.ctxPrevWasLoading = false
+				return m.dynamodb.resumeLoading(&m, m.ctxPrevScreen)
+			}
+			m.screen = m.ctxPrevScreen
 		} else {
 			m.quitting = true
 			return m, tea.Quit
@@ -223,6 +240,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				normalizeStepFunctionsContextReturn(&m)
 			}
 			m.eventBridge.preserveOverlay(&m, screenFeatureList)
+			m.ctxPrevWasLoading = false
 			return m.startLoading(m.switchContext(selected.Name))
 		}
 	case "s":

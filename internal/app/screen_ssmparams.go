@@ -45,6 +45,9 @@ func (pm *ssmParamsModel) clearValue() {
 }
 
 func (m Model) restoreScreenAfterOverlay(previous screen) (tea.Model, tea.Cmd) {
+	if previous == screenLoading && isDynamoDBScreen(m.loadingReturnScreen) {
+		return m.dynamodb.resumeLoading(&m, m.loadingReturnScreen)
+	}
 	if previous == screenLoading && m.loadingReturnScreen == screenSSMParamList {
 		return m.ssmParams.Start(&m)
 	}

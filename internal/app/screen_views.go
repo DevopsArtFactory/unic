@@ -44,6 +44,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureElastiCacheBrowser:    filterElastiCacheResources,
 	domain.FeatureKMSKeyBrowser:         filterKMSKeys,
 	domain.FeatureLambdaBrowser:         filterLambdaFunctions,
+	domain.FeatureDynamoDBBrowser:       filterDynamoDBTables,
 	domain.FeatureBedrockAPIKeys:        filterBedrockKeys,
 	domain.FeatureVPCBrowser:            filterVPCs,
 }
@@ -177,6 +178,7 @@ func (m Model) updateViews(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // different one (the jump continues from contextSwitchedMsg), otherwise jump
 // straight into the feature with the filter prefilled.
 func (m Model) applyView(view config.ViewEntry) (tea.Model, tea.Cmd) {
+	m.ctxPrevWasLoading = false
 	if view.Context != "" && (m.cfg == nil || m.cfg.ContextName != view.Context) {
 		m.pendingView = &view
 		m.ctxPrevScreen = screenServiceList

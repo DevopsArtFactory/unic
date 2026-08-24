@@ -122,6 +122,10 @@ const (
 	screenLambdaFunctionDetail
 	screenLambdaInvokeInput
 	screenLambdaInvokeResult
+	screenDynamoDBTableList
+	screenDynamoDBTableDetail
+	screenDynamoDBLookupInput
+	screenDynamoDBLookupResult
 	screenBedrockKeyList
 	screenBedrockKeyDetail
 	screenBedrockKeyCreate
@@ -214,6 +218,7 @@ type Model struct {
 	stepFunctions  stepFunctionsModel
 	eventBridge    eventBridgeModel
 	lambda         lambdaModel
+	dynamodb       dynamoDBModel
 	inspector      inspectorModel
 
 	// Context picker
@@ -225,6 +230,7 @@ type Model struct {
 	favoriteContexts   map[string]struct{}
 	ctxPrevScreen      screen
 	ctxPickerPending   bool
+	ctxPrevWasLoading  bool
 	pendingContextName string
 	envContextName     string
 	envContextSource   string
@@ -344,6 +350,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.acm = newACMModel()
 	model.stepFunctions = newStepFunctionsModel()
 	model.lambda = newLambdaModel()
+	model.dynamodb = newDynamoDBModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
 	return model
@@ -510,6 +517,9 @@ func (m Model) isTextEntryScreen() bool {
 	if m.screen == screenInspectorChecklistAdd && m.inspector.addStep > 0 {
 		return true
 	}
+	if m.screen == screenDynamoDBLookupInput {
+		return true
+	}
 	if m.screen == screenSQSConfirm {
 		return true
 	}
@@ -602,9 +612,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case errMsg:
 		// A failed view-triggered context switch must not leave its deferred
-		// jump armed for the next unrelated switch.
+		// jump or interrupted context-picker load armed for later navigation.
 		m.pendingView = nil
 		m.stopWatch()
+		m.ctxPrevWasLoading = false
 		m.errMsg = msg.err.Error()
 		m.loadingTitle = ""
 		m.loadingDetails = nil
@@ -665,6 +676,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			!m.isTextEntryScreen() && m.screen != screenFISTemplateList {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
+			m.ctxPrevWasLoading = false
 			wasWatching := m.watch.enabled || m.watch.refreshing
 			m.stopWatch()
 			if m.commands != nil && !wasWatching {
@@ -682,6 +694,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ctxPrevScreen = m.screen
 			}
 			m.ctxPickerPending = true
+			m.ctxPrevWasLoading = false
+			if m.screen == screenLoading && isDynamoDBScreen(m.loadingReturnScreen) {
+				m.ctxPrevScreen = m.loadingReturnScreen
+				m.ctxPrevWasLoading = true
+				if m.commands != nil {
+					m.commands.CancelAll()
+				}
+			}
 			return m, m.loadContexts()
 		}
 		// Global resource-region switch. Authentication identity remains unchanged;
@@ -703,6 +723,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			m.settingsPrevScreen = m.screen
+			m.cancelDynamoDBLoadForOverlay()
 			m.screen = screenSettings
 			return m, nil
 		}
@@ -713,6 +734,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
+			m.cancelDynamoDBLoadForOverlay()
 			return m.openPalette()
 		}
 		// Global saved views — V opens the saved views screen (skip
@@ -722,6 +744,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
+			m.cancelDynamoDBLoadForOverlay()
 			return m.openViews()
 		}
 
@@ -902,6 +925,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.fis.Start(&m)
 	case domain.FeatureLambdaBrowser:
 		return m.lambda.Start(&m)
+	case domain.FeatureDynamoDBBrowser:
+		return m.dynamodb.Start(&m)
 	case domain.FeatureBedrockAPIKeys:
 		return m.bedrock.Start(&m)
 	}
@@ -914,6 +939,7 @@ func (m Model) updateError(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.quitting = true
 		return m, tea.Quit
 	case "esc", "enter":
+		m.ctxPrevWasLoading = false
 		m.screen = screenServiceList
 	}
 	return m, nil

@@ -107,6 +107,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - Step Functions
 - S3
 - KMS
+- DynamoDB
 
 패턴:
 
@@ -169,6 +170,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_stepfunctions.go`
 - `screen_s3.go`
 - `screen_lambda.go`
+- `screen_dynamodb.go`
 - `screen_bedrock.go`
 - `screen_secrets.go`
 - `screen_kms.go`
@@ -259,6 +261,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - S3 bucket/object/detail
 - KMS key list/detail, rotation 상태
 - EventBridge rule list/detail, 스크롤 가능한 전체 event pattern, 변경 가능한 rule mode의 type-to-confirm 상태 변경 flow
+- DynamoDB table list/detail, 전체 primary key 기반 `GetItem`
 - Inspector mode home, checklist setup, KMS rotation finding을 포함한 security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
 - SSO account / role selection, exit notice
