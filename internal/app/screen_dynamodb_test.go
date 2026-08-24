@@ -983,6 +983,55 @@ func TestDynamoDBContextPickerOverlaysPreserveInterruptedLoad(t *testing.T) {
 	}
 }
 
+func TestDynamoDBRegionSwitchClearsInterruptedOverlayReturn(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  rune
+	}{
+		{name: "settings", key: 'S'},
+		{name: "views", key: 'V'},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := multiRegionTestModel()
+			loading, _ := m.dynamodb.Start(&m)
+			m = loading.(Model)
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = opened.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+			overlay, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
+			m = overlay.(Model)
+
+			regionPicker, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+			m = regionPicker.(Model)
+			moved, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+			m = moved.(Model)
+			switching, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			m = switching.(Model)
+			if m.screen != screenLoading || cmd == nil {
+				t.Fatalf("expected %s region switch to start loading, screen=%v cmd=%v", tc.name, m.screen, cmd)
+			}
+
+			switched, _ := m.Update(regionSwitchedMsg{region: "us-east-1"})
+			m = switched.(Model)
+			if m.screen != screenServiceList || m.ctxPrevWasLoading {
+				t.Fatalf("expected %s region switch to clear interrupted return, screen=%v loading=%v", tc.name, m.screen, m.ctxPrevWasLoading)
+			}
+
+			reopened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = reopened.(Model)
+			reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = reloaded.(Model)
+			canceled, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = canceled.(Model)
+			if m.screen != screenServiceList || cmd != nil {
+				t.Fatalf("expected later picker cancel to stay on the service list, screen=%v cmd=%v", m.screen, cmd)
+			}
+		})
+	}
+}
+
 func TestDynamoDBGlobalOverlaysDropInterruptedResultAndRestartOnCancel(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
