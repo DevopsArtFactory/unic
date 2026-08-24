@@ -641,7 +641,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "C" && m.screen != screenContextPicker && !m.isTextEntryScreen() {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			m.ctxPrevScreen = m.screen
+			if m.screen != screenSettings || m.settingsPrevScreen != screenContextPicker {
+				m.ctxPrevScreen = m.screen
+			}
 			return m, m.loadContexts()
 		}
 		// Global resource-region switch. Authentication identity remains unchanged;
