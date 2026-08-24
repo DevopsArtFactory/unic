@@ -125,9 +125,10 @@ func (am acmModel) viewList(m Model) string {
 	b.WriteString("\n")
 	b.WriteString(m.renderFilterValue(filterACMCertificates))
 	b.WriteString("\n")
-	for _, warning := range am.warnings {
-		b.WriteString(errorStyle.Render("  " + warning.Error()))
-		b.WriteString("\n")
+	warningLines := 0
+	if len(am.warnings) > 0 {
+		b.WriteString(m.renderWarningSummary(len(am.warnings), "resource lookup failures", am.warnings[0].Error()))
+		warningLines = 2
 	}
 	b.WriteString("\n")
 	if len(am.filtered) == 0 {
@@ -136,7 +137,7 @@ func (am acmModel) viewList(m Model) string {
 	} else {
 		panel.WriteString(dimStyle.Render("  DOMAIN                                     STATUS         EXPIRES IN USE  RENEWAL"))
 		panel.WriteString("\n")
-		visibleLines := max(m.height-11-len(am.warnings), 5)
+		visibleLines := max(m.height-11-warningLines, 5)
 		start := max(am.idx-visibleLines+1, 0)
 		for i := start; i < min(start+visibleLines, len(am.filtered)); i++ {
 			cursor, style := "  ", normalStyle

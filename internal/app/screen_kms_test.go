@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -54,13 +55,20 @@ func TestKMSKeysLoadedRendersPostureAndDetail(t *testing.T) {
 
 func TestKMSPartialWarningKeepsKeyWithUnknownRotation(t *testing.T) {
 	m := New(testConfig(), "", "dev")
+	m.height = 12
+	warnings := make([]error, 8)
+	for i := range warnings {
+		warnings[i] = fmt.Errorf("failed lookup %d", i+1)
+	}
 	m.kms.HandleMessage(&m, kmsKeysLoadedMsg{
 		keys:     []awsservice.KMSKey{{ID: "key-1", RotationEligible: true}},
-		warnings: []error{errors.New("failed to get rotation status for KMS key key-1: access denied")},
+		warnings: warnings,
 	})
 
 	view := stripANSI(m.kms.viewList(m))
-	if m.screen != screenKMSKeyList || !strings.Contains(view, "key-1") || !strings.Contains(view, "unknown") || !strings.Contains(view, "access denied") {
+	if m.screen != screenKMSKeyList || !strings.Contains(view, "Warnings: 8 resource lookup failures") ||
+		!strings.Contains(view, "failed lookup 1") || strings.Contains(view, "failed lookup 2") ||
+		!strings.Contains(view, "key-1") || !strings.Contains(view, "unknown") || !strings.Contains(view, "esc:") {
 		t.Fatalf("expected partial key and warning, got screen %v:\n%s", m.screen, view)
 	}
 }

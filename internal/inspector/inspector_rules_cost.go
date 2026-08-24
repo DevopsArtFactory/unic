@@ -250,6 +250,9 @@ func inspectEmptyTargetGroups(ctx context.Context, client ELBv2ClientAPI) ([]Sec
 				TargetGroupArn: targetGroup.TargetGroupArn,
 			})
 			if err != nil {
+				if ctx.Err() != nil {
+					return nil, nil, ctx.Err()
+				}
 				warnings = append(warnings, fmt.Errorf("failed to inspect target health for %s: %w", resourceID, err))
 				continue
 			}

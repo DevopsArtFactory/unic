@@ -1,7 +1,7 @@
 package app
 
 import (
-	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -12,13 +12,20 @@ import (
 
 func TestACMPartialWarningKeepsSuccessfulCertificates(t *testing.T) {
 	m := New(testConfig(), "", "dev")
+	m.height = 12
+	warnings := make([]error, 8)
+	for i := range warnings {
+		warnings[i] = fmt.Errorf("failed lookup %d", i+1)
+	}
 	m.acm.HandleMessage(&m, acmCertificatesLoadedMsg{
 		certificates: []awsservice.ACMCertificate{{ARN: "visible", DomainName: "visible.example.com"}},
-		warnings:     []error{errors.New("failed to describe ACM certificate denied: access denied")},
+		warnings:     warnings,
 	})
 
 	view := stripANSI(m.acm.viewList(m))
-	if m.screen != screenACMCertificateList || !strings.Contains(view, "visible.example.com") || !strings.Contains(view, "access denied") {
+	if m.screen != screenACMCertificateList || !strings.Contains(view, "Warnings: 8 resource lookup failures") ||
+		!strings.Contains(view, "failed lookup 1") || strings.Contains(view, "failed lookup 2") ||
+		!strings.Contains(view, "visible.example.com") || !strings.Contains(view, "esc:") {
 		t.Fatalf("expected partial certificate and warning, got screen %v:\n%s", m.screen, view)
 	}
 }

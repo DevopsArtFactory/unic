@@ -1,11 +1,37 @@
 package app
 
 import (
+	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"unic/internal/inspector"
 )
+
+func TestInspectorWarningsStayBoundedWithPartialFindings(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 14
+	m.screen = screenInspectorResults
+	m.inspector.report = &inspector.SecurityScanReport{
+		ScannedAt:    time.Now(),
+		ScannerCount: 1,
+		Warnings:     []string{"cost-waste: failed lookup 1\nfailed lookup 2\nfailed lookup 3"},
+	}
+	m.inspector.findings = []inspector.SecurityFinding{{
+		RuleName:     "Empty target group",
+		Severity:     inspector.RuleSeverityLow,
+		ResourceType: "ELBTargetGroup",
+		ResourceID:   "target-group-1",
+	}}
+
+	view := stripANSI(m.inspector.viewResults(m))
+	if !strings.Contains(view, "Warnings: 1 rule pack errors") || !strings.Contains(view, "failed lookup 1") ||
+		strings.Contains(view, "failed lookup 2") || !strings.Contains(view, "target-group-1") ||
+		!strings.Contains(view, "esc: Inspector mode") {
+		t.Fatalf("expected bounded warnings with findings and help visible:\n%s", view)
+	}
+}
 
 func TestInspectorEnsureWorkflowsKeepsExistingWorkflows(t *testing.T) {
 	im := inspectorModel{

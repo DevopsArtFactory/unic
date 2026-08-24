@@ -106,9 +106,10 @@ func (km kmsModel) viewList(m Model) string {
 	b.WriteString("\n")
 	b.WriteString(m.renderFilterValue(filterKMSKeys))
 	b.WriteString("\n")
-	for _, warning := range km.warnings {
-		b.WriteString(errorStyle.Render("  " + warning.Error()))
-		b.WriteString("\n")
+	warningLines := 0
+	if len(km.warnings) > 0 {
+		b.WriteString(m.renderWarningSummary(len(km.warnings), "resource lookup failures", km.warnings[0].Error()))
+		warningLines = 2
 	}
 	b.WriteString("\n")
 	if len(km.filtered) == 0 {
@@ -117,7 +118,7 @@ func (km kmsModel) viewList(m Model) string {
 		idCol := lipgloss.NewStyle().Width(38).MaxWidth(38)
 		stateCol := lipgloss.NewStyle().Width(16).MaxWidth(16)
 		p.WriteString(dimStyle.Render("  " + idCol.Render("KEY ID / ALIAS") + " " + stateCol.Render("STATE") + " MANAGER  ROTATION\n"))
-		visibleLines := max(m.height-11-len(km.warnings), 5)
+		visibleLines := max(m.height-11-warningLines, 5)
 		start := 0
 		if km.idx >= visibleLines {
 			start = km.idx - visibleLines + 1
