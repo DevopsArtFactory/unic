@@ -13,6 +13,7 @@ const (
 	filterInstances
 	filterEC2BrowserInstances
 	filterEC2BrowserRelated
+	filterAutoScalingGroups
 	filterSubnetIPs
 	filterRDS
 	filterRoute53Zones
@@ -43,6 +44,7 @@ const (
 	filterBedrockKeys
 	filterCWAlarms
 	filterCloudTrailEvents
+	filterEventBridgeRules
 	filterSQSQueues
 	filterELBs
 	filterELBTargetGroups
@@ -50,6 +52,9 @@ const (
 	filterElastiCacheResources
 	filterKMSKeys
 	filterACMCertificates
+	filterCloudFormationStacks
+	filterStepFunctionStateMachines
+	filterStepFunctionExecutions
 	filterDynamoDBTables
 )
 

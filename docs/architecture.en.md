@@ -90,17 +90,21 @@ Current repository clients include:
 - EC2
 - SSM
 - RDS
+- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
 - CloudWatch Metrics
+- EventBridge
 - STS
 - CloudWatch Logs
 - ECS
 - ECR
+- Auto Scaling
 - FIS
 - ElastiCache
 - ACM
+- Step Functions
 - S3
 - KMS
 - DynamoDB
@@ -123,6 +127,7 @@ Pattern:
 - ACM expiry scanning uses the repository certificate list and the configured positive `inspector.acm_expiry_window_days` threshold (30 days by default)
 - Checklist Inspector YAML schema loading, checklist result models, and readiness runners live here
 - rule packs still depend on `internal/services/aws` repository methods and client interfaces rather than raw SDK setup
+- the cost/waste rule pack reuses the EC2 and ELBv2 client interfaces for resource-state, tag, snapshot-age, and target-registration checks
 - this package remains the growth path for future inspector workflows beyond Security and Checklist Inspector
 
 ### `internal/app/`
@@ -148,8 +153,10 @@ Screen-specific rendering still lives in dedicated files such as:
 
 - `screen_ec2.go`
 - `screen_ec2_browser.go`
+- `screen_autoscaling.go`
 - `screen_vpc.go`
 - `screen_rds.go`
+- `screen_cloudformation.go`
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
@@ -160,6 +167,7 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_ecr.go`
 - `screen_elasticache.go`
 - `screen_acm.go`
+- `screen_stepfunctions.go`
 - `screen_s3.go`
 - `screen_lambda.go`
 - `screen_dynamodb.go`
@@ -171,6 +179,8 @@ Screen-specific rendering still lives in dedicated files such as:
 
 Supporting files include `styles.go`, `filter.go`, and `messages.go`.
 `filter.go` and `filter_match.go` now centralize shared list filtering, fuzzy match ordering, and inline match highlighting across common list screens, including the VPC and subnet lists. When a shared filter is active, arrow-key navigation still flows through to the current list selection so users can move through filtered results without closing filter mode first.
+
+`command_lifecycle.go` owns deadline-bound command contexts and generation IDs. `watch.go` uses that shared lifecycle for opt-in 5s/15s/30s refreshes on the alarm list, ECS rollout detail, SQS depth views, and ELB target-health views. Every tick renews and binds a generation so superseded results are dropped; leaving the watched screen invalidates its timer and cancels any in-flight refresh. Feature submodels apply successful watch results in place so list selection and detail scroll state remain stable.
 
 ## Authentication Model
 
@@ -231,8 +241,10 @@ Current screen families include:
 - service list
 - feature list
 - EC2 / SSM
+- Auto Scaling group list, instance/activity detail, capacity input, and typed-confirmation flows
 - VPC / subnet / available IP detail
 - RDS list, detail, and confirm flows
+- CloudFormation stack list/detail, recent-event, and drift-detection flows
 - Route53 zone, record, and mutation flows
 - Secrets Manager list/detail
 - Security Group list/detail/edit flows
@@ -245,8 +257,10 @@ Current screen families include:
 - FIS experiment template list/detail, safe-run preview, and experiment history/detail flows
 - ElastiCache replication-group/cluster list, node list, and node detail flows
 - ACM certificate list/detail flows
+- Step Functions state machine list, failure-prioritized execution list, and execution detail flows
 - S3 bucket/object/detail flows
 - KMS key list/detail and rotation-posture flows
+- EventBridge rule list/detail, scrollable complete event patterns, and type-to-confirm state changes for eligible rule modes
 - DynamoDB table list/detail and complete-primary-key `GetItem` flows
 - Inspector mode home, checklist setup, security findings/detail (including KMS rotation findings), and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows

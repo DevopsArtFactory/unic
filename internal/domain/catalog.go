@@ -18,6 +18,10 @@ func Catalog() []Service {
 					Kind:        FeatureSecurityGroupBrowser,
 					Description: "Browse security groups and view inbound/outbound rules",
 				},
+				{
+					Kind:        FeatureAutoScalingBrowser,
+					Description: "Inspect group capacity, instance health, and scaling activity",
+				},
 			},
 		},
 		{
@@ -79,6 +83,15 @@ func Catalog() []Service {
 				{
 					Kind:        FeatureCloudTrailEvents,
 					Description: "Look up recent API activity: who changed what, and when",
+				},
+			},
+		},
+		{
+			Name: ServiceEventBridge,
+			Features: []Feature{
+				{
+					Kind:        FeatureEventBridgeRules,
+					Description: "Inspect rule schedules, event patterns, targets, and recent trigger activity",
 				},
 			},
 		},
@@ -190,6 +203,13 @@ func Catalog() []Service {
 			}},
 		},
 		{
+			Name: ServiceStepFunctions,
+			Features: []Feature{{
+				Kind:        FeatureStepFunctionsBrowser,
+				Description: "Browse state machines and triage failed executions",
+			}},
+		},
+		{
 			Name: ServiceLambda,
 			Features: []Feature{
 				{
@@ -213,6 +233,15 @@ func Catalog() []Service {
 				{
 					Kind:        FeatureBedrockAPIKeys,
 					Description: "Manage long-term Bedrock API keys for IAM users",
+				},
+			},
+		},
+		{
+			Name: ServiceCloudFormation,
+			Features: []Feature{
+				{
+					Kind:        FeatureCloudFormationBrowser,
+					Description: "Triage stacks, recent events, outputs, parameters, and drift",
 				},
 			},
 		},

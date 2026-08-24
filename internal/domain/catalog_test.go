@@ -61,6 +61,21 @@ func TestCatalogNotEmpty(t *testing.T) {
 	}
 }
 
+func TestCatalogContainsCloudFormationBrowser(t *testing.T) {
+	for _, service := range Catalog() {
+		if service.Name != ServiceCloudFormation {
+			continue
+		}
+		for _, feature := range service.Features {
+			if feature.Kind == FeatureCloudFormationBrowser {
+				return
+			}
+		}
+		t.Fatal("CloudFormation service should have the stack browser feature")
+	}
+	t.Fatal("CloudFormation service not found in catalog")
+}
+
 func TestAllServicesHaveFeatures(t *testing.T) {
 	for _, svc := range Catalog() {
 		if len(svc.Features) == 0 {
@@ -291,4 +306,52 @@ func TestCatalogContainsDynamoDBBrowserFeature(t *testing.T) {
 		return
 	}
 	t.Error("DynamoDB service not found in catalog")
+}
+
+func TestCatalogContainsEventBridgeRulesFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceEventBridge {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureEventBridgeRules {
+				return
+			}
+		}
+		t.Error("EventBridge service should have EventBridge Rules Browser feature")
+		return
+	}
+	t.Error("EventBridge service not found in catalog")
+}
+
+func TestCatalogContainsStepFunctionsBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceStepFunctions {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureStepFunctionsBrowser {
+				return
+			}
+		}
+		t.Error("Step Functions service should have Step Functions Execution Browser feature")
+		return
+	}
+	t.Error("Step Functions service not found in catalog")
+}
+
+func TestCatalogContainsAutoScalingBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceEC2 {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureAutoScalingBrowser {
+				return
+			}
+		}
+		t.Error("EC2 service should have Auto Scaling Group Browser feature")
+		return
+	}
+	t.Error("EC2 service not found in catalog")
 }
