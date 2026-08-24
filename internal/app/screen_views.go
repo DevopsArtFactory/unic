@@ -38,6 +38,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureSQSBrowser:            filterSQSQueues,
 	domain.FeatureELBBrowser:            filterELBs,
 	domain.FeatureACMCertificateBrowser: filterACMCertificates,
+	domain.FeatureStepFunctionsBrowser:  filterStepFunctionStateMachines,
 	domain.FeatureSSMParameterBrowser:   filterSSMParameters,
 	domain.FeatureElastiCacheBrowser:    filterElastiCacheResources,
 	domain.FeatureKMSKeyBrowser:         filterKMSKeys,

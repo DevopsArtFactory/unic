@@ -103,6 +103,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - FIS
 - ElastiCache
 - ACM
+- Step Functions
 - S3
 - KMS
 
@@ -164,6 +165,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_ecr.go`
 - `screen_elasticache.go`
 - `screen_acm.go`
+- `screen_stepfunctions.go`
 - `screen_s3.go`
 - `screen_lambda.go`
 - `screen_bedrock.go`
@@ -252,6 +254,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - FIS experiment template list/detail, safe-run preview 및 experiment history/detail
 - ElastiCache replication group/cluster list, node list, node detail
 - ACM 인증서 list/detail
+- Step Functions state machine list, failure 우선 execution list, execution detail
 - S3 bucket/object/detail
 - KMS key list/detail, rotation 상태
 - Inspector mode home, checklist setup, KMS rotation finding을 포함한 security findings/detail, checklist results/detail

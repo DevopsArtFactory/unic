@@ -994,6 +994,12 @@ func (m Model) helpScreenTitle() string {
 		return "ACM Certificates"
 	case screenACMCertificateDetail:
 		return "ACM Certificate Detail"
+	case screenStepFunctionStateMachineList:
+		return "Step Functions State Machines"
+	case screenStepFunctionExecutionList:
+		return "Step Functions Executions"
+	case screenStepFunctionExecutionDetail:
+		return "Step Functions Execution Detail"
 	case screenS3ObjectList:
 		return "S3 Objects"
 	case screenS3ObjectDetail:

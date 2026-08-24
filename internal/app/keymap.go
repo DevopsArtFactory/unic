@@ -246,6 +246,31 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "q / esc", bar: "esc: back", help: "Go back to the certificate list"},
 		{bar: "H: home"},
 	},
+	screenStepFunctionStateMachineList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between state machines"},
+		{keys: "/", bar: "/: filter", help: "Filter by state machine name, ARN, type, or region"},
+		{keys: "r", bar: "r: refresh", help: "Refresh state machines"},
+		{keys: "enter", bar: "enter: executions", help: "Open recent executions for a STANDARD state machine"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenStepFunctionExecutionList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between executions"},
+		{keys: "/", bar: "/: filter", help: "Filter executions by name, ARN, or status"},
+		{keys: "r", bar: "r: refresh", help: "Refresh recent executions"},
+		{keys: "enter", bar: "enter: detail", help: "Open execution input, output, and failure details"},
+		{keys: "q", bar: "q: feature list", help: "Go back to the feature list"},
+		{keys: "esc", bar: "esc: state machines", help: "Go back to the state machine list"},
+		{bar: "H: home"},
+	},
+	screenStepFunctionExecutionDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll execution details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll execution details by one page"},
+		{keys: "r", bar: "r: refresh", help: "Refresh execution details"},
+		{keys: "q", bar: "q: feature list", help: "Go back to the feature list"},
+		{keys: "esc", bar: "esc: executions", help: "Go back to the execution list"},
+		{bar: "H: home"},
+	},
 
 	screenIAMUserList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},

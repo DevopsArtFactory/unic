@@ -292,6 +292,22 @@ func TestCatalogContainsElastiCacheBrowserFeature(t *testing.T) {
 	t.Error("ElastiCache service not found in catalog")
 }
 
+func TestCatalogContainsStepFunctionsBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceStepFunctions {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureStepFunctionsBrowser {
+				return
+			}
+		}
+		t.Error("Step Functions service should have Step Functions Execution Browser feature")
+		return
+	}
+	t.Error("Step Functions service not found in catalog")
+}
+
 func TestCatalogContainsAutoScalingBrowserFeature(t *testing.T) {
 	for _, svc := range Catalog() {
 		if svc.Name != ServiceEC2 {

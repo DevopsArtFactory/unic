@@ -109,6 +109,9 @@ const (
 	screenKMSKeyDetail
 	screenACMCertificateList
 	screenACMCertificateDetail
+	screenStepFunctionStateMachineList
+	screenStepFunctionExecutionList
+	screenStepFunctionExecutionDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -205,6 +208,7 @@ type Model struct {
 	elasticache    elasticacheModel
 	kms            kmsModel
 	acm            acmModel
+	stepFunctions  stepFunctionsModel
 	lambda         lambdaModel
 	inspector      inspectorModel
 
@@ -332,6 +336,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.elasticache = newElastiCacheModel()
 	model.kms = newKMSModel()
 	model.acm = newACMModel()
+	model.stepFunctions = newStepFunctionsModel()
 	model.lambda = newLambdaModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
@@ -863,6 +868,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.kms.Start(&m)
 	case domain.FeatureACMCertificateBrowser:
 		return m.acm.Start(&m)
+	case domain.FeatureStepFunctionsBrowser:
+		return m.stepFunctions.Start(&m)
 	case domain.FeatureSecurityGroupBrowser:
 		return m.security.Start(&m)
 	case domain.FeatureIAMUsersBrowser:
