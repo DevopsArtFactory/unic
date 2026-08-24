@@ -353,6 +353,7 @@ func (cm *cloudFormationModel) applyDriftStatus(stackID, driftStatus string, che
 		if cm.stacks[i].ID == stackID {
 			cm.stacks[i].DriftStatus = driftStatus
 			cm.stacks[i].LastDriftCheck = checked
+			break
 		}
 	}
 }
