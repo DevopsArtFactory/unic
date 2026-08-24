@@ -67,18 +67,21 @@ func (m Model) helpSections() []helpSection {
 func (m Model) globalHelpShortcuts() []helpShortcut {
 	var shortcuts []helpShortcut
 	if m.screen != screenServiceList && m.screen != screenContextPicker &&
+		m.screen != screenAutoScalingCapacityInput && m.screen != screenAutoScalingConfirm &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
 		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
 		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"H", "Jump to the service list"})
 	}
 	if m.screen != screenContextPicker &&
+		m.screen != screenAutoScalingCapacityInput && m.screen != screenAutoScalingConfirm &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
 		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
 		m.screen != screenBedrockKeyConfirm {
 		shortcuts = append(shortcuts, helpShortcut{"C", "Open the context picker"})
 	}
 	if m.screen != screenSettings &&
+		m.screen != screenAutoScalingCapacityInput && m.screen != screenAutoScalingConfirm &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
 		m.screen != screenLambdaInvokeInput && m.screen != screenBedrockKeyCreate &&
 		m.screen != screenBedrockKeyConfirm {
@@ -365,7 +368,11 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 		}
 	case screenCWAlarmList:
 		shortcuts := listScreenShortcuts("open the selected alarm", "go back to the feature list", true, true)
-		return append(shortcuts, helpShortcut{"tab", "Cycle the alarm state filter"})
+		return append(shortcuts,
+			helpShortcut{"tab", "Cycle the alarm state filter"},
+			helpShortcut{"W", "Toggle automatic alarm refresh"},
+			helpShortcut{"I", "Cycle the watch interval (5s/15s/30s)"},
+		)
 	case screenCWAlarmDetail:
 		return []helpShortcut{
 			{"g", "Jump to the related resource browser"},
@@ -397,6 +404,8 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"↑/↓, j/k", "Scroll the service rollout detail"},
 			{"pgup / pgdn", "Scroll by one page"},
 			{"r", "Refresh the service rollout detail"},
+			{"W", "Toggle automatic rollout refresh"},
+			{"I", "Cycle the watch interval (5s/15s/30s)"},
 			{"enter", "Open running tasks for the selected service"},
 			{"q / esc", "Go back to the service list"},
 		}
@@ -831,6 +840,14 @@ func (m Model) helpScreenTitle() string {
 		return "EC2 Related Resources"
 	case screenEC2InstanceBrowserRelatedDetail:
 		return "EC2 Related Resource Detail"
+	case screenAutoScalingGroupList:
+		return "Auto Scaling Groups"
+	case screenAutoScalingGroupDetail:
+		return "Auto Scaling Group Detail"
+	case screenAutoScalingCapacityInput:
+		return "Auto Scaling Desired Capacity"
+	case screenAutoScalingConfirm:
+		return "Auto Scaling Capacity Confirmation"
 	case screenVPCList:
 		return "VPC List"
 	case screenSubnetList:

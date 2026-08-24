@@ -32,6 +32,14 @@ func (m *mockAutoScalingClient) DescribeAutoScalingGroups(ctx context.Context, p
 	return &autoscaling.DescribeAutoScalingGroupsOutput{}, nil
 }
 
+func (m *mockAutoScalingClient) DescribeScalingActivities(context.Context, *autoscaling.DescribeScalingActivitiesInput, ...func(*autoscaling.Options)) (*autoscaling.DescribeScalingActivitiesOutput, error) {
+	return &autoscaling.DescribeScalingActivitiesOutput{}, nil
+}
+
+func (m *mockAutoScalingClient) SetDesiredCapacity(context.Context, *autoscaling.SetDesiredCapacityInput, ...func(*autoscaling.Options)) (*autoscaling.SetDesiredCapacityOutput, error) {
+	return &autoscaling.SetDesiredCapacityOutput{}, nil
+}
+
 type mockELBv2Client struct {
 	describeTargetGroupsFunc  func(ctx context.Context, params *elasticloadbalancingv2.DescribeTargetGroupsInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error)
 	describeTargetHealthFunc  func(ctx context.Context, params *elasticloadbalancingv2.DescribeTargetHealthInput, optFns ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error)

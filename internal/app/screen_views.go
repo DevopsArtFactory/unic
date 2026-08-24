@@ -18,6 +18,7 @@ import (
 // applies on load, so views (and the palette) can prefill it.
 var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureEC2InstanceBrowser:    filterEC2BrowserInstances,
+	domain.FeatureAutoScalingBrowser:    filterAutoScalingGroups,
 	domain.FeatureSSMSession:            filterInstances,
 	domain.FeatureRDSBrowser:            filterRDS,
 	domain.FeatureCloudFormationBrowser: filterCloudFormationStacks,

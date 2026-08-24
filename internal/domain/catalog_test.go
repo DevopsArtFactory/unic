@@ -291,3 +291,19 @@ func TestCatalogContainsElastiCacheBrowserFeature(t *testing.T) {
 	}
 	t.Error("ElastiCache service not found in catalog")
 }
+
+func TestCatalogContainsAutoScalingBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceEC2 {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureAutoScalingBrowser {
+				return
+			}
+		}
+		t.Error("EC2 service should have Auto Scaling Group Browser feature")
+		return
+	}
+	t.Error("EC2 service not found in catalog")
+}

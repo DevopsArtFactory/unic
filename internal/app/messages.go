@@ -257,6 +257,24 @@ type elasticacheResourcesLoadedMsg struct {
 	resources []awsservice.ElastiCacheResource
 }
 
+type autoScalingGroupsLoadedMsg struct {
+	groups []awsservice.AutoScalingGroup
+	err    error
+}
+
+type autoScalingDetailLoadedMsg struct {
+	groupName  string
+	group      *awsservice.AutoScalingGroup
+	activities []awsservice.AutoScalingActivity
+	err        error
+}
+
+type autoScalingCapacityUpdatedMsg struct {
+	groupName string
+	desired   int32
+	err       error
+}
+
 type acmCertificatesLoadedMsg struct {
 	certificates []awsservice.ACMCertificate
 }

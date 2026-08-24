@@ -9,8 +9,8 @@ import (
 
 func TestBuildPluginCommand(t *testing.T) {
 	sess := &ssm.StartSessionOutput{
-		SessionId: aws.String("sess-abc123"),
-		StreamUrl: aws.String("wss://example.com"),
+		SessionId:  aws.String("sess-abc123"),
+		StreamUrl:  aws.String("wss://example.com"),
 		TokenValue: aws.String("token123"),
 	}
 
