@@ -69,7 +69,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			newM, cmd := m.jumpToView(view)
 			return newM, tea.Batch(tea.ClearScreen, cmd), true
 		}
-		if m.ctxPrevScreen == screenCloudFormationStackList || m.ctxPrevScreen == screenCloudFormationStackDetail {
+		if cloudFormationContextReturnActive(m) {
 			m.ctxPrevScreen = screenFeatureList
 		}
 		m.screen = m.ctxPrevScreen
@@ -192,8 +192,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cursor := m.contextTable.Cursor()
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
-			if m.ctxPrevScreen == screenLoading &&
-				(m.loadingReturnScreen == screenCloudFormationStackList || m.loadingReturnScreen == screenCloudFormationStackDetail) {
+			if cloudFormationContextReturnActive(m) {
 				m.ctxPrevScreen = screenFeatureList
 			}
 			m.pendingContextName = selected.Name

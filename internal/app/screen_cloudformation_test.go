@@ -460,6 +460,40 @@ func TestCloudFormationContextSwitchDuringLoadReturnsToFeatureList(t *testing.T)
 	}
 }
 
+func TestCloudFormationContextSwitchThroughSettingsReturnsToFeatureList(t *testing.T) {
+	cfg := testConfig()
+	cfg.ContextName = "dev"
+	m := New(cfg, "", "dev")
+	m.screen = screenCloudFormationStackDetail
+	m.cloudFormation.selected = &awsservice.CloudFormationStack{ID: "old-stack", Name: "old"}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	model := updated.(Model)
+	updated, contextsCmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	model = updated.(Model)
+	if contextsCmd == nil || model.screen != screenSettings || model.ctxPrevScreen != screenSettings || model.settingsPrevScreen != screenCloudFormationStackDetail {
+		t.Fatalf("expected context loading over Settings and stack detail, got screen=%v context previous=%v settings previous=%v cmd=%v", model.screen, model.ctxPrevScreen, model.settingsPrevScreen, contextsCmd)
+	}
+
+	updated, _ = model.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "new"}}})
+	model = updated.(Model)
+	updated, switchCmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if switchCmd == nil || model.screen != screenLoading || model.ctxPrevScreen != screenFeatureList {
+		t.Fatalf("expected committed switch to replace the nested CloudFormation return, got screen=%v previous=%v cmd=%v", model.screen, model.ctxPrevScreen, switchCmd)
+	}
+
+	updated, _ = model.Update(contextSwitchedMsg{cfg: &config.Config{ContextName: "new", Region: "us-west-2"}})
+	model = updated.(Model)
+	if model.screen != screenFeatureList || model.cloudFormation.selected != nil {
+		t.Fatalf("expected a usable feature list with cleared stack state, got screen=%v selected=%+v", model.screen, model.cloudFormation.selected)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if model = updated.(Model); model.screen != screenServiceList {
+		t.Fatalf("expected Esc not to restore the cleared stack detail, got %v", model.screen)
+	}
+}
+
 func TestCloudFormationStateClearsAfterContextSwitch(t *testing.T) {
 	for _, tt := range []struct {
 		name     string

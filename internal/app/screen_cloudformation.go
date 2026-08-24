@@ -122,10 +122,25 @@ func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, 
 }
 
 func cloudFormationLoadActive(m Model) bool {
-	current := m.screen
+	return cloudFormationOverlayChainMatches(m, m.screen, func(current screen) bool {
+		return current == screenLoading
+	})
+}
+
+func cloudFormationContextReturnActive(m Model) bool {
+	return cloudFormationOverlayChainMatches(m, m.ctxPrevScreen, func(current screen) bool {
+		if current == screenCloudFormationStackList || current == screenCloudFormationStackDetail {
+			return true
+		}
+		return current == screenLoading &&
+			(m.loadingReturnScreen == screenCloudFormationStackList || m.loadingReturnScreen == screenCloudFormationStackDetail)
+	})
+}
+
+func cloudFormationOverlayChainMatches(m Model, current screen, match func(screen) bool) bool {
 	visited := make(map[screen]struct{}, 4)
 	for {
-		if current == screenLoading {
+		if match(current) {
 			return true
 		}
 		if _, ok := visited[current]; ok {
