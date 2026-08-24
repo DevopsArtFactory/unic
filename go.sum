@@ -16,8 +16,8 @@ github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.37 h1:zCEORWo0eU0gDjG+Iy
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.37/go.mod h1:i6c0PEl3TNOWxRbQ++KQcVenPWS/GoQeiklKhNuqzJ8=
 github.com/aws/aws-sdk-go-v2/internal/ini v1.8.6 h1:qYQ4pzQ2Oz6WpQ8T3HvGHnZydA72MnLuFK9tJwmrbHw=
 github.com/aws/aws-sdk-go-v2/internal/ini v1.8.6/go.mod h1:O3h0IK87yXci+kg6flUKzJnWeziQUKciKrLjcatSNcY=
-github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.22 h1:rWyie/PxDRIdhNf4DzRk0lvjVOqFJuNnO8WwaIRVxzQ=
-github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.22/go.mod h1:zd/JsJ4P7oGfUhXn1VyLqaRZwPmZwg44Jf2dS84Dm3Y=
+github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.38 h1:A3UAuCmx7LyUcrixBTzKJYYIUZ2yTvn6ZhT8PB+7APk=
+github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.38/go.mod h1:1PDUYG9Z+JrbbsobsAZHjWOm9QBT/djiK3QbykTL5Z4=
 github.com/aws/aws-sdk-go-v2/service/acm v1.44.1 h1:72rOAOGNHa3M+eCVb+alAQxhLeU8RgY5aXpYPyT0dpU=
 github.com/aws/aws-sdk-go-v2/service/acm v1.44.1/go.mod h1:+vTOe3AOT1hL5xgO+JiD+LObbzNI5xku+VcNkn0Td3g=
 github.com/aws/aws-sdk-go-v2/service/autoscaling v1.61.1 h1:VB+9RFYfUUY8TyL6W025CZToo6h9vC3zeYob7M7/2CE=
@@ -44,6 +44,8 @@ github.com/aws/aws-sdk-go-v2/service/elasticache v1.52.0 h1:inluxH5ArTlQNGrFxP7R
 github.com/aws/aws-sdk-go-v2/service/elasticache v1.52.0/go.mod h1:DxywiXnEB21757xcql9xCqgt8vyTxSB7tVEIOdfKIY8=
 github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.54.11 h1:0iNKMyO0SXuRfl5FF6TQASAHTXnTYZlQS3/oJSfpEbQ=
 github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.54.11/go.mod h1:WdVArS8riWgCC1JoIVmKdqfBfj2+cSWAjBU5dEapMhA=
+github.com/aws/aws-sdk-go-v2/service/eventbridge v1.48.6 h1:zRKQccd9GSrgw4TgfRiO8RueNo/rwyQ/5YLStYx3gfQ=
+github.com/aws/aws-sdk-go-v2/service/eventbridge v1.48.6/go.mod h1:8sJRwDvcA1lmDgokz64ra0UzlHcnyZg3/KzyS1iY5vw=
 github.com/aws/aws-sdk-go-v2/service/fis v1.37.21 h1:hb1yTC+Fgb/L21m5csul5HpXz87e7YAMRjpwF3EElwQ=
 github.com/aws/aws-sdk-go-v2/service/fis v1.37.21/go.mod h1:jyeK24QqvsCI2opB6lfELmQrBbsp9W1tXetd8/3edXg=
 github.com/aws/aws-sdk-go-v2/service/guardduty v1.75.0 h1:sZA3jpOkwrinRL0B5aZY6npTjDmmBCJRY51dee1Oh7Q=

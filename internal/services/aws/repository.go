@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/fis"
 	"github.com/aws/aws-sdk-go-v2/service/guardduty"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -101,6 +102,9 @@ var _ ElastiCacheClientAPI = (*elasticache.Client)(nil)
 
 // Verify *elasticloadbalancingv2.Client satisfies ELBv2ClientAPI at compile time.
 var _ ELBv2ClientAPI = (*elasticloadbalancingv2.Client)(nil)
+
+// Verify *eventbridge.Client satisfies EventBridgeClientAPI at compile time.
+var _ EventBridgeClientAPI = (*eventbridge.Client)(nil)
 
 // Verify *s3.Client satisfies S3ClientAPI at compile time.
 var _ S3ClientAPI = (*s3.Client)(nil)
@@ -318,6 +322,15 @@ type ElastiCacheClientAPI interface {
 	DescribeReplicationGroups(ctx context.Context, params *elasticache.DescribeReplicationGroupsInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error)
 }
 
+// EventBridgeClientAPI is the interface for rule browser operations used by AwsRepository.
+type EventBridgeClientAPI interface {
+	ListEventBuses(ctx context.Context, params *eventbridge.ListEventBusesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListEventBusesOutput, error)
+	ListRules(ctx context.Context, params *eventbridge.ListRulesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error)
+	ListTargetsByRule(ctx context.Context, params *eventbridge.ListTargetsByRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListTargetsByRuleOutput, error)
+	EnableRule(ctx context.Context, params *eventbridge.EnableRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.EnableRuleOutput, error)
+	DisableRule(ctx context.Context, params *eventbridge.DisableRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.DisableRuleOutput, error)
+}
+
 // LambdaClientAPI is the interface for Lambda operations used by AwsRepository.
 type LambdaClientAPI interface {
 	ListFunctions(ctx context.Context, params *lambda.ListFunctionsInput, optFns ...func(*lambda.Options)) (*lambda.ListFunctionsOutput, error)
@@ -384,6 +397,7 @@ type AwsRepository struct {
 	AutoScalingClient    AutoScalingClientAPI
 	FISClient            FISClientAPI
 	ElastiCacheClient    ElastiCacheClientAPI
+	EventBridgeClient    EventBridgeClientAPI
 	ELBv2Client          ELBv2ClientAPI
 	S3Client             S3ClientAPI
 	LambdaClient         LambdaClientAPI
@@ -508,6 +522,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		AutoScalingClient:    autoscaling.NewFromConfig(awsCfg),
 		FISClient:            fis.NewFromConfig(awsCfg),
 		ElastiCacheClient:    elasticache.NewFromConfig(awsCfg),
+		EventBridgeClient:    eventbridge.NewFromConfig(awsCfg),
 		ELBv2Client:          elasticloadbalancingv2.NewFromConfig(awsCfg),
 		S3Client:             s3.NewFromConfig(awsCfg),
 		LambdaClient:         lambda.NewFromConfig(awsCfg),

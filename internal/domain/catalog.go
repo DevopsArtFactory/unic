@@ -87,6 +87,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceEventBridge,
+			Features: []Feature{
+				{
+					Kind:        FeatureEventBridgeRules,
+					Description: "Inspect rule schedules, event patterns, targets, and recent trigger activity",
+				},
+			},
+		},
+		{
 			Name: ServiceCloudWatchLogs,
 			Features: []Feature{
 				{

@@ -69,6 +69,34 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "enter", bar: "enter: confirm", help: "Apply the desired capacity when the name matches"},
 		{keys: "esc", bar: "esc: back", help: "Go back to desired-capacity input"},
 	},
+	screenEventBridgeRuleList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between EventBridge rules"},
+		{keys: "/", bar: "/: filter", help: "Filter by rule, bus, state, trigger, or target"},
+		{keys: "r", bar: "r: refresh", help: "Refresh rules, targets, and recent activity"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected rule"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenEventBridgeRuleDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll rule and target details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll details by one page"},
+		{keys: "e", bar: "e: enable", help: "Enable the selected rule after confirmation",
+			when: func(m Model) bool {
+				return m.eventBridge.selected != nil && !m.eventBridge.selected.IsEnabled() && m.eventBridge.selected.CanChangeState()
+			}},
+		{keys: "d", bar: "d: disable", help: "Disable the selected rule after confirmation",
+			when: func(m Model) bool {
+				return m.eventBridge.selected != nil && m.eventBridge.selected.IsEnabled() && m.eventBridge.selected.CanChangeState()
+			}},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the EventBridge rule list"},
+		{bar: "H: home"},
+	},
+	screenEventBridgeRuleConfirm: {
+		{keys: "type", help: "Enter event-bus/rule to confirm the state change"},
+		{keys: "backspace", help: "Delete the previous character"},
+		{keys: "enter", bar: "enter: confirm", help: "Change rule state when the typed identity matches"},
+		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to rule detail"},
+	},
 
 	screenElastiCacheResourceList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between replication groups and standalone clusters"},

@@ -922,6 +922,12 @@ func (m Model) helpScreenTitle() string {
 		return "CloudTrail Events"
 	case screenCloudTrailEventDetail:
 		return "CloudTrail Event Detail"
+	case screenEventBridgeRuleList:
+		return "EventBridge Rules"
+	case screenEventBridgeRuleDetail:
+		return "EventBridge Rule Detail"
+	case screenEventBridgeRuleConfirm:
+		return "EventBridge Rule Confirmation"
 	case screenCWAlarmList:
 		return "CloudWatch Alarms"
 	case screenCWAlarmDetail:

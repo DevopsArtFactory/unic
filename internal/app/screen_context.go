@@ -15,6 +15,9 @@ import (
 func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case contextsLoadedMsg:
+		if !msg.startup {
+			m.ctxPickerPending = false
+		}
 		m.ctxList = m.contextsWithFavoriteState(msg.contexts)
 		m.filteredCtxList = append([]config.ContextInfo(nil), m.ctxList...)
 		m.sortFavoriteContextsFirst(m.filteredCtxList)
@@ -65,6 +68,19 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if contextChanged {
 			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
+		}
+		m.eventBridge = newEventBridgeModel()
+		if isEventBridgeScreen(m.ctxPrevScreen) {
+			m.ctxPrevScreen = screenFeatureList
+		}
+		if isEventBridgeScreen(m.settingsPrevScreen) {
+			m.settingsPrevScreen = screenFeatureList
+		}
+		if isEventBridgeScreen(m.views.prevScreen) {
+			m.views.prevScreen = screenFeatureList
+		}
+		if isEventBridgeScreen(m.regionPrevScreen) {
+			m.regionPrevScreen = screenFeatureList
 		}
 		if m.pendingView != nil {
 			// A saved view triggered this switch: continue the jump now that
@@ -206,6 +222,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.cfg == nil || m.cfg.ContextName != selected.Name {
 				normalizeStepFunctionsContextReturn(&m)
 			}
+			m.eventBridge.preserveOverlay(&m, screenFeatureList)
 			return m.startLoading(m.switchContext(selected.Name))
 		}
 	case "s":

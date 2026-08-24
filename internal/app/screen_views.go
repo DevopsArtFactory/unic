@@ -29,6 +29,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureCloudWatchMetrics:     filterCWMetrics,
 	domain.FeatureCloudWatchAlarms:      filterCWAlarms,
 	domain.FeatureCloudTrailEvents:      filterCloudTrailEvents,
+	domain.FeatureEventBridgeRules:      filterEventBridgeRules,
 	domain.FeatureCloudWatchLogsBrowser: filterCWLogGroups,
 	domain.FeatureECSExec:               filterECSClusters,
 	domain.FeatureEKSBrowser:            filterEKSClusters,

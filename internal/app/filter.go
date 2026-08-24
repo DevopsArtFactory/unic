@@ -44,6 +44,7 @@ const (
 	filterBedrockKeys
 	filterCWAlarms
 	filterCloudTrailEvents
+	filterEventBridgeRules
 	filterSQSQueues
 	filterELBs
 	filterELBTargetGroups

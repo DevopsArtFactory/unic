@@ -68,6 +68,9 @@ const (
 	screenCWMetricDetail
 	screenCloudTrailEventList
 	screenCloudTrailEventDetail
+	screenEventBridgeRuleList
+	screenEventBridgeRuleDetail
+	screenEventBridgeRuleConfirm
 	screenCWAlarmList
 	screenCWAlarmDetail
 	screenCWLogGroupList
@@ -209,6 +212,7 @@ type Model struct {
 	kms            kmsModel
 	acm            acmModel
 	stepFunctions  stepFunctionsModel
+	eventBridge    eventBridgeModel
 	lambda         lambdaModel
 	inspector      inspectorModel
 
@@ -220,6 +224,7 @@ type Model struct {
 	contextTable       table.Model
 	favoriteContexts   map[string]struct{}
 	ctxPrevScreen      screen
+	ctxPickerPending   bool
 	pendingContextName string
 	envContextName     string
 	envContextSource   string
@@ -321,6 +326,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.cwMetrics = newCloudWatchMetricsModel()
 	model.cwAlarms = newCWAlarmsModel()
 	model.cloudTrail = newCloudTrailModel()
+	model.eventBridge = newEventBridgeModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
 	model.cloudFormation = newCloudFormationModel()
@@ -507,6 +513,9 @@ func (m Model) isTextEntryScreen() bool {
 	if m.screen == screenSQSConfirm {
 		return true
 	}
+	if m.screen == screenEventBridgeRuleConfirm {
+		return true
+	}
 	switch m.screen {
 	case screenContextAdd,
 		screenAutoScalingCapacityInput,
@@ -672,6 +681,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.screen != screenSettings || m.settingsPrevScreen != screenContextPicker {
 				m.ctxPrevScreen = m.screen
 			}
+			m.ctxPickerPending = true
 			return m, m.loadContexts()
 		}
 		// Global resource-region switch. Authentication identity remains unchanged;
@@ -852,6 +862,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.cwAlarms.Start(&m)
 	case domain.FeatureCloudTrailEvents:
 		return m.cloudTrail.Start(&m)
+	case domain.FeatureEventBridgeRules:
+		return m.eventBridge.Start(&m)
 	case domain.FeatureCloudWatchLogsBrowser:
 		return m.cwLogs.Start(&m)
 	case domain.FeatureS3Browser:
