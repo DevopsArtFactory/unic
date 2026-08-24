@@ -28,6 +28,10 @@ const (
 	screenEC2InstanceBrowserDetail
 	screenEC2InstanceBrowserRelatedList
 	screenEC2InstanceBrowserRelatedDetail
+	screenAutoScalingGroupList
+	screenAutoScalingGroupDetail
+	screenAutoScalingCapacityInput
+	screenAutoScalingConfirm
 	screenVPCList
 	screenSubnetList
 	screenSubnetDetail
@@ -174,6 +178,7 @@ type Model struct {
 
 	// Feature submodels
 	ec2Browser   ec2InstanceBrowserModel
+	autoScaling  autoScalingModel
 	ecs          ecsModel
 	eks          eksModel
 	ecr          ecrModel
@@ -299,6 +304,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		watch:            newWatchModel(),
 	}
 	model.ec2Browser = newEC2InstanceBrowserModel()
+	model.autoScaling = newAutoScalingModel()
 	model.ecs = newECSModel()
 	model.eks = newEKSModel()
 	model.ecr = newECRModel()
@@ -494,6 +500,8 @@ func (m Model) isTextEntryScreen() bool {
 	}
 	switch m.screen {
 	case screenContextAdd,
+		screenAutoScalingCapacityInput,
+		screenAutoScalingConfirm,
 		screenRoute53RecordCreate,
 		screenRoute53RecordEdit,
 		screenSecurityGroupAddRule,
@@ -813,6 +821,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.startLoading(m.loadInstances())
 	case domain.FeatureEC2InstanceBrowser:
 		return m.ec2Browser.Start(&m)
+	case domain.FeatureAutoScalingBrowser:
+		return m.autoScaling.Start(&m)
 	case domain.FeatureVPCBrowser:
 		return m.vpc.Start(&m)
 	case domain.FeatureReachabilityAnalyzer:

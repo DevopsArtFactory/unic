@@ -18,6 +18,10 @@ func Catalog() []Service {
 					Kind:        FeatureSecurityGroupBrowser,
 					Description: "Browse security groups and view inbound/outbound rules",
 				},
+				{
+					Kind:        FeatureAutoScalingBrowser,
+					Description: "Inspect group capacity, instance health, and scaling activity",
+				},
 			},
 		},
 		{

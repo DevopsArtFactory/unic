@@ -98,6 +98,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - CloudWatch Logs
 - ECS
 - ECR
+- Auto Scaling
 - FIS
 - ElastiCache
 - ACM
@@ -148,6 +149,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 
 - `screen_ec2.go`
 - `screen_ec2_browser.go`
+- `screen_autoscaling.go`
 - `screen_vpc.go`
 - `screen_rds.go`
 - `screen_route53.go`
@@ -232,6 +234,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - service list
 - feature list
 - EC2 / SSM
+- Auto Scaling group list, instance/activity detail, capacity input, type-to-confirm
 - VPC / subnet / available IP detail
 - RDS list, detail, confirm
 - Route53 zone, record, mutation

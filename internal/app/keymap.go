@@ -22,6 +22,35 @@ type keyBinding struct {
 // log viewer intentionally stays legacy: its bar labels embed live state
 // (wrap on/off, horizontal offset) that a static declaration cannot express.
 var screenKeymaps = map[screen][]keyBinding{
+	screenAutoScalingGroupList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between Auto Scaling groups"},
+		{keys: "/", bar: "/: filter", help: "Filter by group or instance metadata"},
+		{keys: "r", bar: "r: refresh", help: "Refresh Auto Scaling groups"},
+		{keys: "enter", bar: "enter: detail", help: "Open capacity, instance health, and activity details"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenAutoScalingGroupDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll instances and scaling activity"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll by one page"},
+		{keys: "c", bar: "c: capacity", help: "Change the desired capacity"},
+		{keys: "r", bar: "r: refresh", help: "Refresh group and activity details"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the group list"},
+		{bar: "H: home"},
+	},
+	screenAutoScalingCapacityInput: {
+		{keys: "type", help: "Enter a desired capacity within the group limits"},
+		{keys: "backspace", help: "Delete the previous digit"},
+		{keys: "enter", bar: "enter: continue", help: "Continue to typed confirmation"},
+		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to group detail"},
+	},
+	screenAutoScalingConfirm: {
+		{keys: "type", help: "Enter the Auto Scaling group name to confirm"},
+		{keys: "backspace", help: "Delete the previous character"},
+		{keys: "enter", bar: "enter: confirm", help: "Apply the desired capacity when the name matches"},
+		{keys: "esc", bar: "esc: back", help: "Go back to desired-capacity input"},
+	},
+
 	screenElastiCacheResourceList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between replication groups and standalone clusters"},
 		{keys: "/", bar: "/: filter", help: "Start filtering resources"},

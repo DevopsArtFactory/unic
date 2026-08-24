@@ -32,11 +32,11 @@ import (
 const samlRoleAttributeName = "https://aws.amazon.com/SAML/Attributes/Role"
 
 var (
-	oktaHTTPClientFn         = func() *http.Client { return &http.Client{Timeout: 30 * time.Second} }
-	promptOktaCredentialsFn  = promptOktaCredentials
-	stsAssumeRoleWithSAMLFn  = stsAssumeRoleWithSAML
-	cachedOktaSessionFn      = awsservice.CachedOktaSAMLSession
-	saveOktaSessionFn        = awsservice.SaveOktaSAMLSession
+	oktaHTTPClientFn        = func() *http.Client { return &http.Client{Timeout: 30 * time.Second} }
+	promptOktaCredentialsFn = promptOktaCredentials
+	stsAssumeRoleWithSAMLFn = stsAssumeRoleWithSAML
+	cachedOktaSessionFn     = awsservice.CachedOktaSAMLSession
+	saveOktaSessionFn       = awsservice.SaveOktaSAMLSession
 )
 
 // OktaSAMLRole is one AWS role/principal pair carried in the SAML assertion.
