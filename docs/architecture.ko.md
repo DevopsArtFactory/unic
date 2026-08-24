@@ -90,6 +90,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - EC2
 - SSM
 - RDS
+- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
@@ -98,6 +99,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - CloudWatch Logs
 - ECS
 - ECR
+- Auto Scaling
 - FIS
 - ElastiCache
 - ACM
@@ -123,6 +125,7 @@ cross-service inspector workflow와 rule pack을 담당한다.
 - ACM 만료 스캔은 repository 인증서 목록과 양수 `inspector.acm_expiry_window_days` 설정값(기본 30일)을 사용
 - Checklist Inspector YAML schema 로딩, checklist 결과 모델, readiness runner도 여기서 관리
 - rule pack은 raw SDK setup 대신 `internal/services/aws` repository 메서드와 client interface에 의존
+- cost/waste rule pack은 EC2 및 ELBv2 client interface를 재사용해 resource state, tag, snapshot age, target 등록 상태를 점검
 - Security / Checklist Inspector 이후의 후속 inspector workflow도 이 패턴으로 확장
 
 ### `internal/app/`
@@ -148,8 +151,10 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 
 - `screen_ec2.go`
 - `screen_ec2_browser.go`
+- `screen_autoscaling.go`
 - `screen_vpc.go`
 - `screen_rds.go`
+- `screen_cloudformation.go`
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
@@ -171,6 +176,8 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 
 보조 파일로 `styles.go`, `filter.go`, `messages.go` 등이 있다.
 `filter.go`와 `filter_match.go`는 공통 리스트 화면의 필터링, fuzzy match 정렬, inline match highlighting을 중앙에서 처리하며 VPC / subnet 리스트에도 같은 흐름을 적용한다. shared filter가 활성화된 상태에서도 방향키 이동은 현재 리스트 선택으로 전달되어, filter mode를 먼저 닫지 않아도 필터링된 결과를 바로 탐색할 수 있다.
+
+`command_lifecycle.go`는 deadline이 있는 command context와 generation ID를 관리한다. `watch.go`는 이 공통 lifecycle을 사용해 alarm 목록, ECS rollout 상세, SQS depth 화면, ELB target-health 화면을 5초/15초/30초 간격으로 선택적으로 새로 고친다. 각 tick은 새 generation에 command를 묶어 이전 결과를 버리고, 감시 중인 화면을 벗어나면 timer를 무효화하고 진행 중인 refresh도 취소한다. Feature submodel은 성공한 watch 결과를 현재 화면에 적용해 목록 선택과 상세 scroll 위치를 유지한다.
 
 ## 인증 모델
 
@@ -231,8 +238,10 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - service list
 - feature list
 - EC2 / SSM
+- Auto Scaling group list, instance/activity detail, capacity input, type-to-confirm
 - VPC / subnet / available IP detail
 - RDS list, detail, confirm
+- CloudFormation stack list/detail, 최근 event, drift detection
 - Route53 zone, record, mutation
 - Secrets Manager list/detail
 - Security Group list/detail/edit

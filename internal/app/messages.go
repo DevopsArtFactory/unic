@@ -123,6 +123,32 @@ type rdsTickMsg struct {
 	instanceID string
 }
 
+type cloudFormationStacksLoadedMsg struct {
+	stacks []awsservice.CloudFormationStack
+	repo   *awsservice.AwsRepository
+}
+
+type cloudFormationStackDetailLoadedMsg struct {
+	stack *awsservice.CloudFormationStack
+}
+
+type cloudFormationDriftStartedMsg struct {
+	stackID     string
+	detectionID string
+}
+
+type cloudFormationDriftPollTickMsg struct {
+	stackID     string
+	detectionID string
+}
+
+type cloudFormationDriftStatusMsg struct {
+	stackID     string
+	detectionID string
+	status      *awsservice.CloudFormationDriftDetection
+	err         error
+}
+
 type route53ZonesLoadedMsg struct {
 	zones []awsservice.HostedZone
 }
@@ -229,6 +255,24 @@ type ssmParamValueLoadedMsg struct {
 
 type elasticacheResourcesLoadedMsg struct {
 	resources []awsservice.ElastiCacheResource
+}
+
+type autoScalingGroupsLoadedMsg struct {
+	groups []awsservice.AutoScalingGroup
+	err    error
+}
+
+type autoScalingDetailLoadedMsg struct {
+	groupName  string
+	group      *awsservice.AutoScalingGroup
+	activities []awsservice.AutoScalingActivity
+	err        error
+}
+
+type autoScalingCapacityUpdatedMsg struct {
+	groupName string
+	desired   int32
+	err       error
 }
 
 type acmCertificatesLoadedMsg struct {

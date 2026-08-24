@@ -28,6 +28,10 @@ const (
 	screenEC2InstanceBrowserDetail
 	screenEC2InstanceBrowserRelatedList
 	screenEC2InstanceBrowserRelatedDetail
+	screenAutoScalingGroupList
+	screenAutoScalingGroupDetail
+	screenAutoScalingCapacityInput
+	screenAutoScalingConfirm
 	screenVPCList
 	screenSubnetList
 	screenSubnetDetail
@@ -40,6 +44,8 @@ const (
 	screenRDSDetail
 	screenRDSClassPicker
 	screenRDSConfirm
+	screenCloudFormationStackList
+	screenCloudFormationStackDetail
 	screenRoute53ZoneList
 	screenRoute53RecordList
 	screenRoute53RecordDetail
@@ -176,33 +182,35 @@ type Model struct {
 	selectedInstance *awsservice.EC2Instance
 
 	// Feature submodels
-	ec2Browser    ec2InstanceBrowserModel
-	ecs           ecsModel
-	eks           eksModel
-	ecr           ecrModel
-	fis           fisModel
-	vpc           vpcModel
-	reachability  reachabilityModel
-	cwMetrics     cloudWatchMetricsModel
-	cwAlarms      cwAlarmsModel
-	cloudTrail    cloudTrailModel
-	cwLogs        cloudWatchLogsModel
-	rds           rdsModel
-	route53       route53Model
-	iam           iamModel
-	bedrock       bedrockModel
-	secrets       secretsModel
-	security      securityGroupModel
-	s3            s3Model
-	sqs           sqsModel
-	elb           elbModel
-	ssmParams     ssmParamsModel
-	elasticache   elasticacheModel
-	kms           kmsModel
-	acm           acmModel
-	stepFunctions stepFunctionsModel
-	lambda        lambdaModel
-	inspector     inspectorModel
+	ec2Browser     ec2InstanceBrowserModel
+	autoScaling    autoScalingModel
+	ecs            ecsModel
+	eks            eksModel
+	ecr            ecrModel
+	fis            fisModel
+	vpc            vpcModel
+	reachability   reachabilityModel
+	cwMetrics      cloudWatchMetricsModel
+	cwAlarms       cwAlarmsModel
+	cloudTrail     cloudTrailModel
+	cwLogs         cloudWatchLogsModel
+	rds            rdsModel
+	cloudFormation cloudFormationModel
+	route53        route53Model
+	iam            iamModel
+	bedrock        bedrockModel
+	secrets        secretsModel
+	security       securityGroupModel
+	s3             s3Model
+	sqs            sqsModel
+	elb            elbModel
+	ssmParams      ssmParamsModel
+	elasticache    elasticacheModel
+	kms            kmsModel
+	acm            acmModel
+	stepFunctions  stepFunctionsModel
+	lambda         lambdaModel
+	inspector      inspectorModel
 
 	// Context picker
 	configPath         string
@@ -228,6 +236,7 @@ type Model struct {
 
 	// Command lifecycle for background AWS loads (shared across model copies)
 	commands *commandLifecycle
+	watch    watchModel
 
 	// Command palette
 	palette paletteModel
@@ -299,8 +308,10 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 		filters:          make(map[filterTarget]string),
 		contextTable:     newContextTable(),
 		commands:         newCommandLifecycle(),
+		watch:            newWatchModel(),
 	}
 	model.ec2Browser = newEC2InstanceBrowserModel()
+	model.autoScaling = newAutoScalingModel()
 	model.ecs = newECSModel()
 	model.eks = newEKSModel()
 	model.ecr = newECRModel()
@@ -312,6 +323,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.cloudTrail = newCloudTrailModel()
 	model.cwLogs = newCloudWatchLogsModel()
 	model.rds = newRDSModel()
+	model.cloudFormation = newCloudFormationModel()
 	model.route53 = newRoute53Model()
 	model.iam = newIAMModel()
 	model.bedrock = newBedrockModel()
@@ -445,6 +457,10 @@ func (m Model) startLoading(cmd tea.Cmd) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) startLoadingWithMessage(title string, details []string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	// Explicit loads replace watch mode. This also invalidates any scheduled
+	// tick and cancels a refresh already in flight before the new generation
+	// is created below.
+	m.stopWatch()
 	// A new load supersedes whatever was still in flight. The command is
 	// bound to the renewed generation: it will not run once superseded, and
 	// its result is dropped when the generation moved on before delivery.
@@ -493,6 +509,8 @@ func (m Model) isTextEntryScreen() bool {
 	}
 	switch m.screen {
 	case screenContextAdd,
+		screenAutoScalingCapacityInput,
+		screenAutoScalingConfirm,
 		screenRoute53RecordCreate,
 		screenRoute53RecordEdit,
 		screenSecurityGroupAddRule,
@@ -542,6 +560,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.Update(msg.msg)
+	case watchTickMsg:
+		return m.handleWatchTick(msg)
+	case watchRefreshMsg:
+		return m.handleWatchRefresh(msg)
 	case updateAvailableMsg:
 		m.installMethod = msg.method
 		if msg.version != "" {
@@ -573,6 +595,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// A failed view-triggered context switch must not leave its deferred
 		// jump armed for the next unrelated switch.
 		m.pendingView = nil
+		m.stopWatch()
 		m.errMsg = msg.err.Error()
 		m.loadingTitle = ""
 		m.loadingDetails = nil
@@ -599,6 +622,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		// Global quit
 		if msg.String() == "ctrl+c" {
+			m.stopWatch()
 			m.quitting = true
 			return m, tea.Quit
 		}
@@ -632,7 +656,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			!m.isTextEntryScreen() && m.screen != screenFISTemplateList {
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			if m.commands != nil {
+			wasWatching := m.watch.enabled || m.watch.refreshing
+			m.stopWatch()
+			if m.commands != nil && !wasWatching {
 				m.commands.CancelAll()
 			}
 			m.screen = screenServiceList
@@ -640,14 +666,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Global context switch — C key opens context picker (skip text-input screens)
 		if msg.String() == "C" && m.screen != screenContextPicker && !m.isTextEntryScreen() {
+			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			m.ctxPrevScreen = m.screen
+			if m.screen != screenSettings || m.settingsPrevScreen != screenContextPicker {
+				m.ctxPrevScreen = m.screen
+			}
 			return m, m.loadContexts()
 		}
 		// Global resource-region switch. Authentication identity remains unchanged;
 		// only region-scoped AWS clients are recreated.
 		if msg.String() == "R" && m.canSwitchResourceRegion() {
+			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			m.regionPrevScreen = m.screen
@@ -659,6 +689,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// and the filter input so it never steals a typed character).
 		if msg.String() == "S" && !m.filterTI.Focused() && m.screen != screenSettings &&
 			!m.isTextEntryScreen() {
+			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			m.settingsPrevScreen = m.screen
@@ -669,6 +700,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// contexts, and indexed resources (skip text-entry screens).
 		if msg.String() == "P" && !m.filterTI.Focused() && m.screen != screenCommandPalette &&
 			!m.isTextEntryScreen() {
+			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			return m.openPalette()
@@ -677,9 +709,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// text-entry screens and the views screen's own name input).
 		if msg.String() == "V" && !m.filterTI.Focused() && m.screen != screenViewList &&
 			!m.isTextEntryScreen() {
+			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
 			return m.openViews()
+		}
+
+		if !m.filterTI.Focused() && isWatchableScreen(m.screen) {
+			switch msg.String() {
+			case "W":
+				return m.toggleWatch()
+			case "I":
+				return m.cycleWatchInterval()
+			}
 		}
 
 		for _, submodel := range m.featureSubmodels() {
@@ -790,12 +832,16 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.startLoading(m.loadInstances())
 	case domain.FeatureEC2InstanceBrowser:
 		return m.ec2Browser.Start(&m)
+	case domain.FeatureAutoScalingBrowser:
+		return m.autoScaling.Start(&m)
 	case domain.FeatureVPCBrowser:
 		return m.vpc.Start(&m)
 	case domain.FeatureReachabilityAnalyzer:
 		return m.reachability.Start(&m)
 	case domain.FeatureRDSBrowser:
 		return m.rds.Start(&m)
+	case domain.FeatureCloudFormationBrowser:
+		return m.cloudFormation.Start(&m)
 	case domain.FeatureRoute53Browser:
 		return m.route53.Start(&m)
 	case domain.FeatureSecretsBrowser:

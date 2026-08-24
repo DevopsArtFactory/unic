@@ -27,7 +27,7 @@ type SQSQueue struct {
 	VisibilitySec    int
 	RetentionSec     int
 	Fifo             bool
-	DLQTargetARN     string   // where this queue's failures go
+	DLQTargetARN     string // where this queue's failures go
 	MaxReceiveCount  int
 	SourceQueueARNs  []string // queues that dead-letter into this one
 	SourceQueueCount int      // len(SourceQueueARNs), kept for display
