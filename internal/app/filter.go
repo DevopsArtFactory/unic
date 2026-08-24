@@ -13,6 +13,7 @@ const (
 	filterInstances
 	filterEC2BrowserInstances
 	filterEC2BrowserRelated
+	filterAutoScalingGroups
 	filterSubnetIPs
 	filterRDS
 	filterRoute53Zones
@@ -51,6 +52,9 @@ const (
 	filterElastiCacheResources
 	filterKMSKeys
 	filterACMCertificates
+	filterCloudFormationStacks
+	filterStepFunctionStateMachines
+	filterStepFunctionExecutions
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

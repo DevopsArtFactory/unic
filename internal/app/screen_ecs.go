@@ -62,8 +62,15 @@ func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		m.screen = screenECSServiceList
 		return *m, nil, true
 	case ecsServiceDetailLoadedMsg:
+		refreshing := m.watch.refreshing
+		previousScroll := em.detailScroll
 		em.selectedDetail = msg.detail
-		em.detailScroll = 0
+		if refreshing {
+			visibleLines := max(m.height-9, 5)
+			em.detailScroll = min(previousScroll, max(len(em.serviceDetailLines())-visibleLines, 0))
+		} else {
+			em.detailScroll = 0
+		}
 		if msg.detail != nil {
 			summary := msg.detail.Summary()
 			em.selectedService = &summary
@@ -306,6 +313,7 @@ func (em *ecsModel) updateServiceDetail(m *Model, msg tea.KeyMsg) (tea.Model, te
 
 	switch msg.String() {
 	case "q", "esc":
+		m.stopWatch()
 		m.screen = screenECSServiceList
 	case "up", "k":
 		if em.detailScroll > 0 {
@@ -344,6 +352,7 @@ func (em ecsModel) viewServiceDetail(m Model) string {
 
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Service Rollout — %s", detail.Name)))
+	b.WriteString(m.watchBadge())
 	b.WriteString("\n\n")
 
 	lines := em.serviceDetailLines()
@@ -371,7 +380,7 @@ func (em ecsModel) viewServiceDetail(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • enter: tasks • r: refresh • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • W: watch • I: interval • enter: tasks • r: refresh • esc: back • H: home"))
 	return b.String()
 }
 

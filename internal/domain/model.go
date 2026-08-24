@@ -27,8 +27,10 @@ const (
 	ServiceParameterStore AwsService = "Parameter Store"
 	ServiceKMS            AwsService = "KMS"
 	ServiceACM            AwsService = "ACM"
+	ServiceStepFunctions  AwsService = "Step Functions"
 	ServiceLambda         AwsService = "Lambda"
 	ServiceBedrock        AwsService = "Bedrock"
+	ServiceCloudFormation AwsService = "CloudFormation"
 )
 
 // FeatureKind represents a specific feature within a service.
@@ -37,6 +39,7 @@ type FeatureKind string
 const (
 	FeatureSSMSession            FeatureKind = "SSM Sessions Manager"
 	FeatureEC2InstanceBrowser    FeatureKind = "EC2 Instance Browser"
+	FeatureAutoScalingBrowser    FeatureKind = "Auto Scaling Group Browser"
 	FeatureVPCBrowser            FeatureKind = "VPC Browser"
 	FeatureReachabilityAnalyzer  FeatureKind = "Reachability Analyzer"
 	FeatureRDSBrowser            FeatureKind = "RDS Browser"
@@ -63,8 +66,10 @@ const (
 	FeatureSSMParameterBrowser   FeatureKind = "Parameter Store Browser"
 	FeatureKMSKeyBrowser         FeatureKind = "KMS Key Browser"
 	FeatureACMCertificateBrowser FeatureKind = "ACM Certificate Browser"
+	FeatureStepFunctionsBrowser  FeatureKind = "Step Functions Execution Browser"
 	FeatureLambdaBrowser         FeatureKind = "Lambda Browser"
 	FeatureBedrockAPIKeys        FeatureKind = "Bedrock API Keys"
+	FeatureCloudFormationBrowser FeatureKind = "CloudFormation Stack Browser"
 )
 
 // Feature describes a selectable feature under an AWS service.

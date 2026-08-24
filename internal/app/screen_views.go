@@ -18,8 +18,10 @@ import (
 // applies on load, so views (and the palette) can prefill it.
 var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureEC2InstanceBrowser:    filterEC2BrowserInstances,
+	domain.FeatureAutoScalingBrowser:    filterAutoScalingGroups,
 	domain.FeatureSSMSession:            filterInstances,
 	domain.FeatureRDSBrowser:            filterRDS,
+	domain.FeatureCloudFormationBrowser: filterCloudFormationStacks,
 	domain.FeatureRoute53Browser:        filterRoute53Zones,
 	domain.FeatureSecretsBrowser:        filterSecrets,
 	domain.FeatureSecurityGroupBrowser:  filterSecurityGroups,
@@ -37,6 +39,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureSQSBrowser:            filterSQSQueues,
 	domain.FeatureELBBrowser:            filterELBs,
 	domain.FeatureACMCertificateBrowser: filterACMCertificates,
+	domain.FeatureStepFunctionsBrowser:  filterStepFunctionStateMachines,
 	domain.FeatureSSMParameterBrowser:   filterSSMParameters,
 	domain.FeatureElastiCacheBrowser:    filterElastiCacheResources,
 	domain.FeatureKMSKeyBrowser:         filterKMSKeys,

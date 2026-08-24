@@ -50,11 +50,43 @@ func (em *elbModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		if em.selectedLB == nil || em.selectedLB.ARN != msg.loadBalancerARN {
 			return *m, nil, true
 		}
+		rowARN := ""
+		selectedARN := ""
+		targetID := ""
+		var targetPort int32
+		if m.watch.refreshing {
+			if em.groupIdx >= 0 && em.groupIdx < len(em.filteredGroups) {
+				rowARN = em.filteredGroups[em.groupIdx].ARN
+			}
+			if em.selectedGroup != nil {
+				selectedARN = em.selectedGroup.ARN
+				if em.targetIdx >= 0 && em.targetIdx < len(em.selectedGroup.Targets) {
+					targetID = em.selectedGroup.Targets[em.targetIdx].ID
+					targetPort = em.selectedGroup.Targets[em.targetIdx].Port
+				}
+			}
+		}
 		em.groups = msg.groups
 		em.filteredGroups = applyFilter(em.groups, m.filterValue(filterELBTargetGroups))
-		em.groupIdx = 0
-		em.selectedGroup = nil
-		m.screen = screenELBTargetGroupList
+		if m.watch.refreshing {
+			em.groupIdx = indexTargetGroupByARN(em.filteredGroups, rowARN)
+			if m.watch.target == screenELBTargetList {
+				em.selectedGroup = em.targetGroupByARN(selectedARN)
+				if em.selectedGroup == nil {
+					m.stopWatch()
+					m.screen = screenELBTargetGroupList
+				} else {
+					em.targetIdx = indexTarget(em.selectedGroup.Targets, targetID, targetPort)
+					m.screen = screenELBTargetList
+				}
+			} else {
+				m.screen = screenELBTargetGroupList
+			}
+		} else {
+			em.groupIdx = 0
+			em.selectedGroup = nil
+			m.screen = screenELBTargetGroupList
+		}
 		return *m, nil, true
 	}
 	return *m, nil, false
@@ -142,9 +174,11 @@ func (em *elbModel) updateGroupList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cm
 	}
 	switch msg.String() {
 	case "q":
+		m.stopWatch()
 		m.screen = screenFeatureList
 		m.resetFilter(filterELBTargetGroups)
 	case "esc":
+		m.stopWatch()
 		m.screen = screenELBList
 		m.resetFilter(filterELBTargetGroups)
 	case "up", "k":
@@ -159,6 +193,7 @@ func (em *elbModel) updateGroupList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cm
 		}
 	case "enter":
 		if len(em.filteredGroups) > 0 && em.groupIdx < len(em.filteredGroups) {
+			m.stopWatch()
 			selected := em.filteredGroups[em.groupIdx]
 			em.selectedGroup = &selected
 			em.targetIdx = 0
@@ -171,8 +206,10 @@ func (em *elbModel) updateGroupList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cm
 func (em *elbModel) updateTargetList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
+		m.stopWatch()
 		m.screen = screenFeatureList
 	case "esc":
+		m.stopWatch()
 		m.screen = screenELBTargetGroupList
 	case "up", "k":
 		if em.selectedGroup != nil {
@@ -216,6 +253,33 @@ func (em elbModel) loadBalancers(m Model) tea.Cmd {
 		}
 		return elbLoadBalancersLoadedMsg{balancers: balancers}
 	}
+}
+
+func (em *elbModel) targetGroupByARN(arn string) *awsservice.ELBTargetGroupHealth {
+	for i := range em.groups {
+		if em.groups[i].ARN == arn {
+			return &em.groups[i]
+		}
+	}
+	return nil
+}
+
+func indexTargetGroupByARN(groups []awsservice.ELBTargetGroupHealth, arn string) int {
+	for i := range groups {
+		if groups[i].ARN == arn {
+			return i
+		}
+	}
+	return 0
+}
+
+func indexTarget(targets []awsservice.ELBTargetHealth, id string, port int32) int {
+	for i := range targets {
+		if targets[i].ID == id && targets[i].Port == port {
+			return i
+		}
+	}
+	return 0
 }
 
 func (em elbModel) loadGroups(m Model, lb awsservice.ELBLoadBalancer) tea.Cmd {
@@ -299,6 +363,7 @@ func (em elbModel) viewGroupList(m Model) string {
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Target Groups"))
+	b.WriteString(m.watchBadge())
 	b.WriteString("\n")
 	if em.selectedLB != nil {
 		b.WriteString(dimStyle.Render(fmt.Sprintf("  Load balancer: %s (%s)", em.selectedLB.Name, em.selectedLB.DNSName)))
@@ -354,6 +419,7 @@ func (em elbModel) viewTargetList(m Model) string {
 	var panel strings.Builder
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("Target Health"))
+	b.WriteString(m.watchBadge())
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render(fmt.Sprintf("  Target group: %s  healthy:%d unhealthy:%d other:%d",
 		group.Name, group.HealthyCount, group.UnhealthyCount, group.OtherCount)))

@@ -41,8 +41,8 @@ func (f LambdaFunction) shortLastModified() string {
 
 // LambdaInvokeResult holds the result of a Lambda invocation.
 type LambdaInvokeResult struct {
-	StatusCode   int32
-	Payload      string
+	StatusCode    int32
+	Payload       string
 	FunctionError string
-	LogResult    string
+	LogResult     string
 }

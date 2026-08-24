@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -29,6 +30,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -42,6 +44,7 @@ var _ SSMClientAPI = (*ssm.Client)(nil)
 var _ KMSClientAPI = (*kms.Client)(nil)
 
 var _ ACMClientAPI = (*acm.Client)(nil)
+var _ StepFunctionsClientAPI = (*sfn.Client)(nil)
 
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
@@ -69,6 +72,9 @@ var _ CloudWatchClientAPI = (*cloudwatch.Client)(nil)
 
 // Verify *cloudtrail.Client satisfies CloudTrailClientAPI at compile time.
 var _ CloudTrailClientAPI = (*cloudtrail.Client)(nil)
+
+// Verify *cloudformation.Client satisfies CloudFormationClientAPI at compile time.
+var _ CloudFormationClientAPI = (*cloudformation.Client)(nil)
 
 // Verify *guardduty.Client satisfies GuardDutyClientAPI at compile time.
 var _ GuardDutyClientAPI = (*guardduty.Client)(nil)
@@ -137,6 +143,14 @@ type KMSClientAPI interface {
 type ACMClientAPI interface {
 	ListCertificates(ctx context.Context, params *acm.ListCertificatesInput, optFns ...func(*acm.Options)) (*acm.ListCertificatesOutput, error)
 	DescribeCertificate(ctx context.Context, params *acm.DescribeCertificateInput, optFns ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error)
+}
+
+// StepFunctionsClientAPI is the interface for Step Functions browser operations.
+type StepFunctionsClientAPI interface {
+	ListStateMachines(ctx context.Context, params *sfn.ListStateMachinesInput, optFns ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error)
+	ListExecutions(ctx context.Context, params *sfn.ListExecutionsInput, optFns ...func(*sfn.Options)) (*sfn.ListExecutionsOutput, error)
+	DescribeExecution(ctx context.Context, params *sfn.DescribeExecutionInput, optFns ...func(*sfn.Options)) (*sfn.DescribeExecutionOutput, error)
+	GetExecutionHistory(ctx context.Context, params *sfn.GetExecutionHistoryInput, optFns ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
@@ -216,6 +230,14 @@ type CloudTrailClientAPI interface {
 	LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error)
 }
 
+// CloudFormationClientAPI is the interface for stack browser operations.
+type CloudFormationClientAPI interface {
+	cloudformation.DescribeStacksAPIClient
+	cloudformation.DescribeStackEventsAPIClient
+	DetectStackDrift(ctx context.Context, params *cloudformation.DetectStackDriftInput, optFns ...func(*cloudformation.Options)) (*cloudformation.DetectStackDriftOutput, error)
+	DescribeStackDriftDetectionStatus(ctx context.Context, params *cloudformation.DescribeStackDriftDetectionStatusInput, optFns ...func(*cloudformation.Options)) (*cloudformation.DescribeStackDriftDetectionStatusOutput, error)
+}
+
 // GuardDutyClientAPI is the interface for GuardDuty operations used by AwsRepository.
 type GuardDutyClientAPI interface {
 	ListDetectors(ctx context.Context, params *guardduty.ListDetectorsInput, optFns ...func(*guardduty.Options)) (*guardduty.ListDetectorsOutput, error)
@@ -261,6 +283,8 @@ type EKSClientAPI interface {
 type AutoScalingClientAPI interface {
 	DescribeAutoScalingInstances(ctx context.Context, params *autoscaling.DescribeAutoScalingInstancesInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingInstancesOutput, error)
 	DescribeAutoScalingGroups(ctx context.Context, params *autoscaling.DescribeAutoScalingGroupsInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
+	DescribeScalingActivities(ctx context.Context, params *autoscaling.DescribeScalingActivitiesInput, optFns ...func(*autoscaling.Options)) (*autoscaling.DescribeScalingActivitiesOutput, error)
+	SetDesiredCapacity(ctx context.Context, params *autoscaling.SetDesiredCapacityInput, optFns ...func(*autoscaling.Options)) (*autoscaling.SetDesiredCapacityOutput, error)
 }
 
 // ELBv2ClientAPI is the interface for Elastic Load Balancing v2 operations used by AwsRepository.
@@ -317,6 +341,8 @@ type LambdaClientAPI interface {
 // EC2ClientAPI is the interface for EC2 operations used by AwsRepository.
 type EC2ClientAPI interface {
 	ec2.DescribeInstancesAPIClient
+	DescribeAddresses(ctx context.Context, params *ec2.DescribeAddressesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeAddressesOutput, error)
+	DescribeVolumes(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error)
 	DescribeSnapshots(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error)
 	DescribeSnapshotAttribute(ctx context.Context, params *ec2.DescribeSnapshotAttributeInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotAttributeOutput, error)
 	DescribeVpcs(ctx context.Context, params *ec2.DescribeVpcsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error)
@@ -362,6 +388,7 @@ type AwsRepository struct {
 	CloudWatchClient     CloudWatchClientAPI
 	CloudWatchLogsClient CloudWatchLogsClientAPI
 	CloudTrailClient     CloudTrailClientAPI
+	CloudFormationClient CloudFormationClientAPI
 	GuardDutyClient      GuardDutyClientAPI
 	ConfigServiceClient  ConfigServiceClientAPI
 	ECSClient            ECSClientAPI
@@ -375,6 +402,7 @@ type AwsRepository struct {
 	S3Client             S3ClientAPI
 	LambdaClient         LambdaClientAPI
 	ACMClient            ACMClientAPI
+	StepFunctionsClient  StepFunctionsClientAPI
 	Region               string
 	Profile              string
 	awsCfg               aws.Config
@@ -485,6 +513,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		CloudWatchClient:     cloudwatch.NewFromConfig(awsCfg),
 		CloudWatchLogsClient: cloudwatchlogs.NewFromConfig(awsCfg),
 		CloudTrailClient:     cloudtrail.NewFromConfig(awsCfg),
+		CloudFormationClient: cloudformation.NewFromConfig(awsCfg),
 		GuardDutyClient:      guardduty.NewFromConfig(awsCfg),
 		ConfigServiceClient:  configservice.NewFromConfig(awsCfg),
 		ECSClient:            ecs.NewFromConfig(awsCfg),
@@ -498,6 +527,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		S3Client:             s3.NewFromConfig(awsCfg),
 		LambdaClient:         lambda.NewFromConfig(awsCfg),
 		ACMClient:            acm.NewFromConfig(awsCfg),
+		StepFunctionsClient:  sfn.NewFromConfig(awsCfg),
 		Region:               region,
 		Profile:              profile,
 		awsCfg:               awsCfg,

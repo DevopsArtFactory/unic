@@ -59,9 +59,16 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, m.finalizeContextSwitch(), true
 
 	case contextSwitchedMsg:
+		contextChanged := m.cfg == nil || msg.cfg == nil || m.cfg.ContextName != msg.cfg.ContextName || m.cfg.Region != msg.cfg.Region
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
 		m.awsRepo = nil
+		m.cloudFormation = newCloudFormationModel()
+		m.resetFilter(filterCloudFormationStacks)
+		if contextChanged {
+			resetStepFunctionsContextState(&m)
+			normalizeStepFunctionsContextReturn(&m)
+		}
 		m.eventBridge = newEventBridgeModel()
 		if isEventBridgeScreen(m.ctxPrevScreen) {
 			m.ctxPrevScreen = screenFeatureList
@@ -83,12 +90,16 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			newM, cmd := m.jumpToView(view)
 			return newM, tea.Batch(tea.ClearScreen, cmd), true
 		}
+		if cloudFormationContextReturnActive(m) {
+			m.ctxPrevScreen = screenFeatureList
+		}
 		m.screen = m.ctxPrevScreen
 		return m, tea.ClearScreen, true
 
 	case regionSwitchedMsg:
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
+		resetStepFunctionsContextState(&m)
 		// Region-scoped feature state may contain resources from the previous
 		// region, so return to the service catalog after switching.
 		m.screen = screenServiceList
@@ -203,7 +214,14 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cursor := m.contextTable.Cursor()
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
+			if cloudFormationContextReturnActive(m) {
+				m.ctxPrevScreen = screenFeatureList
+			}
 			m.pendingContextName = selected.Name
+			preservePendingStepFunctionsContextReturn(&m)
+			if m.cfg == nil || m.cfg.ContextName != selected.Name {
+				normalizeStepFunctionsContextReturn(&m)
+			}
 			m.eventBridge.preserveOverlay(&m, screenFeatureList)
 			return m.startLoading(m.switchContext(selected.Name))
 		}
