@@ -562,6 +562,8 @@ func overlayChainMatches(m Model, current screen, match func(screen) bool) bool 
 			current = m.views.prevScreen
 		case screenContextPicker:
 			current = m.ctxPrevScreen
+		case screenRegionPicker:
+			current = m.regionPrevScreen
 		default:
 			return false
 		}
@@ -738,7 +740,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			m.regionPrevScreen = m.screen
+			if !overlayChainMatches(m, m.screen, func(current screen) bool {
+				return current == screenRegionPicker
+			}) {
+				m.regionPrevScreen = m.screen
+			}
 			m.regionIdx = m.activeRegionIndex()
 			m.screen = screenRegionPicker
 			return m, nil

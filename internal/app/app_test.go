@@ -376,9 +376,12 @@ func TestContextPickerStackedOverlaysPreserveReturnScreen(t *testing.T) {
 		{name: "views settings views", keys: "VSV"},
 		{name: "palette settings palette", keys: "PSP"},
 		{name: "palette views palette", keys: "PVP"},
+		{name: "settings then region", keys: "SR"},
+		{name: "views region settings region", keys: "VRSR"},
+		{name: "settings region views region", keys: "SRVR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			m := multiRegionTestModel()
 			m.cfg.ContextName = "dev"
 
 			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
