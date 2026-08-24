@@ -926,11 +926,13 @@ func TestDynamoDBContextPickerCommittedOverlaysClearInterruptedLoad(t *testing.T
 func TestDynamoDBContextPickerOverlaysPreserveInterruptedLoad(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		key    rune
+		keys   string
 		screen screen
 	}{
-		{name: "settings", key: 'S', screen: screenSettings},
-		{name: "views", key: 'V', screen: screenViewList},
+		{name: "settings", keys: "S", screen: screenSettings},
+		{name: "views", keys: "V", screen: screenViewList},
+		{name: "settings then views", keys: "SV", screen: screenViewList},
+		{name: "views then settings", keys: "VS", screen: screenSettings},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
@@ -943,8 +945,10 @@ func TestDynamoDBContextPickerOverlaysPreserveInterruptedLoad(t *testing.T) {
 			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
 			m = loaded.(Model)
 
-			overlay, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
-			m = overlay.(Model)
+			for _, key := range tc.keys {
+				overlay, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{key}})
+				m = overlay.(Model)
+			}
 			if m.screen != tc.screen || !m.ctxPrevWasLoading {
 				t.Fatalf("expected %s over the interrupted context picker, screen=%v loading=%v", tc.name, m.screen, m.ctxPrevWasLoading)
 			}

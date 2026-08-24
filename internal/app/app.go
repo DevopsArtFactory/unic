@@ -693,7 +693,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			returnsToContextPicker :=
 				(m.screen == screenSettings && m.settingsPrevScreen == screenContextPicker) ||
 					(m.screen == screenViewList && m.views.prevScreen == screenContextPicker)
-			if !returnsToContextPicker {
+			if !m.ctxPrevWasLoading && !returnsToContextPicker {
 				m.ctxPrevScreen = m.screen
 				m.ctxPrevWasLoading = false
 			}
