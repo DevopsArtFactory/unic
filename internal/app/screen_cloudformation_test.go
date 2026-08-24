@@ -422,6 +422,44 @@ func TestCloudFormationLoadCompletesBeforeContextPickerOpens(t *testing.T) {
 	}
 }
 
+func TestCloudFormationContextSwitchDuringLoadReturnsToFeatureList(t *testing.T) {
+	cfg := testConfig()
+	cfg.ContextName = "dev"
+	m := New(cfg, "", "dev")
+	m.cloudFormation.stacks = []awsservice.CloudFormationStack{{ID: "old-stack"}}
+	m.cloudFormation.filtered = append([]awsservice.CloudFormationStack(nil), m.cloudFormation.stacks...)
+
+	updated, loadCmd := m.cloudFormation.Start(&m)
+	model := updated.(Model)
+	if loadCmd == nil || model.screen != screenLoading || model.loadingReturnScreen != screenCloudFormationStackList {
+		t.Fatalf("expected an owned CloudFormation load, got screen=%v return=%v cmd=%v", model.screen, model.loadingReturnScreen, loadCmd)
+	}
+
+	updated, contextsCmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	model = updated.(Model)
+	if contextsCmd == nil || model.screen != screenLoading || model.ctxPrevScreen != screenLoading {
+		t.Fatalf("expected context loading over the stack load, got screen=%v previous=%v cmd=%v", model.screen, model.ctxPrevScreen, contextsCmd)
+	}
+
+	updated, _ = model.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "new"}}})
+	model = updated.(Model)
+	if model.screen != screenContextPicker || model.ctxPrevScreen != screenLoading {
+		t.Fatalf("expected picker to retain the pending stack load, got screen=%v previous=%v", model.screen, model.ctxPrevScreen)
+	}
+
+	updated, switchCmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if switchCmd == nil || model.screen != screenLoading || model.ctxPrevScreen != screenFeatureList {
+		t.Fatalf("expected committed switch to replace the orphanable loading return, got screen=%v previous=%v cmd=%v", model.screen, model.ctxPrevScreen, switchCmd)
+	}
+
+	updated, _ = model.Update(contextSwitchedMsg{cfg: &config.Config{ContextName: "new", Region: "us-west-2"}})
+	model = updated.(Model)
+	if model.screen != screenFeatureList || len(model.cloudFormation.stacks) != 0 || len(model.cloudFormation.filtered) != 0 {
+		t.Fatalf("expected a usable feature list with cleared stack state, got screen=%v stacks=%+v filtered=%+v", model.screen, model.cloudFormation.stacks, model.cloudFormation.filtered)
+	}
+}
+
 func TestCloudFormationStateClearsAfterContextSwitch(t *testing.T) {
 	for _, tt := range []struct {
 		name     string

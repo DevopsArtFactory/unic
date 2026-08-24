@@ -192,6 +192,10 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cursor := m.contextTable.Cursor()
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
+			if m.ctxPrevScreen == screenLoading &&
+				(m.loadingReturnScreen == screenCloudFormationStackList || m.loadingReturnScreen == screenCloudFormationStackDetail) {
+				m.ctxPrevScreen = screenFeatureList
+			}
 			m.pendingContextName = selected.Name
 			return m.startLoading(m.switchContext(selected.Name))
 		}

@@ -30,7 +30,7 @@ type cloudFormationModel struct {
 func newCloudFormationModel() cloudFormationModel { return cloudFormationModel{} }
 
 func (cm *cloudFormationModel) Start(m *Model) (tea.Model, tea.Cmd) {
-	return m.startLoading(cm.loadStacks(*m))
+	return m.startLoadingFor(screenCloudFormationStackList, "Loading...", nil, cm.loadStacks(*m))
 }
 
 func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -159,6 +159,7 @@ func finishCloudFormationLoad(m *Model, next screen) {
 			*target = next
 		}
 	}
+	m.loadingReturnScreen = 0
 }
 
 func (cm *cloudFormationModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
@@ -178,13 +179,13 @@ func (cm *cloudFormationModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, t
 		case "/":
 			return *m, m.activateFilter(filterCloudFormationStacks), true
 		case "r":
-			newM, cmd := m.startLoading(cm.loadStacks(*m))
+			newM, cmd := m.startLoadingFor(screenCloudFormationStackList, "Loading...", nil, cm.loadStacks(*m))
 			return newM, cmd, true
 		case "enter":
 			if cm.idx < len(cm.filtered) {
 				selected := cm.filtered[cm.idx]
 				cm.selected = &selected
-				newM, cmd := m.startLoadingWithMessage("Loading stack detail...", []string{selected.Name}, cm.loadStack(*m, selected.ID))
+				newM, cmd := m.startLoadingFor(screenCloudFormationStackDetail, "Loading stack detail...", []string{selected.Name}, cm.loadStack(*m, selected.ID))
 				return newM, cmd, true
 			}
 		}
@@ -211,12 +212,12 @@ func (cm *cloudFormationModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, t
 			cm.detailScroll = min(cm.detailScroll+visibleLines, maxOffset)
 		case "r":
 			if cm.selected != nil && cm.driftDetectionID == "" {
-				newM, cmd := m.startLoadingWithMessage("Refreshing stack detail...", []string{cm.selected.Name}, cm.loadStack(*m, cm.selected.ID))
+				newM, cmd := m.startLoadingFor(screenCloudFormationStackDetail, "Refreshing stack detail...", []string{cm.selected.Name}, cm.loadStack(*m, cm.selected.ID))
 				return newM, cmd, true
 			}
 		case "d":
 			if cm.selected != nil && cm.driftDetectionID == "" {
-				newM, cmd := m.startLoadingWithMessage("Starting drift detection...", []string{cm.selected.Name}, cm.detectDrift(*m, cm.selected.ID))
+				newM, cmd := m.startLoadingFor(screenCloudFormationStackDetail, "Starting drift detection...", []string{cm.selected.Name}, cm.detectDrift(*m, cm.selected.ID))
 				return newM, cmd, true
 			}
 		}
