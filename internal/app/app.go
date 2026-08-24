@@ -543,6 +543,31 @@ func (m Model) isTextEntryScreen() bool {
 	}
 }
 
+func overlayChainMatches(m Model, current screen, match func(screen) bool) bool {
+	visited := make(map[screen]struct{}, 4)
+	for {
+		if match(current) {
+			return true
+		}
+		if _, ok := visited[current]; ok {
+			return false
+		}
+		visited[current] = struct{}{}
+		switch current {
+		case screenSettings:
+			current = m.settingsPrevScreen
+		case screenCommandPalette:
+			current = m.palette.prevScreen
+		case screenViewList:
+			current = m.views.prevScreen
+		case screenContextPicker:
+			current = m.ctxPrevScreen
+		default:
+			return false
+		}
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Global messages
 	switch msg := msg.(type) {
@@ -690,9 +715,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			returnsToContextPicker :=
-				(m.screen == screenSettings && m.settingsPrevScreen == screenContextPicker) ||
-					(m.screen == screenViewList && m.views.prevScreen == screenContextPicker)
+			returnsToContextPicker := overlayChainMatches(m, m.screen, func(current screen) bool {
+				return current == screenContextPicker
+			})
 			if !m.ctxPrevWasLoading && !returnsToContextPicker {
 				m.ctxPrevScreen = m.screen
 				m.ctxPrevWasLoading = false

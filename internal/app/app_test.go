@@ -365,6 +365,41 @@ func TestGlobalSettingsShortcutOpensSettings(t *testing.T) {
 	}
 }
 
+func TestContextPickerStackedOverlaysPreserveReturnScreen(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		keys string
+	}{
+		{name: "settings then views", keys: "SV"},
+		{name: "views then settings", keys: "VS"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			m.cfg.ContextName = "dev"
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = opened.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+
+			for _, key := range tc.keys {
+				overlay, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{key}})
+				m = overlay.(Model)
+			}
+
+			reopened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = reopened.(Model)
+			reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = reloaded.(Model)
+			canceled, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = canceled.(Model)
+			if m.screen != screenServiceList || cmd != nil {
+				t.Fatalf("expected cancel to return to the service list, screen=%v cmd=%v", m.screen, cmd)
+			}
+		})
+	}
+}
+
 func TestSettingsViewShowsBootSplashSetting(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenSettings
