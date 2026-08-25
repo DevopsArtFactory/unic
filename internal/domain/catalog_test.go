@@ -308,6 +308,22 @@ func TestCatalogContainsDynamoDBBrowserFeature(t *testing.T) {
 	t.Error("DynamoDB service not found in catalog")
 }
 
+func TestCatalogContainsBackupBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceBackup {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureBackupBrowser {
+				return
+			}
+		}
+		t.Error("AWS Backup service should have Backup Recovery Browser feature")
+		return
+	}
+	t.Error("AWS Backup service not found in catalog")
+}
+
 func TestCatalogContainsEventBridgeRulesFeature(t *testing.T) {
 	for _, svc := range Catalog() {
 		if svc.Name != ServiceEventBridge {

@@ -109,6 +109,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - S3
 - KMS
 - DynamoDB
+- AWS Backup
 
 패턴:
 
@@ -263,6 +264,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - KMS key list/detail, rotation 상태
 - EventBridge rule list/detail, 스크롤 가능한 전체 event pattern, 변경 가능한 rule mode의 type-to-confirm 상태 변경 flow
 - DynamoDB table list/detail, 전체 primary key 기반 `GetItem`
+- AWS Backup vault list, recovery point/protected resource/failed job 스크롤 상세 화면
 - Inspector mode home, checklist setup, KMS rotation finding을 포함한 security findings/detail, checklist results/detail
 - context picker, context add, TUI-native context setup/export/unset
 - SSO account / role selection, exit notice

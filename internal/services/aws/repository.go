@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	"github.com/aws/aws-sdk-go-v2/service/backup"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
@@ -47,6 +48,7 @@ var _ KMSClientAPI = (*kms.Client)(nil)
 var _ ACMClientAPI = (*acm.Client)(nil)
 var _ StepFunctionsClientAPI = (*sfn.Client)(nil)
 var _ DynamoDBClientAPI = (*dynamodb.Client)(nil)
+var _ BackupClientAPI = (*backup.Client)(nil)
 
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
@@ -161,6 +163,14 @@ type DynamoDBClientAPI interface {
 	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
 	DescribeTimeToLive(ctx context.Context, params *dynamodb.DescribeTimeToLiveInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTimeToLiveOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+}
+
+// BackupClientAPI is the interface for read-only AWS Backup browser operations.
+type BackupClientAPI interface {
+	ListBackupVaults(ctx context.Context, params *backup.ListBackupVaultsInput, optFns ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error)
+	ListRecoveryPointsByBackupVault(ctx context.Context, params *backup.ListRecoveryPointsByBackupVaultInput, optFns ...func(*backup.Options)) (*backup.ListRecoveryPointsByBackupVaultOutput, error)
+	ListProtectedResourcesByBackupVault(ctx context.Context, params *backup.ListProtectedResourcesByBackupVaultInput, optFns ...func(*backup.Options)) (*backup.ListProtectedResourcesByBackupVaultOutput, error)
+	ListBackupJobs(ctx context.Context, params *backup.ListBackupJobsInput, optFns ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
@@ -414,6 +424,7 @@ type AwsRepository struct {
 	ACMClient            ACMClientAPI
 	StepFunctionsClient  StepFunctionsClientAPI
 	DynamoDBClient       DynamoDBClientAPI
+	BackupClient         BackupClientAPI
 	Region               string
 	Profile              string
 	awsCfg               aws.Config
@@ -540,6 +551,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		ACMClient:            acm.NewFromConfig(awsCfg),
 		StepFunctionsClient:  sfn.NewFromConfig(awsCfg),
 		DynamoDBClient:       dynamodb.NewFromConfig(awsCfg),
+		BackupClient:         backup.NewFromConfig(awsCfg),
 		Region:               region,
 		Profile:              profile,
 		awsCfg:               awsCfg,

@@ -53,6 +53,7 @@ func (m Model) selectedContextInfo() (config.ContextInfo, bool) {
 }
 
 func (m Model) beginContextSetup(selected config.ContextInfo) (tea.Model, tea.Cmd) {
+	normalizeBackupContextReturn(&m)
 	if auth.IsBaseSSOContext(selected) {
 		details := []string{
 			renderDetailLine("Context", selected.Name),
@@ -69,6 +70,7 @@ func (m Model) beginContextSetup(selected config.ContextInfo) (tea.Model, tea.Cm
 }
 
 func (m Model) beginContextExport(selected config.ContextInfo) (tea.Model, tea.Cmd) {
+	normalizeBackupContextReturn(&m)
 	return m.startLoadingWithMessage(
 		"Copying environment exports...",
 		[]string{renderDetailLine("Context", selected.Name)},
@@ -77,6 +79,7 @@ func (m Model) beginContextExport(selected config.ContextInfo) (tea.Model, tea.C
 }
 
 func (m Model) beginContextUnset() (tea.Model, tea.Cmd) {
+	normalizeBackupContextReturn(&m)
 	return m.startLoadingWithMessage(
 		"Clearing terminal context...",
 		[]string{renderDetailLine("Action", "Unset shell exports and current context")},

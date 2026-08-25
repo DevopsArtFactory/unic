@@ -487,3 +487,16 @@ type dynamoDBTableDetailLoadedMsg struct {
 type dynamoDBItemLoadedMsg struct {
 	item *awsservice.DynamoDBItem
 }
+
+type backupVaultsLoadedMsg struct {
+	vaults   []awsservice.BackupVault
+	warnings []error
+	err      error
+}
+
+type backupVaultDetailLoadedMsg struct {
+	vaultName string
+	detail    *awsservice.BackupVaultDetail
+	warnings  []error
+	err       error
+}

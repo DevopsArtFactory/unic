@@ -11,7 +11,7 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Drill down into resources with filters, detail views, and action screens
 - Open a context-aware keyboard shortcut help screen with `?`
 - Show animated loading indicators while async AWS data is being fetched
-- Perform operational workflows such as EC2 inventory inspection, SSM sessions, RDS control, Route53 record changes, DynamoDB table and keyed-item inspection, ECS rollout inspection/exec, EKS cluster and node group review, IAM access key rotation, and Bedrock API key management
+- Perform operational workflows such as EC2 inventory inspection, SSM sessions, RDS control, Route53 record changes, DynamoDB table and keyed-item inspection, AWS Backup recovery-readiness review, ECS rollout inspection/exec, EKS cluster and node group review, IAM access key rotation, and Bedrock API key management
 - Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in security and cost/waste findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
 ## Documentation Map
@@ -329,6 +329,7 @@ Context ordering:
 | S3 | S3 Browser |
 | Lambda | Lambda Browser |
 | DynamoDB | Table Browser & Key Lookup |
+| AWS Backup | Recovery Browser |
 | Bedrock | API Key Manager |
 | IAM | IAM User Browser |
 | IAM | ListAccessKeys |
@@ -468,6 +469,7 @@ checks:
 | Step Functions | `/` filter state machines by name/ARN/type/region or executions by status/name/ARN, `r` refresh, `Enter` executions/detail, detail `↑`/`↓` scroll, `PgUp`/`PgDn` page |
 | Lambda | `A` toggle all-regions scope (multi-region contexts), `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 | DynamoDB | `/` filter, `r` refresh, `Enter` table detail, detail `l` prompts for the complete partition/sort key and performs one `GetItem`, `↑`/`↓` and `PgUp`/`PgDn` scroll details or item JSON |
+| AWS Backup | `/` filter vaults, `r` refresh, `Enter` recovery-readiness detail, detail `↑`/`↓` scroll and `PgUp`/`PgDn` page through recovery points, protected resources, and recent failed/expired jobs |
 
 The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context. Press `Tab` to opt into searching the active context plus sync-managed contexts; context fan-out is bounded, rows show context and region tags, and per-context/service failures are shown inline. Matching covers names, IDs, ARNs, contexts, and regions where available. Selecting a resource in another context switches context and then jumps to the owning browser with the shared filter prefilled to that resource.
 
@@ -500,6 +502,8 @@ The Step Functions Execution Browser lists state machines in the active region, 
 The EventBridge Rules Browser lists rules from every event bus with disabled rules first, their schedule or event-pattern trigger, attached targets, and recent trigger activity. Complete event patterns are pretty-printed and vertically scrollable in rule detail. “Last Seen” is a best-effort view of the `AWS/Events` `TriggeredRules` CloudWatch metric over the previous seven days in 30-minute buckets; missing or delayed metrics are not a complete invocation audit, and missing `cloudwatch:GetMetricData` permission leaves rule and target browsing available with activity marked unavailable. Enabling or disabling an eligible customer-managed rule requires typing `event-bus/rule` and uses `events:EnableRule` or `events:DisableRule`; rules in `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS` mode are read-only because `EnableRule` cannot restore that exact matching mode. Browsing requires `events:ListEventBuses`, `events:ListRules`, and `events:ListTargetsByRule`.
 
 The DynamoDB Table Browser lists billing mode, provisioned capacity or on-demand mode, approximate item count and size, and global secondary index count. Table detail shows the primary key schema, GSI schemas, TTL status, and stream configuration. Press `l` to enter the complete partition key and optional sort key; unic performs exactly one `GetItem` and renders the returned item as scrollable JSON. It never scans or queries a table. The active identity needs `dynamodb:ListTables`, `dynamodb:DescribeTable`, `dynamodb:DescribeTimeToLive`, and `dynamodb:GetItem` for this flow.
+
+The AWS Backup Recovery Browser lists vault state, type, recovery-point count, encryption key, and Vault Lock retention metadata in the active region. Opening a vault shows failure/expiry-prioritized recovery points, protected resources with their latest backup, and failed, expired, aborted, partial, or completed-with-issues jobs from AWS Backup's recent job window. Each paginated section is independent: completed pages and other sections remain visible when a later page or one section is denied, with the failure summarized inline. The browser is read-only and requires `backup:ListBackupVaults`, `backup:ListRecoveryPointsByBackupVault`, `backup:ListProtectedResourcesByBackupVault`, and `backup:ListBackupJobs`.
 
 The CloudTrail Event Lookup answers "who changed what, and when": recent API events list newest-first with mutations marked `*`, actor, call, and source service per row. Keys `1`-`5` switch the time window (1h/6h/24h/3d/7d), `m` restricts to mutations (server-side via the `ReadOnly=false` lookup attribute), and `n` runs a server-side resource-name lookup — CloudTrail accepts one lookup attribute per call, so combining both applies the mutations restriction client-side. Results are capped at 100 events per query, so narrow the window or use the resource lookup when a busy account truncates. Event detail shows actor, source, region, source IP, touched resources, and the full raw event JSON with scrolling.
 
