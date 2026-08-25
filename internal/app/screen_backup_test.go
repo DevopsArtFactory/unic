@@ -349,6 +349,39 @@ func TestBackupLoadCompletionStaysBehindGlobalOverlays(t *testing.T) {
 	}
 }
 
+func TestBackupLoadCompletionBehindContextAddReturnsToVaultList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "dev"
+	started, _ := m.backup.Start(&m)
+	m = started.(Model)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	m = updated.(Model)
+
+	updated, _ = m.Update(backupVaultsLoadedMsg{vaults: backupTestVaults()})
+	m = updated.(Model)
+	if m.screen != screenContextAdd || m.ctxPrevScreen != screenBackupVaultList {
+		t.Fatalf("expected context add to stay open over the loaded vault list, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected context add cancel to reload the context picker")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenBackupVaultList || len(m.backup.vaults) != len(backupTestVaults()) {
+		t.Fatalf("expected context flow to return to the loaded vault list, screen=%v vaults=%d", m.screen, len(m.backup.vaults))
+	}
+}
+
 func TestBackupErrorBehindContextPickerIsClearedByContextSwitch(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenContextPicker
