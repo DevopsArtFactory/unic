@@ -33,6 +33,44 @@ func isSNSScreen(s screen) bool {
 	}
 }
 
+func resetSNSContextState(m *Model) {
+	m.sns = newSNSModel()
+	m.resetFilter(filterSNSTopics)
+	m.resetFilter(filterSNSSubscriptions)
+}
+
+func normalizeSNSContextReturn(m *Model) {
+	if previous := snsContextReturn(m); previous != nil {
+		*previous = screenFeatureList
+	}
+}
+
+func preservePendingSNSContextReturn(m *Model) {
+	if previous := snsContextReturn(m); previous != nil && *previous == screenLoading {
+		*previous = m.loadingReturnScreen
+	}
+}
+
+func snsContextReturn(m *Model) *screen {
+	previous := &m.ctxPrevScreen
+	seen := make(map[screen]struct{})
+	for range 8 {
+		current := *previous
+		if _, ok := seen[current]; ok {
+			return nil
+		}
+		seen[current] = struct{}{}
+		if isSNSScreen(current) || current == screenLoading && isSNSScreen(m.loadingReturnScreen) {
+			return previous
+		}
+		previous = overlayPreviousScreen(m, current)
+		if previous == nil {
+			return nil
+		}
+	}
+	return nil
+}
+
 func (sm *snsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 	return m.startLoadingFor(screenSNSTopicList, "Loading SNS topics...", nil, sm.loadTopics(*m))
 }
@@ -396,10 +434,7 @@ func (sm snsModel) viewSubscriptionList(m Model) string {
 			if i == sm.subIdx {
 				cursor, style = "> ", selectedStyle
 			}
-			dlq := "-"
-			if subscription.HasRedrive() {
-				dlq = "yes"
-			}
+			dlq := snsSubscriptionDLQLabel(subscription)
 			row := snsSubscriptionRow(subscription.Protocol, subscription.Endpoint, subscription.Owner, subscription.Status(), dlq)
 			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSNSSubscriptions, row)))
 			panel.WriteString("\n")
@@ -412,6 +447,19 @@ func (sm snsModel) viewSubscriptionList(m Model) string {
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
+}
+
+func snsSubscriptionDLQLabel(subscription awsservice.SNSSubscription) string {
+	if !subscription.Confirmed() {
+		return "n/a"
+	}
+	if !subscription.AttributesKnown {
+		return "?"
+	}
+	if subscription.HasRedrive() {
+		return "yes"
+	}
+	return "-"
 }
 
 func snsSubscriptionRow(protocol, endpoint, owner, status, dlq string) string {

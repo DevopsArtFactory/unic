@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -111,6 +112,7 @@ func TestListSNSTopicsReturnsFatalListError(t *testing.T) {
 
 func TestListSNSSubscriptionsSkipsPendingAttributesAndSortsPendingFirst(t *testing.T) {
 	var attributeCalls []string
+	var attributeCallsMu sync.Mutex
 	client := &mockSNSClient{
 		listSubscriptionsByTopicFunc: func(_ context.Context, in *sns.ListSubscriptionsByTopicInput, _ ...func(*sns.Options)) (*sns.ListSubscriptionsByTopicOutput, error) {
 			if awssdk.ToString(in.TopicArn) != "arn:topic" {
@@ -119,12 +121,15 @@ func TestListSNSSubscriptionsSkipsPendingAttributesAndSortsPendingFirst(t *testi
 			return &sns.ListSubscriptionsByTopicOutput{Subscriptions: []snstypes.Subscription{
 				{SubscriptionArn: awssdk.String("arn:sub:confirmed"), Protocol: awssdk.String("sqs"), Endpoint: awssdk.String("arn:queue"), Owner: awssdk.String("1")},
 				{SubscriptionArn: awssdk.String("PendingConfirmation"), Protocol: awssdk.String("email"), Endpoint: awssdk.String("ops@example.com"), Owner: awssdk.String("1")},
+				{SubscriptionArn: awssdk.String("Deleted"), Protocol: awssdk.String("email"), Endpoint: awssdk.String("old@example.com"), Owner: awssdk.String("1")},
 				{SubscriptionArn: awssdk.String("arn:sub:denied"), Protocol: awssdk.String("lambda"), Endpoint: awssdk.String("arn:fn"), Owner: awssdk.String("1")},
 			}}, nil
 		},
 		getSubscriptionAttributesFunc: func(_ context.Context, in *sns.GetSubscriptionAttributesInput, _ ...func(*sns.Options)) (*sns.GetSubscriptionAttributesOutput, error) {
 			arn := awssdk.ToString(in.SubscriptionArn)
+			attributeCallsMu.Lock()
 			attributeCalls = append(attributeCalls, arn)
+			attributeCallsMu.Unlock()
 			if arn == "arn:sub:denied" {
 				return nil, errors.New("AuthorizationError")
 			}
@@ -145,8 +150,11 @@ func TestListSNSSubscriptionsSkipsPendingAttributesAndSortsPendingFirst(t *testi
 			t.Fatalf("expected pending subscriptions to be skipped, calls=%v", attributeCalls)
 		}
 	}
-	if len(subs) != 3 || subs[0].Status() != "pending" {
-		t.Fatalf("expected pending subscription sorted first, got %+v", subs)
+	if len(subs) != 4 {
+		t.Fatalf("expected all subscriptions, got %+v", subs)
+	}
+	if got := []string{subs[0].Status(), subs[1].Status(), subs[2].Status(), subs[3].Status()}; got[0] != "pending" || got[1] != "confirmed" || got[2] != "confirmed" || got[3] != "deleted" {
+		t.Fatalf("expected pending, confirmed, then deleted ordering, got %v", got)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0].Error(), "arn:sub:denied") {
 		t.Fatalf("expected one warning for the denied subscription, got %v", warnings)

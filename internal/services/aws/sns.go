@@ -44,7 +44,7 @@ func (r *AwsRepository) ListSNSTopics(ctx context.Context) ([]SNSTopic, []error,
 		var wg sync.WaitGroup
 		for i, arn := range batch {
 			wg.Add(1)
-			go func() {
+			go func(i int, arn string) {
 				defer wg.Done()
 				results[i] = newSNSTopic(arn, r.Region)
 				out, err := r.SNSClient.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: awssdk.String(arn)})
@@ -53,7 +53,7 @@ func (r *AwsRepository) ListSNSTopics(ctx context.Context) ([]SNSTopic, []error,
 					return
 				}
 				applySNSTopicAttributes(&results[i], out.Attributes)
-			}()
+			}(i, arn)
 		}
 		wg.Wait()
 		if err := ctx.Err(); err != nil {
@@ -108,7 +108,7 @@ func (r *AwsRepository) ListSNSSubscriptionsByTopic(ctx context.Context, topicAR
 				continue
 			}
 			wg.Add(1)
-			go func() {
+			go func(i int) {
 				defer wg.Done()
 				out, err := r.SNSClient.GetSubscriptionAttributes(ctx, &sns.GetSubscriptionAttributesInput{
 					SubscriptionArn: awssdk.String(subscriptions[i].ARN),
@@ -118,7 +118,7 @@ func (r *AwsRepository) ListSNSSubscriptionsByTopic(ctx context.Context, topicAR
 					return
 				}
 				applySNSSubscriptionAttributes(&subscriptions[i], out.Attributes)
-			}()
+			}(i)
 		}
 		wg.Wait()
 		if err := ctx.Err(); err != nil {
@@ -133,8 +133,9 @@ func (r *AwsRepository) ListSNSSubscriptionsByTopic(ctx context.Context, topicAR
 
 	// Pending subscriptions first: they are the ones needing operator action.
 	sort.SliceStable(subscriptions, func(i, j int) bool {
-		if subscriptions[i].Confirmed() != subscriptions[j].Confirmed() {
-			return !subscriptions[i].Confirmed()
+		leftRank, rightRank := snsSubscriptionSortRank(subscriptions[i]), snsSubscriptionSortRank(subscriptions[j])
+		if leftRank != rightRank {
+			return leftRank < rightRank
 		}
 		if subscriptions[i].Protocol != subscriptions[j].Protocol {
 			return subscriptions[i].Protocol < subscriptions[j].Protocol
@@ -142,6 +143,19 @@ func (r *AwsRepository) ListSNSSubscriptionsByTopic(ctx context.Context, topicAR
 		return normalizedSortKey(subscriptions[i].Endpoint) < normalizedSortKey(subscriptions[j].Endpoint)
 	})
 	return subscriptions, warnings, nil
+}
+
+func snsSubscriptionSortRank(subscription SNSSubscription) int {
+	switch subscription.Status() {
+	case "pending":
+		return 0
+	case "confirmed":
+		return 1
+	case "deleted":
+		return 2
+	default:
+		return 3
+	}
 }
 
 func newSNSTopic(arn, region string) SNSTopic {

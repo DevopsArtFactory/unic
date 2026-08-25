@@ -26,6 +26,7 @@ func snsTestSubscriptions() []awsservice.SNSSubscription {
 		{ARN: "PendingConfirmation", Protocol: "email", Endpoint: "ops@example.com", Owner: "1"},
 		{ARN: "arn:sub:confirmed", Protocol: "sqs", Endpoint: "arn:queue", Owner: "1",
 			RedrivePolicy: `{"deadLetterTargetArn":"arn:dlq"}`, AttributesKnown: true},
+		{ARN: "arn:sub:denied", Protocol: "lambda", Endpoint: "arn:fn", Owner: "1"},
 	}
 }
 
@@ -111,10 +112,14 @@ func TestSNSDrillDownToSubscriptionsAndBack(t *testing.T) {
 		t.Fatalf("expected the subscription list, got %v", m.screen)
 	}
 	subs, _ := m.sns.View(m)
-	for _, want := range []string{"SNS Subscriptions", "ops@example.com", "pending", "yes"} {
+	for _, want := range []string{"SNS Subscriptions", "ops@example.com", "pending", "yes", "arn:fn"} {
 		if !strings.Contains(stripANSI(subs), want) {
 			t.Fatalf("expected %q in subscription list, got:\n%s", want, stripANSI(subs))
 		}
+	}
+	unknownRow := snsSubscriptionRow("lambda", "arn:fn", "1", "confirmed", "?")
+	if !strings.Contains(stripANSI(subs), unknownRow) {
+		t.Fatalf("expected denied subscription attributes to render an unknown DLQ marker, got:\n%s", stripANSI(subs))
 	}
 
 	updated, _ = m.sns.updateSubscriptionList(&m, tea.KeyMsg{Type: tea.KeyEsc})
@@ -207,5 +212,70 @@ func TestSNSLoadCompletionStaysBehindGlobalOverlay(t *testing.T) {
 	m = updated.(Model)
 	if m.screen != screenSNSTopicList {
 		t.Fatalf("expected esc to reveal the loaded topic list, got %v", m.screen)
+	}
+}
+
+func TestSNSContextSwitchClearsStateAndNestedReturns(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		contextReturn  screen
+		settingsReturn screen
+		viewsReturn    screen
+		wantScreen     screen
+	}{
+		{
+			name: "subscription list", contextReturn: screenSNSSubscriptionList,
+			wantScreen: screenFeatureList,
+		},
+		{
+			name: "settings and views over topic detail", contextReturn: screenSettings,
+			settingsReturn: screenViewList, viewsReturn: screenSNSTopicDetail,
+			wantScreen: screenSettings,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := snsLoadedModel(t)
+			m.screen = screenContextPicker
+			m.ctxPrevScreen = tc.contextReturn
+			m.settingsPrevScreen = tc.settingsReturn
+			m.views.prevScreen = tc.viewsReturn
+			m.sns.selectedTopic = &m.sns.topics[0]
+			m.sns.subscriptions = snsTestSubscriptions()
+			m.storeFilterValue(filterSNSTopics, "orders")
+			m.storeFilterValue(filterSNSSubscriptions, "email")
+
+			nextCfg := *m.cfg
+			nextCfg.ContextName = "account-b"
+			updated, _ := m.Update(contextSwitchedMsg{cfg: &nextCfg})
+			m = updated.(Model)
+
+			if m.screen != tc.wantScreen {
+				t.Fatalf("expected safe return screen %v, got %v", tc.wantScreen, m.screen)
+			}
+			if len(m.sns.topics) != 0 || len(m.sns.subscriptions) != 0 || m.sns.selectedTopic != nil {
+				t.Fatalf("expected SNS resource state cleared, got %+v", m.sns)
+			}
+			if m.filterValue(filterSNSTopics) != "" || m.filterValue(filterSNSSubscriptions) != "" {
+				t.Fatal("expected SNS filters cleared")
+			}
+			if tc.viewsReturn != 0 && m.views.prevScreen != screenFeatureList {
+				t.Fatalf("expected nested overlay chain normalized, got views return %v", m.views.prevScreen)
+			}
+		})
+	}
+}
+
+func TestSNSRegionSwitchClearsState(t *testing.T) {
+	m := snsLoadedModel(t)
+	m.sns.selectedTopic = &m.sns.topics[0]
+	m.sns.subscriptions = snsTestSubscriptions()
+	m.storeFilterValue(filterSNSTopics, "orders")
+	m.storeFilterValue(filterSNSSubscriptions, "email")
+
+	updated, _ := m.Update(regionSwitchedMsg{region: "us-west-2"})
+	m = updated.(Model)
+	if m.screen != screenServiceList || len(m.sns.topics) != 0 || m.sns.selectedTopic != nil ||
+		m.filterValue(filterSNSTopics) != "" || m.filterValue(filterSNSSubscriptions) != "" {
+		t.Fatalf("expected region switch to clear SNS state, screen=%v state=%+v", m.screen, m.sns)
 	}
 }

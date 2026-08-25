@@ -68,6 +68,8 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if contextChanged {
 			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
+			resetSNSContextState(&m)
+			normalizeSNSContextReturn(&m)
 		}
 		m.eventBridge = newEventBridgeModel()
 		if isEventBridgeScreen(m.ctxPrevScreen) {
@@ -113,6 +115,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
 		resetStepFunctionsContextState(&m)
+		resetSNSContextState(&m)
 		m.ctxPrevWasLoading = false
 		// Region-scoped feature state may contain resources from the previous
 		// region, so return to the service catalog after switching.
@@ -237,8 +240,10 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.pendingContextName = selected.Name
 			preservePendingStepFunctionsContextReturn(&m)
+			preservePendingSNSContextReturn(&m)
 			if m.cfg == nil || m.cfg.ContextName != selected.Name {
 				normalizeStepFunctionsContextReturn(&m)
+				normalizeSNSContextReturn(&m)
 			}
 			m.eventBridge.preserveOverlay(&m, screenFeatureList)
 			m.ctxPrevWasLoading = false
