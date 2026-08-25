@@ -142,6 +142,12 @@ func describeWAFWebACL(ctx context.Context, client WAFV2ClientAPI, cloudFrontCli
 			acl.ResourcesComplete = false
 			warnings = append(warnings, fmt.Errorf("failed to list CloudFront distributions for WAF web ACL %s: %w", acl.Name, err))
 		}
+		tenantARNs, err := listCloudFrontDistributionTenantARNs(ctx, cloudFrontClient, summary.ARN)
+		acl.ResourceARNs = append(acl.ResourceARNs, tenantARNs...)
+		if err != nil {
+			acl.ResourcesComplete = false
+			warnings = append(warnings, fmt.Errorf("failed to list CloudFront distribution tenants for WAF web ACL %s: %w", acl.Name, err))
+		}
 		sort.Strings(acl.ResourceARNs)
 	}
 	return acl, warnings
@@ -174,6 +180,29 @@ func listCloudFrontDistributionARNs(ctx context.Context, client CloudFrontClient
 			return arns, errors.New("CloudFront response was truncated without a next marker")
 		}
 		marker = out.DistributionList.NextMarker
+	}
+}
+
+func listCloudFrontDistributionTenantARNs(ctx context.Context, client CloudFrontClientAPI, webACLARN *string) ([]string, error) {
+	if client == nil {
+		return nil, errors.New("CloudFront client is not configured")
+	}
+	var arns []string
+	var marker *string
+	for {
+		out, err := client.ListDistributionTenantsByCustomization(ctx, &cloudfront.ListDistributionTenantsByCustomizationInput{WebACLArn: webACLARN, Marker: marker})
+		if err != nil {
+			return arns, err
+		}
+		for _, tenant := range out.DistributionTenantList {
+			if arn := awssdk.ToString(tenant.Arn); arn != "" {
+				arns = append(arns, arn)
+			}
+		}
+		if awssdk.ToString(out.NextMarker) == "" {
+			return arns, nil
+		}
+		marker = out.NextMarker
 	}
 }
 

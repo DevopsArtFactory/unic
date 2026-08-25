@@ -37,11 +37,19 @@ func (m *mockWAFV2Client) ListResourcesForWebACL(_ context.Context, input *wafv2
 }
 
 type mockCloudFrontClient struct {
-	listFn func(*cloudfront.ListDistributionsByWebACLIdInput) (*cloudfront.ListDistributionsByWebACLIdOutput, error)
+	listFn    func(*cloudfront.ListDistributionsByWebACLIdInput) (*cloudfront.ListDistributionsByWebACLIdOutput, error)
+	tenantsFn func(*cloudfront.ListDistributionTenantsByCustomizationInput) (*cloudfront.ListDistributionTenantsByCustomizationOutput, error)
 }
 
 func (m *mockCloudFrontClient) ListDistributionsByWebACLId(_ context.Context, input *cloudfront.ListDistributionsByWebACLIdInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
 	return m.listFn(input)
+}
+
+func (m *mockCloudFrontClient) ListDistributionTenantsByCustomization(_ context.Context, input *cloudfront.ListDistributionTenantsByCustomizationInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionTenantsByCustomizationOutput, error) {
+	if m.tenantsFn == nil {
+		return &cloudfront.ListDistributionTenantsByCustomizationOutput{}, nil
+	}
+	return m.tenantsFn(input)
 }
 
 func TestListWAFWebACLsPaginatesScopesAndMapsPosture(t *testing.T) {
@@ -176,6 +184,69 @@ func TestListCloudFrontDistributionARNsPreservesCompletedPagesOnFailure(t *testi
 
 	arns, err := listCloudFrontDistributionARNs(context.Background(), client, awssdk.String("arn:waf:edge"))
 	if !errors.Is(err, denied) || calls != 2 || len(arns) != 1 || arns[0] != "arn:aws:cloudfront::123:distribution/visible" {
+		t.Fatalf("expected retained first page and second-page error, calls=%d arns=%v err=%v", calls, arns, err)
+	}
+}
+
+func TestDescribeWAFWebACLIncludesTenantOnlyCloudFrontAssociation(t *testing.T) {
+	wafClient := &mockWAFV2Client{
+		getFn: func(input *wafv2.GetWebACLInput) (*wafv2.GetWebACLOutput, error) {
+			return &wafv2.GetWebACLOutput{WebACL: testWAFWebACL(awssdk.ToString(input.Name), wafv2types.ScopeCloudfront)}, nil
+		},
+		loggingFn: func(*wafv2.GetLoggingConfigurationInput) (*wafv2.GetLoggingConfigurationOutput, error) {
+			return &wafv2.GetLoggingConfigurationOutput{}, nil
+		},
+		resourcesFn: func(*wafv2.ListResourcesForWebACLInput) (*wafv2.ListResourcesForWebACLOutput, error) {
+			return &wafv2.ListResourcesForWebACLOutput{}, nil
+		},
+	}
+	pages := 0
+	cloudFrontClient := &mockCloudFrontClient{
+		listFn: func(*cloudfront.ListDistributionsByWebACLIdInput) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
+			return &cloudfront.ListDistributionsByWebACLIdOutput{}, nil
+		},
+		tenantsFn: func(input *cloudfront.ListDistributionTenantsByCustomizationInput) (*cloudfront.ListDistributionTenantsByCustomizationOutput, error) {
+			pages++
+			if awssdk.ToString(input.WebACLArn) != "arn:cloudfront:tenant-only" {
+				t.Fatalf("expected Web ACL ARN for tenant lookup, got %q", awssdk.ToString(input.WebACLArn))
+			}
+			if input.Marker == nil {
+				return &cloudfront.ListDistributionTenantsByCustomizationOutput{NextMarker: awssdk.String("next")}, nil
+			}
+			return &cloudfront.ListDistributionTenantsByCustomizationOutput{
+				DistributionTenantList: []cloudfronttypes.DistributionTenantSummary{{Arn: awssdk.String("arn:aws:cloudfront::123:distribution-tenant/example")}},
+			}, nil
+		},
+	}
+
+	acl, warnings := describeWAFWebACL(context.Background(), wafClient, cloudFrontClient, wafSummary("tenant-only", "arn:cloudfront:tenant-only"), wafv2types.ScopeCloudfront, "us-east-1")
+	if len(warnings) != 0 || pages != 2 {
+		t.Fatalf("expected complete tenant pagination without warnings, pages=%d warnings=%v", pages, warnings)
+	}
+	if !acl.ResourcesComplete || acl.ResourceCountLabel() != "1" || strings.Contains(acl.SignalLabel(), "unassociated") {
+		t.Fatalf("expected tenant-only ACL to be associated, got %+v", acl)
+	}
+	if got := strings.Join(acl.ResourceARNs, ","); got != "arn:aws:cloudfront::123:distribution-tenant/example" {
+		t.Fatalf("expected distribution tenant ARN, got %q", got)
+	}
+}
+
+func TestListCloudFrontDistributionTenantARNsPreservesCompletedPagesOnFailure(t *testing.T) {
+	denied := errors.New("access denied")
+	calls := 0
+	client := &mockCloudFrontClient{tenantsFn: func(input *cloudfront.ListDistributionTenantsByCustomizationInput) (*cloudfront.ListDistributionTenantsByCustomizationOutput, error) {
+		calls++
+		if input.Marker == nil {
+			return &cloudfront.ListDistributionTenantsByCustomizationOutput{
+				DistributionTenantList: []cloudfronttypes.DistributionTenantSummary{{Arn: awssdk.String("arn:aws:cloudfront::123:distribution-tenant/visible")}},
+				NextMarker:             awssdk.String("next"),
+			}, nil
+		}
+		return nil, denied
+	}}
+
+	arns, err := listCloudFrontDistributionTenantARNs(context.Background(), client, awssdk.String("arn:waf:edge"))
+	if !errors.Is(err, denied) || calls != 2 || len(arns) != 1 || arns[0] != "arn:aws:cloudfront::123:distribution-tenant/visible" {
 		t.Fatalf("expected retained first page and second-page error, calls=%d arns=%v err=%v", calls, arns, err)
 	}
 }

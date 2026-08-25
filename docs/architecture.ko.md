@@ -109,7 +109,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - S3
 - KMS
 - DynamoDB
-- WAFv2 (regional 및 `us-east-1` CloudFront scope client와 CloudFront association lookup)
+- WAFv2 (regional 및 `us-east-1` CloudFront scope client와 distribution 및 distribution tenant association lookup)
 
 패턴:
 

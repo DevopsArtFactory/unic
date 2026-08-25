@@ -109,7 +109,7 @@ Current repository clients include:
 - S3
 - KMS
 - DynamoDB
-- WAFv2 (regional and `us-east-1` CloudFront-scope clients, plus CloudFront association lookup)
+- WAFv2 (regional and `us-east-1` CloudFront-scope clients, plus distribution and distribution-tenant association lookups)
 
 Pattern:
 

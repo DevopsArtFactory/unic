@@ -178,6 +178,7 @@ type WAFV2ClientAPI interface {
 // CloudFrontClientAPI is the read-only association lookup used by the Web ACL browser.
 type CloudFrontClientAPI interface {
 	ListDistributionsByWebACLId(ctx context.Context, params *cloudfront.ListDistributionsByWebACLIdInput, optFns ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error)
+	ListDistributionTenantsByCustomization(ctx context.Context, params *cloudfront.ListDistributionTenantsByCustomizationInput, optFns ...func(*cloudfront.Options)) (*cloudfront.ListDistributionTenantsByCustomizationOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
