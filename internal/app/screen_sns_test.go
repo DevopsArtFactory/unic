@@ -45,10 +45,11 @@ func snsLoadedModel(t *testing.T) Model {
 func TestSNSTopicListRendersFiltersAndShowsUnknownCounts(t *testing.T) {
 	m := snsLoadedModel(t)
 
-	view, ok := m.sns.View(m)
+	rawView, ok := m.sns.View(m)
 	if !ok {
 		t.Fatal("expected the SNS view to render")
 	}
+	view := stripANSI(rawView)
 	for _, want := range []string{"SNS Topics", "alpha-orders.fifo", "locked-topic", "FIFO", "3 (+1 pending)", "SUBSCRIPTIONS"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected %q in topic list, got:\n%s", want, view)
@@ -112,7 +113,7 @@ func TestSNSDrillDownToSubscriptionsAndBack(t *testing.T) {
 		t.Fatalf("expected the subscription list, got %v", m.screen)
 	}
 	subs, _ := m.sns.View(m)
-	for _, want := range []string{"SNS Subscriptions", "ops@example.com", "pending", "yes", "arn:fn"} {
+	for _, want := range []string{"SNS Subscriptions", "ops@example.com", "pending", "arn:dlq", "arn:fn"} {
 		if !strings.Contains(stripANSI(subs), want) {
 			t.Fatalf("expected %q in subscription list, got:\n%s", want, stripANSI(subs))
 		}
@@ -148,6 +149,34 @@ func TestSNSStaleSubscriptionLoadIsDropped(t *testing.T) {
 	if m.screen != screenLoading || len(m.sns.subscriptions) != 0 {
 		t.Fatalf("expected the stale load to be dropped, screen=%v subs=%+v", m.screen, m.sns.subscriptions)
 	}
+}
+
+func TestSNSLoadErrorsShowErrorScreen(t *testing.T) {
+	loadErr := errors.New("SNS unavailable")
+
+	t.Run("topics", func(t *testing.T) {
+		m := New(testConfig(), "", "dev")
+		m.screen = screenLoading
+		updated, _, handled := m.sns.HandleMessage(&m, snsTopicsLoadedMsg{err: loadErr})
+		m = updated.(Model)
+		if !handled || m.screen != screenError || m.errMsg != loadErr.Error() {
+			t.Fatalf("expected topic error screen, screen=%v err=%q handled=%v", m.screen, m.errMsg, handled)
+		}
+	})
+
+	t.Run("subscriptions", func(t *testing.T) {
+		m := snsLoadedModel(t)
+		m.sns.selectedTopic = &m.sns.topics[0]
+		m.screen = screenLoading
+		updated, _, handled := m.sns.HandleMessage(&m, snsSubscriptionsLoadedMsg{
+			topicARN: m.sns.selectedTopic.ARN,
+			err:      loadErr,
+		})
+		m = updated.(Model)
+		if !handled || m.screen != screenError || m.errMsg != loadErr.Error() {
+			t.Fatalf("expected subscription error screen, screen=%v err=%q handled=%v", m.screen, m.errMsg, handled)
+		}
+	})
 }
 
 func TestSNSSubscriptionFilterAppliesToSubscriptionsOnly(t *testing.T) {
@@ -189,6 +218,36 @@ func TestSNSDetailScrollsWithinBounds(t *testing.T) {
 	}
 	if m.sns.detailScroll != 0 {
 		t.Fatalf("expected scroll back to the top, got %d", m.sns.detailScroll)
+	}
+}
+
+func TestSNSTopicPoliciesWrapWithoutTruncation(t *testing.T) {
+	m := snsLoadedModel(t)
+	topic := m.sns.topics[0]
+	topic.DeliveryPolicy = `{"http":{"defaultHealthyRetryPolicy":{"numRetries":3,"backoffFunction":"exponential"}}}`
+	topic.EffectiveDeliveryPolicy = `{"http":{"disableSubscriptionOverrides":true}}`
+	m.sns.selectedTopic = &topic
+	m.width = 72
+
+	detail := stripANSI(strings.Join(m.sns.topicDetailLines(m), ""))
+	for _, want := range []string{"Delivery Policy", "backoffFunction", "exponential", "Effective Policy", "disableSubscriptionOverrides"} {
+		if !strings.Contains(detail, want) {
+			t.Fatalf("expected wrapped policy field %q to remain visible, got:\n%s", want, detail)
+		}
+	}
+}
+
+func TestSNSSubscriptionRowEscapesTerminalControls(t *testing.T) {
+	row := snsSubscriptionRow("sq\ns", "arn:\x1b[31mqueue", "1\t2", "confirmed", "arn:dlq\r")
+	for _, control := range []string{"\n", "\x1b", "\t", "\r"} {
+		if strings.Contains(row, control) {
+			t.Fatalf("expected subscription row to escape %q, got %q", control, row)
+		}
+	}
+	for _, escaped := range []string{`sq\ns`, `arn:\x1b[31mqueue`, `1\t2`, `arn:dlq\r`} {
+		if !strings.Contains(row, escaped) {
+			t.Fatalf("expected escaped value %q, got %q", escaped, row)
+		}
 	}
 }
 

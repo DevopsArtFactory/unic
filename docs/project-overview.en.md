@@ -19,6 +19,7 @@ Implemented service areas currently include:
 - IAM
 - CloudWatch Metrics
 - EventBridge
+- SNS
 - CloudWatch Logs
 - ECS
 - ECR

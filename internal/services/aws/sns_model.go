@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -103,6 +104,18 @@ func (s SNSSubscription) Status() string {
 
 // HasRedrive reports whether the subscription has a dead-letter queue attached.
 func (s SNSSubscription) HasRedrive() bool { return strings.TrimSpace(s.RedrivePolicy) != "" }
+
+// DeadLetterTargetARN returns the queue ARN from the subscription redrive
+// policy, or an empty string when the policy is absent or malformed.
+func (s SNSSubscription) DeadLetterTargetARN() string {
+	var policy struct {
+		DeadLetterTargetARN string `json:"deadLetterTargetArn"`
+	}
+	if json.Unmarshal([]byte(s.RedrivePolicy), &policy) != nil {
+		return ""
+	}
+	return policy.DeadLetterTargetARN
+}
 
 // FilterText returns searchable subscription metadata.
 func (s SNSSubscription) FilterText() string {

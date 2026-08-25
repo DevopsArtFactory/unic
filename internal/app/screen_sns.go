@@ -388,10 +388,10 @@ func (sm snsModel) topicDetailLines(m Model) []string {
 		lines = append(lines, m.renderEC2DetailLine("Content Dedup", fmt.Sprintf("%t", topic.ContentBasedDeduplication)))
 	}
 	if topic.DeliveryPolicy != "" {
-		lines = append(lines, m.renderEC2DetailLine("Delivery Policy", topic.DeliveryPolicy))
+		lines = append(lines, jsonDetailLines(m, "Delivery Policy", topic.DeliveryPolicy)...)
 	}
 	if topic.EffectiveDeliveryPolicy != "" {
-		lines = append(lines, m.renderEC2DetailLine("Effective Policy", topic.EffectiveDeliveryPolicy))
+		lines = append(lines, jsonDetailLines(m, "Effective Policy", topic.EffectiveDeliveryPolicy)...)
 	}
 	return lines
 }
@@ -456,14 +456,20 @@ func snsSubscriptionDLQLabel(subscription awsservice.SNSSubscription) string {
 	if !subscription.AttributesKnown {
 		return "?"
 	}
+	if targetARN := subscription.DeadLetterTargetARN(); targetARN != "" {
+		return targetARN
+	}
 	if subscription.HasRedrive() {
-		return "yes"
+		return "?"
 	}
 	return "-"
 }
 
 func snsSubscriptionRow(protocol, endpoint, owner, status, dlq string) string {
 	return fmt.Sprintf("%-11s  %-42s  %-14s  %-10s  %s",
-		inspectorShorten(protocol, 11), inspectorShorten(endpoint, 42),
-		inspectorShorten(owner, 14), inspectorShorten(status, 10), dlq)
+		inspectorShorten(escapeTerminalControls(protocol), 11),
+		inspectorShorten(escapeTerminalControls(endpoint), 42),
+		inspectorShorten(escapeTerminalControls(owner), 14),
+		inspectorShorten(escapeTerminalControls(status), 10),
+		escapeTerminalControls(dlq))
 }

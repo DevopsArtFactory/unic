@@ -19,6 +19,7 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 - IAM
 - CloudWatch Metrics
 - EventBridge
+- SNS
 - CloudWatch Logs
 - ECS
 - ECR
