@@ -235,6 +235,14 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cursor := m.contextTable.Cursor()
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
+			if m.cfg != nil && m.cfg.ContextName == selected.Name {
+				snsReturn := snsContextReturn(&m)
+				if snsReturn != nil && *snsReturn == screenLoading {
+					m.ctxPrevWasLoading = false
+					m.screen = m.ctxPrevScreen
+					return m, nil
+				}
+			}
 			if cloudFormationContextReturnActive(m) {
 				m.ctxPrevScreen = screenFeatureList
 			}

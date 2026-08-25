@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"unic/internal/config"
 	awsservice "unic/internal/services/aws"
 )
 
@@ -308,6 +309,68 @@ func TestSNSLoadCompletionStaysBehindGlobalOverlay(t *testing.T) {
 	m = updated.(Model)
 	if m.screen != screenSNSTopicList {
 		t.Fatalf("expected esc to reveal the loaded topic list, got %v", m.screen)
+	}
+}
+
+func TestSNSActiveContextSelectionResumesPendingLoad(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		start      func(*Model) (tea.Model, tea.Cmd)
+		complete   func(*Model)
+		wantScreen screen
+		wantCount  func(Model) int
+	}{
+		{
+			name: "topics",
+			start: func(m *Model) (tea.Model, tea.Cmd) {
+				return m.startLoadingFor(screenSNSTopicList, "Loading SNS topics...", nil, func() tea.Msg { return nil })
+			},
+			complete: func(m *Model) {
+				m.sns.HandleMessage(m, snsTopicsLoadedMsg{topics: snsTestTopics()})
+			},
+			wantScreen: screenSNSTopicList,
+			wantCount:  func(m Model) int { return len(m.sns.topics) },
+		},
+		{
+			name: "subscriptions",
+			start: func(m *Model) (tea.Model, tea.Cmd) {
+				m.sns.topics = snsTestTopics()
+				m.sns.selectedTopic = &m.sns.topics[0]
+				return m.startLoadingFor(screenSNSSubscriptionList, "Loading subscriptions...", nil, func() tea.Msg { return nil })
+			},
+			complete: func(m *Model) {
+				m.sns.HandleMessage(m, snsSubscriptionsLoadedMsg{
+					topicARN: m.sns.selectedTopic.ARN, subscriptions: snsTestSubscriptions(),
+				})
+			},
+			wantScreen: screenSNSSubscriptionList,
+			wantCount:  func(m Model) int { return len(m.sns.subscriptions) },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig()
+			cfg.ContextName = "account-a"
+			m := New(cfg, "", "dev")
+			started, _ := tc.start(&m)
+			m = started.(Model)
+			generation := m.commands.CurrentGen()
+
+			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = updated.(Model)
+			updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-a", Current: true}}})
+			m = updated.(Model)
+
+			updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			m = updated.(Model)
+			if cmd != nil || m.screen != screenLoading || m.commands.CurrentGen() != generation {
+				t.Fatalf("expected active context to resume generation %d, screen=%v generation=%d command=%v", generation, m.screen, m.commands.CurrentGen(), cmd)
+			}
+
+			tc.complete(&m)
+			if m.screen != tc.wantScreen || tc.wantCount(m) == 0 {
+				t.Fatalf("expected pending load to complete on screen %v, got screen=%v state=%+v", tc.wantScreen, m.screen, m.sns)
+			}
+		})
 	}
 }
 
