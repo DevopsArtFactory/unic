@@ -17,6 +17,7 @@ type wafModel struct {
 	selected     *awsservice.WAFWebACL
 	detailScroll int
 	warnings     []error
+	loadFailed   bool
 }
 
 func newWAFModel() wafModel { return wafModel{} }
@@ -31,6 +32,7 @@ func resetWAFContextState(m *Model) {
 }
 
 func (wm *wafModel) Start(m *Model) (tea.Model, tea.Cmd) {
+	wm.loadFailed = false
 	return m.startLoadingFor(screenWAFWebACLList, "Loading WAFv2 web ACLs...", []string{"Regional: " + m.cfg.Region, "CloudFront: us-east-1 endpoint"}, wm.load(*m))
 }
 
@@ -55,12 +57,14 @@ func (wm *wafModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		return *m, nil, false
 	}
 	if loaded.err != nil {
+		wm.loadFailed = true
 		m.errMsg = loaded.err.Error()
 		m.loadingTitle = ""
 		m.loadingDetails = nil
 		finishWAFLoad(m, screenError)
 		return *m, nil, true
 	}
+	wm.loadFailed = false
 	wm.acls = loaded.acls
 	wm.warnings = loaded.warnings
 	wm.filtered = applyFilter(wm.acls, m.filterValue(filterWAFWebACLs))
@@ -357,7 +361,9 @@ func wafContextReturn(m *Model) *screen {
 			return nil
 		}
 		seen[current] = struct{}{}
-		if isWAFScreen(current) || current == screenLoading && isWAFScreen(m.loadingReturnScreen) {
+		if isWAFScreen(current) ||
+			(current == screenLoading && isWAFScreen(m.loadingReturnScreen)) ||
+			(current == screenError && m.waf.loadFailed) {
 			return previous
 		}
 		previous = wafOverlayPrevious(m, current)

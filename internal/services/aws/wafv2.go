@@ -42,7 +42,6 @@ func (r *AwsRepository) ListWAFWebACLs(ctx context.Context) ([]WAFWebACL, []erro
 		summaries, err := listWAFWebACLSummaries(ctx, request.client, request.scope)
 		if err != nil {
 			scopeErrors = append(scopeErrors, fmt.Errorf("%s scope: %w", request.scope, err))
-			continue
 		}
 		for _, summary := range summaries {
 			acl, itemWarnings := describeWAFWebACL(ctx, request.client, r.CloudFrontClient, summary, request.scope, request.region)
@@ -50,7 +49,7 @@ func (r *AwsRepository) ListWAFWebACLs(ctx context.Context) ([]WAFWebACL, []erro
 			warnings = append(warnings, itemWarnings...)
 		}
 	}
-	if len(scopeErrors) == len(scopes) {
+	if len(scopeErrors) == len(scopes) && len(acls) == 0 {
 		return nil, nil, fmt.Errorf("failed to list WAF web ACLs: %w", errors.Join(scopeErrors...))
 	}
 	warnings = append(warnings, scopeErrors...)
@@ -73,7 +72,7 @@ func listWAFWebACLSummaries(ctx context.Context, client WAFV2ClientAPI, scope wa
 	for {
 		out, err := client.ListWebACLs(ctx, &wafv2.ListWebACLsInput{Scope: scope, NextMarker: marker})
 		if err != nil {
-			return nil, fmt.Errorf("failed to list web ACLs: %w", err)
+			return summaries, fmt.Errorf("failed to list web ACLs: %w", err)
 		}
 		summaries = append(summaries, out.WebACLs...)
 		if awssdk.ToString(out.NextMarker) == "" {

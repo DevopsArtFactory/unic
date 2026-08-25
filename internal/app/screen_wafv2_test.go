@@ -133,6 +133,53 @@ func TestWAFFailureBehindSettingsPreservesOverlay(t *testing.T) {
 	}
 }
 
+func TestWAFFailureBehindContextPickerIsNotRestoredAfterContextSwitch(t *testing.T) {
+	cfg := testConfig()
+	cfg.ContextName = "old"
+	m := New(cfg, "", "dev")
+	started, _ := m.waf.Start(&m)
+	m = started.(Model)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "new"}}})
+	m = updated.(Model)
+	updated, _ = m.Update(wafWebACLsLoadedMsg{err: fmt.Errorf("old-context WAF denied")})
+	m = updated.(Model)
+	if m.screen != screenContextPicker || m.ctxPrevScreen != screenError {
+		t.Fatalf("expected failed old-context load behind picker, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd == nil || m.screen != screenLoading {
+		t.Fatalf("expected context switch load, screen=%v command=%v", m.screen, cmd)
+	}
+	newCfg := testConfig()
+	newCfg.ContextName = "new"
+	updated, _ = m.Update(contextSwitchedMsg{cfg: newCfg})
+	m = updated.(Model)
+	if m.screen != screenServiceList {
+		t.Fatalf("expected new context to discard old WAF error, got screen=%v error=%q", m.screen, m.errMsg)
+	}
+}
+
+func TestWAFFailureBehindContextPickerIsShownWhenPickerIsCancelled(t *testing.T) {
+	cfg := testConfig()
+	cfg.ContextName = "old"
+	m := New(cfg, "", "dev")
+	m.screen = screenContextPicker
+	m.ctxPrevScreen = screenLoading
+	m.loadingReturnScreen = screenWAFWebACLList
+
+	m.waf.HandleMessage(&m, wafWebACLsLoadedMsg{err: fmt.Errorf("WAF denied")})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenError || m.errMsg != "WAF denied" {
+		t.Fatalf("expected cancelled picker to show WAF failure, screen=%v error=%q", m.screen, m.errMsg)
+	}
+}
+
 func TestWAFContextChangeClearsResourcesAndReturnTarget(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.cfg.ContextName = "old"

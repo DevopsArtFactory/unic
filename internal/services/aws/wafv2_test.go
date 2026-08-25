@@ -168,6 +168,48 @@ func TestListWAFWebACLsPaginatesScopesAndMapsPosture(t *testing.T) {
 	}
 }
 
+func TestListWAFWebACLsPreservesCompletedPagesWhenBothScopesLaterFail(t *testing.T) {
+	denied := errors.New("access denied")
+	regionalCalls := 0
+	regional := &mockWAFV2Client{
+		listFn: func(input *wafv2.ListWebACLsInput) (*wafv2.ListWebACLsOutput, error) {
+			regionalCalls++
+			if input.NextMarker == nil {
+				return &wafv2.ListWebACLsOutput{
+					WebACLs:    []wafv2types.WebACLSummary{wafSummary("visible", "arn:regional:visible")},
+					NextMarker: awssdk.String("next"),
+				}, nil
+			}
+			return nil, denied
+		},
+		getFn: func(input *wafv2.GetWebACLInput) (*wafv2.GetWebACLOutput, error) {
+			return &wafv2.GetWebACLOutput{WebACL: testWAFWebACL(awssdk.ToString(input.Name), wafv2types.ScopeRegional)}, nil
+		},
+		loggingFn: func(*wafv2.GetLoggingConfigurationInput) (*wafv2.GetLoggingConfigurationOutput, error) {
+			return nil, &wafv2types.WAFNonexistentItemException{Message: awssdk.String("logging disabled")}
+		},
+		resourcesFn: func(*wafv2.ListResourcesForWebACLInput) (*wafv2.ListResourcesForWebACLOutput, error) {
+			return &wafv2.ListResourcesForWebACLOutput{}, nil
+		},
+	}
+	repo := &AwsRepository{
+		WAFV2Client:           regional,
+		WAFV2CloudFrontClient: failingWAFClient(denied),
+		Region:                "ap-northeast-2",
+	}
+
+	acls, warnings, err := repo.ListWAFWebACLs(context.Background())
+	if err != nil {
+		t.Fatalf("completed pages should keep the browser usable: %v", err)
+	}
+	if regionalCalls != 2 || len(acls) != 1 || acls[0].Name != "visible" {
+		t.Fatalf("expected retained first-page ACL, calls=%d acls=%+v", regionalCalls, acls)
+	}
+	if len(warnings) != 2 || !strings.Contains(warnings[0].Error(), "REGIONAL scope") || !strings.Contains(warnings[1].Error(), "CLOUDFRONT scope") {
+		t.Fatalf("expected both pagination failures as warnings, got %v", warnings)
+	}
+}
+
 func TestListCloudFrontDistributionARNsPreservesCompletedPagesOnFailure(t *testing.T) {
 	denied := errors.New("access denied")
 	calls := 0

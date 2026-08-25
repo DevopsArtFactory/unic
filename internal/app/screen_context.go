@@ -68,8 +68,8 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if contextChanged {
 			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
-			resetWAFContextState(&m)
 			normalizeWAFContextReturn(&m)
+			resetWAFContextState(&m)
 		}
 		m.eventBridge = newEventBridgeModel()
 		if isEventBridgeScreen(m.ctxPrevScreen) {
