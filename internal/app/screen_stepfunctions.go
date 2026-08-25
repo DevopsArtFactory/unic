@@ -66,27 +66,12 @@ func stepFunctionsContextReturn(m *Model) *screen {
 		if isStepFunctionsScreen(current) || current == screenLoading && isStepFunctionsScreen(m.loadingReturnScreen) {
 			return previous
 		}
-		previous = stepFunctionsOverlayPrevious(m, current)
+		previous = overlayPreviousScreen(m, current)
 		if previous == nil {
 			return nil
 		}
 	}
 	return nil
-}
-
-func stepFunctionsOverlayPrevious(m *Model, current screen) *screen {
-	switch current {
-	case screenSettings:
-		return &m.settingsPrevScreen
-	case screenCommandPalette:
-		return &m.palette.prevScreen
-	case screenViewList:
-		return &m.views.prevScreen
-	case screenContextPicker:
-		return &m.ctxPrevScreen
-	default:
-		return nil
-	}
 }
 
 func (sm *stepFunctionsModel) Start(m *Model) (tea.Model, tea.Cmd) {
@@ -482,25 +467,5 @@ func finishStepFunctionsLoad(m *Model, target screen) {
 	if m.ctxPrevScreen == screenLoading || isStepFunctionsScreen(m.ctxPrevScreen) {
 		m.ctxPrevScreen = target
 	}
-	if m.screen == screenLoading {
-		m.screen = target
-		return
-	}
-	current := m.screen
-	seen := make(map[screen]struct{})
-	for range 8 {
-		if _, ok := seen[current]; ok {
-			return
-		}
-		seen[current] = struct{}{}
-		previous := stepFunctionsOverlayPrevious(m, current)
-		if previous == nil {
-			return
-		}
-		if *previous == screenLoading {
-			*previous = target
-			return
-		}
-		current = *previous
-	}
+	finishBrowserLoad(m, target)
 }

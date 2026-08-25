@@ -320,6 +320,7 @@ Context ordering:
 | EKS | Cluster & Node Group Browser |
 | FIS | Experiment Template Browser |
 | ElastiCache | Cluster & Replication Group Browser |
+| SNS | Topic Browser |
 | SQS | Queue Browser |
 | ELB | Load Balancer Browser |
 | SSM Parameter Store | Parameter Browser |
@@ -459,6 +460,7 @@ checks:
 | Settings | `Enter`/`Space` toggle selected setting, `Esc`/`q` back |
 | Context Picker | `a` add context, `f` favorite/unfavorite selected context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
+| SNS | `/` filter, `r` refresh, `Enter` topic detail with attributes and subscription counts, detail `↑`/`↓` scroll, `PgUp`/`PgDn` page, detail `Enter` subscriptions, subscription list `/` filter |
 | SQS | `A` toggle all-regions scope, `/` filter, `W` watch queue depth, `I` watch interval, `r` refresh, `Enter` detail, detail `d` jump to DLQ, `m` redrive DLQ (type-to-confirm), `x` purge (type-to-confirm) |
 | ELB | `A` toggle all-regions scope, `/` filter, `r` refresh, `Enter` target groups, target health screens support `W` watch and `I` watch interval, target group list `Enter` per-target health |
 | Parameter Store | `/` filter, `r` refresh, `Enter` detail, detail `v` reveal value (decrypts SecureString), `y` copy value without revealing |
@@ -485,6 +487,8 @@ The ECR Login Helper resolves the private registry URI for the active context an
 The RDS detail screen can resize an instance with `m`: unic loads the orderable DB instance classes for the instance's engine/version in the active region into a filterable picker (current class marked), then a confirmation screen shows the current and new class with a `Tab`-toggleable apply-immediately choice (default: next maintenance window) and requires typing the instance identifier before calling ModifyDBInstance. After submitting, the detail screen polls the instance status until the change settles.
 
 The CloudFormation Stack Browser lists failed and rollback stacks first, followed by in-progress and healthy stacks. Stack detail shows status reasons, parameters, outputs, and up to 30 of the newest resource events with failure reasons. Press `d` to start drift detection; the detail view polls for up to five minutes for CloudFormation to report the resulting stack drift status and drifted-resource count.
+
+The SNS Topic Browser lists topics name-sorted with their type, subscription counts, and encryption key. Topic detail shows the display name, KMS key, confirmed/pending/deleted subscription counts, FIFO content-deduplication posture, and delivery policies; `Enter` opens the topic's subscriptions, listed pending-first with protocol, endpoint, owner, status, and whether a dead-letter queue is attached. Counts and attributes come from per-topic `GetTopicAttributes` calls, so a topic whose policy denies that call still appears with its attributes shown as unavailable rather than as zeros, and the failures are summarised above the list. Subscription attributes are only fetched for confirmed subscriptions because SNS rejects them for the `PendingConfirmation` sentinel. The browser is read-only; publishing and subscription changes are out of scope. Requires `sns:ListTopics`, `sns:GetTopicAttributes`, `sns:ListSubscriptionsByTopic`, and `sns:GetSubscriptionAttributes`.
 
 The SQS Queue Browser is a backlog-first triage view: queues list deepest-backlog first with `!` marking dead-letter queues, showing depth, in-flight, and delayed counts per row. Queue detail shows the redrive relationship — `d` jumps from a source queue into its DLQ, and on a DLQ `m` starts a redrive (StartMessageMoveTask) moving messages back to their source queues. `x` purges a queue. Both actions require typing the queue name to confirm, and rows loaded through the all-regions scope act against their own region.
 

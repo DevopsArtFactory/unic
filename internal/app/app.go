@@ -97,6 +97,9 @@ const (
 	screenFISTemplateDetail
 	screenFISExperimentList
 	screenFISExperimentDetail
+	screenSNSTopicList
+	screenSNSTopicDetail
+	screenSNSSubscriptionList
 	screenSQSQueueList
 	screenSQSQueueDetail
 	screenSQSConfirm
@@ -209,6 +212,7 @@ type Model struct {
 	secrets        secretsModel
 	security       securityGroupModel
 	s3             s3Model
+	sns            snsModel
 	sqs            sqsModel
 	elb            elbModel
 	ssmParams      ssmParamsModel
@@ -342,6 +346,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.secrets = newSecretsModel()
 	model.security = newSecurityGroupModel()
 	model.s3 = newS3Model()
+	model.sns = newSNSModel()
 	model.sqs = newSQSModel()
 	model.elb = newELBModel()
 	model.ssmParams = newSSMParamsModel()
@@ -929,6 +934,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.cwLogs.Start(&m)
 	case domain.FeatureS3Browser:
 		return m.s3.Start(&m)
+	case domain.FeatureSNSBrowser:
+		return m.sns.Start(&m)
 	case domain.FeatureSQSBrowser:
 		return m.sqs.Start(&m)
 	case domain.FeatureELBBrowser:

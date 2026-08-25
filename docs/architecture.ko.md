@@ -261,6 +261,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - Step Functions state machine list, failure 우선 execution list, execution detail
 - S3 bucket/object/detail
 - KMS key list/detail, rotation 상태
+- SNS topic list/detail, topic별 subscription list flow
 - EventBridge rule list/detail, 스크롤 가능한 전체 event pattern, 변경 가능한 rule mode의 type-to-confirm 상태 변경 flow
 - DynamoDB table list/detail, 전체 primary key 기반 `GetItem`
 - Inspector mode home, checklist setup, KMS rotation finding을 포함한 security findings/detail, checklist results/detail

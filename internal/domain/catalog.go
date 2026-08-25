@@ -163,6 +163,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceSNS,
+			Features: []Feature{
+				{
+					Kind:        FeatureSNSBrowser,
+					Description: "Browse topics and their subscriptions, protocols, and endpoints",
+				},
+			},
+		},
+		{
 			Name: ServiceSQS,
 			Features: []Feature{
 				{

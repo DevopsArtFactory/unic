@@ -32,6 +32,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -113,6 +114,17 @@ var _ S3ClientAPI = (*s3.Client)(nil)
 
 // Verify *lambda.Client satisfies LambdaClientAPI at compile time.
 var _ LambdaClientAPI = (*lambda.Client)(nil)
+
+// SNSClientAPI is the interface for SNS topic and subscription browsing.
+type SNSClientAPI interface {
+	sns.ListTopicsAPIClient
+	sns.ListSubscriptionsByTopicAPIClient
+	GetTopicAttributes(ctx context.Context, params *sns.GetTopicAttributesInput, optFns ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error)
+	GetSubscriptionAttributes(ctx context.Context, params *sns.GetSubscriptionAttributesInput, optFns ...func(*sns.Options)) (*sns.GetSubscriptionAttributesOutput, error)
+}
+
+// Verify *sns.Client satisfies SNSClientAPI at compile time.
+var _ SNSClientAPI = (*sns.Client)(nil)
 
 // SQSClientAPI is the interface for SQS operations used by AwsRepository.
 type SQSClientAPI interface {
@@ -389,6 +401,7 @@ type AwsRepository struct {
 	EC2Client            EC2ClientAPI
 	SSMClient            SSMClientAPI
 	KMSClient            KMSClientAPI
+	SNSClient            SNSClientAPI
 	SQSClient            SQSClientAPI
 	RDSClient            RDSClientAPI
 	Route53Client        Route53ClientAPI
@@ -515,6 +528,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		EC2Client:            ec2.NewFromConfig(awsCfg),
 		SSMClient:            ssm.NewFromConfig(awsCfg),
 		KMSClient:            kms.NewFromConfig(awsCfg),
+		SNSClient:            sns.NewFromConfig(awsCfg),
 		SQSClient:            sqs.NewFromConfig(awsCfg),
 		RDSClient:            rds.NewFromConfig(awsCfg),
 		Route53Client:        route53.NewFromConfig(awsCfg),

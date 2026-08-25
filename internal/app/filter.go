@@ -45,6 +45,8 @@ const (
 	filterCWAlarms
 	filterCloudTrailEvents
 	filterEventBridgeRules
+	filterSNSTopics
+	filterSNSSubscriptions
 	filterSQSQueues
 	filterELBs
 	filterELBTargetGroups
