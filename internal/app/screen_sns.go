@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	awsservice "unic/internal/services/aws"
 )
@@ -304,7 +305,7 @@ func (sm snsModel) viewTopicList(m Model) string {
 		panel.WriteString(dimStyle.Render(empty))
 		panel.WriteString("\n")
 	} else {
-		panel.WriteString(dimStyle.Render("  " + snsTopicRow("NAME", "TYPE", "SUBSCRIPTIONS", "ENCRYPTION")))
+		panel.WriteString(dimStyle.Render("  " + snsTopicRow(m, "NAME", "TYPE", "SUBSCRIPTIONS", "ENCRYPTION")))
 		panel.WriteString("\n")
 		visibleLines := max(m.height-12-warningLines, 5)
 		start := max(sm.topicIdx-visibleLines+1, 0)
@@ -315,7 +316,7 @@ func (sm snsModel) viewTopicList(m Model) string {
 			if i == sm.topicIdx {
 				cursor, style = "> ", selectedStyle
 			}
-			row := snsTopicRow(topic.Name, topic.KindLabel(), topic.SubscriptionSummary(), snsEncryptionLabel(topic))
+			row := snsTopicRow(m, topic.Name, topic.KindLabel(), topic.SubscriptionSummary(), snsEncryptionLabel(topic))
 			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSNSTopics, row)))
 			panel.WriteString("\n")
 		}
@@ -329,9 +330,13 @@ func (sm snsModel) viewTopicList(m Model) string {
 	return b.String()
 }
 
-func snsTopicRow(name, kind, subscriptions, encryption string) string {
-	return fmt.Sprintf("%-44s  %-9s  %-18s  %s",
-		inspectorShorten(name, 44), inspectorShorten(kind, 9), inspectorShorten(subscriptions, 18), encryption)
+func snsTopicRow(m Model, name, kind, subscriptions, encryption string) string {
+	widths := snsColumnWidths(m, []int{18, 8, 16, 20}, []int{44, 9, 18, 40})
+	return fmt.Sprintf("%-*s  %-*s  %-*s  %s",
+		widths[0], inspectorShorten(escapeTerminalControls(name), widths[0]),
+		widths[1], inspectorShorten(escapeTerminalControls(kind), widths[1]),
+		widths[2], inspectorShorten(escapeTerminalControls(subscriptions), widths[2]),
+		snsShortenTail(escapeTerminalControls(encryption), widths[3]))
 }
 
 func snsEncryptionLabel(topic awsservice.SNSTopic) string {
@@ -423,7 +428,7 @@ func (sm snsModel) viewSubscriptionList(m Model) string {
 		panel.WriteString(dimStyle.Render(empty))
 		panel.WriteString("\n")
 	} else {
-		panel.WriteString(dimStyle.Render("  " + snsSubscriptionRow("PROTOCOL", "ENDPOINT", "OWNER", "STATUS", "DLQ")))
+		panel.WriteString(dimStyle.Render("  " + snsSubscriptionRow(m, "PROTOCOL", "ENDPOINT", "OWNER", "STATUS", "DLQ")))
 		panel.WriteString("\n")
 		visibleLines := max(m.height-13-warningLines, 5)
 		start := max(sm.subIdx-visibleLines+1, 0)
@@ -435,7 +440,7 @@ func (sm snsModel) viewSubscriptionList(m Model) string {
 				cursor, style = "> ", selectedStyle
 			}
 			dlq := snsSubscriptionDLQLabel(subscription)
-			row := snsSubscriptionRow(subscription.Protocol, subscription.Endpoint, subscription.Owner, subscription.Status(), dlq)
+			row := snsSubscriptionRow(m, subscription.Protocol, subscription.Endpoint, subscription.Owner, subscription.Status(), dlq)
 			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterSNSSubscriptions, row)))
 			panel.WriteString("\n")
 		}
@@ -465,11 +470,78 @@ func snsSubscriptionDLQLabel(subscription awsservice.SNSSubscription) string {
 	return "-"
 }
 
-func snsSubscriptionRow(protocol, endpoint, owner, status, dlq string) string {
-	return fmt.Sprintf("%-11s  %-42s  %-14s  %-10s  %s",
-		inspectorShorten(escapeTerminalControls(protocol), 11),
-		inspectorShorten(escapeTerminalControls(endpoint), 42),
-		inspectorShorten(escapeTerminalControls(owner), 14),
-		inspectorShorten(escapeTerminalControls(status), 10),
-		escapeTerminalControls(dlq))
+func snsSubscriptionRow(m Model, protocol, endpoint, owner, status, dlq string) string {
+	widths := snsColumnWidths(m, []int{8, 16, 12, 9, 21}, []int{11, 42, 14, 10, 42})
+	return fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %s",
+		widths[0], inspectorShorten(escapeTerminalControls(protocol), widths[0]),
+		widths[1], inspectorShorten(escapeTerminalControls(endpoint), widths[1]),
+		widths[2], inspectorShorten(escapeTerminalControls(owner), widths[2]),
+		widths[3], inspectorShorten(escapeTerminalControls(status), widths[3]),
+		snsShortenTail(escapeTerminalControls(dlq), widths[4]))
+}
+
+func snsColumnWidths(m Model, minimum, desired []int) []int {
+	widths := append([]int(nil), minimum...)
+	if m.width <= 0 {
+		return append([]int(nil), desired...)
+	}
+
+	available := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize()-2-2*(len(widths)-1), len(widths))
+	total := 0
+	for _, width := range widths {
+		total += width
+	}
+	for total > available {
+		for i := range widths {
+			if total <= available {
+				break
+			}
+			if widths[i] > 1 {
+				widths[i]--
+				total--
+			}
+		}
+	}
+	for total < available {
+		grew := false
+		for i := range widths {
+			if total >= available {
+				break
+			}
+			if widths[i] < desired[i] {
+				widths[i]++
+				total++
+				grew = true
+			}
+		}
+		if !grew {
+			break
+		}
+	}
+	return widths
+}
+
+func snsShortenTail(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(value) <= width {
+		return value
+	}
+	if width <= 3 {
+		return inspectorShorten(value, width)
+	}
+
+	target := width - 3
+	runes := []rune(value)
+	start, suffixWidth := len(runes), 0
+	for start > 0 {
+		runeWidth := lipgloss.Width(string(runes[start-1]))
+		if suffixWidth+runeWidth > target {
+			break
+		}
+		start--
+		suffixWidth += runeWidth
+	}
+	return "..." + string(runes[start:])
 }

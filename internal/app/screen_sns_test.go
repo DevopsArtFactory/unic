@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -118,7 +119,7 @@ func TestSNSDrillDownToSubscriptionsAndBack(t *testing.T) {
 			t.Fatalf("expected %q in subscription list, got:\n%s", want, stripANSI(subs))
 		}
 	}
-	unknownRow := snsSubscriptionRow("lambda", "arn:fn", "1", "confirmed", "?")
+	unknownRow := snsSubscriptionRow(m, "lambda", "arn:fn", "1", "confirmed", "?")
 	if !strings.Contains(stripANSI(subs), unknownRow) {
 		t.Fatalf("expected denied subscription attributes to render an unknown DLQ marker, got:\n%s", stripANSI(subs))
 	}
@@ -238,7 +239,9 @@ func TestSNSTopicPoliciesWrapWithoutTruncation(t *testing.T) {
 }
 
 func TestSNSSubscriptionRowEscapesTerminalControls(t *testing.T) {
-	row := snsSubscriptionRow("sq\ns", "arn:\x1b[31mqueue", "1\t2", "confirmed", "arn:dlq\r")
+	m := New(testConfig(), "", "dev")
+	m.width = 140
+	row := snsSubscriptionRow(m, "sq\ns", "arn:\x1b[31mqueue", "1\t2", "confirmed", "arn:dlq\r")
 	for _, control := range []string{"\n", "\x1b", "\t", "\r"} {
 		if strings.Contains(row, control) {
 			t.Fatalf("expected subscription row to escape %q, got %q", control, row)
@@ -248,6 +251,40 @@ func TestSNSSubscriptionRowEscapesTerminalControls(t *testing.T) {
 		if !strings.Contains(row, escaped) {
 			t.Fatalf("expected escaped value %q, got %q", escaped, row)
 		}
+	}
+}
+
+func TestSNSListRowsKeepPostureIdentifiersVisible(t *testing.T) {
+	const (
+		kmsKeyARN = "arn:aws:kms:us-east-1:123456789012:key/550e8400-e29b-41d4-a716-446655440000"
+		dlqARN    = "arn:aws:sqs:us-east-1:123456789012:prod-orders-dlq"
+	)
+
+	for _, width := range []int{80, 120} {
+		t.Run(fmt.Sprintf("width-%d", width), func(t *testing.T) {
+			m := snsLoadedModel(t)
+			m.width = width
+			m.sns.topics[0].KMSMasterKeyID = kmsKeyARN
+			m.sns.filteredTopics[0].KMSMasterKeyID = kmsKeyARN
+
+			topics := stripANSI(m.sns.viewTopicList(m))
+			if !strings.Contains(topics, "446655440000") {
+				t.Fatalf("expected KMS key suffix at width %d, got:\n%s", width, topics)
+			}
+
+			m.sns.selectedTopic = &m.sns.topics[0]
+			m.sns.subscriptions = []awsservice.SNSSubscription{{
+				ARN: "arn:aws:sns:us-east-1:123456789012:orders:subscription-id", Protocol: "sqs",
+				Endpoint: "arn:aws:sqs:us-east-1:123456789012:orders", Owner: "123456789012",
+				RedrivePolicy: `{"deadLetterTargetArn":"` + dlqARN + `"}`, AttributesKnown: true,
+			}}
+			m.sns.filteredSubs = m.sns.subscriptions
+
+			subscriptions := stripANSI(m.sns.viewSubscriptionList(m))
+			if !strings.Contains(subscriptions, "prod-orders-dlq") {
+				t.Fatalf("expected DLQ name at width %d, got:\n%s", width, subscriptions)
+			}
+		})
 	}
 }
 
