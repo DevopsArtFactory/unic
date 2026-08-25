@@ -214,16 +214,26 @@ func TestSNSLoadErrorsStayBehindGlobalOverlay(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			m := New(testConfig(), "", "dev")
+			cfg := testConfig()
+			cfg.Regions = []string{"us-east-1", "us-west-2"}
+			m := New(cfg, "", "dev")
 			m = tc.start(&m)
 			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
 			m = updated.(Model)
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+			m = updated.(Model)
 
 			tc.complete(&m)
-			if m.screen != screenSettings || m.settingsPrevScreen != screenError || m.errMsg != loadErr.Error() {
-				t.Fatalf("expected error behind Settings, screen=%v previous=%v err=%q", m.screen, m.settingsPrevScreen, m.errMsg)
+			if m.screen != screenRegionPicker || m.regionPrevScreen != screenSettings ||
+				m.settingsPrevScreen != screenError || m.errMsg != loadErr.Error() {
+				t.Fatalf("expected error behind region picker and Settings, screen=%v region previous=%v settings previous=%v err=%q", m.screen, m.regionPrevScreen, m.settingsPrevScreen, m.errMsg)
 			}
 
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = updated.(Model)
+			if m.screen != screenSettings {
+				t.Fatalf("expected region picker to reveal Settings, got %v", m.screen)
+			}
 			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 			m = updated.(Model)
 			if m.screen != screenError {
@@ -376,21 +386,30 @@ func TestSNSListRowsAlignUnicodeColumns(t *testing.T) {
 }
 
 func TestSNSLoadCompletionStaysBehindGlobalOverlay(t *testing.T) {
-	m := New(testConfig(), "", "dev")
+	cfg := testConfig()
+	cfg.Regions = []string{"us-east-1", "us-west-2"}
+	m := New(cfg, "", "dev")
 	started, _ := m.sns.Start(&m)
 	m = started.(Model)
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
 	m = updated.(Model)
-	if m.screen != screenSettings {
-		t.Fatalf("expected the settings overlay, got %v", m.screen)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m = updated.(Model)
+	if m.screen != screenRegionPicker || m.regionPrevScreen != screenSettings {
+		t.Fatalf("expected the region picker over Settings, screen=%v previous=%v", m.screen, m.regionPrevScreen)
 	}
 
 	m.sns.HandleMessage(&m, snsTopicsLoadedMsg{topics: snsTestTopics()})
-	if m.screen != screenSettings {
-		t.Fatalf("expected the completed load to stay behind settings, got %v", m.screen)
+	if m.screen != screenRegionPicker || m.settingsPrevScreen != screenSNSTopicList {
+		t.Fatalf("expected the completed load to stay behind region picker and Settings, screen=%v settings previous=%v", m.screen, m.settingsPrevScreen)
 	}
 
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenSettings {
+		t.Fatalf("expected region picker to reveal Settings, got %v", m.screen)
+	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = updated.(Model)
 	if m.screen != screenSNSTopicList {

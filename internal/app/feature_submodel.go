@@ -28,6 +28,8 @@ func overlayPreviousScreen(m *Model, current screen) *screen {
 		return &m.views.prevScreen
 	case screenContextPicker:
 		return &m.ctxPrevScreen
+	case screenRegionPicker:
+		return &m.regionPrevScreen
 	default:
 		return nil
 	}
