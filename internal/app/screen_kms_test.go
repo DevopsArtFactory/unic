@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -12,7 +13,7 @@ import (
 func TestKMSKeysLoadedRendersPostureAndDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.kms.HandleMessage(&m, kmsKeysLoadedMsg{keys: []awsservice.KMSKey{
-		{ID: "key-1", Aliases: []string{"alias/app"}, State: "Enabled", Manager: "CUSTOMER", RotationEligible: true, RotationEnabled: true},
+		{ID: "key-1", Aliases: []string{"alias/app"}, State: "Enabled", Manager: "CUSTOMER", RotationEligible: true, RotationKnown: true, RotationEnabled: true},
 		{ID: "key-2", Aliases: []string{"alias/asymmetric"}, State: "Enabled", Manager: "CUSTOMER"},
 	}})
 	view, ok := m.kms.View(m)
@@ -49,6 +50,26 @@ func TestKMSKeysLoadedRendersPostureAndDetail(t *testing.T) {
 	_, _, handled = m.kms.HandleKey(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	if !handled || m.screen != screenKMSKeyList || m.kms.selected != nil {
 		t.Fatalf("expected q to return to key list, got screen %v", m.screen)
+	}
+}
+
+func TestKMSPartialWarningKeepsKeyWithUnknownRotation(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.height = 12
+	warnings := make([]error, 8)
+	for i := range warnings {
+		warnings[i] = fmt.Errorf("failed lookup %d", i+1)
+	}
+	m.kms.HandleMessage(&m, kmsKeysLoadedMsg{
+		keys:     []awsservice.KMSKey{{ID: "key-1", RotationEligible: true}},
+		warnings: warnings,
+	})
+
+	view := stripANSI(m.kms.viewList(m))
+	if m.screen != screenKMSKeyList || !strings.Contains(view, "Warnings: 8 resource lookup failures") ||
+		!strings.Contains(view, "failed lookup 1") || strings.Contains(view, "failed lookup 2") ||
+		!strings.Contains(view, "key-1") || !strings.Contains(view, "unknown") || !strings.Contains(view, "esc:") {
+		t.Fatalf("expected partial key and warning, got screen %v:\n%s", m.screen, view)
 	}
 }
 

@@ -123,6 +123,26 @@ func TestRunSecurityScanCollectsWarningsAndContinues(t *testing.T) {
 	}
 }
 
+func TestRunSecurityScanKeepsPartialFindingsWithWarning(t *testing.T) {
+	withInspectorScanners(t, []InspectorScanner{{
+		Name: "partial",
+		Run: func(context.Context, *AwsRepository) ([]SecurityFinding, error) {
+			return []SecurityFinding{{RuleID: "kept", ResourceID: "resource-1"}}, fmt.Errorf("resource-2: access denied")
+		},
+	}})
+
+	report, err := RunSecurityScan(context.Background(), &AwsRepository{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].ResourceID != "resource-1" {
+		t.Fatalf("expected partial finding to be preserved, got %+v", report.Findings)
+	}
+	if len(report.Warnings) != 1 || report.Warnings[0] != "partial: resource-2: access denied" {
+		t.Fatalf("expected partial warning, got %v", report.Warnings)
+	}
+}
+
 func TestRunSecurityScanStopsWhenContextCanceledBetweenScanners(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

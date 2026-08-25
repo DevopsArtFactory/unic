@@ -113,6 +113,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
 		resetStepFunctionsContextState(&m)
+		m.ctxPrevWasLoading = false
 		// Region-scoped feature state may contain resources from the previous
 		// region, so return to the service catalog after switching.
 		m.screen = screenServiceList

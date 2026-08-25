@@ -838,11 +838,11 @@ func (im inspectorModel) viewResults(m Model) string {
 	b.WriteString(im.renderSeveritySelector())
 	b.WriteString("\n\n")
 
+	warningLines := 0
 	if im.report != nil && len(im.report.Warnings) > 0 {
-		panel.WriteString(errorStyle.Render(fmt.Sprintf("Warnings: %d rule pack(s) reported errors", len(im.report.Warnings))))
+		panel.WriteString(m.renderWarningSummary(len(im.report.Warnings), "rule pack errors", im.report.Warnings[0]))
 		panel.WriteString("\n")
-		panel.WriteString(dimStyle.Render("  " + im.report.Warnings[0]))
-		panel.WriteString("\n\n")
+		warningLines = 3
 	}
 
 	if len(im.findings) == 0 {
@@ -865,7 +865,7 @@ func (im inspectorModel) viewResults(m Model) string {
 		panel.WriteString(dimStyle.Render("  SEVERITY   " + resourceCol.Render("RESOURCE") + "RULE"))
 		panel.WriteString("\n")
 
-		visibleLines := max(m.height-13, 5)
+		visibleLines := max(m.height-13-warningLines, 5)
 		start := 0
 		if im.idx >= visibleLines {
 			start = im.idx - visibleLines + 1

@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -55,9 +56,12 @@ func TestListCertificatesMapsAndSortsByExpiry(t *testing.T) {
 		},
 	}
 
-	certificates, err := (&AwsRepository{ACMClient: mock, Region: "us-east-1"}).ListCertificates(context.Background())
+	certificates, warnings, err := (&AwsRepository{ACMClient: mock, Region: "us-east-1"}).ListCertificates(context.Background())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
 	}
 	if len(certificates) != 2 || certificates[0].ARN != "soon" {
 		t.Fatalf("expected soonest expiry first, got %+v", certificates)
@@ -110,11 +114,45 @@ func TestListCertificatesDescribesConcurrentlyWithLimit(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	certificates, err := (&AwsRepository{ACMClient: mock}).ListCertificates(ctx)
+	certificates, warnings, err := (&AwsRepository{ACMClient: mock}).ListCertificates(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
 	if len(certificates) != certificateCount || peak.Load() != 10 {
 		t.Fatalf("expected %d certificates and 10 concurrent describes, got %d and %d", certificateCount, len(certificates), peak.Load())
+	}
+}
+
+func TestListCertificatesKeepsSuccessfulDescriptions(t *testing.T) {
+	mock := &mockACMClient{
+		list: func(context.Context, *acm.ListCertificatesInput, ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
+			return &acm.ListCertificatesOutput{CertificateSummaryList: []acmtypes.CertificateSummary{
+				{CertificateArn: awssdk.String("denied")},
+				{CertificateArn: awssdk.String("visible")},
+			}}, nil
+		},
+		describe: func(_ context.Context, in *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
+			if awssdk.ToString(in.CertificateArn) == "denied" {
+				return nil, fmt.Errorf("access denied")
+			}
+			return &acm.DescribeCertificateOutput{Certificate: &acmtypes.CertificateDetail{
+				CertificateArn: in.CertificateArn,
+				DomainName:     awssdk.String("visible.example.com"),
+			}}, nil
+		},
+	}
+
+	certificates, warnings, err := (&AwsRepository{ACMClient: mock}).ListCertificates(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(certificates) != 1 || certificates[0].ARN != "visible" {
+		t.Fatalf("expected visible certificate to be preserved, got %+v", certificates)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0].Error(), "failed to describe ACM certificate denied") {
+		t.Fatalf("expected denied certificate warning, got %v", warnings)
 	}
 }

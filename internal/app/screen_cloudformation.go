@@ -122,44 +122,19 @@ func (cm *cloudFormationModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, 
 }
 
 func cloudFormationLoadActive(m Model) bool {
-	return cloudFormationOverlayChainMatches(m, m.screen, func(current screen) bool {
+	return overlayChainMatches(m, m.screen, func(current screen) bool {
 		return current == screenLoading
 	})
 }
 
 func cloudFormationContextReturnActive(m Model) bool {
-	return cloudFormationOverlayChainMatches(m, m.ctxPrevScreen, func(current screen) bool {
+	return overlayChainMatches(m, m.ctxPrevScreen, func(current screen) bool {
 		if current == screenCloudFormationStackList || current == screenCloudFormationStackDetail {
 			return true
 		}
 		return current == screenLoading &&
 			(m.loadingReturnScreen == screenCloudFormationStackList || m.loadingReturnScreen == screenCloudFormationStackDetail)
 	})
-}
-
-func cloudFormationOverlayChainMatches(m Model, current screen, match func(screen) bool) bool {
-	visited := make(map[screen]struct{}, 4)
-	for {
-		if match(current) {
-			return true
-		}
-		if _, ok := visited[current]; ok {
-			return false
-		}
-		visited[current] = struct{}{}
-		switch current {
-		case screenSettings:
-			current = m.settingsPrevScreen
-		case screenCommandPalette:
-			current = m.palette.prevScreen
-		case screenViewList:
-			current = m.views.prevScreen
-		case screenContextPicker:
-			current = m.ctxPrevScreen
-		default:
-			return false
-		}
-	}
 }
 
 func finishCloudFormationLoad(m *Model, next screen) {

@@ -171,6 +171,16 @@ func (m Model) renderListPanel(content string) string {
 	return style.Render(content)
 }
 
+func (m Model) renderWarningSummary(count int, label, first string) string {
+	first, _, _ = strings.Cut(first, "\n")
+	width := m.width - 4
+	if width <= 0 {
+		width = 88
+	}
+	return errorStyle.Render(fmt.Sprintf("  Warnings: %d %s", count, label)) + "\n" +
+		dimStyle.Render("  "+truncateEC2DetailValue(escapeTerminalControls(first), width)) + "\n"
+}
+
 func (m Model) renderHelpBar(content string) string {
 	content = " " + strings.TrimSpace(content)
 	style := m.currentHelpStyle()

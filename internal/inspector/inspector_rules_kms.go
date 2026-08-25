@@ -2,6 +2,7 @@ package inspector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	awsservice "unic/internal/services/aws"
@@ -12,17 +13,17 @@ func init() {
 }
 
 func runKMSRotationScan(ctx context.Context, repo *AwsRepository) ([]SecurityFinding, error) {
-	keys, err := repo.ListKMSKeysWithoutAliases(ctx)
+	keys, warnings, err := repo.ListKMSKeysWithoutAliases(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return inspectKMSRotation(keys), nil
+	return inspectKMSRotation(keys), errors.Join(warnings...)
 }
 
 func inspectKMSRotation(keys []awsservice.KMSKey) []SecurityFinding {
 	var findings []SecurityFinding
 	for _, key := range keys {
-		if !key.RotationEligible || key.RotationEnabled {
+		if !key.RotationEligible || !key.RotationKnown || key.RotationEnabled {
 			continue
 		}
 		findings = append(findings, SecurityFinding{

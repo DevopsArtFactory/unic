@@ -923,6 +923,115 @@ func TestDynamoDBContextPickerCommittedOverlaysClearInterruptedLoad(t *testing.T
 	}
 }
 
+func TestDynamoDBContextPickerOverlaysPreserveInterruptedLoad(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		keys   string
+		screen screen
+	}{
+		{name: "settings", keys: "S", screen: screenSettings},
+		{name: "views", keys: "V", screen: screenViewList},
+		{name: "settings then views", keys: "SV", screen: screenViewList},
+		{name: "views then settings", keys: "VS", screen: screenSettings},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), t.TempDir()+"/config.yaml", "dev")
+			m.cfg.ContextName = "dev"
+			loading, _ := m.dynamodb.Start(&m)
+			m = loading.(Model)
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = opened.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+
+			for _, key := range tc.keys {
+				overlay, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{key}})
+				m = overlay.(Model)
+			}
+			if m.screen != tc.screen || !m.ctxPrevWasLoading {
+				t.Fatalf("expected %s over the interrupted context picker, screen=%v loading=%v", tc.name, m.screen, m.ctxPrevWasLoading)
+			}
+
+			reopened, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = reopened.(Model)
+			if cmd == nil {
+				t.Fatal("expected context reload command")
+			}
+			reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = reloaded.(Model)
+			if m.screen != screenContextPicker || m.ctxPrevScreen != screenDynamoDBTableList || !m.ctxPrevWasLoading {
+				t.Fatalf("expected %s to preserve the interrupted load owner, screen=%v return=%v loading=%v", tc.name, m.screen, m.ctxPrevScreen, m.ctxPrevWasLoading)
+			}
+
+			generation := m.commands.CurrentGen()
+			resumed, resumeCmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = resumed.(Model)
+			if m.screen != screenLoading || m.loadingReturnScreen != screenDynamoDBTableList || resumeCmd == nil {
+				t.Fatalf("expected %s cancel to restart the list load, screen=%v return=%v cmd=%v", tc.name, m.screen, m.loadingReturnScreen, resumeCmd)
+			}
+			if got := m.commands.CurrentGen(); got != generation+1 {
+				t.Fatalf("expected exactly one resumed command generation, got %d after %d", got, generation)
+			}
+
+			stillLoading, duplicateCmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = stillLoading.(Model)
+			if duplicateCmd != nil || m.screen != screenLoading || m.commands.CurrentGen() != generation+1 {
+				t.Fatalf("expected repeated cancel to leave the single resumed load unchanged, screen=%v cmd=%v generation=%d", m.screen, duplicateCmd, m.commands.CurrentGen())
+			}
+		})
+	}
+}
+
+func TestDynamoDBRegionSwitchClearsInterruptedOverlayReturn(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  rune
+	}{
+		{name: "settings", key: 'S'},
+		{name: "views", key: 'V'},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := multiRegionTestModel()
+			loading, _ := m.dynamodb.Start(&m)
+			m = loading.(Model)
+
+			opened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = opened.(Model)
+			loaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = loaded.(Model)
+			overlay, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tc.key}})
+			m = overlay.(Model)
+
+			regionPicker, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+			m = regionPicker.(Model)
+			moved, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+			m = moved.(Model)
+			switching, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			m = switching.(Model)
+			if m.screen != screenLoading || cmd == nil {
+				t.Fatalf("expected %s region switch to start loading, screen=%v cmd=%v", tc.name, m.screen, cmd)
+			}
+
+			switched, _ := m.Update(regionSwitchedMsg{region: "us-east-1"})
+			m = switched.(Model)
+			if m.screen != screenServiceList || m.ctxPrevWasLoading {
+				t.Fatalf("expected %s region switch to clear interrupted return, screen=%v loading=%v", tc.name, m.screen, m.ctxPrevWasLoading)
+			}
+
+			reopened, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = reopened.(Model)
+			reloaded, _ := m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = reloaded.(Model)
+			canceled, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = canceled.(Model)
+			if m.screen != screenServiceList || cmd != nil {
+				t.Fatalf("expected later picker cancel to stay on the service list, screen=%v cmd=%v", m.screen, cmd)
+			}
+		})
+	}
+}
+
 func TestDynamoDBGlobalOverlaysDropInterruptedResultAndRestartOnCancel(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

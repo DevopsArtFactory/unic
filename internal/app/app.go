@@ -543,6 +543,33 @@ func (m Model) isTextEntryScreen() bool {
 	}
 }
 
+func overlayChainMatches(m Model, current screen, match func(screen) bool) bool {
+	visited := make(map[screen]struct{}, 4)
+	for {
+		if match(current) {
+			return true
+		}
+		if _, ok := visited[current]; ok {
+			return false
+		}
+		visited[current] = struct{}{}
+		switch current {
+		case screenSettings:
+			current = m.settingsPrevScreen
+		case screenCommandPalette:
+			current = m.palette.prevScreen
+		case screenViewList:
+			current = m.views.prevScreen
+		case screenContextPicker:
+			current = m.ctxPrevScreen
+		case screenRegionPicker:
+			current = m.regionPrevScreen
+		default:
+			return false
+		}
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Global messages
 	switch msg := msg.(type) {
@@ -690,11 +717,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			if m.screen != screenSettings || m.settingsPrevScreen != screenContextPicker {
+			returnsToContextPicker := overlayChainMatches(m, m.screen, func(current screen) bool {
+				return current == screenContextPicker
+			})
+			if !m.ctxPrevWasLoading && !returnsToContextPicker {
 				m.ctxPrevScreen = m.screen
+				m.ctxPrevWasLoading = false
 			}
 			m.ctxPickerPending = true
-			m.ctxPrevWasLoading = false
 			if m.screen == screenLoading && isDynamoDBScreen(m.loadingReturnScreen) {
 				m.ctxPrevScreen = m.loadingReturnScreen
 				m.ctxPrevWasLoading = true
@@ -710,7 +740,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			m.regionPrevScreen = m.screen
+			if !overlayChainMatches(m, m.screen, func(current screen) bool {
+				return current == screenRegionPicker
+			}) {
+				m.regionPrevScreen = m.screen
+			}
 			m.regionIdx = m.activeRegionIndex()
 			m.screen = screenRegionPicker
 			return m, nil
@@ -722,7 +756,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stopWatch()
 			m.deactivateFilter()
 			m.ssmParams.clearValue()
-			m.settingsPrevScreen = m.screen
+			if !overlayChainMatches(m, m.screen, func(current screen) bool {
+				return current == screenSettings
+			}) {
+				m.settingsPrevScreen = m.screen
+			}
 			m.cancelDynamoDBLoadForOverlay()
 			m.screen = screenSettings
 			return m, nil

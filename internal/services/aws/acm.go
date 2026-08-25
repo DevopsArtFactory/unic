@@ -58,9 +58,10 @@ func (c ACMCertificate) FilterText() string {
 	return strings.ToLower(strings.Join(parts, " "))
 }
 
-// ListCertificates returns certificate details sorted by earliest expiry.
-func (r *AwsRepository) ListCertificates(ctx context.Context) ([]ACMCertificate, error) {
+// ListCertificates returns successful details, per-certificate warnings, and any fatal list error.
+func (r *AwsRepository) ListCertificates(ctx context.Context) ([]ACMCertificate, []error, error) {
 	var certificates []ACMCertificate
+	var warnings []error
 	var nextToken *string
 	for {
 		out, err := r.ACMClient.ListCertificates(ctx, &acm.ListCertificatesInput{
@@ -76,7 +77,7 @@ func (r *AwsRepository) ListCertificates(ctx context.Context) ([]ACMCertificate,
 			}},
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to list ACM certificates: %w", err)
+			return nil, nil, fmt.Errorf("failed to list ACM certificates: %w", err)
 		}
 		for start := 0; start < len(out.CertificateSummaryList); start += 10 {
 			end := min(start+10, len(out.CertificateSummaryList))
@@ -97,9 +98,12 @@ func (r *AwsRepository) ListCertificates(ctx context.Context) ([]ACMCertificate,
 				}()
 			}
 			wg.Wait()
+			if err := ctx.Err(); err != nil {
+				return nil, nil, err
+			}
 			for i, detail := range results {
 				if errs[i] != nil {
-					return nil, errs[i]
+					warnings = append(warnings, errs[i])
 				}
 				if detail == nil {
 					continue
@@ -141,5 +145,5 @@ func (r *AwsRepository) ListCertificates(ctx context.Context) ([]ACMCertificate,
 		}
 		return certificates[i].NotAfter.Before(certificates[j].NotAfter)
 	})
-	return certificates, nil
+	return certificates, warnings, nil
 }
