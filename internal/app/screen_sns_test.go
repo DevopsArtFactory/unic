@@ -311,6 +311,7 @@ func TestSNSListRowsKeepPostureIdentifiersVisible(t *testing.T) {
 	const (
 		kmsKeyARN = "arn:aws:kms:us-east-1:123456789012:key/550e8400-e29b-41d4-a716-446655440000"
 		dlqARN    = "arn:aws:sqs:us-east-1:123456789012:prod-orders-dlq"
+		endpoint  = "arn:aws:sqs:us-east-1:123456789012:endpointq42"
 	)
 
 	for _, width := range []int{80, 120} {
@@ -328,12 +329,15 @@ func TestSNSListRowsKeepPostureIdentifiersVisible(t *testing.T) {
 			m.sns.selectedTopic = &m.sns.topics[0]
 			m.sns.subscriptions = []awsservice.SNSSubscription{{
 				ARN: "arn:aws:sns:us-east-1:123456789012:orders:subscription-id", Protocol: "sqs",
-				Endpoint: "arn:aws:sqs:us-east-1:123456789012:orders", Owner: "123456789012",
+				Endpoint: endpoint, Owner: "123456789012",
 				RedrivePolicy: `{"deadLetterTargetArn":"` + dlqARN + `"}`, AttributesKnown: true,
 			}}
 			m.sns.filteredSubs = m.sns.subscriptions
 
 			subscriptions := stripANSI(m.sns.viewSubscriptionList(m))
+			if !strings.Contains(subscriptions, "endpointq42") {
+				t.Fatalf("expected endpoint resource suffix at width %d, got:\n%s", width, subscriptions)
+			}
 			if !strings.Contains(subscriptions, "prod-orders-dlq") {
 				t.Fatalf("expected DLQ name at width %d, got:\n%s", width, subscriptions)
 			}

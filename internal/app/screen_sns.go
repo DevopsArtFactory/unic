@@ -479,10 +479,17 @@ func snsSubscriptionDLQLabel(subscription awsservice.SNSSubscription) string {
 func snsSubscriptionRow(m Model, protocol, endpoint, owner, status, dlq string) string {
 	widths := snsColumnWidths(m, []int{8, 16, 12, 9, 21}, []int{11, 42, 14, 10, 42})
 	return padInspectorText(inspectorShorten(escapeTerminalControls(protocol), widths[0]), widths[0]) + "  " +
-		padInspectorText(inspectorShorten(escapeTerminalControls(endpoint), widths[1]), widths[1]) + "  " +
+		padInspectorText(snsShortenEndpoint(escapeTerminalControls(endpoint), widths[1]), widths[1]) + "  " +
 		padInspectorText(inspectorShorten(escapeTerminalControls(owner), widths[2]), widths[2]) + "  " +
 		padInspectorText(inspectorShorten(escapeTerminalControls(status), widths[3]), widths[3]) + "  " +
 		snsShortenTail(escapeTerminalControls(dlq), widths[4])
+}
+
+func snsShortenEndpoint(value string, width int) string {
+	if strings.HasPrefix(value, "arn:") {
+		return snsShortenTail(value, width)
+	}
+	return inspectorShorten(value, width)
 }
 
 func snsColumnWidths(m Model, minimum, desired []int) []int {
