@@ -174,6 +174,8 @@ func TestBackupDetailRefreshReloadsVaultMetadata(t *testing.T) {
 	m.screen = screenBackupVaultDetail
 	m.backup.selected = &stale
 	m.backup.detail = &awsservice.BackupVaultDetail{Vault: stale}
+	m.backup.vaults = []awsservice.BackupVault{stale}
+	m.backup.filtered = []awsservice.BackupVault{stale}
 	m.awsRepo = &awsservice.AwsRepository{Region: "ap-northeast-2", BackupClient: &appBackupClient{
 		listVaults: func(_ context.Context, input *backup.ListBackupVaultsInput, _ ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error) {
 			if input.NextToken != nil {
@@ -201,6 +203,63 @@ func TestBackupDetailRefreshReloadsVaultMetadata(t *testing.T) {
 	lines := stripANSI(strings.Join(m.backup.detailLines(m), "\n"))
 	if !strings.Contains(lines, "9") || !strings.Contains(lines, "locked (minimum 30 days)") {
 		t.Fatalf("expected refreshed recovery count and Vault Lock posture, got:\n%s", lines)
+	}
+
+	m.backup.HandleKey(&m, tea.KeyMsg{Type: tea.KeyEsc})
+	if len(m.backup.vaults) != 1 || m.backup.vaults[0].RecoveryPointCount != 9 || len(m.backup.filtered) != 1 || !m.backup.filtered[0].Locked {
+		t.Fatalf("expected refreshed vault metadata in the canonical list, vaults=%+v filtered=%+v", m.backup.vaults, m.backup.filtered)
+	}
+	updated, cmd = m.backup.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	result = runBatchedUserCmd(t, cmd)
+	next, _ = m.Update(result)
+	m = next.(Model)
+	if m.backup.detail == nil || m.backup.detail.Vault.RecoveryPointCount != 9 || !m.backup.detail.Vault.Locked {
+		t.Fatalf("expected refreshed metadata after returning to the detail, got %+v", m.backup.detail)
+	}
+}
+
+func TestBackupDetailRefreshKeepsPriorVaultWhenListingIsPartial(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	selected := awsservice.BackupVault{Name: "prod", ARN: "arn:vault:prod", RecoveryPointCount: 1}
+	m.screen = screenBackupVaultDetail
+	m.backup.selected = &selected
+	m.backup.detail = &awsservice.BackupVaultDetail{Vault: selected}
+	m.backup.vaults = []awsservice.BackupVault{selected}
+	m.backup.filtered = []awsservice.BackupVault{selected}
+	calls := 0
+	m.awsRepo = &awsservice.AwsRepository{BackupClient: &appBackupClient{
+		listVaults: func(_ context.Context, input *backup.ListBackupVaultsInput, _ ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error) {
+			calls++
+			if calls == 1 {
+				return &backup.ListBackupVaultsOutput{
+					NextToken: awssdk.String("page-2"),
+					BackupVaultList: []backuptypes.BackupVaultListMember{{
+						BackupVaultName: awssdk.String("dev"), BackupVaultArn: awssdk.String("arn:vault:dev"),
+					}},
+				}, nil
+			}
+			if awssdk.ToString(input.NextToken) != "page-2" {
+				t.Fatalf("expected second-page token, got %q", awssdk.ToString(input.NextToken))
+			}
+			return nil, errors.New("page denied")
+		},
+	}}
+
+	updated, cmd := m.backup.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updated.(Model)
+	result := runBatchedUserCmd(t, cmd)
+	next, _ := m.Update(result)
+	m = next.(Model)
+
+	if calls != 2 || m.screen != screenBackupVaultDetail || m.backup.errorActive {
+		t.Fatalf("expected usable detail after partial listing, calls=%d screen=%v state=%+v", calls, m.screen, m.backup)
+	}
+	if m.backup.detail == nil || m.backup.detail.Vault.ARN != selected.ARN || m.backup.detail.Vault.RecoveryPointCount != 1 {
+		t.Fatalf("expected prior selected vault metadata to remain available, got %+v", m.backup.detail)
+	}
+	if len(m.backup.detailErrors) != 1 || !strings.Contains(m.backup.detailErrors[0].Error(), "page denied") {
+		t.Fatalf("expected partial-list warning, got %v", m.backup.detailErrors)
 	}
 }
 

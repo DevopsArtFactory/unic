@@ -103,6 +103,7 @@ func (bm *backupModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd,
 		}
 		if msg.detail != nil {
 			selected := msg.detail.Vault
+			bm.reconcileVault(selected, m.filterValue(filterBackupVaults))
 			bm.selected = &selected
 		}
 		bm.detail = msg.detail
@@ -186,6 +187,24 @@ func (bm *backupModel) ApplyFilter(m *Model, target filterTarget) bool {
 	bm.filtered = applyFilter(bm.vaults, m.filterValue(target))
 	bm.idx = 0
 	return true
+}
+
+func (bm *backupModel) reconcileVault(vault awsservice.BackupVault, query string) {
+	for i := range bm.vaults {
+		if !sameBackupVault(bm.vaults[i], vault) {
+			continue
+		}
+		bm.vaults[i] = vault
+		bm.filtered = applyFilter(bm.vaults, query)
+		bm.idx = clampListIndex(bm.idx, len(bm.filtered))
+		for i := range bm.filtered {
+			if sameBackupVault(bm.filtered[i], vault) {
+				bm.idx = i
+				break
+			}
+		}
+		return
+	}
 }
 
 func (bm *backupModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -278,9 +297,12 @@ func (bm backupModel) loadDetail(m Model, vault awsservice.BackupVault, refreshV
 			warnings = append(warnings, listWarnings...)
 			refreshed, ok := findBackupVault(vaults, vault)
 			if !ok {
-				return backupVaultDetailLoadedMsg{vaultName: vault.Name, err: fmt.Errorf("backup vault %s is no longer available", vault.Name)}
+				if len(listWarnings) == 0 {
+					return backupVaultDetailLoadedMsg{vaultName: vault.Name, err: fmt.Errorf("backup vault %s is no longer available", vault.Name)}
+				}
+			} else {
+				vault = refreshed
 			}
-			vault = refreshed
 		}
 
 		detail, detailWarnings, err := repo.GetBackupVaultDetail(ctx, vault)
@@ -292,7 +314,7 @@ func (bm backupModel) loadDetail(m Model, vault awsservice.BackupVault, refreshV
 func findBackupVault(vaults []awsservice.BackupVault, selected awsservice.BackupVault) (awsservice.BackupVault, bool) {
 	if selected.ARN != "" {
 		for _, vault := range vaults {
-			if vault.ARN == selected.ARN {
+			if sameBackupVault(vault, selected) {
 				return vault, true
 			}
 		}
@@ -303,6 +325,13 @@ func findBackupVault(vaults []awsservice.BackupVault, selected awsservice.Backup
 		}
 	}
 	return awsservice.BackupVault{}, false
+}
+
+func sameBackupVault(left, right awsservice.BackupVault) bool {
+	if left.ARN != "" && right.ARN != "" {
+		return left.ARN == right.ARN
+	}
+	return left.Name == right.Name
 }
 
 func (bm backupModel) viewList(m Model) string {
