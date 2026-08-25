@@ -28,34 +28,34 @@ const (
 
 func init() {
 	registerSecurityInspectorScanner(InspectorScanner{
-		Name: inspectorScannerCostWasteName,
-		Run:  runCostWasteScan,
+		Name:          inspectorScannerCostWasteName,
+		RunConfigured: runCostWasteScan,
 	})
 }
 
-func runCostWasteScan(ctx context.Context, repo *AwsRepository) ([]SecurityFinding, error) {
-	return inspectCostWaste(ctx, repo, time.Now().UTC())
+func runCostWasteScan(ctx context.Context, repo *AwsRepository, options SecurityScanOptions) ([]SecurityFinding, error) {
+	return inspectCostWaste(ctx, repo, time.Now().UTC(), options.RequiredTags)
 }
 
-func inspectCostWaste(ctx context.Context, repo *AwsRepository, now time.Time) ([]SecurityFinding, error) {
-	findings, err := inspectElasticIPs(ctx, repo.EC2Client)
+func inspectCostWaste(ctx context.Context, repo *AwsRepository, now time.Time, requiredTags []string) ([]SecurityFinding, error) {
+	findings, err := inspectElasticIPs(ctx, repo.EC2Client, requiredTags)
 	if err != nil {
 		return nil, err
 	}
 
-	volumeFindings, err := inspectEBSVolumes(ctx, repo.EC2Client)
+	volumeFindings, err := inspectEBSVolumes(ctx, repo.EC2Client, requiredTags)
 	if err != nil {
 		return nil, err
 	}
 	findings = append(findings, volumeFindings...)
 
-	instanceFindings, err := inspectEC2InstancesForWaste(ctx, repo.EC2Client)
+	instanceFindings, err := inspectEC2InstancesForWaste(ctx, repo.EC2Client, requiredTags)
 	if err != nil {
 		return nil, err
 	}
 	findings = append(findings, instanceFindings...)
 
-	snapshotFindings, err := inspectEBSSnapshotsForWaste(ctx, repo.EC2Client, now)
+	snapshotFindings, err := inspectEBSSnapshotsForWaste(ctx, repo.EC2Client, now, requiredTags)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func inspectCostWaste(ctx context.Context, repo *AwsRepository, now time.Time) (
 	return findings, errors.Join(warnings...)
 }
 
-func inspectElasticIPs(ctx context.Context, client EC2ClientAPI) ([]SecurityFinding, error) {
+func inspectElasticIPs(ctx context.Context, client EC2ClientAPI, requiredTags []string) ([]SecurityFinding, error) {
 	output, err := client.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to inspect Elastic IP addresses: %w", err)
@@ -105,14 +105,14 @@ func inspectElasticIPs(ctx context.Context, client EC2ClientAPI) ([]SecurityFind
 				Recommendation: "Release the address if it is no longer needed, or associate it with the intended workload.",
 			})
 		}
-		if finding, ok := untaggedCostFinding("ElasticIP", resourceID, address.Tags); ok {
+		if finding, ok := untaggedCostFinding("ElasticIP", resourceID, address.Tags, requiredTags); ok {
 			findings = append(findings, finding)
 		}
 	}
 	return findings, nil
 }
 
-func inspectEBSVolumes(ctx context.Context, client EC2ClientAPI) ([]SecurityFinding, error) {
+func inspectEBSVolumes(ctx context.Context, client EC2ClientAPI, requiredTags []string) ([]SecurityFinding, error) {
 	var findings []SecurityFinding
 	paginator := ec2.NewDescribeVolumesPaginator(client, &ec2.DescribeVolumesInput{})
 	for paginator.HasMorePages() {
@@ -141,7 +141,7 @@ func inspectEBSVolumes(ctx context.Context, client EC2ClientAPI) ([]SecurityFind
 					Recommendation: "Delete the volume after confirming its data is no longer needed, or attach it to the intended instance.",
 				})
 			}
-			if finding, ok := untaggedCostFinding("EBSVolume", volumeID, volume.Tags); ok {
+			if finding, ok := untaggedCostFinding("EBSVolume", volumeID, volume.Tags, requiredTags); ok {
 				findings = append(findings, finding)
 			}
 		}
@@ -149,7 +149,7 @@ func inspectEBSVolumes(ctx context.Context, client EC2ClientAPI) ([]SecurityFind
 	return findings, nil
 }
 
-func inspectEC2InstancesForWaste(ctx context.Context, client EC2ClientAPI) ([]SecurityFinding, error) {
+func inspectEC2InstancesForWaste(ctx context.Context, client EC2ClientAPI, requiredTags []string) ([]SecurityFinding, error) {
 	var findings []SecurityFinding
 	paginator := ec2.NewDescribeInstancesPaginator(client, &ec2.DescribeInstancesInput{})
 	for paginator.HasMorePages() {
@@ -176,7 +176,7 @@ func inspectEC2InstancesForWaste(ctx context.Context, client EC2ClientAPI) ([]Se
 				}
 				if instance.State.Name != ec2types.InstanceStateNameTerminated &&
 					instance.State.Name != ec2types.InstanceStateNameShuttingDown {
-					if finding, ok := untaggedCostFinding("EC2Instance", instanceID, instance.Tags); ok {
+					if finding, ok := untaggedCostFinding("EC2Instance", instanceID, instance.Tags, requiredTags); ok {
 						findings = append(findings, finding)
 					}
 				}
@@ -186,7 +186,7 @@ func inspectEC2InstancesForWaste(ctx context.Context, client EC2ClientAPI) ([]Se
 	return findings, nil
 }
 
-func inspectEBSSnapshotsForWaste(ctx context.Context, client EC2ClientAPI, now time.Time) ([]SecurityFinding, error) {
+func inspectEBSSnapshotsForWaste(ctx context.Context, client EC2ClientAPI, now time.Time, requiredTags []string) ([]SecurityFinding, error) {
 	var findings []SecurityFinding
 	paginator := ec2.NewDescribeSnapshotsPaginator(client, &ec2.DescribeSnapshotsInput{OwnerIds: []string{"self"}})
 	for paginator.HasMorePages() {
@@ -220,7 +220,7 @@ func inspectEBSSnapshotsForWaste(ctx context.Context, client EC2ClientAPI, now t
 					})
 				}
 			}
-			if finding, ok := untaggedCostFinding("EBSSnapshot", snapshotID, snapshot.Tags); ok {
+			if finding, ok := untaggedCostFinding("EBSSnapshot", snapshotID, snapshot.Tags, requiredTags); ok {
 				findings = append(findings, finding)
 			}
 		}
@@ -274,22 +274,46 @@ func inspectEmptyTargetGroups(ctx context.Context, client ELBv2ClientAPI) ([]Sec
 	return findings, warnings, nil
 }
 
-func untaggedCostFinding(resourceType, resourceID string, tags []ec2types.Tag) (SecurityFinding, bool) {
+func untaggedCostFinding(resourceType, resourceID string, tags []ec2types.Tag, requiredTags []string) (SecurityFinding, bool) {
+	if len(requiredTags) == 0 {
+		return SecurityFinding{}, false
+	}
+
+	present := make(map[string]struct{}, len(tags))
 	for _, tag := range tags {
-		key := strings.TrimSpace(awssdk.ToString(tag.Key))
-		if key != "" && !strings.HasPrefix(strings.ToLower(key), "aws:") {
-			return SecurityFinding{}, false
+		key := awssdk.ToString(tag.Key)
+		if key != "" {
+			present[key] = struct{}{}
 		}
+	}
+
+	missing := make([]string, 0, len(requiredTags))
+	seen := make(map[string]struct{}, len(requiredTags))
+	for _, required := range requiredTags {
+		required = strings.TrimSpace(required)
+		if required == "" {
+			continue
+		}
+		if _, duplicate := seen[required]; duplicate {
+			continue
+		}
+		seen[required] = struct{}{}
+		if _, ok := present[required]; !ok {
+			missing = append(missing, required)
+		}
+	}
+	if len(missing) == 0 {
+		return SecurityFinding{}, false
 	}
 
 	return SecurityFinding{
 		RuleID:         inspectorRuleIDCostResourceUntagged,
-		RuleName:       "Untagged cost resource",
+		RuleName:       "Missing required resource tags",
 		Severity:       RuleSeverityLow,
 		ResourceType:   resourceType,
 		ResourceID:     resourceID,
-		Summary:        fmt.Sprintf("%s %s has no user-defined tags for ownership or cost allocation.", resourceType, resourceID),
-		Recommendation: "Add the ownership, environment, and cost-allocation tags required by your tagging policy.",
+		Summary:        fmt.Sprintf("%s %s is missing required tags: %s.", resourceType, resourceID, strings.Join(missing, ", ")),
+		Recommendation: "Add the missing tags required by your tagging policy.",
 	}, true
 }
 

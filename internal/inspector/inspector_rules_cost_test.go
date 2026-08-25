@@ -38,7 +38,7 @@ func (m *mockCostELBv2Client) DescribeRules(context.Context, *elasticloadbalanci
 	return &elasticloadbalancingv2.DescribeRulesOutput{}, nil
 }
 
-func TestInspectCostWasteFindsWasteAndUntaggedResources(t *testing.T) {
+func TestInspectCostWasteFindsWasteAndMissingRequiredTags(t *testing.T) {
 	now := time.Date(2026, time.August, 20, 0, 0, 0, 0, time.UTC)
 	volumeCalls := 0
 	targetGroupCalls := 0
@@ -140,15 +140,15 @@ func TestInspectCostWasteFindsWasteAndUntaggedResources(t *testing.T) {
 		},
 	}
 
-	findings, err := inspectCostWaste(context.Background(), &AwsRepository{EC2Client: ec2Client, ELBv2Client: elbClient}, now)
+	findings, err := inspectCostWaste(context.Background(), &AwsRepository{EC2Client: ec2Client, ELBv2Client: elbClient}, now, []string{"Owner"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if volumeCalls != 2 || targetGroupCalls != 2 || targetHealthCalls != 2 {
 		t.Fatalf("expected paginator and sequential health coverage, got volume calls %d, target group calls %d, and target health calls %d", volumeCalls, targetGroupCalls, targetHealthCalls)
 	}
-	if len(findings) != 9 {
-		t.Fatalf("expected 9 findings, got %d: %+v", len(findings), findings)
+	if len(findings) != 10 {
+		t.Fatalf("expected 10 findings, got %d: %+v", len(findings), findings)
 	}
 
 	byRuleAndResource := make(map[string]SecurityFinding, len(findings))
@@ -162,6 +162,7 @@ func TestInspectCostWasteFindsWasteAndUntaggedResources(t *testing.T) {
 		inspectorRuleIDCostResourceUntagged + "/vol-unused":                                                     RuleSeverityLow,
 		inspectorRuleIDCostInstanceStopped + "/i-stopped":                                                       RuleSeverityMedium,
 		inspectorRuleIDCostResourceUntagged + "/i-stopped":                                                      RuleSeverityLow,
+		inspectorRuleIDCostResourceUntagged + "/i-running":                                                      RuleSeverityLow,
 		inspectorRuleIDCostSnapshotAged + "/snap-aged":                                                          RuleSeverityLow,
 		inspectorRuleIDCostResourceUntagged + "/snap-aged":                                                      RuleSeverityLow,
 		inspectorRuleIDCostTargetGroupEmpty + "/arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/empty/1": RuleSeverityLow,
@@ -175,6 +176,34 @@ func TestInspectCostWasteFindsWasteAndUntaggedResources(t *testing.T) {
 			t.Errorf("finding %s severity = %s, want %s", key, finding.Severity, severity)
 		}
 	}
+	if got := byRuleAndResource[inspectorRuleIDCostResourceUntagged+"/eipalloc-unused"].Summary; got != "ElasticIP eipalloc-unused is missing required tags: Owner." {
+		t.Fatalf("unexpected required-tag summary: %q", got)
+	}
+}
+
+func TestUntaggedCostFindingUsesConfiguredRequiredTags(t *testing.T) {
+	tags := []ec2types.Tag{{Key: awssdk.String("Owner"), Value: awssdk.String("platform")}}
+	finding, ok := untaggedCostFinding(
+		"EC2Instance",
+		"i-123",
+		tags,
+		[]string{"Owner", "Environment", "CostCenter", "Environment", " "},
+	)
+	if !ok {
+		t.Fatal("expected missing required tags to produce a finding")
+	}
+	if finding.Summary != "EC2Instance i-123 is missing required tags: Environment, CostCenter." {
+		t.Fatalf("unexpected summary: %q", finding.Summary)
+	}
+
+	if _, ok := untaggedCostFinding("EC2Instance", "i-123", nil, nil); ok {
+		t.Fatal("expected an empty required-tag policy to disable the rule")
+	}
+
+	whitespaceTag := []ec2types.Tag{{Key: awssdk.String(" Owner ")}}
+	if finding, ok := untaggedCostFinding("EC2Instance", "i-123", whitespaceTag, []string{"Owner"}); !ok || finding.Summary != "EC2Instance i-123 is missing required tags: Owner." {
+		t.Fatalf("expected exact AWS tag-key matching, got finding %+v, ok %t", finding, ok)
+	}
 }
 
 func TestInspectCostWasteReturnsContextualEC2Error(t *testing.T) {
@@ -184,7 +213,7 @@ func TestInspectCostWasteReturnsContextualEC2Error(t *testing.T) {
 		},
 	}}
 
-	_, err := inspectCostWaste(context.Background(), repo, time.Now().UTC())
+	_, err := inspectCostWaste(context.Background(), repo, time.Now().UTC(), nil)
 	if err == nil || err.Error() != "failed to inspect EBS volumes: denied" {
 		t.Fatalf("expected contextual EBS error, got %v", err)
 	}

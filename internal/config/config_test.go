@@ -72,16 +72,23 @@ func TestFallsBackToHardcodedDefaultsWhenNothingSet(t *testing.T) {
 	if cfg.ACMExpiryWindowDays != 30 {
 		t.Errorf("expected default ACM expiry window of 30 days, got %d", cfg.ACMExpiryWindowDays)
 	}
+	if len(cfg.RequiredTags) != 0 {
+		t.Errorf("expected required-tag rule to default to disabled, got %v", cfg.RequiredTags)
+	}
 }
 
-func TestLoadReadsACMExpiryWindow(t *testing.T) {
-	path := writeUnicConfig(t, t.TempDir(), "inspector:\n  acm_expiry_window_days: 60\n")
+func TestLoadReadsInspectorOptions(t *testing.T) {
+	path := writeUnicConfig(t, t.TempDir(), "inspector:\n  acm_expiry_window_days: 60\n  required_tags: [Owner, Environment, CostCenter]\n")
 	cfg, err := Load(nil, nil, path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.ACMExpiryWindowDays != 60 {
 		t.Fatalf("expected ACM expiry window of 60 days, got %d", cfg.ACMExpiryWindowDays)
+	}
+	want := []string{"Owner", "Environment", "CostCenter"}
+	if !slices.Equal(cfg.RequiredTags, want) {
+		t.Fatalf("expected required tags %v, got %v", want, cfg.RequiredTags)
 	}
 }
 
@@ -873,6 +880,8 @@ func TestLoadNamedContext(t *testing.T) {
 	path := writeUnicConfig(t, dir, `
 defaults:
   region: us-east-1
+inspector:
+  required_tags: [Owner, Environment]
 contexts:
   - name: dev
     profile: dev-profile
@@ -898,6 +907,9 @@ contexts:
 	}
 	if cfg.AuthType != AuthTypeAssumeRole {
 		t.Fatalf("expected assume_role auth type, got %q", cfg.AuthType)
+	}
+	if !slices.Equal(cfg.RequiredTags, []string{"Owner", "Environment"}) {
+		t.Fatalf("expected named context to retain global required tags, got %v", cfg.RequiredTags)
 	}
 }
 
