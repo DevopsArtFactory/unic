@@ -74,11 +74,11 @@ func RunSecurityScan(ctx context.Context, repo *AwsRepository, options ...Securi
 		} else {
 			findings, err = scanner.Run(ctx, repo)
 		}
+		report.Findings = append(report.Findings, findings...)
 		if err != nil {
 			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %v", scanner.Name, err))
 			continue
 		}
-		report.Findings = append(report.Findings, findings...)
 	}
 
 	sort.Slice(report.Findings, func(i, j int) bool {

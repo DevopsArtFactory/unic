@@ -189,3 +189,54 @@ func TestInspectCostWasteReturnsContextualEC2Error(t *testing.T) {
 		t.Fatalf("expected contextual EBS error, got %v", err)
 	}
 }
+
+func TestInspectEmptyTargetGroupsKeepsResultsAfterHealthFailure(t *testing.T) {
+	client := &mockCostELBv2Client{
+		describeTargetGroupsFunc: func(context.Context, *elasticloadbalancingv2.DescribeTargetGroupsInput, ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error) {
+			return &elasticloadbalancingv2.DescribeTargetGroupsOutput{TargetGroups: []elbtypes.TargetGroup{
+				{TargetGroupArn: awssdk.String("arn:denied")},
+				{TargetGroupArn: awssdk.String("arn:empty")},
+			}}, nil
+		},
+		describeTargetHealthFunc: func(_ context.Context, params *elasticloadbalancingv2.DescribeTargetHealthInput, _ ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
+			if awssdk.ToString(params.TargetGroupArn) == "arn:denied" {
+				return nil, errors.New("access denied")
+			}
+			return &elasticloadbalancingv2.DescribeTargetHealthOutput{}, nil
+		},
+	}
+
+	findings, warnings, err := inspectEmptyTargetGroups(context.Background(), client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 || findings[0].ResourceID != "arn:empty" {
+		t.Fatalf("expected empty target group finding to be preserved, got %+v", findings)
+	}
+	if len(warnings) != 1 || warnings[0].Error() != "failed to inspect target health for arn:denied: access denied" {
+		t.Fatalf("expected denied target-group warning, got %v", warnings)
+	}
+}
+
+func TestInspectEmptyTargetGroupsStopsOnContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	healthCalls := 0
+	client := &mockCostELBv2Client{
+		describeTargetGroupsFunc: func(context.Context, *elasticloadbalancingv2.DescribeTargetGroupsInput, ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetGroupsOutput, error) {
+			return &elasticloadbalancingv2.DescribeTargetGroupsOutput{TargetGroups: []elbtypes.TargetGroup{
+				{TargetGroupArn: awssdk.String("arn:first")},
+				{TargetGroupArn: awssdk.String("arn:second")},
+			}}, nil
+		},
+		describeTargetHealthFunc: func(context.Context, *elasticloadbalancingv2.DescribeTargetHealthInput, ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
+			healthCalls++
+			cancel()
+			return nil, context.Canceled
+		},
+	}
+
+	findings, warnings, err := inspectEmptyTargetGroups(ctx, client)
+	if !errors.Is(err, context.Canceled) || len(findings) != 0 || len(warnings) != 0 || healthCalls != 1 {
+		t.Fatalf("expected immediate cancellation, got findings=%v warnings=%v err=%v calls=%d", findings, warnings, err, healthCalls)
+	}
+}

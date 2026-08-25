@@ -2,6 +2,7 @@ package inspector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -20,7 +21,7 @@ func inspectACMExpiry(ctx context.Context, repo *AwsRepository, now time.Time, e
 	if expiryWindowDays <= 0 {
 		expiryWindowDays = inspectorACMExpiryDays
 	}
-	certificates, err := repo.ListCertificates(ctx)
+	certificates, warnings, err := repo.ListCertificates(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -48,5 +49,5 @@ func inspectACMExpiry(ctx context.Context, repo *AwsRepository, now time.Time, e
 			Recommendation: "Renew or replace the certificate before expiry and verify dependent resources use the replacement.",
 		})
 	}
-	return findings, nil
+	return findings, errors.Join(warnings...)
 }
