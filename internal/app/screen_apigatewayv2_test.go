@@ -288,6 +288,33 @@ func TestAPIGatewayV2SelectingActiveContextKeepsPendingLoad(t *testing.T) {
 	}
 }
 
+func TestAPIGatewayV2SSOSetupSupersedesPendingLoadSafely(t *testing.T) {
+	m := New(&config.Config{ContextName: "account-a", Region: "us-east-1"}, "", "")
+	updated, _ := m.startLoadingFor(screenAPIGatewayV2APIList, "Loading APIs...", nil, func() tea.Msg { return nil })
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	base := config.ContextInfo{Name: "base-sso", AuthType: "sso", SSOStartURL: "https://example.awsapps.com/start"}
+	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{base}})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = updated.(Model)
+	if cmd == nil || m.screen != screenLoading || m.ctxPrevScreen != screenServiceList {
+		t.Fatalf("expected SSO setup to replace pending API return, screen=%v previous=%v command=%v", m.screen, m.ctxPrevScreen, cmd)
+	}
+
+	updated, _ = m.Update(contextSSOAccountsLoadedMsg{base: base, accounts: []awsservice.SSOAccount{{ID: "123456789012"}}})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenServiceList {
+		t.Fatalf("expected cancelling SSO setup to return safely, got %v", m.screen)
+	}
+}
+
 func TestAPIGatewayV2APINamesEscapeTerminalControls(t *testing.T) {
 	m := New(&config.Config{Region: "us-east-1"}, "", "")
 	m.width, m.height = 100, 24
