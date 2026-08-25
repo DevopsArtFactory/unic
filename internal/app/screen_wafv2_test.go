@@ -72,6 +72,26 @@ func TestWAFDetailScrollsThroughRulesAndResources(t *testing.T) {
 	}
 }
 
+func TestWAFDetailTruncatesLongTitleAtTerminalWidth(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width, m.height = 80, 15
+	m.screen = screenWAFWebACLDetail
+	m.waf.selected = &awsservice.WAFWebACL{
+		Name: strings.Repeat("customer-facing-edge-acl-", 6), Scope: "CLOUDFRONT", Region: "us-east-1",
+		DetailKnown: true, LoggingKnown: true, ResourcesComplete: true,
+	}
+
+	view := m.waf.viewDetail(m)
+	for _, line := range strings.Split(view, "\n") {
+		if width := lipgloss.Width(line); width > m.width {
+			t.Fatalf("WAF detail line is %d cells wide (limit %d): %q", width, m.width, line)
+		}
+	}
+	if !strings.Contains(stripANSI(view), "...") {
+		t.Fatalf("expected overlong title to be truncated, got:\n%s", stripANSI(view))
+	}
+}
+
 func TestWAFLoadCompletingBehindSettingsPreservesOverlay(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenLoading

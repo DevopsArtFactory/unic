@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	cloudfronttypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
@@ -32,6 +34,14 @@ func (m *mockWAFV2Client) GetLoggingConfiguration(_ context.Context, input *wafv
 
 func (m *mockWAFV2Client) ListResourcesForWebACL(_ context.Context, input *wafv2.ListResourcesForWebACLInput, _ ...func(*wafv2.Options)) (*wafv2.ListResourcesForWebACLOutput, error) {
 	return m.resourcesFn(input)
+}
+
+type mockCloudFrontClient struct {
+	listFn func(*cloudfront.ListDistributionsByWebACLIdInput) (*cloudfront.ListDistributionsByWebACLIdOutput, error)
+}
+
+func (m *mockCloudFrontClient) ListDistributionsByWebACLId(_ context.Context, input *cloudfront.ListDistributionsByWebACLIdInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
+	return m.listFn(input)
 }
 
 func TestListWAFWebACLsPaginatesScopesAndMapsPosture(t *testing.T) {
@@ -89,8 +99,28 @@ func TestListWAFWebACLsPaginatesScopesAndMapsPosture(t *testing.T) {
 		}
 		return &wafv2.ListResourcesForWebACLOutput{ResourceArns: []string{"arn:aws:amplify:us-east-1:123:apps/edge"}}, nil
 	}
+	cloudFrontPages := 0
+	cloudFrontAssociations := &mockCloudFrontClient{listFn: func(input *cloudfront.ListDistributionsByWebACLIdInput) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
+		cloudFrontPages++
+		if awssdk.ToString(input.WebACLId) != "arn:cloudfront:edge" {
+			t.Fatalf("expected Web ACL ARN for CloudFront lookup, got %q", awssdk.ToString(input.WebACLId))
+		}
+		if input.Marker == nil {
+			return &cloudfront.ListDistributionsByWebACLIdOutput{DistributionList: &cloudfronttypes.DistributionList{
+				IsTruncated: awssdk.Bool(true), NextMarker: awssdk.String("next"),
+				Items: []cloudfronttypes.DistributionSummary{{ARN: awssdk.String("arn:aws:cloudfront::123:distribution/Z")}},
+			}}, nil
+		}
+		if awssdk.ToString(input.Marker) != "next" {
+			t.Fatalf("unexpected CloudFront marker %q", awssdk.ToString(input.Marker))
+		}
+		return &cloudfront.ListDistributionsByWebACLIdOutput{DistributionList: &cloudfronttypes.DistributionList{
+			IsTruncated: awssdk.Bool(false),
+			Items:       []cloudfronttypes.DistributionSummary{{ARN: awssdk.String("arn:aws:cloudfront::123:distribution/A")}},
+		}}, nil
+	}}
 
-	repo := &AwsRepository{WAFV2Client: regional, WAFV2CloudFrontClient: cloudFront, Region: "us-west-2"}
+	repo := &AwsRepository{WAFV2Client: regional, WAFV2CloudFrontClient: cloudFront, CloudFrontClient: cloudFrontAssociations, Region: "us-west-2"}
 	acls, warnings, err := repo.ListWAFWebACLs(context.Background())
 	if err != nil {
 		t.Fatalf("ListWAFWebACLs returned error: %v", err)
@@ -98,8 +128,8 @@ func TestListWAFWebACLsPaginatesScopesAndMapsPosture(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("expected no warnings, got %v", warnings)
 	}
-	if regionalPages != 2 || resourceCalls != 2*len(wafRegionalResourceTypes) {
-		t.Fatalf("expected pagination and all resource types, pages=%d resource calls=%d", regionalPages, resourceCalls)
+	if regionalPages != 2 || cloudFrontPages != 2 || resourceCalls != 2*len(wafRegionalResourceTypes) {
+		t.Fatalf("expected pagination and all resource types, regional pages=%d CloudFront pages=%d resource calls=%d", regionalPages, cloudFrontPages, resourceCalls)
 	}
 	if len(acls) != 3 || acls[0].Name != "a-regional" || acls[1].Name != "z-regional" || acls[2].Name != "edge" {
 		t.Fatalf("expected stable regional-first ordering, got %+v", acls)
@@ -116,8 +146,31 @@ func TestListWAFWebACLsPaginatesScopesAndMapsPosture(t *testing.T) {
 	if acls[0].Rules[0].Priority != 1 || acls[0].Rules[0].Statement != "managed AWS/AWSManagedRulesCommonRuleSet" || acls[0].Rules[0].Action != "GROUP ACTION" {
 		t.Fatalf("expected priority-sorted managed rule first, got %+v", acls[0].Rules)
 	}
-	if acls[2].LoggingLabel() != "on" || acls[2].ResourceCountLabel() != "1+" || len(acls[2].Signals()) != 0 {
+	if acls[2].LoggingLabel() != "on" || acls[2].ResourceCountLabel() != "3" || len(acls[2].Signals()) != 0 {
 		t.Fatalf("expected protected CloudFront posture, got %+v", acls[2])
+	}
+	if got := strings.Join(acls[2].ResourceARNs, ","); got != "arn:aws:amplify:us-east-1:123:apps/edge,arn:aws:cloudfront::123:distribution/A,arn:aws:cloudfront::123:distribution/Z" {
+		t.Fatalf("expected sorted Amplify and CloudFront associations, got %q", got)
+	}
+}
+
+func TestListCloudFrontDistributionARNsPreservesCompletedPagesOnFailure(t *testing.T) {
+	denied := errors.New("access denied")
+	calls := 0
+	client := &mockCloudFrontClient{listFn: func(input *cloudfront.ListDistributionsByWebACLIdInput) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
+		calls++
+		if input.Marker == nil {
+			return &cloudfront.ListDistributionsByWebACLIdOutput{DistributionList: &cloudfronttypes.DistributionList{
+				IsTruncated: awssdk.Bool(true), NextMarker: awssdk.String("next"),
+				Items: []cloudfronttypes.DistributionSummary{{ARN: awssdk.String("arn:aws:cloudfront::123:distribution/visible")}},
+			}}, nil
+		}
+		return nil, denied
+	}}
+
+	arns, err := listCloudFrontDistributionARNs(context.Background(), client, awssdk.String("arn:waf:edge"))
+	if !errors.Is(err, denied) || calls != 2 || len(arns) != 1 || arns[0] != "arn:aws:cloudfront::123:distribution/visible" {
+		t.Fatalf("expected retained first page and second-page error, calls=%d arns=%v err=%v", calls, arns, err)
 	}
 }
 

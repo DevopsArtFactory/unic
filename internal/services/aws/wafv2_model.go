@@ -66,12 +66,6 @@ func (a WAFWebACL) LoggingLabel() string {
 }
 
 func (a WAFWebACL) ResourceCountLabel() string {
-	if a.Scope == "CLOUDFRONT" {
-		if len(a.ResourceARNs) > 0 {
-			return fmt.Sprintf("%d+", len(a.ResourceARNs))
-		}
-		return "-"
-	}
 	if !a.ResourcesComplete {
 		if len(a.ResourceARNs) > 0 {
 			return fmt.Sprintf("%d+", len(a.ResourceARNs))
@@ -90,7 +84,7 @@ func (a WAFWebACL) Signals() []string {
 	if strings.EqualFold(a.DefaultAction, "ALLOW") {
 		signals = append(signals, "allow-default")
 	}
-	if a.Scope == "REGIONAL" && a.ResourcesComplete && len(a.ResourceARNs) == 0 {
+	if a.ResourcesComplete && len(a.ResourceARNs) == 0 {
 		signals = append(signals, "unassociated")
 	}
 	return signals

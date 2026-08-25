@@ -245,7 +245,12 @@ func (wm wafModel) viewDetail(m Model) string {
 	}
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render("WAFv2 Web ACL — " + escapeTerminalControls(wm.selected.Name)))
+	titleWidth := m.width
+	if titleWidth <= 0 {
+		titleWidth = 80
+	}
+	title := "WAFv2 Web ACL — " + escapeTerminalControls(wm.selected.Name)
+	b.WriteString(titleStyle.Render(truncateEC2DetailValue(title, titleWidth)))
 	b.WriteString("\n\n")
 	lines := wm.detailLines(m)
 	visibleLines := max(m.height-8, 5)
@@ -287,11 +292,6 @@ func (wm wafModel) detailLines(m Model) []string {
 	}
 	lines = append(lines, "\n"+titleStyle.Render("  Protected Resources")+"\n")
 	switch {
-	case acl.Scope == "CLOUDFRONT":
-		lines = append(lines, m.renderEC2DetailLine("Associations", "Amplify shown below; CloudFront distributions require ListDistributionsByWebACLId"))
-		for _, arn := range acl.ResourceARNs {
-			lines = append(lines, m.renderEC2DetailLine("Resource", arn))
-		}
 	case len(acl.ResourceARNs) == 0 && acl.ResourcesComplete:
 		lines = append(lines, m.renderEC2DetailLine("Resource", "None"))
 	case len(acl.ResourceARNs) == 0:

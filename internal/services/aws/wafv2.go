@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
@@ -44,7 +45,7 @@ func (r *AwsRepository) ListWAFWebACLs(ctx context.Context) ([]WAFWebACL, []erro
 			continue
 		}
 		for _, summary := range summaries {
-			acl, itemWarnings := describeWAFWebACL(ctx, request.client, summary, request.scope, request.region)
+			acl, itemWarnings := describeWAFWebACL(ctx, request.client, r.CloudFrontClient, summary, request.scope, request.region)
 			acls = append(acls, acl)
 			warnings = append(warnings, itemWarnings...)
 		}
@@ -82,7 +83,7 @@ func listWAFWebACLSummaries(ctx context.Context, client WAFV2ClientAPI, scope wa
 	}
 }
 
-func describeWAFWebACL(ctx context.Context, client WAFV2ClientAPI, summary wafv2types.WebACLSummary, scope wafv2types.Scope, region string) (WAFWebACL, []error) {
+func describeWAFWebACL(ctx context.Context, client WAFV2ClientAPI, cloudFrontClient CloudFrontClientAPI, summary wafv2types.WebACLSummary, scope wafv2types.Scope, region string) (WAFWebACL, []error) {
 	acl := WAFWebACL{
 		Name: awssdk.ToString(summary.Name), ID: awssdk.ToString(summary.Id), ARN: awssdk.ToString(summary.ARN),
 		Description: awssdk.ToString(summary.Description), Scope: string(scope), Region: region,
@@ -124,20 +125,56 @@ func describeWAFWebACL(ctx context.Context, client WAFV2ClientAPI, summary wafv2
 		}
 		sort.Strings(acl.ResourceARNs)
 	} else {
-		// Amplify uses global ACLs but is enumerable through WAF. CloudFront
-		// distributions require cloudfront:ListDistributionsByWebACLId, so this
-		// association set remains intentionally incomplete.
+		acl.ResourcesComplete = true
+		// Amplify uses global ACLs but is enumerable through WAF.
 		out, err := client.ListResourcesForWebACL(ctx, &wafv2.ListResourcesForWebACLInput{
 			WebACLArn: summary.ARN, ResourceType: wafv2types.ResourceTypeAmplify,
 		})
 		if err != nil {
+			acl.ResourcesComplete = false
 			warnings = append(warnings, fmt.Errorf("failed to list AMPLIFY resources for WAF web ACL %s: %w", acl.Name, err))
 		} else {
 			acl.ResourceARNs = append(acl.ResourceARNs, out.ResourceArns...)
-			sort.Strings(acl.ResourceARNs)
 		}
+		distributionARNs, err := listCloudFrontDistributionARNs(ctx, cloudFrontClient, summary.ARN)
+		acl.ResourceARNs = append(acl.ResourceARNs, distributionARNs...)
+		if err != nil {
+			acl.ResourcesComplete = false
+			warnings = append(warnings, fmt.Errorf("failed to list CloudFront distributions for WAF web ACL %s: %w", acl.Name, err))
+		}
+		sort.Strings(acl.ResourceARNs)
 	}
 	return acl, warnings
+}
+
+func listCloudFrontDistributionARNs(ctx context.Context, client CloudFrontClientAPI, webACLARN *string) ([]string, error) {
+	if client == nil {
+		return nil, errors.New("CloudFront client is not configured")
+	}
+	var arns []string
+	var marker *string
+	for {
+		out, err := client.ListDistributionsByWebACLId(ctx, &cloudfront.ListDistributionsByWebACLIdInput{WebACLId: webACLARN, Marker: marker})
+		if err != nil {
+			return arns, err
+		}
+		if out.DistributionList == nil {
+			return arns, nil
+		}
+		for _, distribution := range out.DistributionList.Items {
+			if arn := awssdk.ToString(distribution.ARN); arn != "" {
+				arns = append(arns, arn)
+			}
+		}
+		if !awssdk.ToBool(out.DistributionList.IsTruncated) {
+			return arns, nil
+		}
+		nextMarker := awssdk.ToString(out.DistributionList.NextMarker)
+		if nextMarker == "" {
+			return arns, errors.New("CloudFront response was truncated without a next marker")
+		}
+		marker = out.DistributionList.NextMarker
+	}
 }
 
 func mapWAFWebACLDetail(acl *WAFWebACL, detail wafv2types.WebACL) {
