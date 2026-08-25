@@ -56,6 +56,11 @@ func preservePendingAPIGatewayV2ContextReturn(m *Model) {
 	}
 }
 
+func pendingAPIGatewayV2ContextLoad(m *Model) bool {
+	previous := apiGatewayV2ContextReturn(m)
+	return previous != nil && *previous == screenLoading
+}
+
 func apiGatewayV2ContextReturn(m *Model) *screen {
 	previous := &m.ctxPrevScreen
 	seen := make(map[screen]struct{})
@@ -361,7 +366,7 @@ func (am apiGatewayV2Model) viewAPIList(m Model) string {
 		panel.WriteString(dimStyle.Render(message))
 		panel.WriteString("\n")
 	} else {
-		panel.WriteString(dimStyle.Render("  " + apiGatewayV2APIRowValues(m, "NAME", "PROTOCOL", "ENDPOINT", "CREATED")))
+		panel.WriteString(dimStyle.Render("  " + apiGatewayV2APIRowValues(m, "NAME", "PROTOCOL", "ENDPOINT", "DEFAULT", "CREATED")))
 		panel.WriteString("\n")
 		visibleLines := max(m.height-12, 5)
 		start := max(am.apiIdx-visibleLines+1, 0)
@@ -589,26 +594,29 @@ func (am apiGatewayV2Model) integrationTarget() string {
 }
 
 func apiGatewayV2APIRow(m Model, api awsservice.APIGatewayV2API) string {
-	endpoint := "enabled"
+	endpointStatus := "enabled"
 	if api.DisableExecuteAPIEndpoint {
-		endpoint = "disabled"
+		endpointStatus = "disabled"
 	}
 	created := "-"
 	if !api.CreatedDate.IsZero() {
 		created = api.CreatedDate.Local().Format("2006-01-02")
 	}
-	return apiGatewayV2APIRowValues(m, api.Name, api.ProtocolType, endpoint, created)
+	return apiGatewayV2APIRowValues(m, api.Name, api.ProtocolType, api.Endpoint, endpointStatus, created)
 }
 
-func apiGatewayV2APIRowValues(m Model, name, protocol, endpoint, created string) string {
+func apiGatewayV2APIRowValues(m Model, name, protocol, endpoint, endpointStatus, created string) string {
 	available := m.width - 4
 	if available <= 0 {
 		available = 76
 	}
-	nameWidth := min(max(available-33, 12), 34)
+	flexibleWidth := max(available-35, 28)
+	nameWidth := min(max(flexibleWidth*2/5, 12), 28)
+	endpointWidth := max(flexibleWidth-nameWidth, 16)
 	return padInspectorText(inspectorShorten(escapeTerminalControls(name), nameWidth), nameWidth) + "  " +
 		padInspectorText(inspectorShorten(escapeTerminalControls(protocol), 9), 9) + "  " +
-		padInspectorText(inspectorShorten(escapeTerminalControls(endpoint), 8), 8) + "  " + escapeTerminalControls(created)
+		padInspectorText(inspectorShorten(escapeTerminalControls(endpoint), endpointWidth), endpointWidth) + "  " +
+		padInspectorText(inspectorShorten(escapeTerminalControls(endpointStatus), 8), 8) + "  " + escapeTerminalControls(created)
 }
 
 func apiGatewayV2RouteRow(m Model, route awsservice.APIGatewayV2Route) string {

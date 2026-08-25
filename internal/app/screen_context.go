@@ -238,6 +238,11 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if cloudFormationContextReturnActive(m) {
 				m.ctxPrevScreen = screenFeatureList
 			}
+			if m.cfg != nil && m.cfg.ContextName == selected.Name && pendingAPIGatewayV2ContextLoad(&m) {
+				m.resetFilter(filterContexts)
+				m.screen = m.ctxPrevScreen
+				return m, nil
+			}
 			m.pendingContextName = selected.Name
 			preservePendingStepFunctionsContextReturn(&m)
 			preservePendingAPIGatewayV2ContextReturn(&m)

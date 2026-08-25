@@ -21,8 +21,8 @@ func TestAPIGatewayV2ListFilteringAndNavigation(t *testing.T) {
 	m.loadingReturnScreen = screenAPIGatewayV2APIList
 
 	updated, _, handled := m.apiGatewayV2.HandleMessage(&m, apiGatewayV2APIsLoadedMsg{apis: []awsservice.APIGatewayV2API{
-		{ID: "api-1", Name: "orders", ProtocolType: "HTTP", Region: "ap-northeast-2"},
-		{ID: "api-2", Name: "socket", ProtocolType: "WEBSOCKET", Region: "ap-northeast-2"},
+		{ID: "api-1", Name: "orders", ProtocolType: "HTTP", Endpoint: "https://orders.example", Region: "ap-northeast-2"},
+		{ID: "api-2", Name: "socket", ProtocolType: "WEBSOCKET", Endpoint: "wss://socket.example", DisableExecuteAPIEndpoint: true, Region: "ap-northeast-2"},
 	}})
 	if !handled {
 		t.Fatal("expected API list message to be handled")
@@ -37,7 +37,7 @@ func TestAPIGatewayV2ListFilteringAndNavigation(t *testing.T) {
 		t.Fatalf("expected protocol filter match, got %+v", m.apiGatewayV2.filteredAPIs)
 	}
 	view := stripANSI(m.apiGatewayV2.viewAPIList(m))
-	if !strings.Contains(view, "socket") || strings.Contains(view, "orders") {
+	if !strings.Contains(view, "socket") || !strings.Contains(view, "wss://socket.example") || !strings.Contains(view, "disabled") || strings.Contains(view, "orders") {
 		t.Fatalf("unexpected filtered API view:\n%s", view)
 	}
 
@@ -262,6 +262,29 @@ func TestAPIGatewayV2ContextSwitchSupersedesPendingLoad(t *testing.T) {
 				t.Fatalf("expected service list after context switch, got %v", m.screen)
 			}
 		})
+	}
+}
+
+func TestAPIGatewayV2SelectingActiveContextKeepsPendingLoad(t *testing.T) {
+	m := New(&config.Config{ContextName: "account-a", Region: "us-east-1"}, "", "")
+	updated, _ := m.startLoadingFor(screenAPIGatewayV2APIList, "Loading APIs...", nil, func() tea.Msg { return nil })
+	m = updated.(Model)
+	loadGeneration := m.commands.CurrentGen()
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-a", Current: true}}})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd != nil || m.screen != screenLoading || m.loadingReturnScreen != screenAPIGatewayV2APIList || m.commands.CurrentGen() != loadGeneration {
+		t.Fatalf("expected active-context selection to keep pending load, screen=%v return=%v generation=%d command=%v", m.screen, m.loadingReturnScreen, m.commands.CurrentGen(), cmd)
+	}
+
+	updated, _ = m.Update(genBoundMsg{gen: loadGeneration, msg: apiGatewayV2APIsLoadedMsg{apis: []awsservice.APIGatewayV2API{{ID: "api-a"}}}})
+	m = updated.(Model)
+	if m.screen != screenAPIGatewayV2APIList || len(m.apiGatewayV2.apis) != 1 || m.apiGatewayV2.apis[0].ID != "api-a" {
+		t.Fatalf("expected pending API result to finish normally, screen=%v APIs=%+v", m.screen, m.apiGatewayV2.apis)
 	}
 }
 
