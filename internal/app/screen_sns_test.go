@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"unic/internal/config"
 	awsservice "unic/internal/services/aws"
@@ -181,6 +182,57 @@ func TestSNSLoadErrorsShowErrorScreen(t *testing.T) {
 	})
 }
 
+func TestSNSLoadErrorsStayBehindGlobalOverlay(t *testing.T) {
+	loadErr := errors.New("SNS unavailable")
+
+	for _, tc := range []struct {
+		name     string
+		start    func(*Model) Model
+		complete func(*Model)
+	}{
+		{
+			name: "topics",
+			start: func(m *Model) Model {
+				updated, _ := m.sns.Start(m)
+				return updated.(Model)
+			},
+			complete: func(m *Model) {
+				m.sns.HandleMessage(m, snsTopicsLoadedMsg{err: loadErr})
+			},
+		},
+		{
+			name: "subscriptions",
+			start: func(m *Model) Model {
+				m.sns.topics = snsTestTopics()
+				m.sns.selectedTopic = &m.sns.topics[0]
+				updated, _ := m.startLoadingFor(screenSNSSubscriptionList, "Loading subscriptions...", nil, func() tea.Msg { return nil })
+				return updated.(Model)
+			},
+			complete: func(m *Model) {
+				m.sns.HandleMessage(m, snsSubscriptionsLoadedMsg{topicARN: m.sns.selectedTopic.ARN, err: loadErr})
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m = tc.start(&m)
+			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+			m = updated.(Model)
+
+			tc.complete(&m)
+			if m.screen != screenSettings || m.settingsPrevScreen != screenError || m.errMsg != loadErr.Error() {
+				t.Fatalf("expected error behind Settings, screen=%v previous=%v err=%q", m.screen, m.settingsPrevScreen, m.errMsg)
+			}
+
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = updated.(Model)
+			if m.screen != screenError {
+				t.Fatalf("expected Settings to reveal the SNS error, got %v", m.screen)
+			}
+		})
+	}
+}
+
 func TestSNSSubscriptionFilterAppliesToSubscriptionsOnly(t *testing.T) {
 	m := snsLoadedModel(t)
 	updated, _ := m.sns.updateTopicList(&m, tea.KeyMsg{Type: tea.KeyEnter})
@@ -287,6 +339,36 @@ func TestSNSListRowsKeepPostureIdentifiersVisible(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSNSListRowsAlignUnicodeColumns(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 140
+
+	displayColumn := func(t *testing.T, row, marker string) int {
+		t.Helper()
+		idx := strings.Index(row, marker)
+		if idx < 0 {
+			t.Fatalf("expected marker %q in row %q", marker, row)
+		}
+		return lipgloss.Width(row[:idx])
+	}
+	assertColumns := func(t *testing.T, plain, unicode string, markers ...string) {
+		t.Helper()
+		for _, marker := range markers {
+			if got, want := displayColumn(t, unicode, marker), displayColumn(t, plain, marker); got != want {
+				t.Fatalf("marker %q shifted from column %d to %d: plain=%q unicode=%q", marker, want, got, plain, unicode)
+			}
+		}
+	}
+
+	plainTopic := snsTopicRow(m, "orders", "standard", "7 confirmed", "alias/orders")
+	unicodeTopic := snsTopicRow(m, "東京😀", "standard", "7 confirmed", "alias/orders")
+	assertColumns(t, plainTopic, unicodeTopic, "standard", "7 confirmed", "alias/orders")
+
+	plainSubscription := snsSubscriptionRow(m, "email", "ops@example.com", "123456789012", "confirmed", "orders-dlq")
+	unicodeSubscription := snsSubscriptionRow(m, "📨", "東京😀", "123456789012", "confirmed", "orders-dlq")
+	assertColumns(t, plainSubscription, unicodeSubscription, "123456789012", "confirmed", "orders-dlq")
 }
 
 func TestSNSLoadCompletionStaysBehindGlobalOverlay(t *testing.T) {

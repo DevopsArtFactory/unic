@@ -80,8 +80,8 @@ func (sm *snsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 	switch msg := msg.(type) {
 	case snsTopicsLoadedMsg:
 		if msg.err != nil {
-			newM, cmd := m.Update(errMsg{err: msg.err})
-			return newM, cmd, true
+			finishSNSError(m, msg.err)
+			return *m, nil, true
 		}
 		sm.topics = msg.topics
 		sm.topicWarnings = msg.warnings
@@ -98,8 +98,8 @@ func (sm *snsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 			return *m, nil, true
 		}
 		if msg.err != nil {
-			newM, cmd := m.Update(errMsg{err: msg.err})
-			return newM, cmd, true
+			finishSNSError(m, msg.err)
+			return *m, nil, true
 		}
 		sm.subscriptions = msg.subscriptions
 		sm.subWarnings = msg.warnings
@@ -109,6 +109,13 @@ func (sm *snsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		return *m, nil, true
 	}
 	return *m, nil, false
+}
+
+func finishSNSError(m *Model, err error) {
+	m.errMsg = err.Error()
+	m.loadingTitle = ""
+	m.loadingDetails = nil
+	finishSNSLoad(m, screenError)
 }
 
 // finishSNSLoad keeps a completed load behind a global overlay and rewrites
@@ -332,11 +339,10 @@ func (sm snsModel) viewTopicList(m Model) string {
 
 func snsTopicRow(m Model, name, kind, subscriptions, encryption string) string {
 	widths := snsColumnWidths(m, []int{18, 8, 16, 20}, []int{44, 9, 18, 40})
-	return fmt.Sprintf("%-*s  %-*s  %-*s  %s",
-		widths[0], inspectorShorten(escapeTerminalControls(name), widths[0]),
-		widths[1], inspectorShorten(escapeTerminalControls(kind), widths[1]),
-		widths[2], inspectorShorten(escapeTerminalControls(subscriptions), widths[2]),
-		snsShortenTail(escapeTerminalControls(encryption), widths[3]))
+	return padInspectorText(inspectorShorten(escapeTerminalControls(name), widths[0]), widths[0]) + "  " +
+		padInspectorText(inspectorShorten(escapeTerminalControls(kind), widths[1]), widths[1]) + "  " +
+		padInspectorText(inspectorShorten(escapeTerminalControls(subscriptions), widths[2]), widths[2]) + "  " +
+		snsShortenTail(escapeTerminalControls(encryption), widths[3])
 }
 
 func snsEncryptionLabel(topic awsservice.SNSTopic) string {
@@ -472,12 +478,11 @@ func snsSubscriptionDLQLabel(subscription awsservice.SNSSubscription) string {
 
 func snsSubscriptionRow(m Model, protocol, endpoint, owner, status, dlq string) string {
 	widths := snsColumnWidths(m, []int{8, 16, 12, 9, 21}, []int{11, 42, 14, 10, 42})
-	return fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %s",
-		widths[0], inspectorShorten(escapeTerminalControls(protocol), widths[0]),
-		widths[1], inspectorShorten(escapeTerminalControls(endpoint), widths[1]),
-		widths[2], inspectorShorten(escapeTerminalControls(owner), widths[2]),
-		widths[3], inspectorShorten(escapeTerminalControls(status), widths[3]),
-		snsShortenTail(escapeTerminalControls(dlq), widths[4]))
+	return padInspectorText(inspectorShorten(escapeTerminalControls(protocol), widths[0]), widths[0]) + "  " +
+		padInspectorText(inspectorShorten(escapeTerminalControls(endpoint), widths[1]), widths[1]) + "  " +
+		padInspectorText(inspectorShorten(escapeTerminalControls(owner), widths[2]), widths[2]) + "  " +
+		padInspectorText(inspectorShorten(escapeTerminalControls(status), widths[3]), widths[3]) + "  " +
+		snsShortenTail(escapeTerminalControls(dlq), widths[4])
 }
 
 func snsColumnWidths(m Model, minimum, desired []int) []int {
