@@ -62,12 +62,18 @@ func (r *AwsRepository) GetBackupVaultDetail(ctx context.Context, vault BackupVa
 		warnings = append(warnings, err)
 	}
 	detail.RecoveryPoints = recoveryPoints
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 
 	resources, err := r.listBackupProtectedResources(ctx, vault.Name)
 	if err != nil {
 		warnings = append(warnings, err)
 	}
 	detail.ProtectedResources = resources
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 
 	jobs, err := r.listFailedBackupJobs(ctx, vault.Name)
 	if err != nil {

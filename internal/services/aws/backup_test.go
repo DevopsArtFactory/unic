@@ -180,6 +180,30 @@ func TestGetBackupVaultDetailKeepsPartialSectionsAndPrioritizesFailures(t *testi
 	}
 }
 
+func TestGetBackupVaultDetailStopsBetweenSectionsWhenContextIsCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	resourcesCalled, jobsCalled := false, false
+	client := &mockBackupClient{
+		listPoints: func(context.Context, *backup.ListRecoveryPointsByBackupVaultInput, ...func(*backup.Options)) (*backup.ListRecoveryPointsByBackupVaultOutput, error) {
+			cancel()
+			return &backup.ListRecoveryPointsByBackupVaultOutput{}, nil
+		},
+		listResources: func(context.Context, *backup.ListProtectedResourcesByBackupVaultInput, ...func(*backup.Options)) (*backup.ListProtectedResourcesByBackupVaultOutput, error) {
+			resourcesCalled = true
+			return &backup.ListProtectedResourcesByBackupVaultOutput{}, nil
+		},
+		listJobs: func(context.Context, *backup.ListBackupJobsInput, ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
+			jobsCalled = true
+			return &backup.ListBackupJobsOutput{}, nil
+		},
+	}
+
+	detail, warnings, err := (&AwsRepository{BackupClient: client}).GetBackupVaultDetail(ctx, BackupVault{Name: "prod"})
+	if !errors.Is(err, context.Canceled) || detail != nil || warnings != nil || resourcesCalled || jobsCalled {
+		t.Fatalf("expected cancellation before later sections, detail=%+v warnings=%v err=%v resources=%t jobs=%t", detail, warnings, err, resourcesCalled, jobsCalled)
+	}
+}
+
 func TestBackupDetailSortsUseUniqueTieBreakers(t *testing.T) {
 	now := time.Date(2026, 8, 26, 4, 0, 0, 0, time.UTC)
 
