@@ -1,17 +1,41 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/backup"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"unic/internal/config"
 	awsservice "unic/internal/services/aws"
 )
+
+type appBackupClient struct {
+	listVaults func(context.Context, *backup.ListBackupVaultsInput, ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error)
+}
+
+func (c *appBackupClient) ListBackupVaults(ctx context.Context, input *backup.ListBackupVaultsInput, opts ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error) {
+	return c.listVaults(ctx, input, opts...)
+}
+
+func (*appBackupClient) ListRecoveryPointsByBackupVault(context.Context, *backup.ListRecoveryPointsByBackupVaultInput, ...func(*backup.Options)) (*backup.ListRecoveryPointsByBackupVaultOutput, error) {
+	return &backup.ListRecoveryPointsByBackupVaultOutput{}, nil
+}
+
+func (*appBackupClient) ListProtectedResourcesByBackupVault(context.Context, *backup.ListProtectedResourcesByBackupVaultInput, ...func(*backup.Options)) (*backup.ListProtectedResourcesByBackupVaultOutput, error) {
+	return &backup.ListProtectedResourcesByBackupVaultOutput{}, nil
+}
+
+func (*appBackupClient) ListBackupJobs(context.Context, *backup.ListBackupJobsInput, ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
+	return &backup.ListBackupJobsOutput{}, nil
+}
 
 func backupTestVaults() []awsservice.BackupVault {
 	return []awsservice.BackupVault{
@@ -139,6 +163,44 @@ func TestBackupDrillDownRendersPartialDetailAndScrolls(t *testing.T) {
 	wantOffset := max(len(m.backup.detailLines(m))-m.backup.detailVisibleLines(m), 0)
 	if m.backup.detailScroll != wantOffset || !strings.Contains(stripANSI(m.backup.viewDetail(m)), "timeout") {
 		t.Fatalf("expected warning-adjusted final detail lines to be reachable, scroll=%d want=%d", m.backup.detailScroll, wantOffset)
+	}
+}
+
+func TestBackupDetailRefreshReloadsVaultMetadata(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	stale := awsservice.BackupVault{
+		Name: "prod", ARN: "arn:vault:prod", RecoveryPointCount: 1,
+	}
+	m.screen = screenBackupVaultDetail
+	m.backup.selected = &stale
+	m.backup.detail = &awsservice.BackupVaultDetail{Vault: stale}
+	m.awsRepo = &awsservice.AwsRepository{Region: "ap-northeast-2", BackupClient: &appBackupClient{
+		listVaults: func(_ context.Context, input *backup.ListBackupVaultsInput, _ ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error) {
+			if input.NextToken != nil {
+				t.Fatalf("expected a single vault-list page, got token %q", awssdk.ToString(input.NextToken))
+			}
+			return &backup.ListBackupVaultsOutput{BackupVaultList: []backuptypes.BackupVaultListMember{{
+				BackupVaultName: awssdk.String("prod"), BackupVaultArn: awssdk.String("arn:vault:prod"),
+				NumberOfRecoveryPoints: 9, Locked: awssdk.Bool(true), MinRetentionDays: awssdk.Int64(30),
+			}}}, nil
+		},
+	}}
+
+	updated, cmd := m.backup.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updated.(Model)
+	result := runBatchedUserCmd(t, cmd)
+	next, _ := m.Update(result)
+	m = next.(Model)
+
+	if m.backup.detail == nil || m.backup.detail.Vault.RecoveryPointCount != 9 || !m.backup.detail.Vault.Locked || !m.backup.detail.Vault.MinRetentionKnown {
+		t.Fatalf("expected refreshed vault metadata in detail, got %+v", m.backup.detail)
+	}
+	if m.backup.selected == nil || m.backup.selected.RecoveryPointCount != 9 || !m.backup.selected.Locked {
+		t.Fatalf("expected refreshed selected vault, got %+v", m.backup.selected)
+	}
+	lines := stripANSI(strings.Join(m.backup.detailLines(m), "\n"))
+	if !strings.Contains(lines, "9") || !strings.Contains(lines, "locked (minimum 30 days)") {
+		t.Fatalf("expected refreshed recovery count and Vault Lock posture, got:\n%s", lines)
 	}
 }
 

@@ -101,6 +101,10 @@ func (bm *backupModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd,
 			bm.finishError(m, msg.err)
 			return *m, nil, true
 		}
+		if msg.detail != nil {
+			selected := msg.detail.Vault
+			bm.selected = &selected
+		}
 		bm.detail = msg.detail
 		bm.detailErrors = msg.warnings
 		bm.detailScroll = 0
@@ -207,7 +211,7 @@ func (bm *backupModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			bm.detail = nil
 			bm.detailErrors = nil
 			bm.errorActive = false
-			return m.startLoadingFor(screenBackupVaultDetail, "Loading backup recovery posture...", []string{selected.Name}, bm.loadDetail(*m, selected))
+			return m.startLoadingFor(screenBackupVaultDetail, "Loading backup recovery posture...", []string{selected.Name}, bm.loadDetail(*m, selected, false))
 		}
 	}
 	return *m, nil
@@ -232,7 +236,7 @@ func (bm *backupModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cm
 	case "r":
 		if bm.selected != nil {
 			bm.errorActive = false
-			return m.startLoadingFor(screenBackupVaultDetail, "Refreshing backup recovery posture...", []string{bm.selected.Name}, bm.loadDetail(*m, *bm.selected))
+			return m.startLoadingFor(screenBackupVaultDetail, "Refreshing backup recovery posture...", []string{bm.selected.Name}, bm.loadDetail(*m, *bm.selected, true))
 		}
 	}
 	return *m, nil
@@ -254,7 +258,7 @@ func (bm backupModel) loadVaults(m Model) tea.Cmd {
 	}
 }
 
-func (bm backupModel) loadDetail(m Model, vault awsservice.BackupVault) tea.Cmd {
+func (bm backupModel) loadDetail(m Model, vault awsservice.BackupVault, refreshVault bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := m.commandContext()
 		repo := m.awsRepo
@@ -265,9 +269,40 @@ func (bm backupModel) loadDetail(m Model, vault awsservice.BackupVault) tea.Cmd 
 				return backupVaultDetailLoadedMsg{vaultName: vault.Name, err: err}
 			}
 		}
-		detail, warnings, err := repo.GetBackupVaultDetail(ctx, vault)
+		var warnings []error
+		if refreshVault {
+			vaults, listWarnings, err := repo.ListBackupVaults(ctx)
+			if err != nil {
+				return backupVaultDetailLoadedMsg{vaultName: vault.Name, err: err}
+			}
+			warnings = append(warnings, listWarnings...)
+			refreshed, ok := findBackupVault(vaults, vault)
+			if !ok {
+				return backupVaultDetailLoadedMsg{vaultName: vault.Name, err: fmt.Errorf("backup vault %s is no longer available", vault.Name)}
+			}
+			vault = refreshed
+		}
+
+		detail, detailWarnings, err := repo.GetBackupVaultDetail(ctx, vault)
+		warnings = append(warnings, detailWarnings...)
 		return backupVaultDetailLoadedMsg{vaultName: vault.Name, detail: detail, warnings: warnings, err: err}
 	}
+}
+
+func findBackupVault(vaults []awsservice.BackupVault, selected awsservice.BackupVault) (awsservice.BackupVault, bool) {
+	if selected.ARN != "" {
+		for _, vault := range vaults {
+			if vault.ARN == selected.ARN {
+				return vault, true
+			}
+		}
+	}
+	for _, vault := range vaults {
+		if vault.Name == selected.Name {
+			return vault, true
+		}
+	}
+	return awsservice.BackupVault{}, false
 }
 
 func (bm backupModel) viewList(m Model) string {
