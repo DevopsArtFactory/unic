@@ -179,6 +179,37 @@ func TestGetBackupVaultDetailKeepsPartialSectionsAndPrioritizesFailures(t *testi
 	}
 }
 
+func TestBackupDetailSortsUseUniqueTieBreakers(t *testing.T) {
+	now := time.Date(2026, 8, 26, 4, 0, 0, 0, time.UTC)
+
+	resources := []BackupProtectedResource{
+		{ARN: "arn:z", Name: "database", LastBackupAt: now},
+		{ARN: "arn:a", Name: "database", LastBackupAt: now},
+	}
+	sortBackupProtectedResources(resources)
+	if resources[0].ARN != "arn:a" {
+		t.Fatalf("expected protected resources to use ARN tie-breaker, got %+v", resources)
+	}
+
+	jobs := []BackupJob{
+		{ID: "job-z", State: "FAILED", CreatedAt: now},
+		{ID: "job-a", State: "FAILED", CreatedAt: now},
+	}
+	sortBackupJobs(jobs)
+	if jobs[0].ID != "job-a" {
+		t.Fatalf("expected jobs to use ID tie-breaker, got %+v", jobs)
+	}
+
+	points := []BackupRecoveryPoint{
+		{ARN: "arn:z", ResourceName: "database", Status: "COMPLETED", CreatedAt: now},
+		{ARN: "arn:a", ResourceName: "database", Status: "COMPLETED", CreatedAt: now},
+	}
+	sortBackupRecoveryPoints(points)
+	if points[0].ARN != "arn:a" {
+		t.Fatalf("expected recovery points to use ARN tie-breaker, got %+v", points)
+	}
+}
+
 func TestGetBackupVaultDetailReturnsWarningsWhenAllSectionsAreDenied(t *testing.T) {
 	client := &mockBackupClient{
 		listPoints: func(context.Context, *backup.ListRecoveryPointsByBackupVaultInput, ...func(*backup.Options)) (*backup.ListRecoveryPointsByBackupVaultOutput, error) {

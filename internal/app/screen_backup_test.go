@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"unic/internal/config"
 	awsservice "unic/internal/services/aws"
@@ -58,7 +59,23 @@ func TestBackupVaultListRendersFiltersWarningsAndEscapesControls(t *testing.T) {
 		t.Fatalf("expected terminal controls to be escaped, got %q", view)
 	}
 
+	m.backup.filtered = []awsservice.BackupVault{{Name: "운영", State: "AVAILABLE", Type: "BACKUP_VAULT"}}
+	unicodeView := strings.Split(stripANSI(m.backup.viewList(m)), "\n")
+	headerColumn, rowColumn := -1, -1
+	for _, line := range unicodeView {
+		if index := strings.Index(line, "STATE"); index >= 0 {
+			headerColumn = lipgloss.Width(line[:index])
+		}
+		if index := strings.Index(line, "AVAILABLE"); index >= 0 {
+			rowColumn = lipgloss.Width(line[:index])
+		}
+	}
+	if headerColumn < 0 || rowColumn != headerColumn {
+		t.Fatalf("expected Unicode vault row to align with header, header=%d row=%d", headerColumn, rowColumn)
+	}
+
 	m.storeFilterValue(filterBackupVaults, "failed")
+	m.backup.vaults = backupTestVaults()
 	m.applyFilterTarget(filterBackupVaults)
 	if len(m.backup.filtered) != 1 || !strings.Contains(m.backup.filtered[0].Name, "dev") {
 		t.Fatalf("expected one failed vault match, got %+v", m.backup.filtered)
@@ -113,6 +130,16 @@ func TestBackupDrillDownRendersPartialDetailAndScrolls(t *testing.T) {
 	if m.backup.detailScroll == 0 || (!strings.Contains(scrolled, "Protected Resources") && !strings.Contains(scrolled, "Failed / Expired Jobs")) {
 		t.Fatalf("expected page-down to reveal later recovery sections, scroll=%d view:\n%s", m.backup.detailScroll, scrolled)
 	}
+
+	m.height = 18
+	m.backup.detailScroll = 0
+	for range 100 {
+		m.backup.HandleKey(&m, tea.KeyMsg{Type: tea.KeyDown})
+	}
+	wantOffset := max(len(m.backup.detailLines(m))-m.backup.detailVisibleLines(m), 0)
+	if m.backup.detailScroll != wantOffset || !strings.Contains(stripANSI(m.backup.viewDetail(m)), "timeout") {
+		t.Fatalf("expected warning-adjusted final detail lines to be reachable, scroll=%d want=%d", m.backup.detailScroll, wantOffset)
+	}
 }
 
 func TestBackupOptionalNumericFieldsRenderWithoutFalseZeroes(t *testing.T) {
@@ -150,6 +177,29 @@ func TestBackupIgnoresStaleDetailLoads(t *testing.T) {
 	})
 	if !handled || m.screen != screenLoading || m.backup.detail != nil {
 		t.Fatalf("expected stale detail to be ignored, screen=%v detail=%+v handled=%v", m.screen, m.backup.detail, handled)
+	}
+}
+
+func TestBackupDropsPriorContextCompletionForSameNamedVault(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	staleGeneration := m.commands.Renew()
+	m.commands.Renew()
+
+	next := testConfig()
+	next.ContextName = "next"
+	updated, _ := m.Update(contextSwitchedMsg{cfg: next})
+	m = updated.(Model)
+	m.screen = screenLoading
+	m.loadingReturnScreen = screenBackupVaultDetail
+	m.backup.selected = &awsservice.BackupVault{Name: "prod"}
+
+	stale, _ := m.Update(genBoundMsg{gen: staleGeneration, msg: backupVaultDetailLoadedMsg{
+		vaultName: "prod",
+		detail:    &awsservice.BackupVaultDetail{Vault: awsservice.BackupVault{Name: "prod", Region: "old"}},
+	}})
+	model := stale.(Model)
+	if model.backup.detail != nil || model.screen != screenLoading {
+		t.Fatalf("expected prior-context Backup detail to be dropped, screen=%v detail=%+v", model.screen, model.backup.detail)
 	}
 }
 

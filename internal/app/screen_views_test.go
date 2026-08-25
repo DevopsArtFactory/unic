@@ -113,6 +113,21 @@ func TestViewsCaptureAndApplyKMSFilter(t *testing.T) {
 	}
 }
 
+func TestViewsApplyUnfilteredBackupClearsExistingFilter(t *testing.T) {
+	m := viewsTestModel(t)
+	m.storeFilterValue(filterBackupVaults, "prod")
+	view := config.ViewEntry{
+		Name: "all-backups", Context: "dev",
+		Service: string(domain.ServiceBackup), Feature: string(domain.FeatureBackupBrowser),
+	}
+
+	next, cmd := m.applyView(view)
+	model := next.(Model)
+	if cmd == nil || model.filterValue(filterBackupVaults) != "" {
+		t.Fatalf("expected unfiltered Backup view to clear the prior filter, filter=%q", model.filterValue(filterBackupVaults))
+	}
+}
+
 func TestViewsApplyAcrossContextsDefersJumpUntilSwitch(t *testing.T) {
 	m := viewsTestModel(t)
 	view := config.ViewEntry{

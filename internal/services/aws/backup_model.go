@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"fmt"
 	"strings"
 	"time"
 )
@@ -28,15 +27,6 @@ type BackupVault struct {
 // FilterText returns searchable vault metadata.
 func (v BackupVault) FilterText() string {
 	return strings.ToLower(strings.Join([]string{v.ARN, v.Name, v.Region, v.State, v.Type, v.EncryptionKeyARN, v.EncryptionKeyType}, " "))
-}
-
-// DisplayTitle returns a column-aligned vault row.
-func (v BackupVault) DisplayTitle() string {
-	lock := "-"
-	if v.Locked {
-		lock = "locked"
-	}
-	return fmt.Sprintf("%-32.32s  %-12.12s  %8d  %-8s  %s", v.Name, valueOrDash(v.State), v.RecoveryPointCount, lock, valueOrDash(v.Type))
 }
 
 // BackupVaultDetail contains the recovery-readiness signals for one vault.

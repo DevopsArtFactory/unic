@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	awsservice "unic/internal/services/aws"
 )
@@ -214,7 +215,7 @@ func (bm *backupModel) updateList(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd)
 
 func (bm *backupModel) updateDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	lines := bm.detailLines(*m)
-	visibleLines := max(m.height-8, 5)
+	visibleLines := bm.detailVisibleLines(*m)
 	maxOffset := max(len(lines)-visibleLines, 0)
 	switch msg.String() {
 	case "q", "esc":
@@ -291,17 +292,28 @@ func (bm backupModel) viewList(m Model) string {
 		panel.WriteString(dimStyle.Render(message))
 		panel.WriteString("\n")
 	} else {
-		panel.WriteString(dimStyle.Render("  VAULT                             STATE           POINTS  LOCK      TYPE"))
+		widths := backupVaultColumnWidths(m)
+		panel.WriteString(dimStyle.Render("  " + renderBackupVaultColumns(widths, []string{"VAULT", "STATE", "POINTS", "LOCK", "TYPE"})))
 		panel.WriteString("\n")
 		visibleLines := max(m.height-11-warningLines, 5)
 		start := max(bm.idx-visibleLines+1, 0)
-		width := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize()-2, 1)
 		for i := start; i < min(start+visibleLines, len(bm.filtered)); i++ {
 			cursor, style := "  ", normalStyle
 			if i == bm.idx {
 				cursor, style = "> ", selectedStyle
 			}
-			row := truncateEC2DetailValue(escapeTerminalControls(bm.filtered[i].DisplayTitle()), width)
+			vault := bm.filtered[i]
+			lock := "-"
+			if vault.Locked {
+				lock = "locked"
+			}
+			row := renderBackupVaultColumns(widths, []string{
+				vault.Name,
+				valueOrDashApp(vault.State),
+				fmt.Sprintf("%d", vault.RecoveryPointCount),
+				lock,
+				valueOrDashApp(vault.Type),
+			})
 			panel.WriteString(style.Render(cursor + m.renderHighlightedValue(filterBackupVaults, row)))
 			panel.WriteString("\n")
 		}
@@ -324,21 +336,86 @@ func (bm backupModel) viewDetail(m Model) string {
 	}
 	b.WriteString(titleStyle.Render("AWS Backup Recovery — " + name))
 	b.WriteString("\n")
-	warningLines := 0
 	if len(bm.detailErrors) > 0 {
 		b.WriteString(m.renderWarningSummary(len(bm.detailErrors), "detail lookup failures", bm.detailErrors[0].Error()))
-		warningLines = 2
 	}
 	b.WriteString("\n")
 
 	lines := bm.detailLines(m)
-	visibleLines := max(m.height-8-warningLines, 5)
+	visibleLines := bm.detailVisibleLines(m)
 	start := min(bm.detailScroll, max(len(lines)-visibleLines, 0))
 	end := min(start+visibleLines, len(lines))
 	b.WriteString(m.renderListPanel(strings.Join(lines[start:end], "\n")))
 	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar(m.keymapHelpBar()))
 	return b.String()
+}
+
+func (bm backupModel) detailVisibleLines(m Model) int {
+	warningLines := 0
+	if len(bm.detailErrors) > 0 {
+		warningLines = 2
+	}
+	return max(m.height-8-warningLines, 5)
+}
+
+func backupVaultColumnWidths(m Model) []int {
+	desired := []int{34, 14, 10, 10, 18}
+	if m.width <= 0 {
+		return desired
+	}
+
+	widths := []int{10, 8, 8, 7, 6}
+	available := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize()-2, len(widths))
+	total := 0
+	for _, width := range widths {
+		total += width
+	}
+	for total > available {
+		for i := range widths {
+			if total <= available {
+				break
+			}
+			if widths[i] > 1 {
+				widths[i]--
+				total--
+			}
+		}
+	}
+	for total < available {
+		grew := false
+		for i := range widths {
+			if total >= available {
+				break
+			}
+			if widths[i] < desired[i] {
+				widths[i]++
+				total++
+				grew = true
+			}
+		}
+		if !grew {
+			break
+		}
+	}
+	return widths
+}
+
+func renderBackupVaultColumns(widths []int, values []string) string {
+	var row strings.Builder
+	for i, width := range widths {
+		valueWidth := width
+		if i < len(widths)-1 {
+			valueWidth = max(width-2, 1)
+		}
+		value := truncateEC2DetailValue(escapeTerminalControls(values[i]), valueWidth)
+		column := lipgloss.NewStyle().Width(width).MaxWidth(width)
+		if i == 2 {
+			column = column.Align(lipgloss.Right)
+		}
+		row.WriteString(column.Render(value))
+	}
+	return row.String()
 }
 
 func (bm backupModel) detailLines(m Model) []string {

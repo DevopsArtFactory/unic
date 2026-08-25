@@ -158,7 +158,11 @@ func sortBackupProtectedResources(items []BackupProtectedResource) {
 		if !items[i].LastBackupAt.Equal(items[j].LastBackupAt) {
 			return items[i].LastBackupAt.After(items[j].LastBackupAt)
 		}
-		return normalizedSortKey(items[i].Name) < normalizedSortKey(items[j].Name)
+		left, right := normalizedSortKey(items[i].Name), normalizedSortKey(items[j].Name)
+		if left != right {
+			return left < right
+		}
+		return normalizedSortKey(items[i].ARN) < normalizedSortKey(items[j].ARN)
 	})
 }
 
@@ -168,7 +172,10 @@ func sortBackupJobs(items []BackupJob) {
 		if left != right {
 			return left < right
 		}
-		return items[i].CreatedAt.After(items[j].CreatedAt)
+		if !items[i].CreatedAt.Equal(items[j].CreatedAt) {
+			return items[i].CreatedAt.After(items[j].CreatedAt)
+		}
+		return normalizedSortKey(items[i].ID) < normalizedSortKey(items[j].ID)
 	})
 }
 
@@ -276,7 +283,11 @@ func sortBackupRecoveryPoints(items []BackupRecoveryPoint) {
 		if !items[i].CreatedAt.Equal(items[j].CreatedAt) {
 			return items[i].CreatedAt.After(items[j].CreatedAt)
 		}
-		return normalizedSortKey(items[i].ResourceName) < normalizedSortKey(items[j].ResourceName)
+		left, right := normalizedSortKey(items[i].ResourceName), normalizedSortKey(items[j].ResourceName)
+		if left != right {
+			return left < right
+		}
+		return normalizedSortKey(items[i].ARN) < normalizedSortKey(items[j].ARN)
 	})
 }
 

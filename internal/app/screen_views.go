@@ -198,10 +198,8 @@ func (m Model) jumpToView(view config.ViewEntry) (tea.Model, tea.Cmd) {
 		service: domain.AwsService(view.Service),
 		feature: kind,
 	})
-	if view.Filter != "" {
-		if target, ok := featurePrimaryFilter[kind]; ok {
-			m.storeFilterValue(target, view.Filter)
-		}
+	if target, ok := featurePrimaryFilter[kind]; ok {
+		m.storeFilterValue(target, view.Filter)
 	}
 	return m.startFeature(kind)
 }
