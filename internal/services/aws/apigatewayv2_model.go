@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 )
 
 // APIGatewayV2API is an HTTP or WebSocket API shown in the browser.
@@ -123,17 +125,43 @@ type APIGatewayV2Detail struct {
 // and API Gateway Lambda invocation URIs. Qualifiers are intentionally omitted so
 // the result can prefill the Lambda browser's function-name filter.
 func APIGatewayV2LambdaFunctionName(uri string) string {
-	const marker = ":function:"
-	index := strings.Index(uri, marker)
+	parsed, err := arn.Parse(uri)
+	if err != nil {
+		return ""
+	}
+	if name := lambdaFunctionNameFromARN(parsed); name != "" {
+		return name
+	}
+
+	if parsed.Service != "apigateway" || parsed.AccountID != "lambda" || !strings.HasPrefix(parsed.Resource, "path/") {
+		return ""
+	}
+	const marker = "/functions/"
+	index := strings.Index(parsed.Resource, marker)
 	if index < 0 {
 		return ""
 	}
-	rest := uri[index+len(marker):]
-	if slash := strings.IndexByte(rest, '/'); slash >= 0 {
-		rest = rest[:slash]
+	embedded := parsed.Resource[index+len(marker):]
+	if slash := strings.IndexByte(embedded, '/'); slash >= 0 {
+		embedded = embedded[:slash]
 	}
-	if qualifier := strings.IndexByte(rest, ':'); qualifier >= 0 {
-		rest = rest[:qualifier]
+	parsed, err = arn.Parse(embedded)
+	if err != nil {
+		return ""
 	}
-	return strings.TrimSpace(rest)
+	return lambdaFunctionNameFromARN(parsed)
+}
+
+func lambdaFunctionNameFromARN(value arn.ARN) string {
+	if value.Service != "lambda" || value.Region == "" || value.AccountID == "" {
+		return ""
+	}
+	name, ok := strings.CutPrefix(value.Resource, "function:")
+	if !ok {
+		return ""
+	}
+	if qualifier := strings.IndexByte(name, ':'); qualifier >= 0 {
+		name = name[:qualifier]
+	}
+	return strings.TrimSpace(name)
 }

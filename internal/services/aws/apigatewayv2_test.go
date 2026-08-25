@@ -214,6 +214,7 @@ func TestAPIGatewayV2LambdaFunctionName(t *testing.T) {
 		},
 		"qualified ARN": {uri: "arn:aws:lambda:us-east-1:123:function:checkout-prod:live", want: "checkout-prod"},
 		"non Lambda":    {uri: "https://example.com/orders", want: ""},
+		"HTTP marker":   {uri: "https://backend.example/path:function:orders", want: ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got := APIGatewayV2LambdaFunctionName(test.uri); got != test.want {
