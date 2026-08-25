@@ -126,15 +126,15 @@ func TestBackupDrillDownRendersPartialDetailAndScrolls(t *testing.T) {
 			ARN: "arn:point", ResourceName: "database\x1b[31m", ResourceType: "RDS", Status: "PARTIAL", StatusMessage: "access denied", CreatedAt: now, DeleteAt: now.Add(24 * time.Hour), SizeBytes: 2048, SizeBytesKnown: true,
 		}},
 		ProtectedResources: []awsservice.BackupProtectedResource{{Name: "database", Type: "RDS", ARN: "arn:db", LastBackupAt: now, LastRecoveryPointARN: "arn:point"}},
-		FailedJobs:         []awsservice.BackupJob{{ID: "job-1", ResourceName: "database", ResourceType: "RDS", State: "FAILED", StatusMessage: "timeout", CreatedAt: now}},
+		FailedJobs:         []awsservice.BackupJob{{ID: "job-1", ResourceName: "database", ResourceType: "RDS", State: "COMPLETED", MessageCategory: "PERMISSIONS", CreatedAt: now}},
 	}
-	m.backup.HandleMessage(&m, backupVaultDetailLoadedMsg{vaultName: "prod", detail: detail, warnings: []error{errors.New("protected resources denied")}})
+	m.backup.HandleMessage(&m, backupVaultDetailLoadedMsg{vaultName: "prod", detail: detail, warnings: []error{errors.New("protected resources denied"), errors.New("jobs denied")}})
 	if m.screen != screenBackupVaultDetail {
 		t.Fatalf("expected backup detail, got %v", m.screen)
 	}
 	initial := m.backup.viewDetail(m)
 	plain := stripANSI(initial)
-	for _, want := range []string{"AWS Backup Recovery", "detail lookup failures", "Recovery Points"} {
+	for _, want := range []string{"AWS Backup Recovery", "detail lookup failures", "protected resources denied", "jobs denied", "Recovery Points"} {
 		if !strings.Contains(plain, want) {
 			t.Fatalf("expected %q in initial detail, got:\n%s", want, plain)
 		}
@@ -161,7 +161,7 @@ func TestBackupDrillDownRendersPartialDetailAndScrolls(t *testing.T) {
 		m.backup.HandleKey(&m, tea.KeyMsg{Type: tea.KeyDown})
 	}
 	wantOffset := max(len(m.backup.detailLines(m))-m.backup.detailVisibleLines(m), 0)
-	if m.backup.detailScroll != wantOffset || !strings.Contains(stripANSI(m.backup.viewDetail(m)), "timeout") {
+	if m.backup.detailScroll != wantOffset || !strings.Contains(stripANSI(m.backup.viewDetail(m)), "PERMISSIONS") {
 		t.Fatalf("expected warning-adjusted final detail lines to be reachable, scroll=%d want=%d", m.backup.detailScroll, wantOffset)
 	}
 }

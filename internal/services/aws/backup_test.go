@@ -154,6 +154,7 @@ func TestGetBackupVaultDetailKeepsPartialSectionsAndPrioritizesFailures(t *testi
 			}
 			return &backup.ListBackupJobsOutput{BackupJobs: []backuptypes.BackupJob{
 				{BackupJobId: awssdk.String("ok"), State: backuptypes.BackupJobStateCompleted, MessageCategory: awssdk.String("SUCCESS")},
+				{BackupJobId: awssdk.String("completed-with-issues"), State: backuptypes.BackupJobStateCompleted, MessageCategory: awssdk.String("PERMISSIONS")},
 				{BackupJobId: awssdk.String("expired"), ResourceName: awssdk.String("old"), State: backuptypes.BackupJobStateExpired, CreationDate: awssdk.Time(now.Add(-time.Hour))},
 				{BackupJobId: awssdk.String("failed"), ResourceName: awssdk.String("db"), State: backuptypes.BackupJobStateFailed, StatusMessage: awssdk.String("access denied"), CreationDate: awssdk.Time(now)},
 			}}, nil
@@ -174,7 +175,7 @@ func TestGetBackupVaultDetailKeepsPartialSectionsAndPrioritizesFailures(t *testi
 	if len(detail.ProtectedResources) != 1 || detail.ProtectedResources[0].LastRecoveryPointARN != "arn:healthy" {
 		t.Fatalf("unexpected protected resources: %+v", detail.ProtectedResources)
 	}
-	if len(detail.FailedJobs) != 2 || detail.FailedJobs[0].ID != "failed" || detail.FailedJobs[1].ID != "expired" {
+	if len(detail.FailedJobs) != 3 || detail.FailedJobs[0].ID != "failed" || detail.FailedJobs[1].ID != "expired" || detail.FailedJobs[2].MessageCategory != "PERMISSIONS" {
 		t.Fatalf("expected only failure jobs in priority order, got %+v", detail.FailedJobs)
 	}
 }

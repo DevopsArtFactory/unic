@@ -76,13 +76,14 @@ type BackupProtectedResource struct {
 
 // BackupJob contains a recent failed or expired backup job.
 type BackupJob struct {
-	ID            string
-	ResourceARN   string
-	ResourceName  string
-	ResourceType  string
-	State         string
-	StatusMessage string
-	SizeBytes     int64
-	CreatedAt     time.Time
-	CompletedAt   time.Time
+	ID              string
+	ResourceARN     string
+	ResourceName    string
+	ResourceType    string
+	State           string
+	StatusMessage   string
+	MessageCategory string
+	SizeBytes       int64
+	CreatedAt       time.Time
+	CompletedAt     time.Time
 }

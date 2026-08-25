@@ -172,13 +172,17 @@ func (m Model) renderListPanel(content string) string {
 }
 
 func (m Model) renderWarningSummary(count int, label, first string) string {
-	first, _, _ = strings.Cut(first, "\n")
+	return errorStyle.Render(fmt.Sprintf("  Warnings: %d %s", count, label)) + "\n" +
+		m.renderWarningDetail(first)
+}
+
+func (m Model) renderWarningDetail(detail string) string {
+	detail, _, _ = strings.Cut(detail, "\n")
 	width := m.width - 4
 	if width <= 0 {
 		width = 88
 	}
-	return errorStyle.Render(fmt.Sprintf("  Warnings: %d %s", count, label)) + "\n" +
-		dimStyle.Render("  "+truncateEC2DetailValue(escapeTerminalControls(first), width)) + "\n"
+	return dimStyle.Render("  "+truncateEC2DetailValue(escapeTerminalControls(detail), width)) + "\n"
 }
 
 func (m Model) renderHelpBar(content string) string {

@@ -249,13 +249,14 @@ func mapBackupProtectedResource(item backuptypes.ProtectedResource) BackupProtec
 
 func mapBackupJob(item backuptypes.BackupJob) BackupJob {
 	mapped := BackupJob{
-		ID:            awssdk.ToString(item.BackupJobId),
-		ResourceARN:   awssdk.ToString(item.ResourceArn),
-		ResourceName:  awssdk.ToString(item.ResourceName),
-		ResourceType:  awssdk.ToString(item.ResourceType),
-		State:         string(item.State),
-		StatusMessage: awssdk.ToString(item.StatusMessage),
-		SizeBytes:     awssdk.ToInt64(item.BackupSizeInBytes),
+		ID:              awssdk.ToString(item.BackupJobId),
+		ResourceARN:     awssdk.ToString(item.ResourceArn),
+		ResourceName:    awssdk.ToString(item.ResourceName),
+		ResourceType:    awssdk.ToString(item.ResourceType),
+		State:           string(item.State),
+		StatusMessage:   awssdk.ToString(item.StatusMessage),
+		MessageCategory: awssdk.ToString(item.MessageCategory),
+		SizeBytes:       awssdk.ToInt64(item.BackupSizeInBytes),
 	}
 	if item.CreationDate != nil {
 		mapped.CreatedAt = *item.CreationDate

@@ -402,6 +402,9 @@ func (bm backupModel) viewDetail(m Model) string {
 	b.WriteString("\n")
 	if len(bm.detailErrors) > 0 {
 		b.WriteString(m.renderWarningSummary(len(bm.detailErrors), "detail lookup failures", bm.detailErrors[0].Error()))
+		for _, detailError := range bm.detailErrors[1:] {
+			b.WriteString(m.renderWarningDetail(detailError.Error()))
+		}
 	}
 	b.WriteString("\n")
 
@@ -418,7 +421,7 @@ func (bm backupModel) viewDetail(m Model) string {
 func (bm backupModel) detailVisibleLines(m Model) int {
 	warningLines := 0
 	if len(bm.detailErrors) > 0 {
-		warningLines = 2
+		warningLines = len(bm.detailErrors) + 1
 	}
 	return max(m.height-8-warningLines, 5)
 }
@@ -555,6 +558,9 @@ func (bm backupModel) detailLines(m Model) []string {
 		)
 		if job.StatusMessage != "" {
 			lines = append(lines, backupDetailLine(m, "Reason", job.StatusMessage))
+		}
+		if job.MessageCategory != "" {
+			lines = append(lines, backupDetailLine(m, "Message Category", job.MessageCategory))
 		}
 	}
 	return lines
