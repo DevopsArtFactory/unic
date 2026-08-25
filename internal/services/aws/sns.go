@@ -68,7 +68,11 @@ func (r *AwsRepository) ListSNSTopics(ctx context.Context) ([]SNSTopic, []error,
 	}
 
 	sort.SliceStable(topics, func(i, j int) bool {
-		return normalizedSortKey(topics[i].Name) < normalizedSortKey(topics[j].Name)
+		left, right := normalizedSortKey(topics[i].Name), normalizedSortKey(topics[j].Name)
+		if left == right {
+			return topics[i].ARN < topics[j].ARN
+		}
+		return left < right
 	})
 	return topics, warnings, nil
 }

@@ -99,6 +99,31 @@ func TestListSNSTopicsPaginatesSortsAndKeepsDeniedTopics(t *testing.T) {
 	}
 }
 
+func TestListSNSTopicsSortsCaseVariantsDeterministically(t *testing.T) {
+	client := &mockSNSClient{
+		listTopicsFunc: func(_ context.Context, in *sns.ListTopicsInput, _ ...func(*sns.Options)) (*sns.ListTopicsOutput, error) {
+			if awssdk.ToString(in.NextToken) == "" {
+				return &sns.ListTopicsOutput{
+					Topics:    []snstypes.Topic{{TopicArn: awssdk.String("arn:aws:sns:us-east-1:1:alerts")}},
+					NextToken: awssdk.String("page2"),
+				}, nil
+			}
+			return &sns.ListTopicsOutput{Topics: []snstypes.Topic{{TopicArn: awssdk.String("arn:aws:sns:us-east-1:1:Alerts")}}}, nil
+		},
+		getTopicAttributesFunc: func(context.Context, *sns.GetTopicAttributesInput, ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
+			return &sns.GetTopicAttributesOutput{Attributes: map[string]string{}}, nil
+		},
+	}
+
+	topics, warnings, err := (&AwsRepository{SNSClient: client}).ListSNSTopics(context.Background())
+	if err != nil || len(warnings) != 0 {
+		t.Fatalf("unexpected list result: warnings=%v err=%v", warnings, err)
+	}
+	if got := []string{topics[0].Name, topics[1].Name}; got[0] != "Alerts" || got[1] != "alerts" {
+		t.Fatalf("expected case-variant topics to use a deterministic tie-breaker, got %v", got)
+	}
+}
+
 func TestListSNSTopicsReturnsFatalListError(t *testing.T) {
 	client := &mockSNSClient{
 		listTopicsFunc: func(context.Context, *sns.ListTopicsInput, ...func(*sns.Options)) (*sns.ListTopicsOutput, error) {
