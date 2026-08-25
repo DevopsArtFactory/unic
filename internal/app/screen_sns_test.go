@@ -417,6 +417,69 @@ func TestSNSLoadCompletionStaysBehindGlobalOverlay(t *testing.T) {
 	}
 }
 
+func TestSNSLoadCompletionStaysBehindContextAdd(t *testing.T) {
+	loadErr := errors.New("SNS unavailable")
+	for _, tc := range []struct {
+		name       string
+		complete   func(*Model)
+		wantScreen screen
+	}{
+		{
+			name: "success",
+			complete: func(m *Model) {
+				m.sns.HandleMessage(m, snsTopicsLoadedMsg{topics: snsTestTopics()})
+			},
+			wantScreen: screenSNSTopicList,
+		},
+		{
+			name: "error",
+			complete: func(m *Model) {
+				m.sns.HandleMessage(m, snsTopicsLoadedMsg{err: loadErr})
+			},
+			wantScreen: screenError,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m.cfg.ContextName = "dev"
+			started, _ := m.sns.Start(&m)
+			m = started.(Model)
+
+			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+			m = updated.(Model)
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = updated.(Model)
+			updated, _ = m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = updated.(Model)
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+			m = updated.(Model)
+
+			tc.complete(&m)
+			if m.screen != screenContextAdd || m.ctxPrevScreen != screenSettings || m.settingsPrevScreen != tc.wantScreen {
+				t.Fatalf("expected completion behind Add Context and Settings, screen=%v context previous=%v settings previous=%v", m.screen, m.ctxPrevScreen, m.settingsPrevScreen)
+			}
+
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = updated.(Model)
+			updated, _ = m.Update(contextsLoadedMsg{contexts: testContexts()})
+			m = updated.(Model)
+			if m.screen != screenContextPicker {
+				t.Fatalf("expected Add Context exit to reopen the context picker, got %v", m.screen)
+			}
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = updated.(Model)
+			if m.screen != screenSettings {
+				t.Fatalf("expected context picker exit to reveal Settings, got %v", m.screen)
+			}
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = updated.(Model)
+			if m.screen != tc.wantScreen {
+				t.Fatalf("expected overlay exits to reveal %v, got %v", tc.wantScreen, m.screen)
+			}
+		})
+	}
+}
+
 func TestSNSActiveContextSelectionResumesPendingLoad(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
