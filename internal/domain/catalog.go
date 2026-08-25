@@ -228,6 +228,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceWAF,
+			Features: []Feature{
+				{
+					Kind:        FeatureWAFWebACLBrowser,
+					Description: "Inspect regional and CloudFront web ACL protection posture",
+				},
+			},
+		},
+		{
 			Name: ServiceBedrock,
 			Features: []Feature{
 				{
