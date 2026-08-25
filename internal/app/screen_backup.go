@@ -376,7 +376,7 @@ func (bm backupModel) detailLines(m Model) []string {
 			backupDetailLine(m, "Completed", backupTime(point.CompletedAt)),
 			backupDetailLine(m, "Cold Storage", backupTime(point.MoveToColdAt)),
 			backupDetailLine(m, "Expires", backupTime(point.DeleteAt)),
-			backupDetailLine(m, "Size", formatBytes(point.SizeBytes)),
+			backupDetailLine(m, "Size", backupRecoveryPointSize(point)),
 			backupDetailLine(m, "Encrypted", fmt.Sprintf("%t", point.Encrypted)),
 			backupDetailLine(m, "Source Vault", valueOrDashApp(point.SourceVaultARN)),
 			backupDetailLine(m, "Recovery Point", point.ARN),
@@ -435,13 +435,25 @@ func backupLockSummary(vault awsservice.BackupVault) string {
 		return "unlocked"
 	}
 	retention := "locked"
-	if vault.MinRetentionDays > 0 || vault.MaxRetentionDays > 0 {
+	switch {
+	case vault.MinRetentionKnown && vault.MaxRetentionKnown:
 		retention += fmt.Sprintf(" (%d-%d days)", vault.MinRetentionDays, vault.MaxRetentionDays)
+	case vault.MinRetentionKnown:
+		retention += fmt.Sprintf(" (minimum %d days)", vault.MinRetentionDays)
+	case vault.MaxRetentionKnown:
+		retention += fmt.Sprintf(" (maximum %d days)", vault.MaxRetentionDays)
 	}
 	if !vault.LockDate.IsZero() {
 		retention += " lock date " + backupTime(vault.LockDate)
 	}
 	return retention
+}
+
+func backupRecoveryPointSize(point awsservice.BackupRecoveryPoint) string {
+	if !point.SizeBytesKnown {
+		return "-"
+	}
+	return formatBytes(point.SizeBytes)
 }
 
 func valueOrDashApp(value string) string {

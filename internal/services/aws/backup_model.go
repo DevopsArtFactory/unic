@@ -19,7 +19,9 @@ type BackupVault struct {
 	Locked             bool
 	LockDate           time.Time
 	MinRetentionDays   int64
+	MinRetentionKnown  bool
 	MaxRetentionDays   int64
+	MaxRetentionKnown  bool
 	CreatedAt          time.Time
 }
 
@@ -55,6 +57,7 @@ type BackupRecoveryPoint struct {
 	StatusMessage  string
 	SourceVaultARN string
 	SizeBytes      int64
+	SizeBytesKnown bool
 	Encrypted      bool
 	CreatedAt      time.Time
 	CompletedAt    time.Time

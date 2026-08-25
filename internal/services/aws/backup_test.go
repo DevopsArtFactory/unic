@@ -91,6 +91,35 @@ func TestListBackupVaultsReturnsFatalInitialError(t *testing.T) {
 	}
 }
 
+func TestBackupOptionalNumericFieldsPreservePresence(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		min, max *int64
+		wantMin  bool
+		wantMax  bool
+	}{
+		{name: "minimum only", min: awssdk.Int64(7), wantMin: true},
+		{name: "maximum only", max: awssdk.Int64(365), wantMax: true},
+		{name: "unbounded"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vault := mapBackupVault(backuptypes.BackupVaultListMember{
+				MinRetentionDays: tc.min,
+				MaxRetentionDays: tc.max,
+			}, "ap-northeast-2")
+			if vault.MinRetentionKnown != tc.wantMin || vault.MaxRetentionKnown != tc.wantMax {
+				t.Fatalf("unexpected retention presence: %+v", vault)
+			}
+		})
+	}
+
+	unknown := mapBackupRecoveryPoint(backuptypes.RecoveryPointByBackupVault{})
+	zero := mapBackupRecoveryPoint(backuptypes.RecoveryPointByBackupVault{BackupSizeInBytes: awssdk.Int64(0)})
+	if unknown.SizeBytesKnown || !zero.SizeBytesKnown || zero.SizeBytes != 0 {
+		t.Fatalf("expected nil size to remain unknown and explicit zero to remain known: unknown=%+v zero=%+v", unknown, zero)
+	}
+}
+
 func TestGetBackupVaultDetailKeepsPartialSectionsAndPrioritizesFailures(t *testing.T) {
 	now := time.Date(2026, 8, 26, 2, 0, 0, 0, time.UTC)
 	pointCalls := 0

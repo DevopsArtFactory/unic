@@ -82,7 +82,7 @@ func TestBackupDrillDownRendersPartialDetailAndScrolls(t *testing.T) {
 	detail := &awsservice.BackupVaultDetail{
 		Vault: *m.backup.selected,
 		RecoveryPoints: []awsservice.BackupRecoveryPoint{{
-			ARN: "arn:point", ResourceName: "database\x1b[31m", ResourceType: "RDS", Status: "PARTIAL", StatusMessage: "access denied", CreatedAt: now, DeleteAt: now.Add(24 * time.Hour), SizeBytes: 2048,
+			ARN: "arn:point", ResourceName: "database\x1b[31m", ResourceType: "RDS", Status: "PARTIAL", StatusMessage: "access denied", CreatedAt: now, DeleteAt: now.Add(24 * time.Hour), SizeBytes: 2048, SizeBytesKnown: true,
 		}},
 		ProtectedResources: []awsservice.BackupProtectedResource{{Name: "database", Type: "RDS", ARN: "arn:db", LastBackupAt: now, LastRecoveryPointARN: "arn:point"}},
 		FailedJobs:         []awsservice.BackupJob{{ID: "job-1", ResourceName: "database", ResourceType: "RDS", State: "FAILED", StatusMessage: "timeout", CreatedAt: now}},
@@ -112,6 +112,31 @@ func TestBackupDrillDownRendersPartialDetailAndScrolls(t *testing.T) {
 	}
 	if m.backup.detailScroll == 0 || (!strings.Contains(scrolled, "Protected Resources") && !strings.Contains(scrolled, "Failed / Expired Jobs")) {
 		t.Fatalf("expected page-down to reveal later recovery sections, scroll=%d view:\n%s", m.backup.detailScroll, scrolled)
+	}
+}
+
+func TestBackupOptionalNumericFieldsRenderWithoutFalseZeroes(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		vault awsservice.BackupVault
+		want  string
+	}{
+		{name: "minimum only", vault: awsservice.BackupVault{Locked: true, MinRetentionDays: 7, MinRetentionKnown: true}, want: "locked (minimum 7 days)"},
+		{name: "maximum only", vault: awsservice.BackupVault{Locked: true, MaxRetentionDays: 365, MaxRetentionKnown: true}, want: "locked (maximum 365 days)"},
+		{name: "unbounded", vault: awsservice.BackupVault{Locked: true}, want: "locked"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := backupLockSummary(tc.vault); got != tc.want {
+				t.Fatalf("backupLockSummary() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+
+	if got := backupRecoveryPointSize(awsservice.BackupRecoveryPoint{}); got != "-" {
+		t.Fatalf("unknown recovery-point size = %q, want -", got)
+	}
+	if got := backupRecoveryPointSize(awsservice.BackupRecoveryPoint{SizeBytesKnown: true}); got != "0 B" {
+		t.Fatalf("known zero recovery-point size = %q, want 0 B", got)
 	}
 }
 

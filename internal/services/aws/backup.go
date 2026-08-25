@@ -184,7 +184,9 @@ func mapBackupVault(item backuptypes.BackupVaultListMember, region string) Backu
 		RecoveryPointCount: item.NumberOfRecoveryPoints,
 		Locked:             awssdk.ToBool(item.Locked),
 		MinRetentionDays:   awssdk.ToInt64(item.MinRetentionDays),
+		MinRetentionKnown:  item.MinRetentionDays != nil,
 		MaxRetentionDays:   awssdk.ToInt64(item.MaxRetentionDays),
+		MaxRetentionKnown:  item.MaxRetentionDays != nil,
 	}
 	if item.CreationDate != nil {
 		vault.CreatedAt = *item.CreationDate
@@ -205,6 +207,7 @@ func mapBackupRecoveryPoint(item backuptypes.RecoveryPointByBackupVault) BackupR
 		StatusMessage:  awssdk.ToString(item.StatusMessage),
 		SourceVaultARN: awssdk.ToString(item.SourceBackupVaultArn),
 		SizeBytes:      awssdk.ToInt64(item.BackupSizeInBytes),
+		SizeBytesKnown: item.BackupSizeInBytes != nil,
 		Encrypted:      item.IsEncrypted,
 	}
 	if item.CreationDate != nil {
