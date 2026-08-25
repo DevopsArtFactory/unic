@@ -240,8 +240,10 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.pendingContextName = selected.Name
 			preservePendingStepFunctionsContextReturn(&m)
+			preservePendingAPIGatewayV2ContextReturn(&m)
 			if m.cfg == nil || m.cfg.ContextName != selected.Name {
 				normalizeStepFunctionsContextReturn(&m)
+				normalizeAPIGatewayV2ContextReturns(&m)
 			}
 			m.eventBridge.preserveOverlay(&m, screenFeatureList)
 			m.ctxPrevWasLoading = false

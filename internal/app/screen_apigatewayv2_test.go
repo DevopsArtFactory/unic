@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -161,6 +162,30 @@ func TestAPIGatewayV2LoadErrorPreservesGlobalOverlay(t *testing.T) {
 	}
 }
 
+func TestAPIGatewayV2LoadCompletionUpdatesPendingContextPickerReturn(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		msg  tea.Msg
+		want screen
+	}{
+		{name: "success", msg: apiGatewayV2APIsLoadedMsg{}, want: screenAPIGatewayV2APIList},
+		{name: "failure", msg: apiGatewayV2APIsLoadedMsg{err: errors.New("access denied")}, want: screenError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(&config.Config{ContextName: "account-a", Region: "us-east-1"}, "", "")
+			m.screen = screenContextPicker
+			m.ctxPrevScreen = screenLoading
+			m.loadingReturnScreen = screenAPIGatewayV2APIList
+
+			updated, _, _ := m.apiGatewayV2.HandleMessage(&m, tc.msg)
+			m = updated.(Model)
+			if m.screen != screenContextPicker || m.ctxPrevScreen != tc.want {
+				t.Fatalf("expected completion behind context picker, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+			}
+		})
+	}
+}
+
 func TestAPIGatewayV2RowsUseTerminalDisplayWidth(t *testing.T) {
 	m := New(&config.Config{Region: "us-east-1"}, "", "")
 	m.width = 80
@@ -195,6 +220,74 @@ func TestAPIGatewayV2ContextSwitchClearsResourceState(t *testing.T) {
 	m = updated.(Model)
 	if len(m.apiGatewayV2.apis) != 0 || m.filterValue(filterAPIGatewayV2APIs) != "" || m.screen != screenServiceList {
 		t.Fatalf("expected API Gateway state cleared, screen=%v model=%+v filter=%q", m.screen, m.apiGatewayV2, m.filterValue(filterAPIGatewayV2APIs))
+	}
+}
+
+func TestAPIGatewayV2ContextSwitchSupersedesPendingLoad(t *testing.T) {
+	for _, completeBeforeSwitch := range []bool{false, true} {
+		t.Run(fmt.Sprintf("complete before switch=%t", completeBeforeSwitch), func(t *testing.T) {
+			m := New(&config.Config{ContextName: "account-a", Region: "us-east-1"}, "", "")
+			updated, _ := m.startLoadingFor(screenAPIGatewayV2APIList, "Loading APIs...", nil, func() tea.Msg { return nil })
+			m = updated.(Model)
+			oldGeneration := m.commands.CurrentGen()
+
+			updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+			m = updated.(Model)
+			updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "account-b", Current: true}}})
+			m = updated.(Model)
+			if completeBeforeSwitch {
+				updated, _ = m.Update(apiGatewayV2APIsLoadedMsg{apis: []awsservice.APIGatewayV2API{{ID: "api-a"}}})
+				m = updated.(Model)
+				if m.screen != screenContextPicker || m.ctxPrevScreen != screenAPIGatewayV2APIList {
+					t.Fatalf("expected completed load behind picker, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+				}
+			}
+
+			updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			m = updated.(Model)
+			if cmd == nil || m.screen != screenLoading || m.ctxPrevScreen != screenServiceList {
+				t.Fatalf("expected context switch to replace API return, screen=%v previous=%v command=%v", m.screen, m.ctxPrevScreen, cmd)
+			}
+			if !completeBeforeSwitch {
+				updated, _ = m.Update(genBoundMsg{gen: oldGeneration, msg: apiGatewayV2APIsLoadedMsg{apis: []awsservice.APIGatewayV2API{{ID: "stale"}}}})
+				m = updated.(Model)
+				if len(m.apiGatewayV2.apis) != 0 {
+					t.Fatalf("expected superseded API result to be dropped, got %+v", m.apiGatewayV2.apis)
+				}
+			}
+
+			updated, _ = m.Update(contextSwitchedMsg{cfg: &config.Config{ContextName: "account-b", Region: "us-east-1"}})
+			m = updated.(Model)
+			if m.screen != screenServiceList {
+				t.Fatalf("expected service list after context switch, got %v", m.screen)
+			}
+		})
+	}
+}
+
+func TestAPIGatewayV2APINamesEscapeTerminalControls(t *testing.T) {
+	m := New(&config.Config{Region: "us-east-1"}, "", "")
+	m.width, m.height = 100, 24
+	api := awsservice.APIGatewayV2API{ID: "api-1", Name: "orders\x1b]52;c;ZmFrZQ==\a"}
+	m.apiGatewayV2.apis = []awsservice.APIGatewayV2API{api}
+	m.apiGatewayV2.filteredAPIs = m.apiGatewayV2.apis
+	m.screen = screenAPIGatewayV2APIList
+
+	updated, cmd := m.apiGatewayV2.updateAPIList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected API detail load command")
+	}
+	loading := m.viewLoading()
+	if strings.Contains(loading, api.Name) || !strings.Contains(loading, escapeTerminalControls(api.Name)) {
+		t.Fatalf("expected escaped API name in loading view, got %q", loading)
+	}
+
+	m.screen = screenAPIGatewayV2RouteList
+	m.apiGatewayV2.selectedAPI = &api
+	routes := m.apiGatewayV2.viewRouteList(m)
+	if strings.Contains(routes, api.Name) || !strings.Contains(stripANSI(routes), escapeTerminalControls(api.Name)) {
+		t.Fatalf("expected escaped API name in route title, got %q", routes)
 	}
 }
 

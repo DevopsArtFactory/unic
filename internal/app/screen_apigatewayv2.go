@@ -45,11 +45,35 @@ func resetAPIGatewayV2ContextState(m *Model) {
 }
 
 func normalizeAPIGatewayV2ContextReturns(m *Model) {
-	for _, previous := range []*screen{&m.ctxPrevScreen, &m.settingsPrevScreen, &m.palette.prevScreen, &m.views.prevScreen, &m.regionPrevScreen} {
-		if isAPIGatewayV2Screen(*previous) || *previous == screenLoading && isAPIGatewayV2Screen(m.loadingReturnScreen) {
-			*previous = screenServiceList
+	if previous := apiGatewayV2ContextReturn(m); previous != nil {
+		*previous = screenServiceList
+	}
+}
+
+func preservePendingAPIGatewayV2ContextReturn(m *Model) {
+	if previous := apiGatewayV2ContextReturn(m); previous != nil && *previous == screenLoading {
+		*previous = m.loadingReturnScreen
+	}
+}
+
+func apiGatewayV2ContextReturn(m *Model) *screen {
+	previous := &m.ctxPrevScreen
+	seen := make(map[screen]struct{})
+	for range 8 {
+		current := *previous
+		if _, ok := seen[current]; ok {
+			return nil
+		}
+		seen[current] = struct{}{}
+		if isAPIGatewayV2Screen(current) || current == screenLoading && isAPIGatewayV2Screen(m.loadingReturnScreen) {
+			return previous
+		}
+		previous = apiGatewayV2OverlayPrevious(m, current)
+		if previous == nil {
+			return nil
 		}
 	}
+	return nil
 }
 
 func (am *apiGatewayV2Model) Start(m *Model) (tea.Model, tea.Cmd) {
@@ -187,7 +211,7 @@ func (am *apiGatewayV2Model) updateAPIList(m *Model, msg tea.KeyMsg) (tea.Model,
 			am.detail = nil
 			am.selectedRoute = nil
 			m.resetFilter(filterAPIGatewayV2Routes)
-			return m.startLoadingFor(screenAPIGatewayV2APIDetail, "Loading API Gateway v2 detail...", []string{selected.Name}, am.loadDetail(*m, selected, screenAPIGatewayV2APIDetail))
+			return m.startLoadingFor(screenAPIGatewayV2APIDetail, "Loading API Gateway v2 detail...", []string{escapeTerminalControls(selected.Name)}, am.loadDetail(*m, selected, screenAPIGatewayV2APIDetail))
 		}
 	}
 	return *m, nil
@@ -216,7 +240,7 @@ func (am *apiGatewayV2Model) updateAPIDetail(m *Model, msg tea.KeyMsg) (tea.Mode
 		}
 	case "r":
 		if am.selectedAPI != nil {
-			return m.startLoadingFor(screenAPIGatewayV2APIDetail, "Refreshing API Gateway v2 detail...", []string{am.selectedAPI.Name}, am.loadDetail(*m, *am.selectedAPI, screenAPIGatewayV2APIDetail))
+			return m.startLoadingFor(screenAPIGatewayV2APIDetail, "Refreshing API Gateway v2 detail...", []string{escapeTerminalControls(am.selectedAPI.Name)}, am.loadDetail(*m, *am.selectedAPI, screenAPIGatewayV2APIDetail))
 		}
 	}
 	return *m, nil
@@ -240,7 +264,7 @@ func (am *apiGatewayV2Model) updateRouteList(m *Model, msg tea.KeyMsg) (tea.Mode
 		return *m, m.activateFilter(filterAPIGatewayV2Routes)
 	case "r":
 		if am.selectedAPI != nil {
-			return m.startLoadingFor(screenAPIGatewayV2RouteList, "Refreshing API Gateway v2 routes...", []string{am.selectedAPI.Name}, am.loadDetail(*m, *am.selectedAPI, screenAPIGatewayV2RouteList))
+			return m.startLoadingFor(screenAPIGatewayV2RouteList, "Refreshing API Gateway v2 routes...", []string{escapeTerminalControls(am.selectedAPI.Name)}, am.loadDetail(*m, *am.selectedAPI, screenAPIGatewayV2RouteList))
 		}
 	case "enter":
 		if am.routeIdx < len(am.filteredRoutes) {
@@ -273,7 +297,7 @@ func (am *apiGatewayV2Model) updateRouteDetail(m *Model, msg tea.KeyMsg) (tea.Mo
 		am.routeScroll = min(am.routeScroll+visibleLines, maxOffset)
 	case "r":
 		if am.selectedAPI != nil {
-			return m.startLoadingFor(screenAPIGatewayV2RouteDetail, "Refreshing API Gateway v2 route...", []string{am.selectedAPI.Name}, am.loadDetail(*m, *am.selectedAPI, screenAPIGatewayV2RouteDetail))
+			return m.startLoadingFor(screenAPIGatewayV2RouteDetail, "Refreshing API Gateway v2 route...", []string{escapeTerminalControls(am.selectedAPI.Name)}, am.loadDetail(*m, *am.selectedAPI, screenAPIGatewayV2RouteDetail))
 		}
 	case "y":
 		target := am.integrationTarget()
@@ -439,7 +463,7 @@ func (am apiGatewayV2Model) viewRouteList(m Model) string {
 	var b, panel strings.Builder
 	name := ""
 	if am.selectedAPI != nil {
-		name = " — " + am.selectedAPI.Name
+		name = " — " + escapeTerminalControls(am.selectedAPI.Name)
 	}
 	b.WriteString(m.renderStatusBar())
 	b.WriteString(titleStyle.Render("API Gateway v2 Routes" + name))
@@ -649,6 +673,12 @@ func handleAPIGatewayV2LoadError(m *Model, err error) (tea.Model, tea.Cmd) {
 }
 
 func finishAPIGatewayV2Load(m *Model, target screen) bool {
+	finished := false
+	if m.ctxPrevScreen == screenLoading || isAPIGatewayV2Screen(m.ctxPrevScreen) {
+		m.ctxPrevScreen = target
+		m.loadingReturnScreen = 0
+		finished = true
+	}
 	if m.screen == screenLoading {
 		m.loadingReturnScreen = 0
 		m.screen = target
@@ -658,12 +688,12 @@ func finishAPIGatewayV2Load(m *Model, target screen) bool {
 	seen := make(map[screen]struct{})
 	for range 8 {
 		if _, ok := seen[current]; ok {
-			return false
+			return finished
 		}
 		seen[current] = struct{}{}
 		previous := apiGatewayV2OverlayPrevious(m, current)
 		if previous == nil {
-			return false
+			return finished
 		}
 		if *previous == screenLoading {
 			*previous = target
@@ -672,5 +702,5 @@ func finishAPIGatewayV2Load(m *Model, target screen) bool {
 		}
 		current = *previous
 	}
-	return false
+	return finished
 }
