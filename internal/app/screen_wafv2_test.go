@@ -72,6 +72,19 @@ func TestWAFDetailScrollsThroughRulesAndResources(t *testing.T) {
 	}
 }
 
+func TestWAFDetailRendersRuleActionOverrides(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.waf.selected = &awsservice.WAFWebACL{DetailKnown: true, Rules: []awsservice.WAFRule{
+		{Name: "managed", Statement: "managed AWS/common", Action: "GROUP ACTION", ActionOverrides: []string{"SizeRestrictions_BODY=CAPTCHA"}},
+		{Name: "custom-group", Statement: "rule group custom", Action: "GROUP ACTION", ActionOverrides: []string{"CustomBlock=BLOCK"}},
+	}}
+
+	view := stripANSI(strings.Join(m.waf.detailLines(m), ""))
+	if !strings.Contains(view, "Rule Override") || !strings.Contains(view, "SizeRestrictions_BODY=CAPTCHA") || !strings.Contains(view, "CustomBlock=BLOCK") {
+		t.Fatalf("expected managed and custom rule-group overrides in WAF detail, got:\n%s", view)
+	}
+}
+
 func TestWAFDetailTruncatesLongTitleAtTerminalWidth(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.width, m.height = 80, 15

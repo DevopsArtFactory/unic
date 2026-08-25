@@ -188,7 +188,7 @@ func mapWAFWebACLDetail(acl *WAFWebACL, detail wafv2types.WebACL) {
 		statement, managed := wafStatement(rule.Statement)
 		mapped := WAFRule{
 			Name: awssdk.ToString(rule.Name), Priority: rule.Priority, Statement: statement,
-			Action: wafRuleAction(rule.Action, rule.OverrideAction), Managed: managed,
+			Action: wafRuleAction(rule.Action, rule.OverrideAction), ActionOverrides: wafRuleActionOverrides(rule.Statement), Managed: managed,
 		}
 		if rule.VisibilityConfig != nil {
 			mapped.MetricName = awssdk.ToString(rule.VisibilityConfig.MetricName)
@@ -242,6 +242,35 @@ func wafRuleAction(action *wafv2types.RuleAction, override *wafv2types.OverrideA
 		return "GROUP ACTION"
 	}
 	return "unknown"
+}
+
+func wafRuleActionOverrides(statement *wafv2types.Statement) []string {
+	if statement == nil {
+		return nil
+	}
+	var overrides []wafv2types.RuleActionOverride
+	var excluded []wafv2types.ExcludedRule
+	switch {
+	case statement.ManagedRuleGroupStatement != nil:
+		overrides = statement.ManagedRuleGroupStatement.RuleActionOverrides
+		excluded = statement.ManagedRuleGroupStatement.ExcludedRules
+	case statement.RuleGroupReferenceStatement != nil:
+		overrides = statement.RuleGroupReferenceStatement.RuleActionOverrides
+		excluded = statement.RuleGroupReferenceStatement.ExcludedRules
+	}
+	values := make([]string, 0, len(overrides)+len(excluded))
+	for _, override := range overrides {
+		if name := awssdk.ToString(override.Name); name != "" {
+			values = append(values, name+"="+wafRuleAction(override.ActionToUse, nil))
+		}
+	}
+	for _, rule := range excluded {
+		if name := awssdk.ToString(rule.Name); name != "" {
+			values = append(values, name+"=COUNT")
+		}
+	}
+	sort.Strings(values)
+	return values
 }
 
 func wafStatement(statement *wafv2types.Statement) (string, bool) {

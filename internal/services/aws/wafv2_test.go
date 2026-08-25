@@ -146,6 +146,12 @@ func TestListWAFWebACLsPaginatesScopesAndMapsPosture(t *testing.T) {
 	if acls[0].Rules[0].Priority != 1 || acls[0].Rules[0].Statement != "managed AWS/AWSManagedRulesCommonRuleSet" || acls[0].Rules[0].Action != "GROUP ACTION" {
 		t.Fatalf("expected priority-sorted managed rule first, got %+v", acls[0].Rules)
 	}
+	if got := strings.Join(acls[0].Rules[0].ActionOverrides, ","); got != "LegacyCount=COUNT,SizeRestrictions_BODY=CAPTCHA" {
+		t.Fatalf("expected managed rule action overrides, got %q", got)
+	}
+	if got := strings.Join(acls[0].Rules[1].ActionOverrides, ","); got != "CustomBlock=BLOCK" {
+		t.Fatalf("expected custom rule-group action override, got %q", got)
+	}
 	if acls[2].LoggingLabel() != "on" || acls[2].ResourceCountLabel() != "3" || len(acls[2].Signals()) != 0 {
 		t.Fatalf("expected protected CloudFront posture, got %+v", acls[2])
 	}
@@ -251,9 +257,24 @@ func testWAFWebACL(name string, scope wafv2types.Scope) *wafv2types.WebACL {
 				Name: awssdk.String("managed"), Priority: 1,
 				Statement: &wafv2types.Statement{ManagedRuleGroupStatement: &wafv2types.ManagedRuleGroupStatement{
 					VendorName: awssdk.String("AWS"), Name: awssdk.String("AWSManagedRulesCommonRuleSet"),
+					RuleActionOverrides: []wafv2types.RuleActionOverride{{
+						Name: awssdk.String("SizeRestrictions_BODY"), ActionToUse: &wafv2types.RuleAction{Captcha: &wafv2types.CaptchaAction{}},
+					}},
+					ExcludedRules: []wafv2types.ExcludedRule{{Name: awssdk.String("LegacyCount")}},
 				}},
 				OverrideAction:   &wafv2types.OverrideAction{None: &wafv2types.NoneAction{}},
 				VisibilityConfig: &wafv2types.VisibilityConfig{MetricName: awssdk.String("managed"), SampledRequestsEnabled: true},
+			},
+			{
+				Name: awssdk.String("custom-group"), Priority: 10,
+				Statement: &wafv2types.Statement{RuleGroupReferenceStatement: &wafv2types.RuleGroupReferenceStatement{
+					ARN: awssdk.String("arn:aws:wafv2:us-west-2:123:regional/rulegroup/custom/group-id"),
+					RuleActionOverrides: []wafv2types.RuleActionOverride{{
+						Name: awssdk.String("CustomBlock"), ActionToUse: &wafv2types.RuleAction{Block: &wafv2types.BlockAction{}},
+					}},
+				}},
+				OverrideAction:   &wafv2types.OverrideAction{None: &wafv2types.NoneAction{}},
+				VisibilityConfig: &wafv2types.VisibilityConfig{MetricName: awssdk.String("custom-group")},
 			},
 		},
 	}

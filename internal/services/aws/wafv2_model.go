@@ -29,6 +29,7 @@ type WAFRule struct {
 	Priority        int32
 	Statement       string
 	Action          string
+	ActionOverrides []string
 	Managed         bool
 	MetricName      string
 	MetricsEnabled  bool
@@ -41,6 +42,7 @@ func (a WAFWebACL) FilterText() string {
 	parts = append(parts, a.ResourceARNs...)
 	for _, rule := range a.Rules {
 		parts = append(parts, rule.Name, rule.Statement, rule.Action, rule.MetricName)
+		parts = append(parts, rule.ActionOverrides...)
 	}
 	return strings.ToLower(strings.Join(parts, " "))
 }

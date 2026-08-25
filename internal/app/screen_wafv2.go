@@ -312,12 +312,15 @@ func (wm wafModel) detailLines(m Model) []string {
 	}
 	for _, rule := range acl.Rules {
 		visibility := fmt.Sprintf("metric=%s metrics=%t sampled=%t", rule.MetricName, rule.MetricsEnabled, rule.SamplingEnabled)
-		lines = append(lines,
+		ruleLines := []string{
 			m.renderEC2DetailLine("Rule", fmt.Sprintf("[%d] %s", rule.Priority, rule.Name)),
 			m.renderEC2DetailLine("Statement", rule.Statement),
 			m.renderEC2DetailLine("Action", rule.Action),
-			m.renderEC2DetailLine("Visibility", visibility),
-		)
+		}
+		for _, override := range rule.ActionOverrides {
+			ruleLines = append(ruleLines, m.renderEC2DetailLine("Rule Override", override))
+		}
+		lines = append(lines, append(ruleLines, m.renderEC2DetailLine("Visibility", visibility))...)
 	}
 	return lines
 }
