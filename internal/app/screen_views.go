@@ -45,6 +45,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureKMSKeyBrowser:         filterKMSKeys,
 	domain.FeatureLambdaBrowser:         filterLambdaFunctions,
 	domain.FeatureDynamoDBBrowser:       filterDynamoDBTables,
+	domain.FeatureAPIGatewayV2Browser:   filterAPIGatewayV2APIs,
 	domain.FeatureBedrockAPIKeys:        filterBedrockKeys,
 	domain.FeatureVPCBrowser:            filterVPCs,
 }

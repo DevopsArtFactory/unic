@@ -115,6 +115,10 @@ const (
 	screenStepFunctionStateMachineList
 	screenStepFunctionExecutionList
 	screenStepFunctionExecutionDetail
+	screenAPIGatewayV2APIList
+	screenAPIGatewayV2APIDetail
+	screenAPIGatewayV2RouteList
+	screenAPIGatewayV2RouteDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -216,6 +220,7 @@ type Model struct {
 	kms            kmsModel
 	acm            acmModel
 	stepFunctions  stepFunctionsModel
+	apiGatewayV2   apiGatewayV2Model
 	eventBridge    eventBridgeModel
 	lambda         lambdaModel
 	dynamodb       dynamoDBModel
@@ -349,6 +354,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.kms = newKMSModel()
 	model.acm = newACMModel()
 	model.stepFunctions = newStepFunctionsModel()
+	model.apiGatewayV2 = newAPIGatewayV2Model()
 	model.lambda = newLambdaModel()
 	model.dynamodb = newDynamoDBModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
@@ -943,6 +949,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.acm.Start(&m)
 	case domain.FeatureStepFunctionsBrowser:
 		return m.stepFunctions.Start(&m)
+	case domain.FeatureAPIGatewayV2Browser:
+		return m.apiGatewayV2.Start(&m)
 	case domain.FeatureSecurityGroupBrowser:
 		return m.security.Start(&m)
 	case domain.FeatureIAMUsersBrowser:

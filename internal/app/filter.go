@@ -56,6 +56,8 @@ const (
 	filterStepFunctionStateMachines
 	filterStepFunctionExecutions
 	filterDynamoDBTables
+	filterAPIGatewayV2APIs
+	filterAPIGatewayV2Routes
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

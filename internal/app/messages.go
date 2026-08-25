@@ -306,6 +306,18 @@ type stepFunctionExecutionDetailLoadedMsg struct {
 	detail *awsservice.StepFunctionExecutionDetail
 }
 
+type apiGatewayV2APIsLoadedMsg struct {
+	apis []awsservice.APIGatewayV2API
+	err  error
+}
+
+type apiGatewayV2DetailLoadedMsg struct {
+	apiID  string
+	detail *awsservice.APIGatewayV2Detail
+	target screen
+	err    error
+}
+
 type s3BucketsLoadedMsg struct {
 	buckets []awsservice.S3Bucket
 }

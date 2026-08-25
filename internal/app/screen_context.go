@@ -68,6 +68,8 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if contextChanged {
 			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
+			resetAPIGatewayV2ContextState(&m)
+			normalizeAPIGatewayV2ContextReturns(&m)
 		}
 		m.eventBridge = newEventBridgeModel()
 		if isEventBridgeScreen(m.ctxPrevScreen) {
@@ -113,6 +115,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
 		resetStepFunctionsContextState(&m)
+		resetAPIGatewayV2ContextState(&m)
 		m.ctxPrevWasLoading = false
 		// Region-scoped feature state may contain resources from the previous
 		// region, so return to the service catalog after switching.

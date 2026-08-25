@@ -1006,6 +1006,14 @@ func (m Model) helpScreenTitle() string {
 		return "Step Functions Executions"
 	case screenStepFunctionExecutionDetail:
 		return "Step Functions Execution Detail"
+	case screenAPIGatewayV2APIList:
+		return "API Gateway v2 APIs"
+	case screenAPIGatewayV2APIDetail:
+		return "API Gateway v2 API Detail"
+	case screenAPIGatewayV2RouteList:
+		return "API Gateway v2 Routes"
+	case screenAPIGatewayV2RouteDetail:
+		return "API Gateway v2 Route Detail"
 	case screenS3ObjectList:
 		return "S3 Objects"
 	case screenS3ObjectDetail:
