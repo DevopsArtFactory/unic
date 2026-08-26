@@ -262,6 +262,7 @@ Current screen families include:
 - Step Functions state machine list, failure-prioritized execution list, and execution detail flows
 - S3 bucket/object/detail flows
 - KMS key list/detail and rotation-posture flows
+- SNS topic list/detail and per-topic subscription list flows
 - EventBridge rule list/detail, scrollable complete event patterns, and type-to-confirm state changes for eligible rule modes
 - DynamoDB table list/detail and complete-primary-key `GetItem` flows
 - WAFv2 regional/CloudFront Web ACL list and scrollable posture/rule detail flows

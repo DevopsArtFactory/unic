@@ -68,6 +68,8 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if contextChanged {
 			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
+			resetSNSContextState(&m)
+			normalizeSNSContextReturn(&m)
 			normalizeWAFContextReturn(&m)
 			resetWAFContextState(&m)
 		}
@@ -115,6 +117,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
 		resetStepFunctionsContextState(&m)
+		resetSNSContextState(&m)
 		m.ctxPrevWasLoading = false
 		// Region-scoped feature state may contain resources from the previous
 		// region, so return to the service catalog after switching.
@@ -235,15 +238,25 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cursor := m.contextTable.Cursor()
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
+			if m.cfg != nil && m.cfg.ContextName == selected.Name {
+				snsReturn := snsContextReturn(&m)
+				if snsReturn != nil && *snsReturn == screenLoading {
+					m.ctxPrevWasLoading = false
+					m.screen = m.ctxPrevScreen
+					return m, nil
+				}
+			}
 			if cloudFormationContextReturnActive(m) {
 				m.ctxPrevScreen = screenFeatureList
 			}
 			m.pendingContextName = selected.Name
 			wafPending := pendingWAFContextReturn(&m)
 			preservePendingStepFunctionsContextReturn(&m)
+			preservePendingSNSContextReturn(&m)
 			preservePendingWAFContextReturn(&m)
 			if m.cfg == nil || m.cfg.ContextName != selected.Name {
 				normalizeStepFunctionsContextReturn(&m)
+				normalizeSNSContextReturn(&m)
 				normalizeWAFContextReturn(&m)
 			} else if wafPending {
 				normalizeWAFContextReturn(&m)
