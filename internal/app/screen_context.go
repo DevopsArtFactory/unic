@@ -68,6 +68,8 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		if contextChanged {
 			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
+			normalizeWAFContextReturn(&m)
+			resetWAFContextState(&m)
 		}
 		m.eventBridge = newEventBridgeModel()
 		if isEventBridgeScreen(m.ctxPrevScreen) {
@@ -185,6 +187,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if !ok {
 				return m, nil
 			}
+			normalizePendingWAFContextReturn(&m)
 			return m.beginContextSetup(selected)
 		case "ctrl+y":
 			selected, ok := m.selectedContextInfo()
@@ -236,9 +239,14 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.ctxPrevScreen = screenFeatureList
 			}
 			m.pendingContextName = selected.Name
+			wafPending := pendingWAFContextReturn(&m)
 			preservePendingStepFunctionsContextReturn(&m)
+			preservePendingWAFContextReturn(&m)
 			if m.cfg == nil || m.cfg.ContextName != selected.Name {
 				normalizeStepFunctionsContextReturn(&m)
+				normalizeWAFContextReturn(&m)
+			} else if wafPending {
+				normalizeWAFContextReturn(&m)
 			}
 			m.eventBridge.preserveOverlay(&m, screenFeatureList)
 			m.ctxPrevWasLoading = false
@@ -249,6 +257,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			return m, nil
 		}
+		normalizePendingWAFContextReturn(&m)
 		return m.beginContextSetup(selected)
 	case "y":
 		selected, ok := m.selectedContextInfo()
