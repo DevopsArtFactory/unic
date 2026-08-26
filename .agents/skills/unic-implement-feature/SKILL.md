@@ -37,9 +37,11 @@ a repository maintainer through GitHub repository permissions.
   tell the user instead of implementing duplicate scope. Only continue if the
   user explicitly asks to work on that existing PR or to intentionally create a
   follow-up.
-- If the user gave an issue number, read it with `gh issue view <number>`.
+- If the user gave an issue number, read its body and comments with
+  `gh issue view <number> --json title,body,comments`.
 - When an issue number is known, also search open PRs for that issue first
-  (title, body, or branch naming) before starting implementation.
+  (title, body, branch naming, or links in issue comments) before starting
+  implementation.
 - Once the issue to implement is known and you have confirmed there is no open
   PR already covering it, claim the issue before coding by commenting
   `@unic-bot: assign me` on the issue.

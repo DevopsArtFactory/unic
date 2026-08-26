@@ -27,10 +27,11 @@ If `$ARGUMENTS` is empty or blank:
 
 ## Phase 1: Gather Context
 
-1. If the argument is a GitHub issue number, fetch it with `gh issue view <number>`. Read the full body, checklist, and comments.
+1. If the argument is a GitHub issue number, fetch its body and comments with
+   `gh issue view <number> --json title,body,comments`.
 2. If the argument is a description, search for a matching issue with `gh issue list --search "<description>"` and read it if found.
-3. Inspect related pull requests and issue comments for current status and
-   design decisions.
+3. Inspect related pull requests and issue comments for current status, linked
+   or in-progress pull requests, and design decisions.
 4. If an open pull request already covers the selected issue, stop and report it
    instead of starting duplicate work.
 5. Read `.kiro/docs/architecture-en.md` if it exists for architectural context.
