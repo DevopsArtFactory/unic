@@ -25,7 +25,9 @@ loading mechanism.
    assessing or proposing changes. Fetch every merged pull request with `gh api
    --paginate 'repos/{owner}/{repo}/pulls?state=closed&per_page=100' --jq '.[] |
    select(.merged_at != null) | {number,title,merged_at}'` when checking whether
-   work has shipped.
+   work has shipped, then inspect plausible candidates with `gh pr view <number>
+   --json title,body,state,mergedAt,comments,reviews` before deciding work is
+   complete or recommending issue changes.
 3. For each open issue (or filtered subset), assess:
    - **Already done?** — Check if the feature/fix has been merged (search PRs, git log, code).
    - **Partially done?** — Check if some checklist items are complete and the issue body needs updating.
