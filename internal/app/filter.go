@@ -45,6 +45,8 @@ const (
 	filterCWAlarms
 	filterCloudTrailEvents
 	filterEventBridgeRules
+	filterSNSTopics
+	filterSNSSubscriptions
 	filterSQSQueues
 	filterELBs
 	filterELBTargetGroups
@@ -58,6 +60,7 @@ const (
 	filterDynamoDBTables
 	filterAPIGatewayV2APIs
 	filterAPIGatewayV2Routes
+	filterWAFWebACLs
 )
 
 // Filterable is implemented by any type that supports text-based filtering.

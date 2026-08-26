@@ -171,6 +171,31 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "esc", bar: "esc: cancel", help: "Cancel and return to the record detail"},
 	},
 
+	screenSNSTopicList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between topics"},
+		{keys: "/", bar: "/: filter", help: "Filter by topic name, ARN, display name, or type"},
+		{keys: "r", bar: "r: refresh", help: "Refresh the topic list"},
+		{keys: "enter", bar: "enter: detail", help: "Open the selected topic"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenSNSTopicDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll topic details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll topic details by one page"},
+		{keys: "enter", bar: "enter: subscriptions", help: "Open the topic's subscriptions"},
+		{keys: "r", bar: "r: refresh", help: "Refresh the topic list"},
+		{keys: "q", bar: "q: feature list", help: "Go back to the feature list"},
+		{keys: "esc", bar: "esc: topics", help: "Go back to the topic list"},
+		{bar: "H: home"},
+	},
+	screenSNSSubscriptionList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between subscriptions"},
+		{keys: "/", bar: "/: filter", help: "Filter by protocol, endpoint, owner, or status"},
+		{keys: "r", bar: "r: refresh", help: "Refresh the subscription list"},
+		{keys: "q", bar: "q: feature list", help: "Go back to the feature list"},
+		{keys: "esc", bar: "esc: topic", help: "Go back to the topic detail"},
+		{bar: "H: home"},
+	},
 	screenSQSQueueList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between queues"},
 		{keys: "/", bar: "/: filter", help: "Start filtering the list"},
@@ -364,6 +389,20 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll the item JSON by one page"},
 		{keys: "l", bar: "l: lookup again", help: "Look up another primary key"},
 		{keys: "q / esc", bar: "esc: detail", help: "Return to table detail"},
+		{bar: "H: home"},
+	},
+	screenWAFWebACLList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between WAF web ACLs"},
+		{keys: "/", bar: "/: filter", help: "Filter by name, scope, rule, ARN, or protected resource"},
+		{keys: "r", bar: "r: refresh", help: "Refresh regional and CloudFront web ACLs"},
+		{keys: "enter", bar: "enter: detail", help: "Open rules, logging, and association details"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenWAFWebACLDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll Web ACL details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll Web ACL details by one page"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the Web ACL list"},
 		{bar: "H: home"},
 	},
 

@@ -226,6 +226,19 @@ type cwLogEventsLoadedMsg struct {
 
 type cwLogTailTickMsg struct{}
 
+type snsTopicsLoadedMsg struct {
+	topics   []awsservice.SNSTopic
+	warnings []error
+	err      error
+}
+
+type snsSubscriptionsLoadedMsg struct {
+	topicARN      string
+	subscriptions []awsservice.SNSSubscription
+	warnings      []error
+	err           error
+}
+
 type sqsQueuesLoadedMsg struct {
 	queues       []awsservice.SQSQueue
 	regionErrors []awsservice.RegionError
@@ -490,6 +503,12 @@ type lambdaInvokeResultMsg struct {
 
 type dynamoDBTablesLoadedMsg struct {
 	tables []awsservice.DynamoDBTable
+}
+
+type wafWebACLsLoadedMsg struct {
+	acls     []awsservice.WAFWebACL
+	warnings []error
+	err      error
 }
 
 type dynamoDBTableDetailLoadedMsg struct {

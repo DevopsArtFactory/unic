@@ -1034,6 +1034,10 @@ func (m Model) helpScreenTitle() string {
 		return "DynamoDB Key Lookup"
 	case screenDynamoDBLookupResult:
 		return "DynamoDB Item"
+	case screenWAFWebACLList:
+		return "WAFv2 Web ACLs"
+	case screenWAFWebACLDetail:
+		return "WAFv2 Web ACL Detail"
 	case screenBedrockKeyList:
 		return "Bedrock API Keys"
 	case screenBedrockKeyDetail:

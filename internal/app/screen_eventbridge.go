@@ -409,7 +409,7 @@ func (em eventBridgeModel) detailLines(m Model) []string {
 		m.renderEC2DetailLine("ARN", rule.ARN),
 		m.renderEC2DetailLine("Schedule", ec2ValueOrDash(rule.ScheduleExpression)),
 	)
-	lines = append(lines, eventBridgePatternDetailLines(m, rule.EventPattern)...)
+	lines = append(lines, jsonDetailLines(m, "Event Pattern", rule.EventPattern)...)
 	lines = append(lines,
 		m.renderEC2DetailLine("Last Seen", rule.LastTriggerDisplay()),
 		m.renderEC2DetailLine("Description", ec2ValueOrDash(rule.Description)),
@@ -443,22 +443,21 @@ func (em eventBridgeModel) detailLines(m Model) []string {
 	return lines
 }
 
-func eventBridgePatternDetailLines(m Model, pattern string) []string {
-	pattern = strings.TrimSpace(pattern)
-	if pattern == "" {
-		return []string{m.renderEC2DetailLine("Event Pattern", "-")}
+func jsonDetailLines(m Model, label, value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return []string{m.renderEC2DetailLine(label, "-")}
 	}
 
 	var pretty bytes.Buffer
-	if json.Indent(&pretty, []byte(pattern), "", "  ") == nil {
-		pattern = pretty.String()
+	if json.Indent(&pretty, []byte(value), "", "  ") == nil {
+		value = pretty.String()
 	}
 	width := m.ec2DetailValueWidth(ec2DetailLabelWidth)
-	label := "Event Pattern"
 	var lines []string
-	for _, sourceLine := range strings.Split(pattern, "\n") {
+	for _, sourceLine := range strings.Split(value, "\n") {
 		sourceLine = escapeTerminalControls(sourceLine)
-		for _, wrapped := range wrapEventBridgeDetailValue(sourceLine, width) {
+		for _, wrapped := range wrapDetailValue(sourceLine, width) {
 			lines = append(lines, m.renderEC2StyledDetailLine(label, normalStyle.Render(wrapped)))
 			label = ""
 		}
@@ -466,7 +465,7 @@ func eventBridgePatternDetailLines(m Model, pattern string) []string {
 	return lines
 }
 
-func wrapEventBridgeDetailValue(value string, width int) []string {
+func wrapDetailValue(value string, width int) []string {
 	if width <= 0 || lipgloss.Width(value) <= width {
 		return []string{value}
 	}

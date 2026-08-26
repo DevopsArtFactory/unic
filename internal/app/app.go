@@ -97,6 +97,9 @@ const (
 	screenFISTemplateDetail
 	screenFISExperimentList
 	screenFISExperimentDetail
+	screenSNSTopicList
+	screenSNSTopicDetail
+	screenSNSSubscriptionList
 	screenSQSQueueList
 	screenSQSQueueDetail
 	screenSQSConfirm
@@ -130,6 +133,8 @@ const (
 	screenDynamoDBTableDetail
 	screenDynamoDBLookupInput
 	screenDynamoDBLookupResult
+	screenWAFWebACLList
+	screenWAFWebACLDetail
 	screenBedrockKeyList
 	screenBedrockKeyDetail
 	screenBedrockKeyCreate
@@ -213,6 +218,7 @@ type Model struct {
 	secrets        secretsModel
 	security       securityGroupModel
 	s3             s3Model
+	sns            snsModel
 	sqs            sqsModel
 	elb            elbModel
 	ssmParams      ssmParamsModel
@@ -224,6 +230,7 @@ type Model struct {
 	eventBridge    eventBridgeModel
 	lambda         lambdaModel
 	dynamodb       dynamoDBModel
+	waf            wafModel
 	inspector      inspectorModel
 
 	// Context picker
@@ -347,6 +354,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.secrets = newSecretsModel()
 	model.security = newSecurityGroupModel()
 	model.s3 = newS3Model()
+	model.sns = newSNSModel()
 	model.sqs = newSQSModel()
 	model.elb = newELBModel()
 	model.ssmParams = newSSMParamsModel()
@@ -357,6 +365,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.apiGatewayV2 = newAPIGatewayV2Model()
 	model.lambda = newLambdaModel()
 	model.dynamodb = newDynamoDBModel()
+	model.waf = newWAFModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
 	return model
@@ -935,6 +944,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.cwLogs.Start(&m)
 	case domain.FeatureS3Browser:
 		return m.s3.Start(&m)
+	case domain.FeatureSNSBrowser:
+		return m.sns.Start(&m)
 	case domain.FeatureSQSBrowser:
 		return m.sqs.Start(&m)
 	case domain.FeatureELBBrowser:
@@ -973,6 +984,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.lambda.Start(&m)
 	case domain.FeatureDynamoDBBrowser:
 		return m.dynamodb.Start(&m)
+	case domain.FeatureWAFWebACLBrowser:
+		return m.waf.Start(&m)
 	case domain.FeatureBedrockAPIKeys:
 		return m.bedrock.Start(&m)
 	}
