@@ -46,6 +46,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureKMSKeyBrowser:         filterKMSKeys,
 	domain.FeatureLambdaBrowser:         filterLambdaFunctions,
 	domain.FeatureDynamoDBBrowser:       filterDynamoDBTables,
+	domain.FeatureBackupBrowser:         filterBackupVaults,
 	domain.FeatureAPIGatewayV2Browser:   filterAPIGatewayV2APIs,
 	domain.FeatureWAFWebACLBrowser:      filterWAFWebACLs,
 	domain.FeatureBedrockAPIKeys:        filterBedrockKeys,
@@ -200,10 +201,8 @@ func (m Model) jumpToView(view config.ViewEntry) (tea.Model, tea.Cmd) {
 		service: domain.AwsService(view.Service),
 		feature: kind,
 	})
-	if view.Filter != "" {
-		if target, ok := featurePrimaryFilter[kind]; ok {
-			m.storeFilterValue(target, view.Filter)
-		}
+	if target, ok := featurePrimaryFilter[kind]; ok {
+		m.storeFilterValue(target, view.Filter)
 	}
 	return m.startFeature(kind)
 }

@@ -58,6 +58,7 @@ const (
 	filterStepFunctionStateMachines
 	filterStepFunctionExecutions
 	filterDynamoDBTables
+	filterBackupVaults
 	filterAPIGatewayV2APIs
 	filterAPIGatewayV2Routes
 	filterWAFWebACLs

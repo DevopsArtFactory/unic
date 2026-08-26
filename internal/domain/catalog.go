@@ -237,6 +237,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceBackup,
+			Features: []Feature{
+				{
+					Kind:        FeatureBackupBrowser,
+					Description: "Inspect backup vaults, recovery points, protected resources, and failed jobs",
+				},
+			},
+		},
+		{
 			Name: ServiceAPIGateway,
 			Features: []Feature{
 				{

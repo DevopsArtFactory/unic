@@ -391,6 +391,21 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "q / esc", bar: "esc: detail", help: "Return to table detail"},
 		{bar: "H: home"},
 	},
+	screenBackupVaultList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between backup vaults"},
+		{keys: "/", bar: "/: filter", help: "Filter by vault name, state, type, region, or encryption key"},
+		{keys: "r", bar: "r: refresh", help: "Refresh backup vaults"},
+		{keys: "enter", bar: "enter: recovery", help: "Open recovery points, protected resources, and failed jobs"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenBackupVaultDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll backup recovery details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll backup recovery details by one page"},
+		{keys: "r", bar: "r: refresh", help: "Refresh the selected backup vault"},
+		{keys: "q / esc", bar: "esc: vaults", help: "Go back to the backup vault list"},
+		{bar: "H: home"},
+	},
 	screenWAFWebACLList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between WAF web ACLs"},
 		{keys: "/", bar: "/: filter", help: "Filter by name, scope, rule, ARN, or protected resource"},

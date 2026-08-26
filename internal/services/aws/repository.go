@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	"github.com/aws/aws-sdk-go-v2/service/backup"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
@@ -51,6 +52,7 @@ var _ KMSClientAPI = (*kms.Client)(nil)
 var _ ACMClientAPI = (*acm.Client)(nil)
 var _ StepFunctionsClientAPI = (*sfn.Client)(nil)
 var _ DynamoDBClientAPI = (*dynamodb.Client)(nil)
+var _ BackupClientAPI = (*backup.Client)(nil)
 var _ APIGatewayV2ClientAPI = (*apigatewayv2.Client)(nil)
 var _ WAFV2ClientAPI = (*wafv2.Client)(nil)
 var _ CloudFrontClientAPI = (*cloudfront.Client)(nil)
@@ -179,6 +181,14 @@ type DynamoDBClientAPI interface {
 	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
 	DescribeTimeToLive(ctx context.Context, params *dynamodb.DescribeTimeToLiveInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTimeToLiveOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+}
+
+// BackupClientAPI is the interface for read-only AWS Backup browser operations.
+type BackupClientAPI interface {
+	ListBackupVaults(ctx context.Context, params *backup.ListBackupVaultsInput, optFns ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error)
+	ListRecoveryPointsByBackupVault(ctx context.Context, params *backup.ListRecoveryPointsByBackupVaultInput, optFns ...func(*backup.Options)) (*backup.ListRecoveryPointsByBackupVaultOutput, error)
+	ListProtectedResourcesByBackupVault(ctx context.Context, params *backup.ListProtectedResourcesByBackupVaultInput, optFns ...func(*backup.Options)) (*backup.ListProtectedResourcesByBackupVaultOutput, error)
+	ListBackupJobs(ctx context.Context, params *backup.ListBackupJobsInput, optFns ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error)
 }
 
 // APIGatewayV2ClientAPI is the interface for HTTP and WebSocket API browser operations.
@@ -455,6 +465,7 @@ type AwsRepository struct {
 	ACMClient            ACMClientAPI
 	StepFunctionsClient  StepFunctionsClientAPI
 	DynamoDBClient       DynamoDBClientAPI
+	BackupClient         BackupClientAPI
 	APIGatewayV2Client   APIGatewayV2ClientAPI
 
 	WAFV2Client           WAFV2ClientAPI
@@ -590,6 +601,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		ACMClient:            acm.NewFromConfig(awsCfg),
 		StepFunctionsClient:  sfn.NewFromConfig(awsCfg),
 		DynamoDBClient:       dynamodb.NewFromConfig(awsCfg),
+		BackupClient:         backup.NewFromConfig(awsCfg),
 		APIGatewayV2Client:   apigatewayv2.NewFromConfig(awsCfg),
 
 		WAFV2Client:           wafv2.NewFromConfig(awsCfg),

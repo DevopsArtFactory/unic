@@ -90,6 +90,8 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		m.dynamodb = newDynamoDBModel()
 		m.resetFilter(filterDynamoDBTables)
+		normalizeBackupContextReturn(&m)
+		resetBackupContextState(&m)
 		m.ctxPrevWasLoading = false
 		if m.settingsPrevScreen == screenLoading || isDynamoDBScreen(m.settingsPrevScreen) {
 			m.settingsPrevScreen = screenServiceList
@@ -119,6 +121,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
 		resetStepFunctionsContextState(&m)
+		resetBackupContextState(&m)
 		resetSNSContextState(&m)
 		resetAPIGatewayV2ContextState(&m)
 		m.ctxPrevWasLoading = false
@@ -272,6 +275,7 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				normalizeWAFContextReturn(&m)
 			}
 			m.eventBridge.preserveOverlay(&m, screenFeatureList)
+			normalizeBackupContextReturn(&m)
 			m.ctxPrevWasLoading = false
 			return m.startLoading(m.switchContext(selected.Name))
 		}

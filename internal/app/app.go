@@ -133,6 +133,8 @@ const (
 	screenDynamoDBTableDetail
 	screenDynamoDBLookupInput
 	screenDynamoDBLookupResult
+	screenBackupVaultList
+	screenBackupVaultDetail
 	screenWAFWebACLList
 	screenWAFWebACLDetail
 	screenBedrockKeyList
@@ -230,6 +232,7 @@ type Model struct {
 	eventBridge    eventBridgeModel
 	lambda         lambdaModel
 	dynamodb       dynamoDBModel
+	backup         backupModel
 	waf            wafModel
 	inspector      inspectorModel
 
@@ -365,6 +368,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.apiGatewayV2 = newAPIGatewayV2Model()
 	model.lambda = newLambdaModel()
 	model.dynamodb = newDynamoDBModel()
+	model.backup = newBackupModel()
 	model.waf = newWAFModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
@@ -984,6 +988,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.lambda.Start(&m)
 	case domain.FeatureDynamoDBBrowser:
 		return m.dynamodb.Start(&m)
+	case domain.FeatureBackupBrowser:
+		return m.backup.Start(&m)
 	case domain.FeatureWAFWebACLBrowser:
 		return m.waf.Start(&m)
 	case domain.FeatureBedrockAPIKeys:

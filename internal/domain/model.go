@@ -33,6 +33,7 @@ const (
 	ServiceBedrock        AwsService = "Bedrock"
 	ServiceCloudFormation AwsService = "CloudFormation"
 	ServiceDynamoDB       AwsService = "DynamoDB"
+	ServiceBackup         AwsService = "AWS Backup"
 	ServiceAPIGateway     AwsService = "API Gateway"
 	ServiceWAF            AwsService = "WAF"
 )
@@ -76,6 +77,7 @@ const (
 	FeatureBedrockAPIKeys        FeatureKind = "Bedrock API Keys"
 	FeatureCloudFormationBrowser FeatureKind = "CloudFormation Stack Browser"
 	FeatureDynamoDBBrowser       FeatureKind = "DynamoDB Table Browser"
+	FeatureBackupBrowser         FeatureKind = "Backup Recovery Browser"
 	FeatureAPIGatewayV2Browser   FeatureKind = "API Gateway v2 Browser"
 	FeatureWAFWebACLBrowser      FeatureKind = "WAFv2 Web ACL Browser"
 )

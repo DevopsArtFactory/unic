@@ -878,6 +878,10 @@ func (m Model) helpScreenTitle() string {
 		return "CloudFormation Stacks"
 	case screenCloudFormationStackDetail:
 		return "CloudFormation Stack Detail"
+	case screenBackupVaultList:
+		return "AWS Backup Vaults"
+	case screenBackupVaultDetail:
+		return "AWS Backup Recovery Detail"
 	case screenElastiCacheNodeList:
 		return "ElastiCache Nodes"
 	case screenElastiCacheNodeDetail:

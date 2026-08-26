@@ -111,6 +111,7 @@ Current repository clients include:
 - KMS
 - DynamoDB
 - WAFv2 (regional and `us-east-1` CloudFront-scope clients, plus distribution and distribution-tenant association lookups)
+- AWS Backup
 
 Pattern:
 
@@ -268,6 +269,7 @@ Current screen families include:
 - EventBridge rule list/detail, scrollable complete event patterns, and type-to-confirm state changes for eligible rule modes
 - DynamoDB table list/detail and complete-primary-key `GetItem` flows
 - WAFv2 regional/CloudFront Web ACL list and scrollable posture/rule detail flows
+- AWS Backup vault list and scrollable recovery-point/protected-resource/failed-job detail flows
 - Inspector mode home, checklist setup, security findings/detail (including KMS rotation findings), and checklist results/detail flows
 - context picker, context add, and TUI-native context setup/export/unset flows
 - SSO account / role selection and exit notice flows

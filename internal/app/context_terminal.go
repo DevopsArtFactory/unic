@@ -53,6 +53,7 @@ func (m Model) selectedContextInfo() (config.ContextInfo, bool) {
 }
 
 func (m Model) beginContextSetup(selected config.ContextInfo) (tea.Model, tea.Cmd) {
+	normalizeBackupContextReturn(&m)
 	if pendingAPIGatewayV2ContextLoad(&m) {
 		normalizeAPIGatewayV2ContextReturns(&m)
 	}

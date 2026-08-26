@@ -1,0 +1,418 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/backup"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"unic/internal/config"
+	awsservice "unic/internal/services/aws"
+)
+
+type appBackupClient struct {
+	listVaults func(context.Context, *backup.ListBackupVaultsInput, ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error)
+}
+
+func (c *appBackupClient) ListBackupVaults(ctx context.Context, input *backup.ListBackupVaultsInput, opts ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error) {
+	return c.listVaults(ctx, input, opts...)
+}
+
+func (*appBackupClient) ListRecoveryPointsByBackupVault(context.Context, *backup.ListRecoveryPointsByBackupVaultInput, ...func(*backup.Options)) (*backup.ListRecoveryPointsByBackupVaultOutput, error) {
+	return &backup.ListRecoveryPointsByBackupVaultOutput{}, nil
+}
+
+func (*appBackupClient) ListProtectedResourcesByBackupVault(context.Context, *backup.ListProtectedResourcesByBackupVaultInput, ...func(*backup.Options)) (*backup.ListProtectedResourcesByBackupVaultOutput, error) {
+	return &backup.ListProtectedResourcesByBackupVaultOutput{}, nil
+}
+
+func (*appBackupClient) ListBackupJobs(context.Context, *backup.ListBackupJobsInput, ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
+	return &backup.ListBackupJobsOutput{}, nil
+}
+
+func backupTestVaults() []awsservice.BackupVault {
+	return []awsservice.BackupVault{
+		{Name: "prod", ARN: "arn:vault:prod", Region: "ap-northeast-2", State: "AVAILABLE", Type: "BACKUP_VAULT", RecoveryPointCount: 3, Locked: true, EncryptionKeyARN: "arn:kms:prod"},
+		{Name: "dev\x1b]52;c;spoof\a", ARN: "arn:vault:dev", Region: "ap-northeast-2", State: "FAILED", Type: "BACKUP_VAULT"},
+	}
+}
+
+func TestBackupHelpScreenTitles(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	for _, tc := range []struct {
+		screen screen
+		want   string
+	}{
+		{screenBackupVaultList, "AWS Backup Vaults"},
+		{screenBackupVaultDetail, "AWS Backup Recovery Detail"},
+	} {
+		m.screen = tc.screen
+		if got := m.helpScreenTitle(); got != tc.want {
+			t.Errorf("helpScreenTitle() = %q, want %q", got, tc.want)
+		}
+	}
+}
+
+func TestBackupVaultListRendersFiltersWarningsAndEscapesControls(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 80
+	m.height = 20
+	started, _ := m.backup.Start(&m)
+	m = started.(Model)
+	_, _, handled := m.backup.HandleMessage(&m, backupVaultsLoadedMsg{
+		vaults: backupTestVaults(), warnings: []error{errors.New("second page denied")},
+	})
+	if !handled || m.screen != screenBackupVaultList {
+		t.Fatalf("expected backup vault list, screen=%v handled=%v", m.screen, handled)
+	}
+	view := m.backup.viewList(m)
+	plain := stripANSI(view)
+	for _, want := range []string{"AWS Backup Vaults", "prod", "AVAILABLE", "3", "vault listing failures"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("expected %q in vault list, got:\n%s", want, plain)
+		}
+	}
+	if strings.Contains(view, "\x1b]52;c;spoof\a") || !strings.Contains(plain, `\x1b]52;c;spoof\a`) {
+		t.Fatalf("expected terminal controls to be escaped, got %q", view)
+	}
+
+	m.backup.filtered = []awsservice.BackupVault{{Name: "운영", State: "AVAILABLE", Type: "BACKUP_VAULT"}}
+	unicodeView := strings.Split(stripANSI(m.backup.viewList(m)), "\n")
+	headerColumn, rowColumn := -1, -1
+	for _, line := range unicodeView {
+		if index := strings.Index(line, "STATE"); index >= 0 {
+			headerColumn = lipgloss.Width(line[:index])
+		}
+		if index := strings.Index(line, "AVAILABLE"); index >= 0 {
+			rowColumn = lipgloss.Width(line[:index])
+		}
+	}
+	if headerColumn < 0 || rowColumn != headerColumn {
+		t.Fatalf("expected Unicode vault row to align with header, header=%d row=%d", headerColumn, rowColumn)
+	}
+
+	m.storeFilterValue(filterBackupVaults, "failed")
+	m.backup.vaults = backupTestVaults()
+	m.applyFilterTarget(filterBackupVaults)
+	if len(m.backup.filtered) != 1 || !strings.Contains(m.backup.filtered[0].Name, "dev") {
+		t.Fatalf("expected one failed vault match, got %+v", m.backup.filtered)
+	}
+}
+
+func TestBackupDrillDownRendersPartialDetailAndScrolls(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width = 100
+	m.height = 10
+	m.screen = screenBackupVaultList
+	m.backup.vaults = backupTestVaults()[:1]
+	m.backup.filtered = append([]awsservice.BackupVault(nil), m.backup.vaults...)
+
+	updated, cmd := m.backup.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd == nil || m.screen != screenLoading || m.backup.selected == nil || m.backup.selected.Name != "prod" {
+		t.Fatalf("expected detail load, screen=%v selected=%+v command=%v", m.screen, m.backup.selected, cmd)
+	}
+	now := time.Date(2026, 8, 26, 3, 0, 0, 0, time.UTC)
+	detail := &awsservice.BackupVaultDetail{
+		Vault: *m.backup.selected,
+		RecoveryPoints: []awsservice.BackupRecoveryPoint{{
+			ARN: "arn:point", ResourceName: "database\x1b[31m", ResourceType: "RDS", Status: "PARTIAL", StatusMessage: "access denied", CreatedAt: now, DeleteAt: now.Add(24 * time.Hour), SizeBytes: 2048, SizeBytesKnown: true,
+		}},
+		ProtectedResources: []awsservice.BackupProtectedResource{{Name: "database", Type: "RDS", ARN: "arn:db", LastBackupAt: now, LastRecoveryPointARN: "arn:point"}},
+		FailedJobs:         []awsservice.BackupJob{{ID: "job-1", ResourceName: "database", ResourceType: "RDS", State: "COMPLETED", MessageCategory: "PERMISSIONS", CreatedAt: now}},
+	}
+	m.backup.HandleMessage(&m, backupVaultDetailLoadedMsg{vaultName: "prod", detail: detail, warnings: []error{errors.New("protected resources denied"), errors.New("jobs denied")}})
+	if m.screen != screenBackupVaultDetail {
+		t.Fatalf("expected backup detail, got %v", m.screen)
+	}
+	initial := m.backup.viewDetail(m)
+	plain := stripANSI(initial)
+	for _, want := range []string{"AWS Backup Recovery", "detail lookup failures", "protected resources denied", "jobs denied", "Recovery Points"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("expected %q in initial detail, got:\n%s", want, plain)
+		}
+	}
+	if strings.Contains(initial, "\x1b[31m") {
+		t.Fatalf("expected recovery point controls to be escaped, got %q", initial)
+	}
+
+	scrolled := ""
+	for range 10 {
+		m.backup.HandleKey(&m, tea.KeyMsg{Type: tea.KeyPgDown})
+		scrolled = stripANSI(m.backup.viewDetail(m))
+		if strings.Contains(scrolled, "Protected Resources") || strings.Contains(scrolled, "Failed / Expired Jobs") {
+			break
+		}
+	}
+	if m.backup.detailScroll == 0 || (!strings.Contains(scrolled, "Protected Resources") && !strings.Contains(scrolled, "Failed / Expired Jobs")) {
+		t.Fatalf("expected page-down to reveal later recovery sections, scroll=%d view:\n%s", m.backup.detailScroll, scrolled)
+	}
+
+	m.height = 18
+	m.backup.detailScroll = 0
+	for range 100 {
+		m.backup.HandleKey(&m, tea.KeyMsg{Type: tea.KeyDown})
+	}
+	wantOffset := max(len(m.backup.detailLines(m))-m.backup.detailVisibleLines(m), 0)
+	if m.backup.detailScroll != wantOffset || !strings.Contains(stripANSI(m.backup.viewDetail(m)), "PERMISSIONS") {
+		t.Fatalf("expected warning-adjusted final detail lines to be reachable, scroll=%d want=%d", m.backup.detailScroll, wantOffset)
+	}
+}
+
+func TestBackupDetailRefreshReloadsVaultMetadata(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	stale := awsservice.BackupVault{
+		Name: "prod", ARN: "arn:vault:prod", RecoveryPointCount: 1,
+	}
+	m.screen = screenBackupVaultDetail
+	m.backup.selected = &stale
+	m.backup.detail = &awsservice.BackupVaultDetail{Vault: stale}
+	m.backup.vaults = []awsservice.BackupVault{stale}
+	m.backup.filtered = []awsservice.BackupVault{stale}
+	m.awsRepo = &awsservice.AwsRepository{Region: "ap-northeast-2", BackupClient: &appBackupClient{
+		listVaults: func(_ context.Context, input *backup.ListBackupVaultsInput, _ ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error) {
+			if input.NextToken != nil {
+				t.Fatalf("expected a single vault-list page, got token %q", awssdk.ToString(input.NextToken))
+			}
+			return &backup.ListBackupVaultsOutput{BackupVaultList: []backuptypes.BackupVaultListMember{{
+				BackupVaultName: awssdk.String("prod"), BackupVaultArn: awssdk.String("arn:vault:prod"),
+				NumberOfRecoveryPoints: 9, Locked: awssdk.Bool(true), MinRetentionDays: awssdk.Int64(30),
+			}}}, nil
+		},
+	}}
+
+	updated, cmd := m.backup.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updated.(Model)
+	result := runBatchedUserCmd(t, cmd)
+	next, _ := m.Update(result)
+	m = next.(Model)
+
+	if m.backup.detail == nil || m.backup.detail.Vault.RecoveryPointCount != 9 || !m.backup.detail.Vault.Locked || !m.backup.detail.Vault.MinRetentionKnown {
+		t.Fatalf("expected refreshed vault metadata in detail, got %+v", m.backup.detail)
+	}
+	if m.backup.selected == nil || m.backup.selected.RecoveryPointCount != 9 || !m.backup.selected.Locked {
+		t.Fatalf("expected refreshed selected vault, got %+v", m.backup.selected)
+	}
+	lines := stripANSI(strings.Join(m.backup.detailLines(m), "\n"))
+	if !strings.Contains(lines, "9") || !strings.Contains(lines, "locked (minimum 30 days)") {
+		t.Fatalf("expected refreshed recovery count and Vault Lock posture, got:\n%s", lines)
+	}
+
+	m.backup.HandleKey(&m, tea.KeyMsg{Type: tea.KeyEsc})
+	if len(m.backup.vaults) != 1 || m.backup.vaults[0].RecoveryPointCount != 9 || len(m.backup.filtered) != 1 || !m.backup.filtered[0].Locked {
+		t.Fatalf("expected refreshed vault metadata in the canonical list, vaults=%+v filtered=%+v", m.backup.vaults, m.backup.filtered)
+	}
+	updated, cmd = m.backup.updateList(&m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	result = runBatchedUserCmd(t, cmd)
+	next, _ = m.Update(result)
+	m = next.(Model)
+	if m.backup.detail == nil || m.backup.detail.Vault.RecoveryPointCount != 9 || !m.backup.detail.Vault.Locked {
+		t.Fatalf("expected refreshed metadata after returning to the detail, got %+v", m.backup.detail)
+	}
+}
+
+func TestBackupDetailRefreshKeepsPriorVaultWhenListingIsPartial(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	selected := awsservice.BackupVault{Name: "prod", ARN: "arn:vault:prod", RecoveryPointCount: 1}
+	m.screen = screenBackupVaultDetail
+	m.backup.selected = &selected
+	m.backup.detail = &awsservice.BackupVaultDetail{Vault: selected}
+	m.backup.vaults = []awsservice.BackupVault{selected}
+	m.backup.filtered = []awsservice.BackupVault{selected}
+	calls := 0
+	m.awsRepo = &awsservice.AwsRepository{BackupClient: &appBackupClient{
+		listVaults: func(_ context.Context, input *backup.ListBackupVaultsInput, _ ...func(*backup.Options)) (*backup.ListBackupVaultsOutput, error) {
+			calls++
+			if calls == 1 {
+				return &backup.ListBackupVaultsOutput{
+					NextToken: awssdk.String("page-2"),
+					BackupVaultList: []backuptypes.BackupVaultListMember{{
+						BackupVaultName: awssdk.String("dev"), BackupVaultArn: awssdk.String("arn:vault:dev"),
+					}},
+				}, nil
+			}
+			if awssdk.ToString(input.NextToken) != "page-2" {
+				t.Fatalf("expected second-page token, got %q", awssdk.ToString(input.NextToken))
+			}
+			return nil, errors.New("page denied")
+		},
+	}}
+
+	updated, cmd := m.backup.updateDetail(&m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updated.(Model)
+	result := runBatchedUserCmd(t, cmd)
+	next, _ := m.Update(result)
+	m = next.(Model)
+
+	if calls != 2 || m.screen != screenBackupVaultDetail || m.backup.errorActive {
+		t.Fatalf("expected usable detail after partial listing, calls=%d screen=%v state=%+v", calls, m.screen, m.backup)
+	}
+	if m.backup.detail == nil || m.backup.detail.Vault.ARN != selected.ARN || m.backup.detail.Vault.RecoveryPointCount != 1 {
+		t.Fatalf("expected prior selected vault metadata to remain available, got %+v", m.backup.detail)
+	}
+	if len(m.backup.detailErrors) != 1 || !strings.Contains(m.backup.detailErrors[0].Error(), "page denied") {
+		t.Fatalf("expected partial-list warning, got %v", m.backup.detailErrors)
+	}
+}
+
+func TestBackupOptionalNumericFieldsRenderWithoutFalseZeroes(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		vault awsservice.BackupVault
+		want  string
+	}{
+		{name: "minimum only", vault: awsservice.BackupVault{Locked: true, MinRetentionDays: 7, MinRetentionKnown: true}, want: "locked (minimum 7 days)"},
+		{name: "maximum only", vault: awsservice.BackupVault{Locked: true, MaxRetentionDays: 365, MaxRetentionKnown: true}, want: "locked (maximum 365 days)"},
+		{name: "unbounded", vault: awsservice.BackupVault{Locked: true}, want: "locked"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := backupLockSummary(tc.vault); got != tc.want {
+				t.Fatalf("backupLockSummary() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+
+	if got := backupRecoveryPointSize(awsservice.BackupRecoveryPoint{}); got != "-" {
+		t.Fatalf("unknown recovery-point size = %q, want -", got)
+	}
+	if got := backupRecoveryPointSize(awsservice.BackupRecoveryPoint{SizeBytesKnown: true}); got != "0 B" {
+		t.Fatalf("known zero recovery-point size = %q, want 0 B", got)
+	}
+}
+
+func TestBackupIgnoresStaleDetailLoads(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenLoading
+	m.loadingReturnScreen = screenBackupVaultDetail
+	m.backup.selected = &awsservice.BackupVault{Name: "current"}
+	_, _, handled := m.backup.HandleMessage(&m, backupVaultDetailLoadedMsg{
+		vaultName: "stale", detail: &awsservice.BackupVaultDetail{Vault: awsservice.BackupVault{Name: "stale"}},
+	})
+	if !handled || m.screen != screenLoading || m.backup.detail != nil {
+		t.Fatalf("expected stale detail to be ignored, screen=%v detail=%+v handled=%v", m.screen, m.backup.detail, handled)
+	}
+}
+
+func TestBackupDropsPriorContextCompletionForSameNamedVault(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	staleGeneration := m.commands.Renew()
+	m.commands.Renew()
+
+	next := testConfig()
+	next.ContextName = "next"
+	updated, _ := m.Update(contextSwitchedMsg{cfg: next})
+	m = updated.(Model)
+	m.screen = screenLoading
+	m.loadingReturnScreen = screenBackupVaultDetail
+	m.backup.selected = &awsservice.BackupVault{Name: "prod"}
+
+	stale, _ := m.Update(genBoundMsg{gen: staleGeneration, msg: backupVaultDetailLoadedMsg{
+		vaultName: "prod",
+		detail:    &awsservice.BackupVaultDetail{Vault: awsservice.BackupVault{Name: "prod", Region: "old"}},
+	}})
+	model := stale.(Model)
+	if model.backup.detail != nil || model.screen != screenLoading {
+		t.Fatalf("expected prior-context Backup detail to be dropped, screen=%v detail=%+v", model.screen, model.backup.detail)
+	}
+}
+
+func TestBackupLoadCompletionStaysBehindGlobalOverlays(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		screen  screen
+		prepare func(*Model)
+		result  func(Model) screen
+	}{
+		{name: "settings", screen: screenSettings, prepare: func(m *Model) { m.settingsPrevScreen = screenLoading }, result: func(m Model) screen { return m.settingsPrevScreen }},
+		{name: "palette", screen: screenCommandPalette, prepare: func(m *Model) { m.palette.prevScreen = screenLoading }, result: func(m Model) screen { return m.palette.prevScreen }},
+		{name: "views", screen: screenViewList, prepare: func(m *Model) { m.views.prevScreen = screenLoading }, result: func(m Model) screen { return m.views.prevScreen }},
+		{name: "region", screen: screenRegionPicker, prepare: func(m *Model) { m.regionPrevScreen = screenLoading }, result: func(m Model) screen { return m.regionPrevScreen }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testConfig(), "", "dev")
+			m.screen = tc.screen
+			m.loadingReturnScreen = screenBackupVaultList
+			tc.prepare(&m)
+			m.backup.HandleMessage(&m, backupVaultsLoadedMsg{vaults: backupTestVaults()})
+			if m.screen != tc.screen || tc.result(m) != screenBackupVaultList {
+				t.Fatalf("expected load completion behind %s, screen=%v return=%v", tc.name, m.screen, tc.result(m))
+			}
+		})
+	}
+}
+
+func TestBackupLoadCompletionBehindContextAddReturnsToVaultList(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "dev"
+	started, _ := m.backup.Start(&m)
+	m = started.(Model)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: testContexts()})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	m = updated.(Model)
+
+	updated, _ = m.Update(backupVaultsLoadedMsg{vaults: backupTestVaults()})
+	m = updated.(Model)
+	if m.screen != screenContextAdd || m.ctxPrevScreen != screenBackupVaultList {
+		t.Fatalf("expected context add to stay open over the loaded vault list, screen=%v previous=%v", m.screen, m.ctxPrevScreen)
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected context add cancel to reload the context picker")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.screen != screenBackupVaultList || len(m.backup.vaults) != len(backupTestVaults()) {
+		t.Fatalf("expected context flow to return to the loaded vault list, screen=%v vaults=%d", m.screen, len(m.backup.vaults))
+	}
+}
+
+func TestBackupErrorBehindContextPickerIsClearedByContextSwitch(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenContextPicker
+	m.ctxPrevScreen = screenLoading
+	m.loadingReturnScreen = screenBackupVaultList
+	m.backup.HandleMessage(&m, backupVaultsLoadedMsg{err: errors.New("backup denied")})
+	if m.screen != screenContextPicker || m.ctxPrevScreen != screenError || !m.backup.errorActive {
+		t.Fatalf("expected error behind picker, screen=%v return=%v state=%+v", m.screen, m.ctxPrevScreen, m.backup)
+	}
+
+	next := testConfig()
+	next.ContextName = "next"
+	updated, _ := m.Update(contextSwitchedMsg{cfg: next})
+	m = updated.(Model)
+	if m.screen != screenServiceList || len(m.backup.vaults) != 0 || m.backup.errorActive {
+		t.Fatalf("expected context switch to clear backup state and return, screen=%v state=%+v", m.screen, m.backup)
+	}
+}
+
+func TestBackupContextSwitchClearsStateAndFilter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenContextPicker
+	m.ctxPrevScreen = screenBackupVaultDetail
+	m.backup.vaults = backupTestVaults()
+	m.backup.selected = &m.backup.vaults[0]
+	m.storeFilterValue(filterBackupVaults, "prod")
+
+	next := &config.Config{ContextName: "next", Region: "us-east-1"}
+	updated, _ := m.Update(contextSwitchedMsg{cfg: next})
+	m = updated.(Model)
+	if m.screen != screenServiceList || len(m.backup.vaults) != 0 || m.backup.selected != nil || m.filterValue(filterBackupVaults) != "" {
+		t.Fatalf("expected clean backup state after context switch, screen=%v state=%+v filter=%q", m.screen, m.backup, m.filterValue(filterBackupVaults))
+	}
+}
