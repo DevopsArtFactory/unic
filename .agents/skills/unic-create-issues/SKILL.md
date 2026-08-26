@@ -1,27 +1,33 @@
 ---
 name: unic-create-issues
-description: Use when the user asks to create GitHub issues from planned but unimplemented unic work in PLAN.md. Do not use for editing existing issues or for implementation.
+description: Use when the user asks to create GitHub issues for confirmed but unimplemented unic work. Do not use for editing existing issues or for implementation.
 ---
 
-Create GitHub issues for planned `unic` work that does not already have issue
-coverage.
+Create GitHub issues for confirmed `unic` work that does not already have issue
+or pull request coverage.
 
 ## Workflow
 
-1. Read `PLAN.md` to identify planned milestones and unimplemented work.
-2. Fetch existing issues with `gh issue list --state all --limit 100`.
-3. For borderline matches, inspect candidate issues with `gh issue view <number>`
-before deciding a PLAN item is uncovered.
-4. Identify PLAN items without corresponding issues.
-5. Create missing issues with `gh issue create`.
-- Title format: `feat: <description> (M<X>.<Y>)`
-- Label: `enhancement`
-- Body sections: Summary, Details, Checklist
-- Keep checklist items grounded in the repo's real files and directories
+1. Resolve the requested scope from explicit maintainer input. If the request is
+general, inspect current issues and pull requests, recent commits, and relevant
+repository docs or code for a concrete unimplemented gap. Stop without creating
+an issue when no gap is supported by repository evidence.
+2. Fetch existing issues with `gh issue list --state all --limit 100` and open
+pull requests with `gh pr list --state open --limit 100`.
+3. For borderline matches, inspect candidates with `gh issue view <number>` or
+`gh pr view <number>` before deciding the work is uncovered.
+4. Create only confirmed missing issues with `gh issue create`.
+- Use a conventional title prefix that matches the work, such as `feat:`,
+  `fix:`, `docs:`, or `chore:`.
+- Add a label only when an existing repository label clearly applies.
+- Use body sections: Summary, Evidence, Acceptance criteria.
+- Ground the evidence and acceptance criteria in explicit maintainer input,
+  concrete repository paths, or observable current behavior.
 
-6. Skip anything that already has an open or closed issue.
+5. Skip anything already covered by an open or closed issue or an open pull
+request. Do not invent roadmap items, milestones, or implementation details.
 
 ## Output
 
-Report the created issues with URLs and note any PLAN items you intentionally
-left alone because matching issues already existed.
+Report created issues with URLs, duplicate matches that were skipped, and any
+requested scope left alone because it lacked concrete evidence.

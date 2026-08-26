@@ -7,25 +7,24 @@ $ARGUMENTS — feature description or GitHub issue number (e.g., "CloudWatch Log
 
 If `$ARGUMENTS` is empty or blank:
 
-1. Read `PLAN.md` and identify milestones/features that are **not** marked ✅ (complete).
-2. Run `gh issue list --state open --limit 30` to fetch open GitHub issues.
-3. Cross-reference: find open issues whose title or body matches an incomplete PLAN.md item. Also note incomplete PLAN.md items that have no issue yet.
-4. Rank candidates by priority:
-   - Items in the earliest incomplete milestone come first (M3 before M4, M4 before M5, etc.)
-   - Within a milestone, prefer items that already have an open GitHub issue
-   - Within the same milestone, prefer items with fewer dependencies or prerequisites
-5. Present the top 3–5 candidates to the user using AskUserQuestion, showing for each:
-   - The PLAN.md item name and milestone (e.g., "M3.6 — Route 53 Phase 2")
-   - The linked GitHub issue number if one exists, or "(no issue yet)" otherwise
-   - A one-line summary of what's involved
-6. After the user picks one, if no GitHub issue exists for it, remind the user that one should be created (per project workflow rules) before proceeding.
-7. Continue to Phase 1 with the selected feature.
+1. Run `gh issue list --state open --limit 30` to fetch the current backlog.
+2. Inspect open pull requests and exclude issues that already have work in
+   progress.
+3. Rank only actionable open issues, using explicit maintainer priority, issue
+   metadata, described dependencies, and implementation readiness. Do not infer
+   new roadmap work from the codebase.
+4. Present the top 3–5 candidates to the user using AskUserQuestion, showing
+   each issue number, title, and a one-line evidence-based summary.
+5. If no actionable issue exists, stop and report that state instead of
+   inventing a feature.
+6. Continue to Phase 1 with the selected issue.
 
 ## Phase 1: Gather Context
 
 1. If the argument is a GitHub issue number, fetch it with `gh issue view <number>`. Read the full body, checklist, and comments.
 2. If the argument is a description, search for a matching issue with `gh issue list --search "<description>"` and read it if found.
-3. Read `PLAN.md` (if not already read in Phase 0) to find the relevant milestone and any design decisions.
+3. Inspect related pull requests and issue comments for current status and
+   design decisions.
 4. Read `.kiro/docs/architecture-en.md` if it exists for architectural context.
 5. Explore the codebase to understand existing patterns:
    - `internal/domain/model.go` and `catalog.go` for service/feature registration
@@ -43,7 +42,8 @@ Ask the user to clarify before implementing. Tailor questions based on what the 
 - Any edge cases or constraints specific to their AWS environment?
 - Should this go on a separate branch, or add to an existing one?
 
-Skip questions that are already answered by the GitHub issue or PLAN.md.
+Skip questions that are already answered by the GitHub issue, its comments, or
+repository documentation.
 
 ## Phase 3: Plan
 

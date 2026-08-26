@@ -1,6 +1,6 @@
 ---
 name: unic-update-docs
-description: Use when the user asks to refresh documentation for the unic repository after code changes, shipped features, milestone progress, or README drift. Do not use for feature implementation or PR shipping.
+description: Use when the user asks to refresh documentation for the unic repository after code changes, shipped features, delivery status changes, or README drift. Do not use for feature implementation or PR shipping.
 ---
 
 Update `unic` documentation so the checked-in docs match the current repo
@@ -9,7 +9,7 @@ state.
 ## Workflow
 
 1. Gather current state.
-- Read `README.md` and `PLAN.md`.
+- Read `README.md` and the relevant files under `docs/`.
 - Check recent history with `git log --oneline -10`.
 - If the docs update is tied to shipped or in-flight GitHub work, inspect the
   source issue or PR with `gh issue view <number>` or `gh pr view <number>`.
@@ -25,10 +25,13 @@ state.
 - Update `Usage` when commands or flags changed.
 - Update `Configuration` when config shape or precedence changed.
 
-3. Update `PLAN.md` when roadmap state changed.
-- Mark completed items.
-- Adjust sequencing notes when implementation order shifted.
-- Add narrowly scoped sub-items only when the codebase clearly requires them.
+3. Use GitHub tracking for planning status.
+- Treat related issues and pull requests as the source of truth for planned and
+  shipped work.
+- Do not recreate a repository roadmap or infer future work from implementation
+  details.
+- Report issue or pull request status drift that is outside the requested docs
+  update.
 
 4. Keep the docs factual.
 - Do not mark work complete unless the code and validation support it.

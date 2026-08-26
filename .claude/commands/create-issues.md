@@ -1,26 +1,34 @@
-Create GitHub issues for planned but unimplemented features.
+Create GitHub issues for confirmed but unimplemented work.
 
 ## Input
-$ARGUMENTS — optional scope (e.g., "M3 services" or "all remaining")
+$ARGUMENTS — requested scope or explicit maintainer direction
 
 ## Workflow
 
-1. Read `PLAN.md` to identify planned milestones and features.
-2. Run `gh issue list --state all --limit 50` to see existing issues.
-3. Identify features in PLAN.md that don't have corresponding issues yet.
-4. For each missing feature, create an issue with `gh issue create`:
-   - Title: `feat: <description> (M<X>.<Y>)` with the milestone reference
-   - Label: `enhancement`
+1. Resolve the scope from `$ARGUMENTS` or explicit maintainer input. If the
+   request is general, inspect current issues and pull requests, recent commits,
+   and relevant repository docs or code for a concrete unimplemented gap. Stop
+   when no gap is supported by repository evidence.
+2. Run `gh issue list --state all --limit 100` and
+   `gh pr list --state open --limit 100` to find existing coverage.
+3. Inspect borderline matches with `gh issue view <number>` or
+   `gh pr view <number>` before deciding work is uncovered.
+4. For each confirmed missing item, create an issue with `gh issue create`:
+   - Use a conventional title prefix matching the work, such as `feat:`,
+     `fix:`, `docs:`, or `chore:`.
+   - Add a label only when an existing repository label clearly applies.
    - Body format:
      ```
      ## Summary
      <1-2 sentence description>
 
-     ## Details
-     <bullet points of what needs to be built>
+     ## Evidence
+     <explicit maintainer input, concrete repository paths, or current behavior>
 
-     ## Checklist
-     <implementation steps referencing specific files/directories>
+     ## Acceptance criteria
+     <observable outcomes grounded in the evidence>
      ```
-5. Skip features that already have open or closed issues.
-6. Report the list of created issues with URLs.
+5. Skip work already covered by an open or closed issue or an open pull request.
+   Do not invent roadmap items, milestones, or implementation details.
+6. Report created issues with URLs, duplicate matches that were skipped, and
+   requested scope left alone because it lacked concrete evidence.

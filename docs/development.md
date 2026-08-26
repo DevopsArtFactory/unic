@@ -18,6 +18,16 @@ Preferred format:
 <work-type>/<issue-number>-<short-description>
 ```
 
+## Work Tracking
+
+Use GitHub issues and pull requests as the source of truth for planned work,
+implementation status, and delivery decisions.
+
+Before creating an issue, search both open and closed issues and check open pull
+requests for existing coverage. Create new issues only from explicit maintainer
+direction or a concrete gap supported by repository files or observable
+behavior; do not invent roadmap items or mandatory milestone references.
+
 ## Worktree Isolation
 
 Always start repository work from `main` in a fresh git worktree.

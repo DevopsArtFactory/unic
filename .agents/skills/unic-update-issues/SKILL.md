@@ -11,7 +11,7 @@ apply updates.
 1. Gather state.
 - Fetch open issues with `gh issue list --state open --limit 50`.
 - Read issue details with `gh issue view <number>` before proposing edits.
-- Read `PLAN.md`.
+- Read relevant repository docs, code, and issue comments.
 - Check recent history with `git log --oneline -20`.
 - Inspect merged PRs or current code when an issue appears complete.
 - Use `gh pr view <number>` or `gh pr list --state merged --limit 50` when an
@@ -22,7 +22,7 @@ apply updates.
 - partially done
 - stale or superseded
 - missing details or missing links
-- labels or milestone references that should change
+- labels or tracking references that should change
 
 3. Present recommendations before mutating anything.
 - Summarize each issue and the suggested action.
