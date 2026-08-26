@@ -493,6 +493,12 @@ type dynamoDBTablesLoadedMsg struct {
 	tables []awsservice.DynamoDBTable
 }
 
+type wafWebACLsLoadedMsg struct {
+	acls     []awsservice.WAFWebACL
+	warnings []error
+	err      error
+}
+
 type dynamoDBTableDetailLoadedMsg struct {
 	table *awsservice.DynamoDBTable
 }

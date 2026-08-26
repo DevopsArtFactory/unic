@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -36,6 +37,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 
 	"unic/internal/config"
 	uniclog "unic/internal/log"
@@ -48,6 +50,8 @@ var _ KMSClientAPI = (*kms.Client)(nil)
 var _ ACMClientAPI = (*acm.Client)(nil)
 var _ StepFunctionsClientAPI = (*sfn.Client)(nil)
 var _ DynamoDBClientAPI = (*dynamodb.Client)(nil)
+var _ WAFV2ClientAPI = (*wafv2.Client)(nil)
+var _ CloudFrontClientAPI = (*cloudfront.Client)(nil)
 
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
@@ -173,6 +177,20 @@ type DynamoDBClientAPI interface {
 	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
 	DescribeTimeToLive(ctx context.Context, params *dynamodb.DescribeTimeToLiveInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTimeToLiveOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+}
+
+// WAFV2ClientAPI is the read-only surface used by the Web ACL browser.
+type WAFV2ClientAPI interface {
+	ListWebACLs(ctx context.Context, params *wafv2.ListWebACLsInput, optFns ...func(*wafv2.Options)) (*wafv2.ListWebACLsOutput, error)
+	GetWebACL(ctx context.Context, params *wafv2.GetWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.GetWebACLOutput, error)
+	GetLoggingConfiguration(ctx context.Context, params *wafv2.GetLoggingConfigurationInput, optFns ...func(*wafv2.Options)) (*wafv2.GetLoggingConfigurationOutput, error)
+	ListResourcesForWebACL(ctx context.Context, params *wafv2.ListResourcesForWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.ListResourcesForWebACLOutput, error)
+}
+
+// CloudFrontClientAPI is the read-only association lookup used by the Web ACL browser.
+type CloudFrontClientAPI interface {
+	ListDistributionsByWebACLId(ctx context.Context, params *cloudfront.ListDistributionsByWebACLIdInput, optFns ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error)
+	ListDistributionTenantsByCustomization(ctx context.Context, params *cloudfront.ListDistributionTenantsByCustomizationInput, optFns ...func(*cloudfront.Options)) (*cloudfront.ListDistributionTenantsByCustomizationOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
@@ -427,9 +445,14 @@ type AwsRepository struct {
 	ACMClient            ACMClientAPI
 	StepFunctionsClient  StepFunctionsClientAPI
 	DynamoDBClient       DynamoDBClientAPI
-	Region               string
-	Profile              string
-	awsCfg               aws.Config
+
+	WAFV2Client           WAFV2ClientAPI
+	WAFV2CloudFrontClient WAFV2ClientAPI
+	CloudFrontClient      CloudFrontClientAPI
+
+	Region  string
+	Profile string
+	awsCfg  aws.Config
 }
 
 // NewAwsRepository creates a new AwsRepository with configured EC2 and SSM clients.
@@ -524,6 +547,8 @@ func (r *AwsRepository) ForRegion(region string) *AwsRepository {
 }
 
 func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepository {
+	cloudFrontCfg := awsCfg
+	cloudFrontCfg.Region = "us-east-1"
 	return &AwsRepository{
 		EC2Client:            ec2.NewFromConfig(awsCfg),
 		SSMClient:            ssm.NewFromConfig(awsCfg),
@@ -554,9 +579,14 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		ACMClient:            acm.NewFromConfig(awsCfg),
 		StepFunctionsClient:  sfn.NewFromConfig(awsCfg),
 		DynamoDBClient:       dynamodb.NewFromConfig(awsCfg),
-		Region:               region,
-		Profile:              profile,
-		awsCfg:               awsCfg,
+
+		WAFV2Client:           wafv2.NewFromConfig(awsCfg),
+		WAFV2CloudFrontClient: wafv2.NewFromConfig(cloudFrontCfg),
+		CloudFrontClient:      cloudfront.NewFromConfig(cloudFrontCfg),
+
+		Region:  region,
+		Profile: profile,
+		awsCfg:  awsCfg,
 	}
 }
 

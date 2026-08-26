@@ -371,3 +371,19 @@ func TestCatalogContainsSNSBrowserFeature(t *testing.T) {
 	}
 	t.Error("SNS service not found in catalog")
 }
+
+func TestCatalogContainsWAFWebACLBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceWAF {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureWAFWebACLBrowser {
+				return
+			}
+		}
+		t.Error("WAF service should have WAFv2 Web ACL Browser feature")
+		return
+	}
+	t.Error("WAF service not found in catalog")
+}

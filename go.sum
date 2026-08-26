@@ -24,6 +24,8 @@ github.com/aws/aws-sdk-go-v2/service/autoscaling v1.61.1 h1:VB+9RFYfUUY8TyL6W025
 github.com/aws/aws-sdk-go-v2/service/autoscaling v1.61.1/go.mod h1:6q/I1pH386VpPfB6FE62X/MOs6NW/oCsY9FXU33YXOU=
 github.com/aws/aws-sdk-go-v2/service/cloudformation v1.76.3 h1:FjNSXIPC9bbvVRh67j7jGf37gJo/5THzf+pS3T+Don0=
 github.com/aws/aws-sdk-go-v2/service/cloudformation v1.76.3/go.mod h1:yQcvrM5JfBihExrlz+2k7W6mBEM6xexhWT8eHr0akzs=
+github.com/aws/aws-sdk-go-v2/service/cloudfront v1.68.0 h1:JEXUV287ovPx1ttxFSO2O7Cy4IqkB5EJhmDz+wir1pI=
+github.com/aws/aws-sdk-go-v2/service/cloudfront v1.68.0/go.mod h1:jNUBs0mXEytoFacbqg9Kt/6/WK2x31qz4/pztK/I7g4=
 github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.9 h1:ndjU1c3H1BYJy7fG0Y6Nh/sgD2M/KN+PZaqyCK/Fdfs=
 github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.9/go.mod h1:aH6yXmBYSr1k8uycfqxH5pv4T5N3x2cfFPvrlhyWjAU=
 github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.56.0 h1:ud2A364lLBkhGAC7oYw/1xg9BF4acwJC+qdLykxy83o=
@@ -92,6 +94,8 @@ github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.17 h1:jzKAXIlhZhJbnYwHbvUQZEB
 github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.17/go.mod h1:Al9fFsXjv4KfbzQHGe6V4NZSZQXecFcvaIF4e70FoRA=
 github.com/aws/aws-sdk-go-v2/service/sts v1.41.9 h1:Cng+OOwCHmFljXIxpEVXAGMnBia8MSU6Ch5i9PgBkcU=
 github.com/aws/aws-sdk-go-v2/service/sts v1.41.9/go.mod h1:LrlIndBDdjA/EeXeyNBle+gyCwTlizzW5ycgWnvIxkk=
+github.com/aws/aws-sdk-go-v2/service/wafv2 v1.77.7 h1:aYEubZA71DBiNQ5xiKzaLN6hGSBDY/UTnvVlP/8xr34=
+github.com/aws/aws-sdk-go-v2/service/wafv2 v1.77.7/go.mod h1:PO56Pf1k6JN5JAKnXs7NRkOv9IQNsEHPKY7/t6/Wklg=
 github.com/aws/smithy-go v1.27.8 h1:FR0dxZfIlV7Z8eh2iHfIofdunw382XsDV3Mxt9nUvRY=
 github.com/aws/smithy-go v1.27.8/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=

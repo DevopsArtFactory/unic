@@ -352,6 +352,20 @@ var screenKeymaps = map[screen][]keyBinding{
 		{keys: "q / esc", bar: "esc: detail", help: "Return to table detail"},
 		{bar: "H: home"},
 	},
+	screenWAFWebACLList: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between WAF web ACLs"},
+		{keys: "/", bar: "/: filter", help: "Filter by name, scope, rule, ARN, or protected resource"},
+		{keys: "r", bar: "r: refresh", help: "Refresh regional and CloudFront web ACLs"},
+		{keys: "enter", bar: "enter: detail", help: "Open rules, logging, and association details"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the feature list"},
+		{bar: "H: home"},
+	},
+	screenWAFWebACLDetail: {
+		{keys: "↑/↓, j/k", bar: "↑/↓: scroll", help: "Scroll Web ACL details"},
+		{keys: "pgup/pgdn", bar: "pgup/pgdn: page", help: "Scroll Web ACL details by one page"},
+		{keys: "q / esc", bar: "esc: back", help: "Go back to the Web ACL list"},
+		{bar: "H: home"},
+	},
 
 	screenIAMUserList: {
 		{keys: "↑/↓, j/k", bar: "↑/↓: navigate", help: "Move between rows"},
