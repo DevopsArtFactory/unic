@@ -12,8 +12,10 @@ or pull request coverage.
 general, inspect current issues and pull requests, recent commits, and relevant
 repository docs or code for a concrete unimplemented gap. Stop without creating
 an issue when no gap is supported by repository evidence.
-2. Fetch existing issues with `gh issue list --state all --limit 100` and open
-pull requests with `gh pr list --state open --limit 100`.
+2. Fetch all existing issues with
+`gh api --paginate 'repos/{owner}/{repo}/issues?state=all&per_page=100' --jq
+'.[] | select(.pull_request == null)'` and all open pull requests with
+`gh api --paginate 'repos/{owner}/{repo}/pulls?state=open&per_page=100'`.
 3. For borderline matches, inspect candidates with `gh issue view <number>` or
 `gh pr view <number>` before deciding the work is uncovered.
 4. Create only confirmed missing issues with `gh issue create`.

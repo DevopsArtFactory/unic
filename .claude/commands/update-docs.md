@@ -9,7 +9,8 @@ $ARGUMENTS — optional description of what changed (e.g., "RDS is now complete"
    `git log --oneline -10` to understand what shipped. Inspect related GitHub
    issues and pull requests when planning or delivery status matters.
 2. Update `README.md`:
-   - Feature matrix: change status emojis (🚧 → ✅) for completed features
+   - Feature matrix: change status emojis (🚧 → ✅) only after inspecting the
+     implementation and confirming its validation passed
    - Key bindings table: add any new bindings
    - Configuration: update if new config options were added
 3. Update relevant files under `docs/` according to

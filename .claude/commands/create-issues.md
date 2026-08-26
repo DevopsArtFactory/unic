@@ -9,8 +9,10 @@ $ARGUMENTS — requested scope or explicit maintainer direction
    request is general, inspect current issues and pull requests, recent commits,
    and relevant repository docs or code for a concrete unimplemented gap. Stop
    when no gap is supported by repository evidence.
-2. Run `gh issue list --state all --limit 100` and
-   `gh pr list --state open --limit 100` to find existing coverage.
+2. Fetch all existing issues with
+   `gh api --paginate 'repos/{owner}/{repo}/issues?state=all&per_page=100' --jq
+   '.[] | select(.pull_request == null)'` and all open pull requests with
+   `gh api --paginate 'repos/{owner}/{repo}/pulls?state=open&per_page=100'`.
 3. Inspect borderline matches with `gh issue view <number>` or
    `gh pr view <number>` before deciding work is uncovered.
 4. For each confirmed missing item, create an issue with `gh issue create`:

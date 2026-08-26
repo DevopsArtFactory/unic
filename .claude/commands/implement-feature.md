@@ -25,8 +25,10 @@ If `$ARGUMENTS` is empty or blank:
 2. If the argument is a description, search for a matching issue with `gh issue list --search "<description>"` and read it if found.
 3. Inspect related pull requests and issue comments for current status and
    design decisions.
-4. Read `.kiro/docs/architecture-en.md` if it exists for architectural context.
-5. Explore the codebase to understand existing patterns:
+4. If an open pull request already covers the selected issue, stop and report it
+   instead of starting duplicate work.
+5. Read `.kiro/docs/architecture-en.md` if it exists for architectural context.
+6. Explore the codebase to understand existing patterns:
    - `internal/domain/model.go` and `catalog.go` for service/feature registration
    - `internal/services/aws/repository.go` for client interfaces
    - Pick one completed service (e.g., `rds.go`, `rds_model.go`, `rds_test.go`) as the reference implementation

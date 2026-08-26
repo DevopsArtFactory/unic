@@ -25,7 +25,7 @@ state.
 - Update `Usage` when commands or flags changed.
 - Update `Configuration` when config shape or precedence changed.
 
-3. Use GitHub tracking for planning status.
+1. Use GitHub tracking for planning status.
 - Treat related issues and pull requests as the source of truth for planned and
   shipped work.
 - Do not recreate a repository roadmap or infer future work from implementation
