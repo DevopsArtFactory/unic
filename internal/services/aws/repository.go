@@ -8,9 +8,11 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -33,9 +35,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 
 	"unic/internal/config"
 	uniclog "unic/internal/log"
@@ -49,6 +53,9 @@ var _ ACMClientAPI = (*acm.Client)(nil)
 var _ StepFunctionsClientAPI = (*sfn.Client)(nil)
 var _ DynamoDBClientAPI = (*dynamodb.Client)(nil)
 var _ BackupClientAPI = (*backup.Client)(nil)
+var _ APIGatewayV2ClientAPI = (*apigatewayv2.Client)(nil)
+var _ WAFV2ClientAPI = (*wafv2.Client)(nil)
+var _ CloudFrontClientAPI = (*cloudfront.Client)(nil)
 
 // Verify *ec2.Client satisfies EC2ClientAPI at compile time.
 var _ EC2ClientAPI = (*ec2.Client)(nil)
@@ -116,6 +123,17 @@ var _ S3ClientAPI = (*s3.Client)(nil)
 // Verify *lambda.Client satisfies LambdaClientAPI at compile time.
 var _ LambdaClientAPI = (*lambda.Client)(nil)
 
+// SNSClientAPI is the interface for SNS topic and subscription browsing.
+type SNSClientAPI interface {
+	sns.ListTopicsAPIClient
+	sns.ListSubscriptionsByTopicAPIClient
+	GetTopicAttributes(ctx context.Context, params *sns.GetTopicAttributesInput, optFns ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error)
+	GetSubscriptionAttributes(ctx context.Context, params *sns.GetSubscriptionAttributesInput, optFns ...func(*sns.Options)) (*sns.GetSubscriptionAttributesOutput, error)
+}
+
+// Verify *sns.Client satisfies SNSClientAPI at compile time.
+var _ SNSClientAPI = (*sns.Client)(nil)
+
 // SQSClientAPI is the interface for SQS operations used by AwsRepository.
 type SQSClientAPI interface {
 	sqs.ListQueuesAPIClient
@@ -171,6 +189,28 @@ type BackupClientAPI interface {
 	ListRecoveryPointsByBackupVault(ctx context.Context, params *backup.ListRecoveryPointsByBackupVaultInput, optFns ...func(*backup.Options)) (*backup.ListRecoveryPointsByBackupVaultOutput, error)
 	ListProtectedResourcesByBackupVault(ctx context.Context, params *backup.ListProtectedResourcesByBackupVaultInput, optFns ...func(*backup.Options)) (*backup.ListProtectedResourcesByBackupVaultOutput, error)
 	ListBackupJobs(ctx context.Context, params *backup.ListBackupJobsInput, optFns ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error)
+}
+
+// APIGatewayV2ClientAPI is the interface for HTTP and WebSocket API browser operations.
+type APIGatewayV2ClientAPI interface {
+	GetApis(ctx context.Context, params *apigatewayv2.GetApisInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error)
+	GetStages(ctx context.Context, params *apigatewayv2.GetStagesInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error)
+	GetRoutes(ctx context.Context, params *apigatewayv2.GetRoutesInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error)
+	GetIntegrations(ctx context.Context, params *apigatewayv2.GetIntegrationsInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error)
+}
+
+// WAFV2ClientAPI is the read-only surface used by the Web ACL browser.
+type WAFV2ClientAPI interface {
+	ListWebACLs(ctx context.Context, params *wafv2.ListWebACLsInput, optFns ...func(*wafv2.Options)) (*wafv2.ListWebACLsOutput, error)
+	GetWebACL(ctx context.Context, params *wafv2.GetWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.GetWebACLOutput, error)
+	GetLoggingConfiguration(ctx context.Context, params *wafv2.GetLoggingConfigurationInput, optFns ...func(*wafv2.Options)) (*wafv2.GetLoggingConfigurationOutput, error)
+	ListResourcesForWebACL(ctx context.Context, params *wafv2.ListResourcesForWebACLInput, optFns ...func(*wafv2.Options)) (*wafv2.ListResourcesForWebACLOutput, error)
+}
+
+// CloudFrontClientAPI is the read-only association lookup used by the Web ACL browser.
+type CloudFrontClientAPI interface {
+	ListDistributionsByWebACLId(ctx context.Context, params *cloudfront.ListDistributionsByWebACLIdInput, optFns ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error)
+	ListDistributionTenantsByCustomization(ctx context.Context, params *cloudfront.ListDistributionTenantsByCustomizationInput, optFns ...func(*cloudfront.Options)) (*cloudfront.ListDistributionTenantsByCustomizationOutput, error)
 }
 
 // RDSClientAPI is the interface for RDS operations used by AwsRepository.
@@ -399,6 +439,7 @@ type AwsRepository struct {
 	EC2Client            EC2ClientAPI
 	SSMClient            SSMClientAPI
 	KMSClient            KMSClientAPI
+	SNSClient            SNSClientAPI
 	SQSClient            SQSClientAPI
 	RDSClient            RDSClientAPI
 	Route53Client        Route53ClientAPI
@@ -425,9 +466,15 @@ type AwsRepository struct {
 	StepFunctionsClient  StepFunctionsClientAPI
 	DynamoDBClient       DynamoDBClientAPI
 	BackupClient         BackupClientAPI
-	Region               string
-	Profile              string
-	awsCfg               aws.Config
+	APIGatewayV2Client   APIGatewayV2ClientAPI
+
+	WAFV2Client           WAFV2ClientAPI
+	WAFV2CloudFrontClient WAFV2ClientAPI
+	CloudFrontClient      CloudFrontClientAPI
+
+	Region  string
+	Profile string
+	awsCfg  aws.Config
 }
 
 // NewAwsRepository creates a new AwsRepository with configured EC2 and SSM clients.
@@ -522,10 +569,13 @@ func (r *AwsRepository) ForRegion(region string) *AwsRepository {
 }
 
 func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepository {
+	cloudFrontCfg := awsCfg
+	cloudFrontCfg.Region = "us-east-1"
 	return &AwsRepository{
 		EC2Client:            ec2.NewFromConfig(awsCfg),
 		SSMClient:            ssm.NewFromConfig(awsCfg),
 		KMSClient:            kms.NewFromConfig(awsCfg),
+		SNSClient:            sns.NewFromConfig(awsCfg),
 		SQSClient:            sqs.NewFromConfig(awsCfg),
 		RDSClient:            rds.NewFromConfig(awsCfg),
 		Route53Client:        route53.NewFromConfig(awsCfg),
@@ -552,9 +602,15 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		StepFunctionsClient:  sfn.NewFromConfig(awsCfg),
 		DynamoDBClient:       dynamodb.NewFromConfig(awsCfg),
 		BackupClient:         backup.NewFromConfig(awsCfg),
-		Region:               region,
-		Profile:              profile,
-		awsCfg:               awsCfg,
+		APIGatewayV2Client:   apigatewayv2.NewFromConfig(awsCfg),
+
+		WAFV2Client:           wafv2.NewFromConfig(awsCfg),
+		WAFV2CloudFrontClient: wafv2.NewFromConfig(cloudFrontCfg),
+		CloudFrontClient:      cloudfront.NewFromConfig(cloudFrontCfg),
+
+		Region:  region,
+		Profile: profile,
+		awsCfg:  awsCfg,
 	}
 }
 

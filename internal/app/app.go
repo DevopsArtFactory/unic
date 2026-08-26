@@ -97,6 +97,9 @@ const (
 	screenFISTemplateDetail
 	screenFISExperimentList
 	screenFISExperimentDetail
+	screenSNSTopicList
+	screenSNSTopicDetail
+	screenSNSSubscriptionList
 	screenSQSQueueList
 	screenSQSQueueDetail
 	screenSQSConfirm
@@ -115,6 +118,10 @@ const (
 	screenStepFunctionStateMachineList
 	screenStepFunctionExecutionList
 	screenStepFunctionExecutionDetail
+	screenAPIGatewayV2APIList
+	screenAPIGatewayV2APIDetail
+	screenAPIGatewayV2RouteList
+	screenAPIGatewayV2RouteDetail
 	screenS3BucketList
 	screenS3ObjectList
 	screenS3ObjectDetail
@@ -128,6 +135,8 @@ const (
 	screenDynamoDBLookupResult
 	screenBackupVaultList
 	screenBackupVaultDetail
+	screenWAFWebACLList
+	screenWAFWebACLDetail
 	screenBedrockKeyList
 	screenBedrockKeyDetail
 	screenBedrockKeyCreate
@@ -211,6 +220,7 @@ type Model struct {
 	secrets        secretsModel
 	security       securityGroupModel
 	s3             s3Model
+	sns            snsModel
 	sqs            sqsModel
 	elb            elbModel
 	ssmParams      ssmParamsModel
@@ -218,10 +228,12 @@ type Model struct {
 	kms            kmsModel
 	acm            acmModel
 	stepFunctions  stepFunctionsModel
+	apiGatewayV2   apiGatewayV2Model
 	eventBridge    eventBridgeModel
 	lambda         lambdaModel
 	dynamodb       dynamoDBModel
 	backup         backupModel
+	waf            wafModel
 	inspector      inspectorModel
 
 	// Context picker
@@ -345,6 +357,7 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.secrets = newSecretsModel()
 	model.security = newSecurityGroupModel()
 	model.s3 = newS3Model()
+	model.sns = newSNSModel()
 	model.sqs = newSQSModel()
 	model.elb = newELBModel()
 	model.ssmParams = newSSMParamsModel()
@@ -352,9 +365,11 @@ func New(cfg *config.Config, configPath string, version string, checklistPath ..
 	model.kms = newKMSModel()
 	model.acm = newACMModel()
 	model.stepFunctions = newStepFunctionsModel()
+	model.apiGatewayV2 = newAPIGatewayV2Model()
 	model.lambda = newLambdaModel()
 	model.dynamodb = newDynamoDBModel()
 	model.backup = newBackupModel()
+	model.waf = newWAFModel()
 	model.inspector = newInspectorModel(configuredChecklistPath)
 	model.applyServiceListFilter()
 	return model
@@ -933,6 +948,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.cwLogs.Start(&m)
 	case domain.FeatureS3Browser:
 		return m.s3.Start(&m)
+	case domain.FeatureSNSBrowser:
+		return m.sns.Start(&m)
 	case domain.FeatureSQSBrowser:
 		return m.sqs.Start(&m)
 	case domain.FeatureELBBrowser:
@@ -947,6 +964,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.acm.Start(&m)
 	case domain.FeatureStepFunctionsBrowser:
 		return m.stepFunctions.Start(&m)
+	case domain.FeatureAPIGatewayV2Browser:
+		return m.apiGatewayV2.Start(&m)
 	case domain.FeatureSecurityGroupBrowser:
 		return m.security.Start(&m)
 	case domain.FeatureIAMUsersBrowser:
@@ -971,6 +990,8 @@ func (m Model) startFeature(kind domain.FeatureKind) (tea.Model, tea.Cmd) {
 		return m.dynamodb.Start(&m)
 	case domain.FeatureBackupBrowser:
 		return m.backup.Start(&m)
+	case domain.FeatureWAFWebACLBrowser:
+		return m.waf.Start(&m)
 	case domain.FeatureBedrockAPIKeys:
 		return m.bedrock.Start(&m)
 	}

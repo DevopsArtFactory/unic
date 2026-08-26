@@ -36,6 +36,7 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureECRRepositoryBrowser:  filterECRRepositories,
 	domain.FeatureFISTemplateBrowser:    filterFISTemplates,
 	domain.FeatureS3Browser:             filterS3Buckets,
+	domain.FeatureSNSBrowser:            filterSNSTopics,
 	domain.FeatureSQSBrowser:            filterSQSQueues,
 	domain.FeatureELBBrowser:            filterELBs,
 	domain.FeatureACMCertificateBrowser: filterACMCertificates,
@@ -46,6 +47,8 @@ var featurePrimaryFilter = map[domain.FeatureKind]filterTarget{
 	domain.FeatureLambdaBrowser:         filterLambdaFunctions,
 	domain.FeatureDynamoDBBrowser:       filterDynamoDBTables,
 	domain.FeatureBackupBrowser:         filterBackupVaults,
+	domain.FeatureAPIGatewayV2Browser:   filterAPIGatewayV2APIs,
+	domain.FeatureWAFWebACLBrowser:      filterWAFWebACLs,
 	domain.FeatureBedrockAPIKeys:        filterBedrockKeys,
 	domain.FeatureVPCBrowser:            filterVPCs,
 }

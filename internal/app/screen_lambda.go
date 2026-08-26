@@ -49,9 +49,8 @@ func (lm *lambdaModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd,
 	case lambdaFunctionsLoadedMsg:
 		lm.functions = msg.functions
 		lm.regionErrors = msg.regionErrors
-		lm.filtered = msg.functions
+		lm.filtered = applyFilter(msg.functions, m.filterValue(filterLambdaFunctions))
 		lm.functionIdx = 0
-		m.resetFilter(filterLambdaFunctions)
 		m.screen = screenLambdaFunctionList
 		return *m, nil, true
 	case lambdaInvokeResultMsg:
@@ -114,6 +113,7 @@ func (lm *lambdaModel) updateFunctionList(m *Model, msg tea.KeyMsg) (tea.Model, 
 
 	switch msg.String() {
 	case "q", "esc":
+		m.resetFilter(filterLambdaFunctions)
 		m.screen = screenFeatureList
 	case "up", "k":
 		lm.functionIdx = previousListIndex(lm.functionIdx, len(lm.filtered))

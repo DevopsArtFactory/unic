@@ -22,6 +22,7 @@ const (
 	ServiceFIS            AwsService = "FIS"
 	ServiceElastiCache    AwsService = "ElastiCache"
 	ServiceS3             AwsService = "S3"
+	ServiceSNS            AwsService = "SNS"
 	ServiceSQS            AwsService = "SQS"
 	ServiceELB            AwsService = "ELB"
 	ServiceParameterStore AwsService = "Parameter Store"
@@ -33,6 +34,8 @@ const (
 	ServiceCloudFormation AwsService = "CloudFormation"
 	ServiceDynamoDB       AwsService = "DynamoDB"
 	ServiceBackup         AwsService = "AWS Backup"
+	ServiceAPIGateway     AwsService = "API Gateway"
+	ServiceWAF            AwsService = "WAF"
 )
 
 // FeatureKind represents a specific feature within a service.
@@ -63,6 +66,7 @@ const (
 	FeatureFISTemplateBrowser    FeatureKind = "FIS Experiment Template Browser"
 	FeatureElastiCacheBrowser    FeatureKind = "ElastiCache Browser"
 	FeatureS3Browser             FeatureKind = "S3 Browser"
+	FeatureSNSBrowser            FeatureKind = "SNS Topic Browser"
 	FeatureSQSBrowser            FeatureKind = "SQS Queue Browser"
 	FeatureELBBrowser            FeatureKind = "Load Balancer Browser"
 	FeatureSSMParameterBrowser   FeatureKind = "Parameter Store Browser"
@@ -74,6 +78,8 @@ const (
 	FeatureCloudFormationBrowser FeatureKind = "CloudFormation Stack Browser"
 	FeatureDynamoDBBrowser       FeatureKind = "DynamoDB Table Browser"
 	FeatureBackupBrowser         FeatureKind = "Backup Recovery Browser"
+	FeatureAPIGatewayV2Browser   FeatureKind = "API Gateway v2 Browser"
+	FeatureWAFWebACLBrowser      FeatureKind = "WAFv2 Web ACL Browser"
 )
 
 // Feature describes a selectable feature under an AWS service.

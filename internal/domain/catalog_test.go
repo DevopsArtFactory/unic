@@ -356,6 +356,22 @@ func TestCatalogContainsStepFunctionsBrowserFeature(t *testing.T) {
 	t.Error("Step Functions service not found in catalog")
 }
 
+func TestCatalogContainsAPIGatewayV2BrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceAPIGateway {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureAPIGatewayV2Browser {
+				return
+			}
+		}
+		t.Error("API Gateway service should have API Gateway v2 Browser feature")
+		return
+	}
+	t.Error("API Gateway service not found in catalog")
+}
+
 func TestCatalogContainsAutoScalingBrowserFeature(t *testing.T) {
 	for _, svc := range Catalog() {
 		if svc.Name != ServiceEC2 {
@@ -370,4 +386,36 @@ func TestCatalogContainsAutoScalingBrowserFeature(t *testing.T) {
 		return
 	}
 	t.Error("EC2 service not found in catalog")
+}
+
+func TestCatalogContainsSNSBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceSNS {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureSNSBrowser {
+				return
+			}
+		}
+		t.Error("SNS service should have SNS Topic Browser feature")
+		return
+	}
+	t.Error("SNS service not found in catalog")
+}
+
+func TestCatalogContainsWAFWebACLBrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceWAF {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureWAFWebACLBrowser {
+				return
+			}
+		}
+		t.Error("WAF service should have WAFv2 Web ACL Browser feature")
+		return
+	}
+	t.Error("WAF service not found in catalog")
 }

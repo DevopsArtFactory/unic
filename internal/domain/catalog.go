@@ -163,6 +163,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceSNS,
+			Features: []Feature{
+				{
+					Kind:        FeatureSNSBrowser,
+					Description: "Browse topics and their subscriptions, protocols, and endpoints",
+				},
+			},
+		},
+		{
 			Name: ServiceSQS,
 			Features: []Feature{
 				{
@@ -233,6 +242,24 @@ func Catalog() []Service {
 				{
 					Kind:        FeatureBackupBrowser,
 					Description: "Inspect backup vaults, recovery points, protected resources, and failed jobs",
+				},
+			},
+		},
+		{
+			Name: ServiceAPIGateway,
+			Features: []Feature{
+				{
+					Kind:        FeatureAPIGatewayV2Browser,
+					Description: "Browse HTTP and WebSocket APIs, stages, routes, and integrations",
+				},
+			},
+		},
+		{
+			Name: ServiceWAF,
+			Features: []Feature{
+				{
+					Kind:        FeatureWAFWebACLBrowser,
+					Description: "Inspect regional and CloudFront web ACL protection posture",
 				},
 			},
 		},
