@@ -21,7 +21,13 @@ verified as a repository maintainer through GitHub repository permissions.
    pull requests with
    `gh api --paginate 'repos/{owner}/{repo}/pulls?state=open&per_page=100' --jq
    '.[] | {number,title,state,head: .head.ref}'`.
-3. Inspect borderline matches with
+3. For every proposed item, search all issue states and open pull requests with
+   distinctive candidate terms in titles, bodies, and comments:
+   `gh issue list --state all --search '<terms> in:title,body,comments' --limit
+   1000 --json number,title,state` and
+   `gh pr list --state open --search '<terms> in:title,body,comments' --limit
+   1000 --json number,title,state,headRefName`. Repeat with additional defining
+   terms when needed, then inspect every plausible match with
    `gh issue view <number> --json title,body,state,comments` or
    `gh pr view <number> --json title,body,state,comments,reviews` before
    deciding work is uncovered.

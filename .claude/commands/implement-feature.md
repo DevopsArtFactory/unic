@@ -13,8 +13,12 @@ a repository maintainer through GitHub repository permissions.
 
 If `$ARGUMENTS` is empty or blank:
 
-1. Run `gh issue list --state open --limit 30` to fetch the current backlog.
-2. Inspect open pull requests and exclude issues that already have work in
+1. Fetch the complete current backlog with `gh api --paginate
+   'repos/{owner}/{repo}/issues?state=open&per_page=100' --jq '.[] |
+   select(.pull_request == null) | {number,title,state}'`.
+2. Inspect every open pull request with `gh api --paginate
+   'repos/{owner}/{repo}/pulls?state=open&per_page=100' --jq '.[] |
+   {number,title,head: .head.ref}'` and exclude issues that already have work in
    progress.
 3. Rank only actionable open issues, using explicit maintainer priority, issue
    metadata, described dependencies, and implementation readiness. Do not infer
@@ -27,11 +31,16 @@ If `$ARGUMENTS` is empty or blank:
 
 ## Phase 1: Gather Context
 
-1. If the argument is a GitHub issue number, fetch its body and comments with
-   `gh issue view <number> --json title,body,comments`.
-2. If the argument is a description, search for a matching issue with `gh issue list --search "<description>"` and read it if found.
-3. Inspect related pull requests and issue comments for current status, linked
-   or in-progress pull requests, and design decisions.
+1. Resolve the argument to an issue number. For a description, search open
+   issues with `gh issue list --state open --search "<description>"`, then
+   select a matching issue before continuing.
+2. Fetch the selected issue with `gh issue view <number> --json
+   title,body,state,comments`. Stop unless it is open, except when the invoking
+   user or a permission-verified maintainer explicitly directs follow-up work.
+3. Search every open pull request for the issue number and distinctive terms in
+   titles, bodies, and comments with `gh pr list --state open --search '<terms>
+   in:title,body,comments' --limit 1000 --json number,title,headRefName`. Also
+   inspect branch names and links in the issue comments.
 4. If an open pull request already covers the selected issue, stop and report it
    instead of starting duplicate work.
 5. Read `.kiro/docs/architecture-en.md` if it exists for architectural context.
