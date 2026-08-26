@@ -53,6 +53,9 @@ func (m Model) selectedContextInfo() (config.ContextInfo, bool) {
 }
 
 func (m Model) beginContextSetup(selected config.ContextInfo) (tea.Model, tea.Cmd) {
+	if pendingAPIGatewayV2ContextLoad(&m) {
+		normalizeAPIGatewayV2ContextReturns(&m)
+	}
 	if auth.IsBaseSSOContext(selected) {
 		details := []string{
 			renderDetailLine("Context", selected.Name),

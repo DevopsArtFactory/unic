@@ -8,6 +8,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
@@ -50,6 +51,7 @@ var _ KMSClientAPI = (*kms.Client)(nil)
 var _ ACMClientAPI = (*acm.Client)(nil)
 var _ StepFunctionsClientAPI = (*sfn.Client)(nil)
 var _ DynamoDBClientAPI = (*dynamodb.Client)(nil)
+var _ APIGatewayV2ClientAPI = (*apigatewayv2.Client)(nil)
 var _ WAFV2ClientAPI = (*wafv2.Client)(nil)
 var _ CloudFrontClientAPI = (*cloudfront.Client)(nil)
 
@@ -177,6 +179,14 @@ type DynamoDBClientAPI interface {
 	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
 	DescribeTimeToLive(ctx context.Context, params *dynamodb.DescribeTimeToLiveInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTimeToLiveOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+}
+
+// APIGatewayV2ClientAPI is the interface for HTTP and WebSocket API browser operations.
+type APIGatewayV2ClientAPI interface {
+	GetApis(ctx context.Context, params *apigatewayv2.GetApisInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error)
+	GetStages(ctx context.Context, params *apigatewayv2.GetStagesInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error)
+	GetRoutes(ctx context.Context, params *apigatewayv2.GetRoutesInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetRoutesOutput, error)
+	GetIntegrations(ctx context.Context, params *apigatewayv2.GetIntegrationsInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error)
 }
 
 // WAFV2ClientAPI is the read-only surface used by the Web ACL browser.
@@ -445,6 +455,7 @@ type AwsRepository struct {
 	ACMClient            ACMClientAPI
 	StepFunctionsClient  StepFunctionsClientAPI
 	DynamoDBClient       DynamoDBClientAPI
+	APIGatewayV2Client   APIGatewayV2ClientAPI
 
 	WAFV2Client           WAFV2ClientAPI
 	WAFV2CloudFrontClient WAFV2ClientAPI
@@ -579,6 +590,7 @@ func newRepositoryFromConfig(awsCfg aws.Config, region, profile string) *AwsRepo
 		ACMClient:            acm.NewFromConfig(awsCfg),
 		StepFunctionsClient:  sfn.NewFromConfig(awsCfg),
 		DynamoDBClient:       dynamodb.NewFromConfig(awsCfg),
+		APIGatewayV2Client:   apigatewayv2.NewFromConfig(awsCfg),
 
 		WAFV2Client:           wafv2.NewFromConfig(awsCfg),
 		WAFV2CloudFrontClient: wafv2.NewFromConfig(cloudFrontCfg),

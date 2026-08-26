@@ -106,6 +106,7 @@ Current repository clients include:
 - ElastiCache
 - ACM
 - Step Functions
+- API Gateway v2
 - S3
 - KMS
 - DynamoDB
@@ -260,6 +261,7 @@ Current screen families include:
 - ElastiCache replication-group/cluster list, node list, and node detail flows
 - ACM certificate list/detail flows
 - Step Functions state machine list, failure-prioritized execution list, and execution detail flows
+- API Gateway v2 API list, stage summary, route list, and integration detail flows with Lambda handoff
 - S3 bucket/object/detail flows
 - KMS key list/detail and rotation-posture flows
 - SNS topic list/detail and per-topic subscription list flows

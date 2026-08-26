@@ -481,6 +481,8 @@ The service list defaults to favorites first, then alphabetical order. Press `f`
 
 Watch mode is available on the CloudWatch alarm list, ECS rollout detail, SQS queue list/detail, and ELB target-group/target-health screens. Press `W` to toggle opt-in background refresh and `I` to cycle the 5s, 15s, and 30s presets. The active screen keeps its selection or scroll position while data changes; leaving the screen or starting an explicit refresh stops watch mode and cancels any in-flight watch request.
 
+API Gateway v2 lists support filtering across APIs and routes.
+
 The EKS Browser includes a managed add-on status view for each cluster. Add-on rows show the installed version, status, and health summary, with degraded or unhealthy add-ons highlighted so core components such as CoreDNS, kube-proxy, VPC CNI, and CSI drivers are easy to spot.
 
 The ECR Login Helper resolves the private registry URI for the active context and shows copyable Docker and Podman login commands without leaving the TUI. The copied commands are prefixed with `eval "$(unic env <context>)"` so they authenticate with the active unic context rather than whatever ambient AWS credentials the shell happens to have; `unic ecr login` remains as a secondary CLI helper for scripting. The ECR Repository Browser opens image/tag lists from each repository. Image rows include tags, digest, pushed time, and size, and mark untagged images or images older than 90 days as cleanup candidates. Image detail exposes digest and tag values for clipboard copy.

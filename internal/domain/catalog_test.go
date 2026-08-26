@@ -340,6 +340,22 @@ func TestCatalogContainsStepFunctionsBrowserFeature(t *testing.T) {
 	t.Error("Step Functions service not found in catalog")
 }
 
+func TestCatalogContainsAPIGatewayV2BrowserFeature(t *testing.T) {
+	for _, svc := range Catalog() {
+		if svc.Name != ServiceAPIGateway {
+			continue
+		}
+		for _, feat := range svc.Features {
+			if feat.Kind == FeatureAPIGatewayV2Browser {
+				return
+			}
+		}
+		t.Error("API Gateway service should have API Gateway v2 Browser feature")
+		return
+	}
+	t.Error("API Gateway service not found in catalog")
+}
+
 func TestCatalogContainsAutoScalingBrowserFeature(t *testing.T) {
 	for _, svc := range Catalog() {
 		if svc.Name != ServiceEC2 {

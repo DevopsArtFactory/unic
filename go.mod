@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.12
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.12
 	github.com/aws/aws-sdk-go-v2/service/acm v1.44.1
+	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.37.7
 	github.com/aws/aws-sdk-go-v2/service/autoscaling v1.61.1
 	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.76.3
 	github.com/aws/aws-sdk-go-v2/service/cloudfront v1.68.0

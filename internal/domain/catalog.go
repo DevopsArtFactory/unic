@@ -237,6 +237,15 @@ func Catalog() []Service {
 			},
 		},
 		{
+			Name: ServiceAPIGateway,
+			Features: []Feature{
+				{
+					Kind:        FeatureAPIGatewayV2Browser,
+					Description: "Browse HTTP and WebSocket APIs, stages, routes, and integrations",
+				},
+			},
+		},
+		{
 			Name: ServiceWAF,
 			Features: []Feature{
 				{

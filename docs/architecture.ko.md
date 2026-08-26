@@ -106,6 +106,7 @@ repository와 서비스별 AWS 연동 계층이다.
 - ElastiCache
 - ACM
 - Step Functions
+- API Gateway v2
 - S3
 - KMS
 - DynamoDB
@@ -260,6 +261,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - ElastiCache replication group/cluster list, node list, node detail
 - ACM 인증서 list/detail
 - Step Functions state machine list, failure 우선 execution list, execution detail
+- API Gateway v2 API list, stage 요약, route list, integration detail 및 Lambda handoff flow
 - S3 bucket/object/detail
 - KMS key list/detail, rotation 상태
 - SNS topic list/detail, topic별 subscription list flow
