@@ -53,8 +53,8 @@ asks for planning or advisory-only output.
   shipped behavior.
 - Keep `Currently Implemented Features`, `TUI Key Bindings`, `Usage`, and
   `Configuration` aligned with the code.
-- When milestone or issue status changes, update the relevant GitHub issue or
-  pull request before shipping.
+- When issue or pull request status changes, update the relevant GitHub record
+  before shipping.
 
 ## Repo Skills
 
