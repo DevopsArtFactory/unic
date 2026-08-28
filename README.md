@@ -323,7 +323,7 @@ Context ordering:
 | SNS | Topic Browser |
 | SQS | Queue Browser |
 | ELB | Load Balancer Browser |
-| SSM Parameter Store | Parameter Browser |
+| Parameter Store | Parameter Browser |
 | KMS | Key Browser |
 | ACM | Certificate Browser |
 | Step Functions | Execution Browser |
@@ -331,6 +331,7 @@ Context ordering:
 | Lambda | Lambda Browser |
 | DynamoDB | Table Browser & Key Lookup |
 | AWS Backup | Recovery Browser |
+| API Gateway | API Gateway v2 Browser |
 | WAF | WAFv2 Web ACL Browser |
 | Bedrock | API Key Manager |
 | IAM | IAM User Browser |
@@ -473,6 +474,7 @@ checks:
 | Lambda | `A` toggle all-regions scope (multi-region contexts), `Enter` invoke, `d` detail, `l` view CloudWatch Logs, `/` filter, `r` refresh |
 | DynamoDB | `/` filter, `r` refresh, `Enter` table detail, detail `l` prompts for the complete partition/sort key and performs one `GetItem`, `↑`/`↓` and `PgUp`/`PgDn` scroll details or item JSON |
 | AWS Backup | `/` filter vaults, `r` refresh, `Enter` recovery-readiness detail, detail `↑`/`↓` scroll and `PgUp`/`PgDn` page through recovery points, protected resources, and recent failed/expired jobs |
+| API Gateway v2 | `/` filter APIs/routes, `r` refresh, `Enter` detail/routes, route detail `y` copy integration target, `g` open linked Lambda function |
 | WAFv2 | `/` filter, `r` refresh regional and CloudFront scopes, `Enter` logging/association/rule detail, detail `↑`/`↓` scroll, `PgUp`/`PgDn` page |
 
 The command palette (`P`) fuzzy-searches three kinds of items from anywhere outside text-entry screens: service features (jump straight into a browser), contexts (switch without opening the picker), and resources indexed across services. Opening the palette starts an async index of EC2 instances, RDS instances, Lambda functions, S3 buckets, ECS clusters, and Route53 zones in the current context. Press `Tab` to opt into searching the active context plus sync-managed contexts; context fan-out is bounded, rows show context and region tags, and per-context/service failures are shown inline. Matching covers names, IDs, ARNs, contexts, and regions where available. Selecting a resource in another context switches context and then jumps to the owning browser with the shared filter prefilled to that resource.

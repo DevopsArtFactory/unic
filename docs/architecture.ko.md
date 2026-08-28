@@ -90,28 +90,37 @@ repository와 서비스별 AWS 연동 계층이다.
 
 - EC2
 - SSM
+- KMS
+- SNS
+- SQS
 - RDS
-- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
-- CloudWatch Metrics
-- EventBridge
 - STS
+- CloudWatch Metrics / Alarms
 - CloudWatch Logs
+- CloudTrail
+- CloudFormation
+- GuardDuty
+- AWS Config
 - ECS
 - ECR
+- EKS
 - Auto Scaling
 - FIS
 - ElastiCache
+- EventBridge
+- ELBv2
+- S3
+- Lambda
 - ACM
 - Step Functions
-- API Gateway v2
-- S3
-- KMS
 - DynamoDB
-- WAFv2 (regional 및 `us-east-1` CloudFront scope client와 distribution 및 distribution tenant association lookup)
 - AWS Backup
+- API Gateway v2
+- WAFv2 (regional 및 `us-east-1` CloudFront scope client)
+- CloudFront (WAFv2의 distribution 및 distribution tenant association lookup)
 
 패턴:
 
@@ -159,23 +168,35 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - `screen_ec2_browser.go`
 - `screen_autoscaling.go`
 - `screen_vpc.go`
+- `screen_reachability.go`
 - `screen_rds.go`
 - `screen_cloudformation.go`
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
+- `screen_cloudtrail.go`
+- `screen_eventbridge.go`
+- `screen_cwalarms.go`
 - `screen_cloudwatchmetrics.go`
 - `screen_cloudwatchlogs.go`
 - `screen_ecs.go`
 - `screen_eks.go`
 - `screen_ecr.go`
+- `screen_fis.go`
 - `screen_elasticache.go`
+- `screen_sns.go`
+- `screen_sqs.go`
+- `screen_elb.go`
+- `screen_ssmparams.go`
 - `screen_acm.go`
 - `screen_stepfunctions.go`
+- `screen_apigatewayv2.go`
 - `screen_s3.go`
 - `screen_lambda.go`
 - `screen_dynamodb.go`
 - `screen_bedrock.go`
+- `screen_backup.go`
+- `screen_wafv2.go`
 - `screen_secrets.go`
 - `screen_kms.go`
 - `screen_inspector.go`
@@ -253,6 +274,8 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - Secrets Manager list/detail
 - Security Group list/detail/edit
 - IAM user, key, key rotation
+- CloudTrail event list/detail, time window, mutation, resource-name filtering
+- CloudWatch alarm list/detail, 상태 filtering, watch, 관련 resource/log handoff
 - CloudWatch metric list/detail
 - CloudWatch Logs group/stream/viewer
 - ECS cluster/service/rollout detail/task/container
@@ -266,7 +289,12 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - S3 bucket/object/detail
 - KMS key list/detail, rotation 상태
 - SNS topic list/detail, topic별 subscription list flow
+- SQS queue list/detail, DLQ navigation, watch, type-to-confirm redrive/purge
+- ELB load balancer/target group/target health, watch flow
+- Parameter Store list/detail, reveal-gated value, no-print copy flow
 - EventBridge rule list/detail, 스크롤 가능한 전체 event pattern, 변경 가능한 rule mode의 type-to-confirm 상태 변경 flow
+- Lambda function list/detail, invoke, CloudWatch Logs handoff flow
+- Bedrock IAM user/API key list, type-to-confirm create/rotate/delete flow
 - DynamoDB table list/detail, 전체 primary key 기반 `GetItem`
 - WAFv2 regional/CloudFront Web ACL list, 스크롤 가능한 posture/rule detail
 - AWS Backup vault list, recovery point/protected resource/failed job 스크롤 상세 화면
