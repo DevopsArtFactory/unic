@@ -51,7 +51,7 @@ func mutationError(err error, permission string) StructuredError {
 
 	result.Code = apiErr.ErrorCode()
 	code := strings.ToLower(result.Code)
-	result.Retryable = apiErr.ErrorFault() == smithy.FaultServer || strings.Contains(code, "throttl") || strings.Contains(code, "timeout")
+	result.Retryable = apiErr.ErrorFault() == smithy.FaultServer || strings.Contains(code, "throttl") || strings.Contains(code, "timeout") || strings.Contains(code, "serviceunavailable")
 	if strings.Contains(code, "accessdenied") || strings.Contains(code, "unauthorized") || strings.Contains(code, "forbidden") {
 		result.RequiredPermission = permission
 	}

@@ -190,6 +190,7 @@ func TestContextSyncJSONErrorsClassifyRetryAndPermission(t *testing.T) {
 		permission bool
 	}{
 		{name: "retryable", apiError: &smithy.GenericAPIError{Code: "ThrottlingException", Message: "slow down", Fault: smithy.FaultClient}, retryable: true},
+		{name: "service unavailable", apiError: &smithy.GenericAPIError{Code: "ServiceUnavailableException", Message: "try later", Fault: smithy.FaultClient}, retryable: true},
 		{name: "permission", apiError: &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "denied", Fault: smithy.FaultClient}, permission: true},
 	}
 	for _, tt := range tests {
