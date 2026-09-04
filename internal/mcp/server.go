@@ -305,7 +305,10 @@ func decodeArguments(raw json.RawMessage, target any) error {
 
 func toolError(err error) map[string]any {
 	structured := map[string]any{"code": "operation_failed", "message": err.Error(), "retryable": false}
-	encoded, _ := json.Marshal(structured)
+	encoded, marshalErr := json.Marshal(structured)
+	if marshalErr != nil {
+		encoded = []byte(`{"code":"operation_failed","message":"failed to encode error","retryable":false}`)
+	}
 	return map[string]any{
 		"content":           []map[string]string{{"type": "text", "text": string(encoded)}},
 		"structuredContent": structured,

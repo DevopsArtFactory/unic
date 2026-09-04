@@ -72,6 +72,9 @@ func TestToolFailureReturnsStructuredToolError(t *testing.T) {
 		t.Fatal(err)
 	}
 	responses := decodeResponses(t, output.String())
+	if len(responses) == 0 {
+		t.Fatal("expected a response")
+	}
 	result := responses[0].Result.(map[string]any)
 	if result["isError"] != true {
 		t.Fatalf("expected tool error: %#v", result)
@@ -88,6 +91,9 @@ func TestServerRejectsMalformedRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	responses := decodeResponses(t, output.String())
+	if len(responses) == 0 {
+		t.Fatal("expected a response")
+	}
 	if responses[0].Error == nil || responses[0].Error.Code != -32700 {
 		t.Fatalf("unexpected response: %#v", responses[0])
 	}
