@@ -140,6 +140,8 @@ In the CLI `unic context setup` flow, the picker filters contexts, SSO accounts,
 Use `unic context order` to open reorder mode, choose a context with `↑/↓` or `j/k`, press `Enter` to start moving it, then press `Enter` again to save. `unic context order <name> <number>` still works for direct updates.
 `unic context sync [base-context]` lists the AWS accounts and roles visible to an SSO base context and previews a sync plan without writing config. Apply the plan explicitly with `--apply --confirm <base-context>`; add `--prune` to remove sync-managed contexts that disappeared from SSO. Existing contexts are never rewritten, and new contexts inherit the base context's regions. Use `--json` for a stable v1 plan/result contract containing `before`, `after`, `changed`, and an optional rollback hint. JSON failures include a stable error code, message, retryability, and the required AWS permission when known; machine-readable output stays on stdout while diagnostics use stderr.
 
+For automation, `unic resources backup-vaults --json` lists AWS Backup vaults using the active context (or `--profile` / `--region`) without starting the TUI. The versioned JSON envelope contains `data`, partial-result `warnings`, and pagination metadata; stdout contains only JSON. Without `--json`, the command prints a compact table and sends warnings to stderr. This CLI is a secondary scripting surface; interactive workflows remain TUI-first.
+
 ## Configuration
 
 Primary config path:

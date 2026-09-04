@@ -31,6 +31,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newContextCmd())
 	cmd.AddCommand(newECRCmd())
+	cmd.AddCommand(newResourcesCmd())
 	cmd.AddCommand(newEnvCmd())
 	cmd.AddCommand(newUpdateCmd())
 	cmd.AddCommand(newCapabilitiesCmd(cmd))
