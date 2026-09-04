@@ -10,27 +10,36 @@ UNIC은 다음 세 가지를 결합한 Go 기반 AWS 터미널 콘솔이다.
 
 현재 구현된 서비스 영역은 다음과 같다.
 
-- EC2 / SSM
+- EC2 (SSM Session Manager 포함)
 - VPC
 - RDS
-- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
 - CloudWatch Metrics
-- EventBridge
-- SNS
+- CloudWatch Alarms
 - CloudWatch Logs
+- CloudTrail
+- EventBridge
 - ECS
 - ECR
+- EKS
 - FIS
 - ElastiCache
+- S3
+- SNS
+- SQS
+- ELB
+- Parameter Store
+- KMS
 - ACM
 - Step Functions
-- S3
 - Lambda
+- Bedrock
+- CloudFormation
 - DynamoDB
-- KMS
+- AWS Backup
+- API Gateway v2
 - WAF
 - Inspector mode
 

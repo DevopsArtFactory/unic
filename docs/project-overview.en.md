@@ -10,27 +10,36 @@ UNIC is a Go-based AWS terminal console that combines:
 
 Implemented service areas currently include:
 
-- EC2 / SSM
+- EC2 (including SSM Session Manager)
 - VPC
 - RDS
-- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
 - CloudWatch Metrics
-- EventBridge
-- SNS
+- CloudWatch Alarms
 - CloudWatch Logs
+- CloudTrail
+- EventBridge
 - ECS
 - ECR
+- EKS
 - FIS
 - ElastiCache
+- S3
+- SNS
+- SQS
+- ELB
+- Parameter Store
+- KMS
 - ACM
 - Step Functions
-- S3
 - Lambda
+- Bedrock
+- CloudFormation
 - DynamoDB
-- KMS
+- AWS Backup
+- API Gateway v2
 - WAF
 - Inspector mode
 

@@ -92,28 +92,37 @@ Current repository clients include:
 
 - EC2
 - SSM
+- KMS
+- SNS
+- SQS
 - RDS
-- CloudFormation
 - Route53
 - Secrets Manager
 - IAM
-- CloudWatch Metrics
-- EventBridge
 - STS
+- CloudWatch Metrics / Alarms
 - CloudWatch Logs
+- CloudTrail
+- CloudFormation
+- GuardDuty
+- AWS Config
 - ECS
 - ECR
+- EKS
 - Auto Scaling
 - FIS
 - ElastiCache
+- EventBridge
+- ELBv2
+- S3
+- Lambda
 - ACM
 - Step Functions
-- API Gateway v2
-- S3
-- KMS
 - DynamoDB
-- WAFv2 (regional and `us-east-1` CloudFront-scope clients, plus distribution and distribution-tenant association lookups)
 - AWS Backup
+- API Gateway v2
+- WAFv2 (regional and `us-east-1` CloudFront-scope clients)
+- CloudFront (distribution and distribution-tenant association lookups for WAFv2)
 
 Pattern:
 
@@ -161,23 +170,35 @@ Screen-specific rendering still lives in dedicated files such as:
 - `screen_ec2_browser.go`
 - `screen_autoscaling.go`
 - `screen_vpc.go`
+- `screen_reachability.go`
 - `screen_rds.go`
 - `screen_cloudformation.go`
 - `screen_route53.go`
 - `screen_securitygroup.go`
 - `screen_iam.go`
+- `screen_cloudtrail.go`
+- `screen_eventbridge.go`
+- `screen_cwalarms.go`
 - `screen_cloudwatchmetrics.go`
 - `screen_cloudwatchlogs.go`
 - `screen_ecs.go`
 - `screen_eks.go`
 - `screen_ecr.go`
+- `screen_fis.go`
 - `screen_elasticache.go`
+- `screen_sns.go`
+- `screen_sqs.go`
+- `screen_elb.go`
+- `screen_ssmparams.go`
 - `screen_acm.go`
 - `screen_stepfunctions.go`
+- `screen_apigatewayv2.go`
 - `screen_s3.go`
 - `screen_lambda.go`
 - `screen_dynamodb.go`
 - `screen_bedrock.go`
+- `screen_backup.go`
+- `screen_wafv2.go`
 - `screen_secrets.go`
 - `screen_kms.go`
 - `screen_inspector.go`
@@ -255,6 +276,8 @@ Current screen families include:
 - Secrets Manager list/detail
 - Security Group list/detail/edit flows
 - IAM user, key, and key-rotation flows
+- CloudTrail event list/detail and time-window, mutation, and resource-name filtering flows
+- CloudWatch alarm list/detail, state filtering, watch, and related-resource/log handoff flows
 - CloudWatch metric list/detail flows
 - CloudWatch Logs group/stream/viewer flows
 - ECS cluster/service/rollout detail/task/container flows
@@ -268,7 +291,12 @@ Current screen families include:
 - S3 bucket/object/detail flows
 - KMS key list/detail and rotation-posture flows
 - SNS topic list/detail and per-topic subscription list flows
+- SQS queue list/detail, DLQ navigation, watch, and typed-confirmation redrive/purge flows
+- ELB load balancer/target group/target-health and watch flows
+- Parameter Store list/detail, reveal-gated value, and no-print copy flows
 - EventBridge rule list/detail, scrollable complete event patterns, and type-to-confirm state changes for eligible rule modes
+- Lambda function list/detail, invoke, and CloudWatch Logs handoff flows
+- Bedrock IAM user/API key list and typed-confirmation create, rotate, and delete flows
 - DynamoDB table list/detail and complete-primary-key `GetItem` flows
 - WAFv2 regional/CloudFront Web ACL list and scrollable posture/rule detail flows
 - AWS Backup vault list and scrollable recovery-point/protected-resource/failed-job detail flows
