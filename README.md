@@ -127,6 +127,8 @@ In the CLI `unic context setup` flow, the picker filters contexts, SSO accounts,
 Use `unic context order` to open reorder mode, choose a context with `↑/↓` or `j/k`, press `Enter` to start moving it, then press `Enter` again to save. `unic context order <name> <number>` still works for direct updates.
 `unic context sync [base-context]` lists the AWS accounts and roles visible to an SSO base context and adds a sync-managed concrete context for each new account/role pair, inheriting the base context's regions. When only one SSO base context exists the argument can be omitted. Existing contexts are never rewritten: pairs that already have a context (manual or synced) are kept as-is. Synced contexts carry a `sync_source: <base-context>` marker in `config.yaml`; when their account/role disappears from SSO they are reported as orphans and removed only with `--prune`. Use `--dry-run` to preview the plan without writing config.
 
+For automation, `unic resources backup-vaults --json` lists AWS Backup vaults using the active context (or `--profile` / `--region`) without starting the TUI. The versioned JSON envelope contains `data`, partial-result `warnings`, and pagination metadata; stdout contains only JSON. Without `--json`, the command prints a compact table and sends warnings to stderr. This CLI is a secondary scripting surface; interactive workflows remain TUI-first.
+
 ## Configuration
 
 Primary config path:

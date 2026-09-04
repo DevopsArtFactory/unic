@@ -8,6 +8,8 @@ go test ./...
 make build
 ```
 
+Read-only automation commands live under `internal/cli/`; keep their `--json` output versioned and deterministic, write only JSON to stdout, and cover human and JSON output paths with CLI tests.
+
 ## Branch Naming
 
 Use [`branch-naming-harness.md`](branch-naming-harness.md) for branch names.
