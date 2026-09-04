@@ -142,6 +142,28 @@ Use `unic context order` to open reorder mode, choose a context with `↑/↓` o
 
 For automation, `unic resources backup-vaults --json` lists AWS Backup vaults using the active context (or `--profile` / `--region`) without starting the TUI. The versioned JSON envelope contains `data`, partial-result `warnings`, and pagination metadata; stdout contains only JSON. Without `--json`, the command prints a compact table and sends warnings to stderr. This CLI is a secondary scripting surface; interactive workflows remain TUI-first.
 
+### MCP server
+
+Build or install the stdio MCP server for local AI agents:
+
+```bash
+go install ./cmd/unic-mcp
+```
+
+Example client configuration:
+
+```json
+{
+  "mcpServers": {
+    "unic": {
+      "command": "unic-mcp"
+    }
+  }
+}
+```
+
+The server exposes capability discovery, command schemas, AWS Backup vault listing, and SSO context-sync planning through the same versioned CLI contracts described above. It reads the existing unic/AWS configuration from the server process environment. The context-sync tool is preview-only: it never passes `--apply` or writes configuration.
+
 ## Configuration
 
 Primary config path:
