@@ -120,6 +120,17 @@ unic context sync dev-sso --apply --confirm dev-sso
 unic context sync dev-sso --prune --apply --confirm dev-sso
 ```
 
+### Agent discovery
+
+AI agents and scripts can inspect supported AWS features and executable CLI commands without starting the TUI:
+
+```bash
+unic capabilities --json
+unic schema context sync --json
+```
+
+The deterministic v1 JSON includes command arguments, flags, read-only and destructive classifications, and each command's output contract version. Service data comes from the same catalog used by the TUI.
+
 `unic context setup` writes its prompts to `stderr` and copies the generated shell commands to the clipboard.
 `unic env` prints shell commands to `stdout` so it can be used with `eval`.
 `unic ecr login` prints a machine-usable container registry login command to `stdout` and can optionally copy it to the clipboard with `--copy`.

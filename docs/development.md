@@ -8,6 +8,17 @@ go test ./...
 make build
 ```
 
+## Machine-readable command discovery
+
+Use the registered Cobra command tree and domain catalog as the source of truth for automation contracts:
+
+```bash
+unic capabilities --json
+unic schema context sync --json
+```
+
+Discovery output is deterministic, versioned JSON. New executable commands should set the `unic.dev/read-only`, `unic.dev/destructive`, and `unic.dev/output-version` annotations when their defaults do not describe the command accurately.
+
 ## Branch Naming
 
 Use [`branch-naming-harness.md`](branch-naming-harness.md) for branch names.
