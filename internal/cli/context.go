@@ -92,7 +92,7 @@ func newContextSyncCmd() *cobra.Command {
 			if jsonOutput {
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(MutationResult{
 					Version: "v1", Operation: contract.Operation, Resource: contract.Resource,
-					Changed: len(plan.Add) > 0 || prune && len(plan.Orphans) > 0, Before: contract.Before, After: contract.After,
+					Changed: len(plan.Add) > 0 || (prune && len(plan.Orphans) > 0), Before: contract.Before, After: contract.After,
 					RollbackHint: "restore the previous config file from backup or version control",
 				})
 			}
