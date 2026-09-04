@@ -16,10 +16,11 @@ var (
 
 func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "unic",
-		Short:   "AWS DevOps TUI tool",
-		Long:    "unic is a TUI tool for browsing and managing AWS resources in the terminal.",
-		Version: Version,
+		Use:          "unic",
+		Short:        "AWS DevOps TUI tool",
+		Long:         "unic is a TUI tool for browsing and managing AWS resources in the terminal.",
+		Version:      Version,
+		SilenceUsage: true,
 	}
 
 	cmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "AWS profile to use")
@@ -33,6 +34,8 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newResourcesCmd())
 	cmd.AddCommand(newEnvCmd())
 	cmd.AddCommand(newUpdateCmd())
+	cmd.AddCommand(newCapabilitiesCmd(cmd))
+	cmd.AddCommand(newSchemaCmd(cmd))
 
 	return cmd
 }

@@ -46,7 +46,9 @@ cmd/unic/main.go
   - SSO base context에 보이는 account/role 조합마다 sync-managed context를 생성
   - 생성된 context는 `sync_source` marker로 수동 context와 구분
   - 사라진 account/role의 sync-managed context는 orphan으로 보고하고 `--prune`일 때만 삭제
-  - `--dry-run`으로 config를 쓰지 않고 plan만 출력
+  - 기본 동작으로 config를 쓰지 않고 plan만 출력
+  - `--apply --confirm <base-context>`로 plan을 명시적으로 적용하며 `--prune`은 orphan 제거를 포함
+  - `--json`으로 자동화용 stable v1 plan/result/error contract 출력
 - `unic context unset`
 
 ### `internal/config/`

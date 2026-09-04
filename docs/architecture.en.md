@@ -46,7 +46,9 @@ Owns non-TUI commands:
   - generates a sync-managed context for every account/role pair visible to an SSO base context
   - generated contexts carry a `sync_source` marker to stay distinguishable from manual ones
   - sync-managed contexts whose account/role disappeared are reported as orphans and removed only with `--prune`
-  - `--dry-run` prints the plan without writing config
+  - previews the plan without writing config by default
+  - `--apply --confirm <base-context>` explicitly applies a plan; `--prune` includes orphan removal
+  - `--json` emits stable v1 plan/result/error contracts for automation
 - `unic context unset`
 
 ### `internal/config/`
