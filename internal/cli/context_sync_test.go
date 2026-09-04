@@ -82,7 +82,7 @@ func TestContextSyncPrintsPlanWithoutApplying(t *testing.T) {
 	for _, want := range []string{
 		"add:    dev-sso-333333333333-developerrole",
 		"orphan: dev-sso-222222222222-stale",
-		"sync dev-sso: 1 added, 1 kept, 1 orphaned (dry run, nothing written)",
+		"sync dev-sso: 1 added, 1 kept, 1 orphaned (preview, nothing written)",
 		"use --prune",
 	} {
 		if !strings.Contains(out, want) {
@@ -103,6 +103,9 @@ func TestContextSyncDryRunDoesNotApply(t *testing.T) {
 	}
 	if !strings.Contains(out, "dry run, nothing written") {
 		t.Fatalf("expected dry-run marker in output, got:\n%s", out)
+	}
+	if strings.Contains(out, "preview, nothing written") {
+		t.Fatalf("explicit dry run should not use the default preview marker, got:\n%s", out)
 	}
 }
 

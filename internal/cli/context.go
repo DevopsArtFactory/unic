@@ -79,7 +79,11 @@ func newContextSyncCmd() *cobra.Command {
 				if jsonOutput {
 					return json.NewEncoder(cmd.OutOrStdout()).Encode(contract)
 				}
-				printSyncPlan(cmd.OutOrStdout(), plan, prune, true)
+				suffix := " (preview, nothing written)"
+				if dryRun {
+					suffix = " (dry run, nothing written)"
+				}
+				printSyncPlan(cmd.OutOrStdout(), plan, prune, suffix)
 				return nil
 			}
 			if confirmation != base.Name {
@@ -96,7 +100,7 @@ func newContextSyncCmd() *cobra.Command {
 					RollbackHint: "restore the previous config file from backup or version control",
 				})
 			}
-			printSyncPlan(cmd.OutOrStdout(), plan, prune, false)
+			printSyncPlan(cmd.OutOrStdout(), plan, prune, "")
 			return nil
 		},
 	}
@@ -177,7 +181,7 @@ func resolveSyncBase(configPath string, args []string) (config.ContextInfo, erro
 	}
 }
 
-func printSyncPlan(out io.Writer, plan auth.ContextSyncPlan, prune, dryRun bool) {
+func printSyncPlan(out io.Writer, plan auth.ContextSyncPlan, prune bool, suffix string) {
 	for _, entry := range plan.Add {
 		fmt.Fprintf(out, "add:    %s\n", entry.Name)
 	}
@@ -187,10 +191,6 @@ func printSyncPlan(out io.Writer, plan auth.ContextSyncPlan, prune, dryRun bool)
 			action = "remove"
 		}
 		fmt.Fprintf(out, "%s: %s\n", action, name)
-	}
-	suffix := ""
-	if dryRun {
-		suffix = " (dry run, nothing written)"
 	}
 	fmt.Fprintf(out, "sync %s: %d added, %d kept, %d orphaned%s\n", plan.Base, len(plan.Add), len(plan.Keep), len(plan.Orphans), suffix)
 	if !prune && len(plan.Orphans) > 0 {
