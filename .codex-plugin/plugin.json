@@ -1,0 +1,30 @@
+{
+  "name": "unic",
+  "version": "0.1.0",
+  "description": "Inspect AWS resources and plan unic context changes through a local MCP server.",
+  "author": {
+    "name": "DevopsArtFactory",
+    "url": "https://github.com/DevopsArtFactory"
+  },
+  "homepage": "https://github.com/DevopsArtFactory/unic",
+  "repository": "https://github.com/DevopsArtFactory/unic",
+  "license": "MIT",
+  "keywords": ["aws", "cloud", "infrastructure", "unic", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "unic AWS",
+    "shortDescription": "Inspect AWS safely with unic",
+    "longDescription": "Discover unic capabilities, inspect supported AWS resources, and preview context synchronization through a local MCP server.",
+    "developerName": "DevopsArtFactory",
+    "category": "Developer Tools",
+    "capabilities": ["AWS resource inspection", "Command discovery", "Context sync preview"],
+    "websiteURL": "https://github.com/DevopsArtFactory/unic",
+    "defaultPrompt": [
+      "Show the AWS capabilities available through unic.",
+      "List my AWS Backup vaults with unic.",
+      "Preview a unic context sync without changing config."
+    ],
+    "brandColor": "#FF9900"
+  }
+}

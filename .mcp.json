@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "unic": {
+      "type": "stdio",
+      "command": "unic-mcp",
+      "args": []
+    }
+  }
+}

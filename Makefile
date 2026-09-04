@@ -1,4 +1,5 @@
 APP_NAME := unic
+MCP_APP_NAME := unic-mcp
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null)
 VERSION  := $(if $(VERSION),$(patsubst v%,%,$(VERSION)),dev)
 DIST_DIR := dist
@@ -15,6 +16,7 @@ all: build
 ## Build for current platform (debug)
 build:
 	go build -ldflags="-X unic/internal/cli.Version=$(VERSION)" -o $(APP_NAME) $(CMD_PATH)
+	go build -ldflags="-X unic/internal/cli.Version=$(VERSION)" -o $(MCP_APP_NAME) ./cmd/unic-mcp
 
 ## Build for current platform (release, stripped)
 release:
@@ -71,7 +73,7 @@ archive: build-all
 ## ── Clean ───────────────────────────────────────────────
 
 clean:
-	rm -f $(APP_NAME)
+	rm -f $(APP_NAME) $(MCP_APP_NAME)
 	rm -rf $(DIST_DIR)
 	go clean
 
