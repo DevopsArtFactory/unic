@@ -8,6 +8,8 @@ go test ./...
 make build
 ```
 
+`make build` derives the CLI version from `git describe`; use an explicit override such as `make build VERSION=0.3.1` for reproducible packaging outside a tagged checkout.
+
 ## Machine-readable command discovery
 
 Use the registered Cobra command tree and domain catalog as the source of truth for automation contracts:

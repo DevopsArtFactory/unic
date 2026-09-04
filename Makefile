@@ -1,5 +1,6 @@
 APP_NAME := unic
-VERSION  := 0.1.3
+VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null)
+VERSION  := $(if $(VERSION),$(patsubst v%,%,$(VERSION)),dev)
 DIST_DIR := dist
 CMD_PATH := ./cmd/unic
 
