@@ -115,7 +115,9 @@ unic context unset
 # Generate contexts from the accounts/roles visible to an SSO base context
 unic context sync
 unic context sync dev-sso --dry-run
-unic context sync dev-sso --prune
+unic context sync dev-sso --json
+unic context sync dev-sso --apply --confirm dev-sso
+unic context sync dev-sso --prune --apply --confirm dev-sso
 ```
 
 ### Agent discovery
@@ -136,7 +138,7 @@ Both flows now include a `UNIC_CONTEXT` marker in the generated exports so the T
 Contexts can be prioritized in the setup picker with an `order` field in config.
 In the CLI `unic context setup` flow, the picker filters contexts, SSO accounts, SSO roles, and configured resource regions as you type, with arrow-key navigation and Enter to confirm. Multi-region contexts prompt for the shell session region after account/role selection; single-region contexts skip that step. The selection changes `AWS_REGION` and `AWS_DEFAULT_REGION` in the generated exports without modifying the context's persisted default region.
 Use `unic context order` to open reorder mode, choose a context with `↑/↓` or `j/k`, press `Enter` to start moving it, then press `Enter` again to save. `unic context order <name> <number>` still works for direct updates.
-`unic context sync [base-context]` lists the AWS accounts and roles visible to an SSO base context and adds a sync-managed concrete context for each new account/role pair, inheriting the base context's regions. When only one SSO base context exists the argument can be omitted. Existing contexts are never rewritten: pairs that already have a context (manual or synced) are kept as-is. Synced contexts carry a `sync_source: <base-context>` marker in `config.yaml`; when their account/role disappears from SSO they are reported as orphans and removed only with `--prune`. Use `--dry-run` to preview the plan without writing config.
+`unic context sync [base-context]` lists the AWS accounts and roles visible to an SSO base context and previews a sync plan without writing config. Apply the plan explicitly with `--apply --confirm <base-context>`; add `--prune` to remove sync-managed contexts that disappeared from SSO. Existing contexts are never rewritten, and new contexts inherit the base context's regions. Use `--json` for a stable v1 plan/result contract containing `before`, `after`, `changed`, and an optional rollback hint. JSON failures include a stable error code, message, retryability, and the required AWS permission when known; machine-readable output stays on stdout while diagnostics use stderr.
 
 ## Configuration
 

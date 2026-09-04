@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -45,40 +47,100 @@ func newContextCmd() *cobra.Command {
 }
 
 func newContextSyncCmd() *cobra.Command {
-	var prune, dryRun bool
+	var prune, dryRun, apply, jsonOutput bool
+	var confirmation string
 	cmd := &cobra.Command{
 		Use:   "sync [base-context]",
-		Short: "Generate contexts from the accounts and roles visible to an SSO base context",
-		Long: "List the AWS accounts and roles visible to an SSO base context and add a sync-managed context for each pair. " +
-			"Existing contexts are never rewritten; sync-managed contexts whose account/role disappeared are reported and removed only with --prune.",
+		Short: "Plan or apply contexts from the accounts and roles visible to an SSO base context",
+		Long: "Build a plan for the accounts and roles visible to an SSO base context. Apply it only with --apply and --confirm. " +
+			"Existing contexts are never rewritten; sync-managed contexts whose account/role disappeared are removed only when applying with --prune.",
 		Args:        cobra.MaximumNArgs(1),
 		Annotations: map[string]string{annotationDestructive: "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRun && apply {
+				return writeMutationError(cmd, fmt.Errorf("--dry-run and --apply cannot be used together"), jsonOutput, "")
+			}
 			configPath, err := defaultPathFn()
 			if err != nil {
-				return err
+				return writeMutationError(cmd, err, jsonOutput, "")
 			}
 			if err := ensureConfigExistsFn(configPath); err != nil {
-				return err
+				return writeMutationError(cmd, err, jsonOutput, "")
 			}
 			base, err := resolveSyncBase(configPath, args)
 			if err != nil {
-				return err
+				return writeMutationError(cmd, err, jsonOutput, "")
 			}
 			plan, err := buildSyncPlanFn(context.Background(), configPath, base)
 			if err != nil {
-				return err
+				return writeMutationError(cmd, err, jsonOutput, "sso:ListAccounts,sso:ListAccountRoles")
 			}
-			printSyncPlan(cmd.OutOrStdout(), plan, prune, dryRun)
-			if dryRun {
+			contract := contextSyncMutationPlan(plan, prune)
+			if !apply {
+				if jsonOutput {
+					return json.NewEncoder(cmd.OutOrStdout()).Encode(contract)
+				}
+				suffix := " (preview, nothing written)"
+				if dryRun {
+					suffix = " (dry run, nothing written)"
+				}
+				printSyncPlan(cmd.OutOrStdout(), plan, prune, suffix)
 				return nil
 			}
-			return applySyncPlanFn(configPath, plan, prune)
+			if confirmation != base.Name {
+				err := fmt.Errorf("%w: pass --confirm %s", errConfirmationMismatch, base.Name)
+				return writeMutationError(cmd, err, jsonOutput, "")
+			}
+			if err := applySyncPlanFn(configPath, plan, prune); err != nil {
+				return writeMutationError(cmd, err, jsonOutput, "")
+			}
+			if jsonOutput {
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(MutationResult{
+					Version: "v1", Operation: contract.Operation, Resource: contract.Resource,
+					Changed: len(plan.Add) > 0 || (prune && len(plan.Orphans) > 0), Before: contract.Before, After: contract.After,
+					RollbackHint: "restore the previous config file from backup or version control",
+				})
+			}
+			printSyncPlan(cmd.OutOrStdout(), plan, prune, "")
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&prune, "prune", false, "remove sync-managed contexts whose SSO account/role is no longer visible")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show the sync plan without writing config")
+	cmd.Flags().BoolVar(&apply, "apply", false, "apply the sync plan")
+	cmd.Flags().StringVar(&confirmation, "confirm", "", "confirm execution by repeating the base context name")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "write the plan, result, or error as JSON")
 	return cmd
+}
+
+type contextSyncSnapshot struct {
+	Contexts []string `json:"contexts"`
+}
+
+func contextSyncMutationPlan(plan auth.ContextSyncPlan, prune bool) MutationPlan {
+	before := append(append([]string{}, plan.Keep...), plan.Orphans...)
+	after := append([]string{}, plan.Keep...)
+	for _, entry := range plan.Add {
+		after = append(after, entry.Name)
+	}
+	if !prune {
+		after = append(after, plan.Orphans...)
+	}
+	sort.Strings(before)
+	sort.Strings(after)
+	return MutationPlan{
+		Version: "v1", Operation: "context.sync", Resource: plan.Base,
+		Before: contextSyncSnapshot{Contexts: before}, After: contextSyncSnapshot{Contexts: after}, Confirmation: plan.Base,
+	}
+}
+
+func writeMutationError(cmd *cobra.Command, err error, jsonOutput bool, permission string) error {
+	if jsonOutput {
+		if encodeErr := json.NewEncoder(cmd.OutOrStdout()).Encode(mutationError(err, permission)); encodeErr != nil {
+			return encodeErr
+		}
+	}
+	return err
 }
 
 func resolveSyncBase(configPath string, args []string) (config.ContextInfo, error) {
@@ -120,7 +182,7 @@ func resolveSyncBase(configPath string, args []string) (config.ContextInfo, erro
 	}
 }
 
-func printSyncPlan(out io.Writer, plan auth.ContextSyncPlan, prune, dryRun bool) {
+func printSyncPlan(out io.Writer, plan auth.ContextSyncPlan, prune bool, suffix string) {
 	for _, entry := range plan.Add {
 		fmt.Fprintf(out, "add:    %s\n", entry.Name)
 	}
@@ -130,10 +192,6 @@ func printSyncPlan(out io.Writer, plan auth.ContextSyncPlan, prune, dryRun bool)
 			action = "remove"
 		}
 		fmt.Fprintf(out, "%s: %s\n", action, name)
-	}
-	suffix := ""
-	if dryRun {
-		suffix = " (dry run, nothing written)"
 	}
 	fmt.Fprintf(out, "sync %s: %d added, %d kept, %d orphaned%s\n", plan.Base, len(plan.Add), len(plan.Keep), len(plan.Orphans), suffix)
 	if !prune && len(plan.Orphans) > 0 {
