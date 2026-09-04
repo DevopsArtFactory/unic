@@ -46,6 +46,8 @@ brew tap DevopsArtFactory/unic
 brew install unic
 ```
 
+Homebrew and release archives install both the `unic` TUI and the `unic-mcp` stdio server.
+
 ### Install Script
 
 ```bash
@@ -144,25 +146,56 @@ For automation, `unic resources backup-vaults --json` lists AWS Backup vaults us
 
 ### MCP server
 
-Build or install the stdio MCP server for local AI agents:
+`unic-mcp` exposes unic's read-only automation commands to local AI agents. Install it with Homebrew or the install script above, then confirm it is on `PATH`:
 
 ```bash
-go install ./cmd/unic-mcp
+command -v unic-mcp
 ```
 
-Example client configuration:
+It reads the existing unic and AWS configuration from the server process environment. Keep AWS credentials in the standard AWS credential chain; do not put credentials in MCP configuration.
+
+#### Codex
+
+Install this repository as a Codex plugin, or register the server directly:
+
+```bash
+codex mcp add unic -- unic-mcp
+codex mcp get unic
+```
+
+#### Claude Code and Claude Desktop
+
+Claude Code can load the repository plugin or register the same server directly:
+
+```bash
+claude mcp add unic --scope user -- unic-mcp
+claude mcp get unic
+```
+
+For Claude Desktop and other JSON-configured MCP clients, use:
 
 ```json
 {
   "mcpServers": {
     "unic": {
-      "command": "unic-mcp"
+      "command": "unic-mcp",
+      "args": []
     }
   }
 }
 ```
 
-The server exposes capability discovery, command schemas, AWS Backup vault listing, and SSO context-sync planning through the same versioned CLI contracts described above. It reads the existing unic/AWS configuration from the server process environment. The context-sync tool is preview-only: it never passes `--apply` or writes configuration.
+#### Kiro
+
+In Kiro, open **Powers**, choose **Add Custom Power**, and import this repository from GitHub. The root `plugin.json`, `mcp.json`, and `skills/` directory follow the Agent Plugins format used by Kiro Powers.
+
+The server provides `get_capabilities`, `get_command_schema`, `list_backup_vaults`, and `plan_context_sync`. Example prompts:
+
+- `Show the AWS capabilities available through unic.`
+- `List my AWS Backup vaults in ap-northeast-2.`
+- `Preview a unic context sync without changing config.`
+
+The context-sync tool is preview-only: it never passes `--apply` or writes configuration. If a client cannot start the server, verify `unic-mcp` is on the client's `PATH` and that the required AWS profile or SSO session is available in the client process environment.
 
 ## Configuration
 

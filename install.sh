@@ -43,16 +43,17 @@ curl -sSfL "$URL" -o "${TMPDIR}/${ARCHIVE}"
 # Extract
 tar -xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
 
-# Install
+# Install both the TUI and MCP server.
 if [ -w "$INSTALL_DIR" ]; then
-  mv "${TMPDIR}/unic" "${INSTALL_DIR}/unic"
+  install -m 0755 "${TMPDIR}/unic" "${INSTALL_DIR}/unic"
+  install -m 0755 "${TMPDIR}/unic-mcp" "${INSTALL_DIR}/unic-mcp"
 else
   echo "Installing to ${INSTALL_DIR} (requires sudo)..."
-  sudo mv "${TMPDIR}/unic" "${INSTALL_DIR}/unic"
+  sudo install -m 0755 "${TMPDIR}/unic" "${INSTALL_DIR}/unic"
+  sudo install -m 0755 "${TMPDIR}/unic-mcp" "${INSTALL_DIR}/unic-mcp"
 fi
 
-chmod +x "${INSTALL_DIR}/unic"
-
 echo "unic ${TAG} installed to ${INSTALL_DIR}/unic"
+echo "unic-mcp ${TAG} installed to ${INSTALL_DIR}/unic-mcp"
 echo ""
 echo "Run 'unic' to get started."
