@@ -51,7 +51,8 @@ func newContextSyncCmd() *cobra.Command {
 		Short: "Generate contexts from the accounts and roles visible to an SSO base context",
 		Long: "List the AWS accounts and roles visible to an SSO base context and add a sync-managed context for each pair. " +
 			"Existing contexts are never rewritten; sync-managed contexts whose account/role disappeared are reported and removed only with --prune.",
-		Args: cobra.MaximumNArgs(1),
+		Args:        cobra.MaximumNArgs(1),
+		Annotations: map[string]string{annotationDestructive: "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, err := defaultPathFn()
 			if err != nil {
@@ -142,9 +143,10 @@ func printSyncPlan(out io.Writer, plan auth.ContextSyncPlan, prune, dryRun bool)
 
 func newContextOrderCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "order [context-name] [number]",
-		Short: "Set the display order for a context",
-		Args:  cobra.MaximumNArgs(2),
+		Use:         "order [context-name] [number]",
+		Short:       "Set the display order for a context",
+		Args:        cobra.MaximumNArgs(2),
+		Annotations: map[string]string{annotationReadOnly: "false"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, err := defaultPathFn()
 			if err != nil {
@@ -203,9 +205,10 @@ func parseContextOrder(raw string) (int, error) {
 
 func newContextSetupCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "setup",
-		Short: "Interactively select a context and copy shell exports to the clipboard",
-		Long:  "Select a context, resolve any required SSO account/role and resource region, set it as current, and copy shell export commands to the clipboard.",
+		Use:         "setup",
+		Short:       "Interactively select a context and copy shell exports to the clipboard",
+		Long:        "Select a context, resolve any required SSO account/role and resource region, set it as current, and copy shell export commands to the clipboard.",
+		Annotations: map[string]string{annotationReadOnly: "false"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, err := defaultPathFn()
 			if err != nil {
@@ -231,9 +234,10 @@ func newContextSetupCmd() *cobra.Command {
 
 func newContextUnsetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unset",
-		Short: "Clear the current context and copy shell cleanup commands to the clipboard",
-		Long:  "Remove the current context selection from config and copy AWS environment cleanup commands to the clipboard.",
+		Use:         "unset",
+		Short:       "Clear the current context and copy shell cleanup commands to the clipboard",
+		Long:        "Remove the current context selection from config and copy AWS environment cleanup commands to the clipboard.",
+		Annotations: map[string]string{annotationDestructive: "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, err := defaultPathFn()
 			if err != nil {
@@ -261,9 +265,10 @@ func newContextUnsetCmd() *cobra.Command {
 
 func newEnvCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "env [context-name]",
-		Short: "Print shell exports for the current or named context",
-		Args:  cobra.MaximumNArgs(1),
+		Use:         "env [context-name]",
+		Short:       "Print shell exports for the current or named context",
+		Args:        cobra.MaximumNArgs(1),
+		Annotations: map[string]string{annotationReadOnly: "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, err := defaultPathFn()
 			if err != nil {
