@@ -10,9 +10,10 @@ import (
 
 func newUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update",
-		Short: "Update unic to the latest version",
-		Long:  "Check for the latest release on GitHub and replace the current binary in-place.",
+		Use:         "update",
+		Short:       "Update unic to the latest version",
+		Long:        "Check for the latest release on GitHub and replace the current binary in-place.",
+		Annotations: map[string]string{annotationDestructive: "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Current version: %s\n", Version)
 			fmt.Println("Checking for updates...")

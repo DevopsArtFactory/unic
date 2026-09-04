@@ -35,8 +35,9 @@ func newECRLoginCmd() *cobra.Command {
 	var copyToClipboard bool
 
 	cmd := &cobra.Command{
-		Use:   "login",
-		Short: "Print an ECR login command for the current AWS context",
+		Use:         "login",
+		Short:       "Print an ECR login command for the current AWS context",
+		Annotations: map[string]string{annotationReadOnly: "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, err := ecrDefaultPathFn()
 			if err != nil {
