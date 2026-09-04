@@ -21,6 +21,8 @@ Discovery output is deterministic, versioned JSON. New executable commands shoul
 
 Read-only automation commands live under `internal/cli/`; keep their `--json` output versioned and deterministic, write only JSON to stdout, and cover human and JSON output paths with CLI tests.
 
+The stdio MCP entry point lives at `cmd/unic-mcp` and delegates tool calls to those same CLI commands through `internal/cli.ExecuteAutomation`. Keep the MCP layer limited to protocol handling and argument mapping; AWS and config behavior belongs in the existing CLI, auth, and service packages. MCP mutation tools remain preview-only until their trust boundary is reviewed.
+
 ## Branch Naming
 
 Use [`branch-naming-harness.md`](branch-naming-harness.md) for branch names.
