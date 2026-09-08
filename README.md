@@ -56,6 +56,8 @@ curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.s
 
 Set `INSTALL_DIR` to override the default install path.
 
+The script checks that the downloaded archive contains both binaries before replacing either installation. If an older release lacks `unic-mcp`, build from source until a release containing both is available.
+
 ### Build From Source
 
 ```bash
@@ -407,6 +409,12 @@ Context ordering:
 | IAM | IAM User Browser |
 | IAM | ListAccessKeys |
 | IAM | RotateAccessKey |
+
+### Automation
+
+| Workflow | Status | Notes |
+|---|---|---|
+| `unic-mcp` MCP server | Ready | Read-only capability and command discovery, AWS Backup vault listing, and context-sync previews for local AI agents |
 
 ### Inspector Mode
 

@@ -10,6 +10,8 @@ make build
 
 `make build` derives the CLI version from `git describe`; use an explicit override such as `make build VERSION=0.3.1` for reproducible packaging outside a tagged checkout.
 
+`make build` and `make release` build both `unic` and `unic-mcp`. The platform targets and `make build-all` build both binaries for macOS and Linux (amd64 and arm64) and Windows (amd64). `make archive` bundles each pair in a platform archive, using the executable names expected by `install.sh`. The installer validates both extracted binaries before replacing either installed executable; `make test` includes an offline regression check for incomplete archives.
+
 ## Machine-readable command discovery
 
 Use the registered Cobra command tree and domain catalog as the source of truth for automation contracts:
