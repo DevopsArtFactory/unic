@@ -29,6 +29,8 @@ The stdio MCP entry point lives at `cmd/unic-mcp` and delegates tool calls to th
 
 The repository root is also the portable agent-plugin package. Keep shared MCP guidance in `skills/unic-aws`, Kiro metadata in `plugin.json` and `mcp.json`, and client-specific manifests in `.codex-plugin`, `.claude-plugin`, and `.mcp.json`. All clients must launch the released `unic-mcp` binary from `PATH`; do not add client-specific MCP implementations.
 
+Codex filters the environment inherited by stdio MCP servers. Keep the `.mcp.json` `env_vars` list and the README's direct Codex registration example aligned: forward AWS credential/profile/region variables, credential-provider and configuration paths, and `XDG_CONFIG_HOME` by name, never by copying credential values into manifests. When changing this list, run a Codex client-launch smoke check with dummy environment values and verify that they reach the MCP child process; MCP initialization alone does not prove that credential forwarding works. Use an isolated client configuration and a local probe server so this check needs neither real credentials nor AWS calls.
+
 ## Branch Naming
 
 Use [`branch-naming-harness.md`](branch-naming-harness.md) for branch names.

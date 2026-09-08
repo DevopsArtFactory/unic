@@ -158,12 +158,36 @@ It reads the existing unic and AWS configuration from the server process environ
 
 #### Codex
 
-Install this repository as a Codex plugin, or register the server directly:
+Install this repository as a Codex plugin. Its MCP configuration forwards the AWS credential, profile, region, credential-provider, and configuration-path variables listed below, plus `XDG_CONFIG_HOME` for unic configuration, from the environment that launches Codex. Only variable names are stored in the plugin.
+
+For direct registration, add this table to `~/.codex/config.toml` (or update the existing `[mcp_servers.unic]` table created by `codex mcp add unic -- unic-mcp`):
+
+```toml
+[mcp_servers.unic]
+command = "unic-mcp"
+args = []
+env_vars = [
+  "AWS_ACCESS_KEY_ID", "AWS_ACCESS_KEY",
+  "AWS_SECRET_ACCESS_KEY", "AWS_SECRET_KEY", "AWS_SESSION_TOKEN",
+  "AWS_PROFILE", "AWS_DEFAULT_PROFILE",
+  "AWS_REGION", "AWS_DEFAULT_REGION",
+  "AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE",
+  "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_ROLE_ARN", "AWS_ROLE_SESSION_NAME",
+  "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+  "AWS_CONTAINER_AUTHORIZATION_TOKEN", "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+  "AWS_EC2_METADATA_DISABLED", "AWS_EC2_METADATA_V1_DISABLED",
+  "AWS_EC2_METADATA_SERVICE_ENDPOINT", "AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE",
+  "AWS_CA_BUNDLE", "XDG_CONFIG_HOME",
+]
+```
+
+Then inspect the registration:
 
 ```bash
-codex mcp add unic -- unic-mcp
 codex mcp get unic
 ```
+
+Codex requires explicit [`env_vars` forwarding](https://developers.openai.com/codex/mcp#stdio-servers); `codex mcp add` alone does not add this list. Launch Codex from the shell containing your intended AWS environment. After changing shell exports, restart Codex from that shell so the MCP server receives the updated environment. Keep credential values out of `env` entries and `--env` arguments, which persist values in configuration. If authentication fails or the wrong profile is selected, check the forwarded variable names and Codex's launch environment.
 
 #### Claude Code and Claude Desktop
 
