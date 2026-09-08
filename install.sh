@@ -43,16 +43,25 @@ curl -sSfL "$URL" -o "${TMPDIR}/${ARCHIVE}"
 # Extract
 tar -xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
 
-# Install
+# Validate the complete archive before replacing either installed binary.
+for binary in unic unic-mcp; do
+  if [ ! -f "${TMPDIR}/${binary}" ] || [ ! -s "${TMPDIR}/${binary}" ] || [ ! -r "${TMPDIR}/${binary}" ]; then
+    echo "Release ${TAG} does not contain a usable ${binary} binary; nothing was installed." >&2
+    exit 1
+  fi
+done
+
+# Install both the TUI and MCP server.
 if [ -w "$INSTALL_DIR" ]; then
-  mv "${TMPDIR}/unic" "${INSTALL_DIR}/unic"
+  install -m 0755 "${TMPDIR}/unic" "${INSTALL_DIR}/unic"
+  install -m 0755 "${TMPDIR}/unic-mcp" "${INSTALL_DIR}/unic-mcp"
 else
   echo "Installing to ${INSTALL_DIR} (requires sudo)..."
-  sudo mv "${TMPDIR}/unic" "${INSTALL_DIR}/unic"
+  sudo install -m 0755 "${TMPDIR}/unic" "${INSTALL_DIR}/unic"
+  sudo install -m 0755 "${TMPDIR}/unic-mcp" "${INSTALL_DIR}/unic-mcp"
 fi
 
-chmod +x "${INSTALL_DIR}/unic"
-
 echo "unic ${TAG} installed to ${INSTALL_DIR}/unic"
+echo "unic-mcp ${TAG} installed to ${INSTALL_DIR}/unic-mcp"
 echo ""
 echo "Run 'unic' to get started."

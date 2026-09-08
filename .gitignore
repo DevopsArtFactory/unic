@@ -1,5 +1,6 @@
 /dist/
 /unic
+/unic-mcp
 .claude/reports/
 # SSM session-manager-plugin temp files (ecs exec session state)
 cs.json

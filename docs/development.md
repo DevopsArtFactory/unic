@@ -10,6 +10,10 @@ make build
 
 `make build` derives the CLI version from `git describe`; use an explicit override such as `make build VERSION=0.3.1` for reproducible packaging outside a tagged checkout.
 
+Local builds place both executables in the repository root. Follow the [source installation steps](../README.md#build-from-source) to put them on the MCP client's `PATH`, or configure the client with an absolute path to the built `unic-mcp` executable.
+
+`make build` and `make release` build both `unic` and `unic-mcp`. The platform targets and `make build-all` build both binaries for macOS and Linux (amd64 and arm64) and Windows (amd64). `make archive` bundles each pair in a platform archive, using the executable names expected by `install.sh`. The installer validates both extracted binaries before replacing either installed executable; `make test` includes an offline regression check for incomplete archives.
+
 ## Machine-readable command discovery
 
 Use the registered Cobra command tree and domain catalog as the source of truth for automation contracts:
@@ -24,6 +28,10 @@ Discovery output is deterministic, versioned JSON. New executable commands shoul
 Read-only automation commands live under `internal/cli/`; keep their `--json` output versioned and deterministic, write only JSON to stdout, and cover human and JSON output paths with CLI tests.
 
 The stdio MCP entry point lives at `cmd/unic-mcp` and delegates tool calls to those same CLI commands through `internal/cli.ExecuteAutomation`. Keep the MCP layer limited to protocol handling and argument mapping; AWS and config behavior belongs in the existing CLI, auth, and service packages. MCP mutation tools remain preview-only until their trust boundary is reviewed.
+
+The repository root is also the portable agent-plugin package. Keep shared MCP guidance in `skills/unic-aws`, Kiro metadata in `plugin.json` and `mcp.json`, and client-specific manifests in `.codex-plugin`, `.claude-plugin`, and `.mcp.json`. All clients must launch the released `unic-mcp` binary from `PATH`; do not add client-specific MCP implementations.
+
+Codex filters the environment inherited by stdio MCP servers. Keep the `.mcp.json` `env_vars` list and the README's direct Codex registration example aligned: forward AWS credential/profile/region variables, credential-provider and configuration paths, and `XDG_CONFIG_HOME` by name, never by copying credential values into manifests. When changing this list, run a Codex client-launch smoke check with dummy environment values and verify that they reach the MCP child process; MCP initialization alone does not prove that credential forwarding works. Use an isolated client configuration and a local probe server so this check needs neither real credentials nor AWS calls.
 
 ## Branch Naming
 

@@ -1,0 +1,13 @@
+{
+  "name": "unic",
+  "version": "0.1.0",
+  "description": "Inspect AWS resources and plan unic context changes through a local MCP server.",
+  "author": {
+    "name": "DevopsArtFactory",
+    "url": "https://github.com/DevopsArtFactory"
+  },
+  "homepage": "https://github.com/DevopsArtFactory/unic",
+  "repository": "https://github.com/DevopsArtFactory/unic",
+  "license": "MIT",
+  "keywords": ["aws", "cloud", "infrastructure", "unic", "mcp"]
+}

@@ -1,8 +1,25 @@
 version: 2
 
 builds:
-  - main: ./cmd/unic
+  - id: unic
+    main: ./cmd/unic
     binary: unic
+    ldflags:
+      - -s -w
+      - -X unic/internal/cli.Version={{.Version}}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+  - id: unic-mcp
+    main: ./cmd/unic-mcp
+    binary: unic-mcp
     ldflags:
       - -s -w
       - -X unic/internal/cli.Version={{.Version}}
@@ -18,7 +35,10 @@ builds:
         goarch: arm64
 
 archives:
-  - format: tar.gz
+  - ids:
+      - unic
+      - unic-mcp
+    format: tar.gz
     name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
     format_overrides:
       - goos: windows
@@ -34,9 +54,10 @@ brews:
     description: "Go-based TUI tool for browsing and managing AWS resources in the terminal"
     license: "MIT"
     install: |
-      bin.install "unic"
+      bin.install "unic", "unic-mcp"
     test: |
       system "#{bin}/unic", "--version"
+      assert_predicate bin/"unic-mcp", :executable?
 
 changelog:
   sort: asc
