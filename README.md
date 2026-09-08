@@ -64,7 +64,12 @@ The script checks that the downloaded archive contains both binaries before repl
 git clone https://github.com/DevopsArtFactory/unic.git
 cd unic
 make build
+mkdir -p "$HOME/.local/bin"
+install -m 0755 unic unic-mcp "$HOME/.local/bin/"
+export PATH="$HOME/.local/bin:$PATH"
 ```
+
+Keep `$HOME/.local/bin` on `PATH` in your shell configuration and launch MCP clients from that environment so they can find `unic-mcp`. For desktop clients launched outside the shell, use the absolute path to the installed `unic-mcp` binary in their MCP configuration if they do not inherit that `PATH`.
 
 ## CLI Usage
 

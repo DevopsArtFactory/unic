@@ -4,11 +4,14 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestInstallerValidatesBothBinariesBeforeInstalling(t *testing.T) {
@@ -84,13 +87,20 @@ printf '%s\n' '{"tag_name":"v0.0.0-test"}'
 			if err := os.WriteFile(filepath.Join(fakeBin, "curl"), []byte(fakeCurl), 0755); err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.Command("sh", "install.sh")
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "sh", "install.sh")
+			// Bound output draining if a subprocess keeps the shell's pipes open.
+			cmd.WaitDelay = 5 * time.Second
 			cmd.Env = append(os.Environ(),
 				"PATH="+fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"INSTALL_DIR="+installDir,
 				"UNIC_TEST_ARCHIVE="+archivePath,
 			)
 			output, err := cmd.CombinedOutput()
+			if ctx.Err() != nil || errors.Is(err, exec.ErrWaitDelay) {
+				t.Fatalf("installer exceeded time limit: %v (context: %v); output:\n%s", err, ctx.Err(), output)
+			}
 			if (err != nil) != tc.wantErr {
 				t.Errorf("installer error = %v, want error %v; output:\n%s", err, tc.wantErr, output)
 			}
