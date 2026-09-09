@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Test scanner summary
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
       - name: Scan plugin package
         id: scan
         uses: hashgraph-online/ai-plugin-scanner-action@caba2e96aa8ad2feb6cf6fca52442b52e22e779f # v1.2.635
@@ -29,6 +31,9 @@ jobs:
           pr_comment: "off"
           format: json
           output: ${{ runner.temp }}/hol-plugin-scanner-report.json
+      - name: Publish scanner summary
+        if: ${{ !cancelled() && steps.scan.outputs.report_path != '' }}
+        run: python3 .github/scripts/scanner_summary.py "$RUNNER_TEMP/hol-plugin-scanner-report.json" >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve scanner report
         if: ${{ !cancelled() && steps.scan.outputs.report_path != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
