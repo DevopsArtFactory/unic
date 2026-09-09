@@ -653,6 +653,8 @@ go test ./...
 make build
 ```
 
+The HOL Plugin Scanner checks the agent-plugin package on pull requests to `main` and pushes to `main`. Its job summary and downloadable JSON report show findings, including failed scans; see the [scanner workflow guidance](docs/development.md#plugin-scanner-ci) for thresholds and local reproduction.
+
 Release artifacts are produced through GoReleaser and the `dist/` outputs.
 
 ## Community Standards

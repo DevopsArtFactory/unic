@@ -101,6 +101,25 @@ Prefer tests for:
 - TUI transition logic when a feature adds or changes a flow
 - context add/setup flows when auth types or auth-specific branches change
 
+## Plugin Scanner CI
+
+`.github/workflows/hol-plugin-scanner.yml` runs the SHA-pinned [HOL Plugin Scanner action](https://github.com/hashgraph-online/ai-plugin-scanner-action/tree/caba2e96aa8ad2feb6cf6fca52442b52e22e779f) on pull requests to `main` and pushes to `main`. It uses static `scan` mode with the default profile and ecosystem detection, a minimum score of 80, and failure on high or critical findings. A failed threshold keeps the job failed; the report upload does not override the result.
+
+The job needs only `contents: read`, does not persist checkout credentials, and requires no repository or AWS secrets. Online probing, runtime `verify`, PR comments, and SARIF upload are disabled. It writes a job summary and retains `hol-plugin-scanner-report` as a JSON artifact for 14 days, including when the scanner produces a report but fails its gate. Setup errors before report generation may leave no artifact.
+
+For a local reproduction, use an isolated Python environment with `plugin-scanner==3.0.123`, the version bundled by the pinned action. The action verifies the scanner wheel's committed SHA-256 and PyPI provenance and installs hash-locked dependencies; use its pinned installation files when reproducing the CI environment. Run from a clean checkout and write the report outside the repository:
+
+```bash
+env -u MCP_SCANNER_API_KEY -u MCP_SCANNER_LLM_API_KEY \
+  plugin-scanner scan /path/to/clean/unic \
+  --profile default --ecosystem auto \
+  --cisco-skill-scan auto --cisco-mcp-scan auto --cisco-policy balanced \
+  --min-score 80 --fail-on-severity high \
+  --format json --output /path/outside/unic/report.json
+```
+
+Inspect the integration statuses before interpreting a score: unavailable Cisco analyzers mean those deeper checks did not run. Static JSON output's `verify_pass` field is not evidence of runtime verification. Review each finding's rule and location against the source; the existing fixture and false-positive dispositions are recorded in [issue #344](https://github.com/DevopsArtFactory/unic/issues/344#issuecomment-5595530140). Document dispositions or fix confirmed defects without lowering the gate to hide them. Keep the action SHA, bundled scanner version, and this reproduction guidance aligned when updating the scanner.
+
 ## Docs Ownership Model
 
 - `README.md`: concise user-facing entrypoint
