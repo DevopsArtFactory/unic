@@ -1,3 +1,7 @@
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 from scanner_summary import render_summary
@@ -31,6 +35,24 @@ class ScannerSummaryTest(unittest.TestCase):
         self.assertNotIn("<example>", summary)
         self.assertNotIn("sensitive", summary)
         self.assertIn("JSON artifact", summary)
+
+    def test_invalid_report_keeps_failure_and_writes_summary(self):
+        script = Path(__file__).with_name("scanner_summary.py")
+        with tempfile.TemporaryDirectory() as temp:
+            report = Path(temp) / "report.json"
+            for content in (
+                "malformed JSON", "{}", '{"score": 78, "summary": null}',
+                '{"score": 78, "summary": {"integrations": []}, "findings": [null]}',
+            ):
+                with self.subTest(content=content):
+                    report.write_text(content, encoding="utf-8")
+                    result = subprocess.run(
+                        [sys.executable, str(script), str(report)],
+                        capture_output=True, text=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn("Unable to render", result.stdout)
+                    self.assertIn("Invalid or unavailable", result.stderr)
 
 
 if __name__ == "__main__":

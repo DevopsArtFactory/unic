@@ -25,5 +25,9 @@ def render_summary(report):
 
 
 if __name__ == "__main__":
-    with open(sys.argv[1], encoding="utf-8") as report_file:
-        print(render_summary(json.load(report_file)))
+    try:
+        with open(sys.argv[1], encoding="utf-8") as report_file:
+            print(render_summary(json.load(report_file)))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        print("## HOL Plugin Scanner\n\nUnable to render the scanner report. See the scan logs and JSON artifact if available.")
+        sys.exit("Invalid or unavailable scanner report.")

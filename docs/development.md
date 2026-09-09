@@ -107,6 +107,8 @@ Prefer tests for:
 
 The job needs only `contents: read`, does not persist checkout credentials, and requires no repository or AWS secrets. Online probing, runtime `verify`, PR comments, and SARIF upload are disabled. After a report is produced, a separate step renders its score, analyzer status, and finding rules/locations into the job summary, including when the scanner fails its gate. Finding descriptions remain in the full `hol-plugin-scanner-report` JSON artifact, retained for 14 days. Setup errors before report generation may leave no summary or artifact. The workflow checks the renderer with `python3 -m unittest discover -s .github/scripts -p 'test_*.py'` before scanning; run the same command locally when changing it.
 
+If a saved report is unreadable or malformed, the publisher writes an error summary and fails; artifact retention still runs.
+
 For a local reproduction, use an isolated Python environment with `plugin-scanner==3.0.123`, the version bundled by the pinned action. The action verifies the scanner wheel's committed SHA-256 and PyPI provenance and installs hash-locked dependencies; use its pinned installation files when reproducing the CI environment. Run from a clean checkout and write the report outside the repository:
 
 ```bash
