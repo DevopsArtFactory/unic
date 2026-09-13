@@ -93,6 +93,8 @@ unic init --force
 unic update
 ```
 
+For direct binary installations, updates install `unic` and `unic-mcp` together. If the installed version predates MCP packaging (including v0.3.1), run the install script once after a newer release is published; the older updater can replace only `unic`. Homebrew installations should continue to use `brew upgrade unic`.
+
 ### Shell environment helpers
 
 ```bash
