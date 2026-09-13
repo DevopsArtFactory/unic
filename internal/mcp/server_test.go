@@ -35,7 +35,7 @@ func TestServerLifecycleAndTools(t *testing.T) {
 		t.Fatalf("protocolVersion = %v", got)
 	}
 	listed := responses[1].Result.(map[string]any)["tools"].([]any)
-	if len(listed) != 4 {
+	if len(listed) != 5 {
 		t.Fatalf("listed %d tools", len(listed))
 	}
 	wantCall := []string{"resources", "backup-vaults", "--json", "--profile", "prod", "--region", "us-east-1"}
@@ -45,6 +45,42 @@ func TestServerLifecycleAndTools(t *testing.T) {
 	result := responses[2].Result.(map[string]any)
 	if result["isError"] != false || result["structuredContent"].(map[string]any)["schema_version"] != "v1" {
 		t.Fatalf("unexpected tool result: %#v", result)
+	}
+}
+
+func TestMCPCapabilitiesStayAlignedWithRegisteredTools(t *testing.T) {
+	capabilities := mcpCapabilities()
+	listed := capabilities["tools"].([]map[string]any)
+	if len(listed) != len(tools) {
+		t.Fatalf("capabilities list %d tools, registration has %d", len(listed), len(tools))
+	}
+	for i, registered := range tools {
+		if listed[i]["name"] != registered.Name {
+			t.Fatalf("tool %d = %v, want %s", i, listed[i]["name"], registered.Name)
+		}
+		if listed[i]["output_contract"] == "" {
+			t.Fatalf("tool %s has no output contract", registered.Name)
+		}
+		if _, ok := listed[i]["required_permissions"].([]string); !ok {
+			t.Fatalf("tool %s permissions are not a stable array", registered.Name)
+		}
+	}
+}
+
+func TestGetMCPCapabilitiesDoesNotExecuteCLI(t *testing.T) {
+	execute := func(context.Context, ...string) ([]byte, error) {
+		t.Fatal("internal capability discovery must not execute the CLI")
+		return nil, nil
+	}
+	input := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_mcp_capabilities","arguments":{}}}`
+	var output bytes.Buffer
+	if err := New("test", execute).Serve(context.Background(), strings.NewReader(input), &output); err != nil {
+		t.Fatal(err)
+	}
+	result := decodeResponses(t, output.String())[0].Result.(map[string]any)
+	structured := result["structuredContent"].(map[string]any)
+	if structured["schema_version"] != "v1" || len(structured["tools"].([]any)) != len(tools) {
+		t.Fatalf("unexpected capabilities: %#v", structured)
 	}
 }
 
