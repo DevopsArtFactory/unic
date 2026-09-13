@@ -657,6 +657,8 @@ make build
 
 Release artifacts are produced through GoReleaser and the `dist/` outputs.
 
+GitHub Actions use full commit SHA pins; see the [maintenance guidance](docs/development.md#github-actions).
+
 ## Community Standards
 
 - [Code of Conduct](CODE_OF_CONDUCT.md)
