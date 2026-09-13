@@ -90,8 +90,12 @@ The TUI shows a short retro bootup splash after a new install or version update,
 ```bash
 unic init
 unic init --force
+unic doctor
+unic doctor --json
 unic update
 ```
+
+`unic doctor` checks the paired binary versions, configuration, AWS credential chain, and a local MCP initialize/tool-discovery handshake. It never prints credential values; use `--json` for its stable v1 report.
 
 For direct binary installations, updates install `unic` and `unic-mcp` together. If the installed version predates MCP packaging (including v0.3.1), run the install script once after a newer release is published; the older updater can replace only `unic`. Homebrew installations should continue to use `brew upgrade unic`.
 
@@ -159,6 +163,7 @@ For automation, `unic resources backup-vaults --json` lists AWS Backup vaults us
 
 ```bash
 command -v unic-mcp
+unic doctor
 ```
 
 It reads the existing unic and AWS configuration from the server process environment. Keep AWS credentials in the standard AWS credential chain; do not put credentials in MCP configuration.
