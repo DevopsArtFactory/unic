@@ -85,8 +85,8 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 	}
 
 	catalogFeatures := make(map[domain.FeatureKind]bool)
-	mappedCommands := make(map[string]bool)
-	mappedTools := make(map[string]bool)
+	mappedCommands := make(map[string]domain.FeatureKind)
+	mappedTools := make(map[string]domain.FeatureKind)
 	for _, service := range domain.Catalog() {
 		for _, feature := range service.Features {
 			if catalogFeatures[feature.Kind] {
@@ -125,8 +125,16 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 			} else if want := "unic.resources." + surface.command + ".v1"; toolContract != want {
 				t.Errorf("MCP tool %q has output contract %q, want %q", surface.tool, toolContract, want)
 			}
-			mappedCommands[surface.command] = true
-			mappedTools[surface.tool] = true
+			if owner, mapped := mappedCommands[surface.command]; mapped {
+				t.Errorf("resource command %q is mapped by catalog features %q and %q", surface.command, owner, feature.Kind)
+			} else {
+				mappedCommands[surface.command] = feature.Kind
+			}
+			if owner, mapped := mappedTools[surface.tool]; mapped {
+				t.Errorf("resource MCP tool %q is mapped by catalog features %q and %q", surface.tool, owner, feature.Kind)
+			} else {
+				mappedTools[surface.tool] = feature.Kind
+			}
 		}
 	}
 
@@ -141,12 +149,12 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 		}
 	}
 	for command := range registeredCommands {
-		if !mappedCommands[command] {
+		if _, mapped := mappedCommands[command]; !mapped {
 			t.Errorf("resource command %q has no catalog feature mapping", command)
 		}
 	}
 	for tool := range registeredResourceTools {
-		if !mappedTools[tool] {
+		if _, mapped := mappedTools[tool]; !mapped {
 			t.Errorf("resource MCP tool %q has no catalog feature mapping", tool)
 		}
 	}
