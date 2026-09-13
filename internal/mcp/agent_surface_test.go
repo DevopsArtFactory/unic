@@ -13,6 +13,12 @@ type agentSurface struct {
 	tool    string
 }
 
+type agentCommandContract struct {
+	readOnly      string
+	outputVersion string
+	json          bool
+}
+
 var agentSurfaceByFeature = map[domain.FeatureKind]agentSurface{
 	domain.FeatureBackupBrowser:      {command: "backup-vaults", tool: "list_backup_vaults"},
 	domain.FeatureCloudTrailEvents:   {command: "cloudtrail-events", tool: "list_cloudtrail_events"},
@@ -62,9 +68,13 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	registeredCommands := make(map[string]bool, len(resources.Commands()))
+	registeredCommands := make(map[string]agentCommandContract, len(resources.Commands()))
 	for _, command := range resources.Commands() {
-		registeredCommands[command.Name()] = true
+		registeredCommands[command.Name()] = agentCommandContract{
+			readOnly:      command.Annotations["unic.dev/read-only"],
+			outputVersion: command.Annotations["unic.dev/output-version"],
+			json:          command.Flags().Lookup("json") != nil,
+		}
 	}
 
 	registeredResourceTools := make(map[string]bool)
@@ -95,8 +105,19 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 				}
 				continue
 			}
-			if !registeredCommands[surface.command] {
+			contract, registered := registeredCommands[surface.command]
+			if !registered {
 				t.Errorf("catalog feature %q maps to unregistered command %q", feature.Kind, surface.command)
+			} else {
+				if contract.readOnly != "true" {
+					t.Errorf("resource command %q must advertise read-only", surface.command)
+				}
+				if contract.outputVersion != "v1" {
+					t.Errorf("resource command %q must advertise v1 output", surface.command)
+				}
+				if !contract.json {
+					t.Errorf("resource command %q must provide JSON output", surface.command)
+				}
 			}
 			if !registeredResourceTools[surface.tool] {
 				t.Errorf("catalog feature %q maps to unregistered MCP tool %q", feature.Kind, surface.tool)

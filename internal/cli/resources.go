@@ -112,6 +112,7 @@ func newBackupVaultsCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Annotations = map[string]string{annotationReadOnly: "true", annotationOutputVersion: "v1"}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Emit stable machine-readable JSON")
 	return cmd
 }
