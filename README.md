@@ -178,6 +178,16 @@ unic doctor
 
 It reads the existing unic and AWS configuration from the server process environment. Keep AWS credentials in the standard AWS credential chain; do not put credentials in MCP configuration.
 
+Register the server for a supported client with one command:
+
+```bash
+unic mcp setup codex
+unic mcp setup claude
+unic mcp setup kiro
+```
+
+Add `--dry-run` to preview the exact resulting configuration. Setup preserves unrelated servers, is safe to repeat, backs up an existing file before changing it, verifies the `unic-mcp` handshake, and stores only credential variable names—never their values. It updates `~/.codex/config.toml`, `~/.claude.json`, or `~/.kiro/settings/mcp.json`, respectively.
+
 #### Codex
 
 Install this repository as a Codex plugin. Its MCP configuration forwards the AWS credential, profile, region, credential-provider, and configuration-path variables listed below, plus `XDG_CONFIG_HOME` for unic configuration, from the environment that launches Codex. Only variable names are stored in the plugin.
@@ -460,7 +470,7 @@ Context ordering:
 
 | Workflow | Status | Notes |
 |---|---|---|
-| `unic-mcp` MCP server | Ready | Read-only capability and command discovery, AWS Backup vault listing, and context-sync previews for local AI agents |
+| `unic-mcp` MCP server | Ready | Read-only capability and AWS discovery, context-sync previews, and one-command Codex/Claude/Kiro setup |
 
 ### Inspector Mode
 
