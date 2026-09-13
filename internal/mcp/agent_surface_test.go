@@ -70,6 +70,10 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 	}
 	registeredCommands := make(map[string]agentCommandContract, len(resources.Commands()))
 	for _, command := range resources.Commands() {
+		if _, registered := registeredCommands[command.Name()]; registered {
+			t.Errorf("resource command %q is registered more than once", command.Name())
+			continue
+		}
 		registeredCommands[command.Name()] = agentCommandContract{
 			readOnly:      command.Annotations["unic.dev/read-only"],
 			outputVersion: command.Annotations["unic.dev/output-version"],
@@ -77,10 +81,16 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 		}
 	}
 
-	registeredResourceTools := make(map[string]string)
+	registeredToolNames := make(map[string]bool, len(tools))
+	registeredResourceTools := make(map[string]tool)
 	for _, registered := range tools {
+		if registeredToolNames[registered.Name] {
+			t.Errorf("MCP tool %q is registered more than once", registered.Name)
+			continue
+		}
+		registeredToolNames[registered.Name] = true
 		if strings.HasPrefix(registered.Metadata.OutputContract, "unic.resources.") {
-			registeredResourceTools[registered.Name] = registered.Metadata.OutputContract
+			registeredResourceTools[registered.Name] = registered
 		}
 	}
 
@@ -119,11 +129,16 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 					t.Errorf("resource command %q must provide JSON output", surface.command)
 				}
 			}
-			toolContract, registered := registeredResourceTools[surface.tool]
+			registeredTool, registered := registeredResourceTools[surface.tool]
 			if !registered {
 				t.Errorf("catalog feature %q maps to unregistered MCP tool %q", feature.Kind, surface.tool)
-			} else if want := "unic.resources." + surface.command + ".v1"; toolContract != want {
-				t.Errorf("MCP tool %q has output contract %q, want %q", surface.tool, toolContract, want)
+			} else {
+				if !registeredTool.Annotations.ReadOnlyHint {
+					t.Errorf("MCP tool %q must advertise read-only", surface.tool)
+				}
+				if want := "unic.resources." + surface.command + ".v1"; registeredTool.Metadata.OutputContract != want {
+					t.Errorf("MCP tool %q has output contract %q, want %q", surface.tool, registeredTool.Metadata.OutputContract, want)
+				}
 			}
 			if owner, mapped := mappedCommands[surface.command]; mapped {
 				t.Errorf("resource command %q is mapped by catalog features %q and %q", surface.command, owner, feature.Kind)
