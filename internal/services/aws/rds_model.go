@@ -7,20 +7,20 @@ import (
 
 // RDSInstance holds essential information about an RDS database instance.
 type RDSInstance struct {
-	DBInstanceID          string
-	Engine                string
-	EngineVersion         string
-	Status                string
-	InstanceClass         string
-	PendingInstanceClass  string
-	Region                string
-	MultiAZ               bool
-	StorageGB             int32
-	StorageEncrypted      bool
-	PubliclyAccessible    bool
-	BackupRetentionPeriod int32
-	Endpoint              string
-	ClusterID             string
+	DBInstanceID          string `json:"db_instance_id"`
+	Engine                string `json:"engine"`
+	EngineVersion         string `json:"engine_version"`
+	Status                string `json:"status"`
+	InstanceClass         string `json:"instance_class"`
+	PendingInstanceClass  string `json:"pending_instance_class"`
+	Region                string `json:"region"`
+	MultiAZ               bool   `json:"multi_az"`
+	StorageGB             int32  `json:"storage_gb"`
+	StorageEncrypted      bool   `json:"storage_encrypted"`
+	PubliclyAccessible    bool   `json:"publicly_accessible"`
+	BackupRetentionPeriod int32  `json:"backup_retention_period"`
+	Endpoint              string `json:"endpoint"`
+	ClusterID             string `json:"cluster_id"`
 }
 
 // DisplayTitle returns a formatted string for list display.

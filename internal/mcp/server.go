@@ -100,6 +100,51 @@ var tools = []tool{
 		},
 	},
 	{
+		Name: "list_ec2_instances", Description: "List EC2 instances for operational inventory.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"ec2:DescribeInstances"}, OutputContract: "unic.resources.ec2-instances.v1", Paginated: true},
+	},
+	{
+		Name: "list_rds_instances", Description: "List RDS instances and their current status.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"rds:DescribeDBInstances"}, OutputContract: "unic.resources.rds-instances.v1", Paginated: true},
+	},
+	{
+		Name: "list_cloudwatch_alarms", Description: "List CloudWatch alarms with firing alarms first.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"cloudwatch:DescribeAlarms"}, OutputContract: "unic.resources.alarms.v1", Paginated: true},
+	},
+	{
+		Name: "get_ecs_service_rollout", Description: "Get ECS service rollout, deployment, image, and recent event status.",
+		InputSchema: awsContextSchema(map[string]any{
+			"cluster": map[string]any{"type": "string", "minLength": 1, "description": "ECS cluster name or ARN"},
+			"service": map[string]any{"type": "string", "minLength": 1, "description": "ECS service name or ARN"},
+		}, []string{"cluster", "service"}),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"ecs:DescribeServices", "ecs:DescribeTaskDefinition"}, OutputContract: "unic.resources.ecs-rollout.v1"},
+	},
+	{
+		Name: "list_cloudtrail_events", Description: "List recent CloudTrail events, optionally narrowed to changes or a resource.",
+		InputSchema: awsContextSchema(map[string]any{
+			"since":          map[string]any{"type": "string", "description": "Go duration lookback, for example 6h or 24h", "default": "24h"},
+			"resource":       map[string]any{"type": "string", "description": "Optional resource name"},
+			"mutations_only": map[string]any{"type": "boolean", "default": false},
+		}, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"cloudtrail:LookupEvents"}, OutputContract: "unic.resources.cloudtrail-events.v1", Paginated: true},
+	},
+	{
+		Name: "get_elb_target_health", Description: "Get target health grouped by target group for one load balancer.",
+		InputSchema: awsContextSchema(map[string]any{
+			"load_balancer": map[string]any{"type": "string", "minLength": 1, "description": "Load balancer ARN"},
+		}, []string{"load_balancer"}),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"elasticloadbalancing:DescribeTargetGroups", "elasticloadbalancing:DescribeTargetHealth"}, OutputContract: "unic.resources.elb-target-health.v1", Paginated: true},
+	},
+	{
 		Name: "plan_context_sync", Description: "Preview an SSO context sync plan. This tool never writes configuration.",
 		InputSchema: objectSchema(map[string]any{
 			"base_context": map[string]any{"type": "string", "description": "Optional SSO base context"},
@@ -122,6 +167,15 @@ func objectSchema(properties map[string]any, required []string) map[string]any {
 		schema["required"] = required
 	}
 	return schema
+}
+
+func awsContextSchema(properties map[string]any, required []string) map[string]any {
+	if properties == nil {
+		properties = map[string]any{}
+	}
+	properties["profile"] = map[string]any{"type": "string", "description": "Optional unic context or AWS profile"}
+	properties["region"] = map[string]any{"type": "string", "description": "Optional AWS region"}
+	return objectSchema(properties, required)
 }
 
 // Serve reads newline-delimited JSON-RPC messages and writes MCP responses.
@@ -281,6 +335,7 @@ func mcpCapabilities() map[string]any {
 			"name": registered.Name, "description": registered.Description,
 			"input_schema": registered.InputSchema, "annotations": registered.Annotations,
 			"required_permissions": permissions,
+			"input_contract":       "unic.mcp." + registered.Name + ".input.v1",
 			"output_contract":      registered.Metadata.OutputContract,
 			"paginated":            registered.Metadata.Paginated, "partial_results": registered.Metadata.PartialResults,
 		})
@@ -325,6 +380,65 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 			result = append(result, "--region", args.Region)
 		}
 		return result, nil
+	case "list_ec2_instances", "list_rds_instances", "list_cloudwatch_alarms":
+		var args struct {
+			Profile string `json:"profile"`
+			Region  string `json:"region"`
+		}
+		if err := decodeArguments(raw, &args); err != nil {
+			return nil, err
+		}
+		command := map[string]string{"list_ec2_instances": "ec2-instances", "list_rds_instances": "rds-instances", "list_cloudwatch_alarms": "alarms"}[name]
+		return withAWSContext([]string{"resources", command, "--json"}, args.Profile, args.Region), nil
+	case "get_ecs_service_rollout":
+		var args struct {
+			Cluster string `json:"cluster"`
+			Service string `json:"service"`
+			Profile string `json:"profile"`
+			Region  string `json:"region"`
+		}
+		if err := decodeArguments(raw, &args); err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(args.Cluster) == "" || strings.TrimSpace(args.Service) == "" {
+			return nil, errors.New("cluster and service are required")
+		}
+		return withAWSContext([]string{"resources", "ecs-rollout", "--cluster", args.Cluster, "--service", args.Service, "--json"}, args.Profile, args.Region), nil
+	case "list_cloudtrail_events":
+		var args struct {
+			Since         string `json:"since"`
+			Resource      string `json:"resource"`
+			MutationsOnly bool   `json:"mutations_only"`
+			Profile       string `json:"profile"`
+			Region        string `json:"region"`
+		}
+		if err := decodeArguments(raw, &args); err != nil {
+			return nil, err
+		}
+		if args.Since == "" {
+			args.Since = "24h"
+		}
+		result := []string{"resources", "cloudtrail-events", "--since", args.Since, "--json"}
+		if args.Resource != "" {
+			result = append(result, "--resource", args.Resource)
+		}
+		if args.MutationsOnly {
+			result = append(result, "--mutations-only")
+		}
+		return withAWSContext(result, args.Profile, args.Region), nil
+	case "get_elb_target_health":
+		var args struct {
+			LoadBalancer string `json:"load_balancer"`
+			Profile      string `json:"profile"`
+			Region       string `json:"region"`
+		}
+		if err := decodeArguments(raw, &args); err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(args.LoadBalancer) == "" {
+			return nil, errors.New("load_balancer is required")
+		}
+		return withAWSContext([]string{"resources", "elb-target-health", "--load-balancer", args.LoadBalancer, "--json"}, args.Profile, args.Region), nil
 	case "plan_context_sync":
 		var args struct {
 			BaseContext string `json:"base_context"`
@@ -345,6 +459,16 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("%w %q", errUnknownTool, name)
 	}
+}
+
+func withAWSContext(args []string, profile, region string) []string {
+	if profile != "" {
+		args = append(args, "--profile", profile)
+	}
+	if region != "" {
+		args = append(args, "--region", region)
+	}
+	return args
 }
 
 func decodeParams(raw json.RawMessage, target any) error {

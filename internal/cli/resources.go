@@ -57,6 +57,8 @@ var loadBackupVaults = func(ctx context.Context) ([]awsservice.BackupVault, []er
 func newResourcesCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "resources", Short: "Read-only resource queries for automation"}
 	cmd.AddCommand(newBackupVaultsCmd())
+	cmd.AddCommand(newEC2InstancesCmd(), newRDSInstancesCmd(), newAlarmsCmd())
+	cmd.AddCommand(newECSRolloutCmd(), newCloudTrailEventsCmd(), newELBTargetHealthCmd())
 	return cmd
 }
 

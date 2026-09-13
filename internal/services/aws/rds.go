@@ -14,37 +14,39 @@ import (
 // ListDBInstances returns all RDS DB instances in the current account/region.
 func (r *AwsRepository) ListDBInstances(ctx context.Context) ([]RDSInstance, error) {
 	uniclog.Debug("aws", "ListDBInstances called")
-	output, err := r.RDSClient.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to describe DB instances: %w", err)
-	}
-
-	instances := make([]RDSInstance, 0, len(output.DBInstances))
-	for _, db := range output.DBInstances {
-		inst := RDSInstance{
-			DBInstanceID:          awssdk.ToString(db.DBInstanceIdentifier),
-			Engine:                awssdk.ToString(db.Engine),
-			EngineVersion:         awssdk.ToString(db.EngineVersion),
-			Status:                awssdk.ToString(db.DBInstanceStatus),
-			InstanceClass:         awssdk.ToString(db.DBInstanceClass),
-			MultiAZ:               awssdk.ToBool(db.MultiAZ),
-			StorageGB:             awssdk.ToInt32(db.AllocatedStorage),
-			StorageEncrypted:      awssdk.ToBool(db.StorageEncrypted),
-			PubliclyAccessible:    awssdk.ToBool(db.PubliclyAccessible),
-			BackupRetentionPeriod: awssdk.ToInt32(db.BackupRetentionPeriod),
-			ClusterID:             awssdk.ToString(db.DBClusterIdentifier),
+	var instances []RDSInstance
+	paginator := rds.NewDescribeDBInstancesPaginator(r.RDSClient, &rds.DescribeDBInstancesInput{})
+	for paginator.HasMorePages() {
+		output, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe DB instances: %w", err)
 		}
-		if db.PendingModifiedValues != nil {
-			inst.PendingInstanceClass = awssdk.ToString(db.PendingModifiedValues.DBInstanceClass)
-		}
-		inst.Region = r.Region
+		for _, db := range output.DBInstances {
+			inst := RDSInstance{
+				DBInstanceID:          awssdk.ToString(db.DBInstanceIdentifier),
+				Engine:                awssdk.ToString(db.Engine),
+				EngineVersion:         awssdk.ToString(db.EngineVersion),
+				Status:                awssdk.ToString(db.DBInstanceStatus),
+				InstanceClass:         awssdk.ToString(db.DBInstanceClass),
+				MultiAZ:               awssdk.ToBool(db.MultiAZ),
+				StorageGB:             awssdk.ToInt32(db.AllocatedStorage),
+				StorageEncrypted:      awssdk.ToBool(db.StorageEncrypted),
+				PubliclyAccessible:    awssdk.ToBool(db.PubliclyAccessible),
+				BackupRetentionPeriod: awssdk.ToInt32(db.BackupRetentionPeriod),
+				ClusterID:             awssdk.ToString(db.DBClusterIdentifier),
+			}
+			if db.PendingModifiedValues != nil {
+				inst.PendingInstanceClass = awssdk.ToString(db.PendingModifiedValues.DBInstanceClass)
+			}
+			inst.Region = r.Region
 
-		// Endpoint may be nil for stopped instances
-		if db.Endpoint != nil {
-			inst.Endpoint = fmt.Sprintf("%s:%d", awssdk.ToString(db.Endpoint.Address), awssdk.ToInt32(db.Endpoint.Port))
-		}
+			// Endpoint may be nil for stopped instances
+			if db.Endpoint != nil {
+				inst.Endpoint = fmt.Sprintf("%s:%d", awssdk.ToString(db.Endpoint.Address), awssdk.ToInt32(db.Endpoint.Port))
+			}
 
-		instances = append(instances, inst)
+			instances = append(instances, inst)
+		}
 	}
 	sort.Slice(instances, func(i, j int) bool {
 		left := normalizedSortKey(instances[i].DBInstanceID)

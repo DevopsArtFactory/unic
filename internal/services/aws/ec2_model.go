@@ -8,27 +8,27 @@ import (
 
 // EC2Instance holds the essential information about an EC2 instance.
 type EC2Instance struct {
-	InstanceID       string
-	Name             string
-	State            string
-	InstanceType     string
-	AvailabilityZone string
-	Region           string
-	VPCID            string
-	SubnetID         string
-	PrivateIP        string
-	PublicIP         string
-	SecurityGroups   []EC2InstanceSecurityGroup
-	LaunchTime       time.Time
-	PlatformDetails  string
-	IAMProfile       string
-	Tags             map[string]string
+	InstanceID       string                     `json:"instance_id"`
+	Name             string                     `json:"name"`
+	State            string                     `json:"state"`
+	InstanceType     string                     `json:"instance_type"`
+	AvailabilityZone string                     `json:"availability_zone"`
+	Region           string                     `json:"region"`
+	VPCID            string                     `json:"vpc_id"`
+	SubnetID         string                     `json:"subnet_id"`
+	PrivateIP        string                     `json:"private_ip"`
+	PublicIP         string                     `json:"public_ip"`
+	SecurityGroups   []EC2InstanceSecurityGroup `json:"security_groups"`
+	LaunchTime       time.Time                  `json:"launch_time"`
+	PlatformDetails  string                     `json:"platform_details"`
+	IAMProfile       string                     `json:"iam_profile"`
+	Tags             map[string]string          `json:"tags"`
 }
 
 // EC2InstanceSecurityGroup identifies a security group attached to an instance.
 type EC2InstanceSecurityGroup struct {
-	GroupID string
-	Name    string
+	GroupID string `json:"group_id"`
+	Name    string `json:"name"`
 }
 
 // FilterText returns a lowercase string combining name, instance ID, and IP
