@@ -52,6 +52,12 @@ func TestUpdateCodexConfigIsIdempotentAndPreservesOtherTables(t *testing.T) {
 	}
 }
 
+func TestUpdateCodexConfigRejectsMalformed(t *testing.T) {
+	if _, err := updateCodexConfig([]byte("[mcp_servers.unic\ncommand = \"bad\"\n"), "unic-mcp"); err == nil {
+		t.Fatal("malformed TOML must fail")
+	}
+}
+
 func TestMCPSetupPlanUsesClientPaths(t *testing.T) {
 	home := t.TempDir()
 	path, before, after, err := mcpSetupPlan("kiro", home, "/bin/unic-mcp")

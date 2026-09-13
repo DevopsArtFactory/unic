@@ -174,7 +174,13 @@ func updateCodexConfig(before []byte, binary string) ([]byte, error) {
 	start, end := -1, len(lines)
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") && !strings.HasSuffix(trimmed, "]") {
+			return nil, fmt.Errorf("malformed Codex config: invalid table header on line %d", i+1)
+		}
 		if trimmed == "[mcp_servers.unic]" {
+			if start >= 0 {
+				return nil, errors.New("malformed Codex config: duplicate [mcp_servers.unic] table")
+			}
 			start = i
 			continue
 		}
