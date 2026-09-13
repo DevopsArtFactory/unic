@@ -49,6 +49,14 @@ type tool struct {
 	Description string         `json:"description"`
 	InputSchema map[string]any `json:"inputSchema"`
 	Annotations annotations    `json:"annotations"`
+	Metadata    toolMetadata   `json:"-"`
+}
+
+type toolMetadata struct {
+	RequiredPermissions []string `json:"required_permissions"`
+	OutputContract      string   `json:"output_contract"`
+	Paginated           bool     `json:"paginated"`
+	PartialResults      bool     `json:"partial_results"`
 }
 
 type annotations struct {
@@ -63,6 +71,13 @@ var tools = []tool{
 		Name: "get_capabilities", Description: "List unic AWS features and automation commands.",
 		InputSchema: objectSchema(nil, nil),
 		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true},
+		Metadata:    toolMetadata{OutputContract: "unic.capabilities.v1"},
+	},
+	{
+		Name: "get_mcp_capabilities", Description: "List operations callable through this MCP server.",
+		InputSchema: objectSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true},
+		Metadata:    toolMetadata{OutputContract: "unic.mcp-capabilities.v1"},
 	},
 	{
 		Name: "get_command_schema", Description: "Describe one unic automation command contract.",
@@ -70,6 +85,7 @@ var tools = []tool{
 			"command": map[string]any{"type": "string", "description": "Command path, for example: context sync"},
 		}, []string{"command"}),
 		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true},
+		Metadata:    toolMetadata{OutputContract: "unic.command-schema.v1"},
 	},
 	{
 		Name: "list_backup_vaults", Description: "List AWS Backup vaults using unic's active or selected AWS context.",
@@ -78,6 +94,10 @@ var tools = []tool{
 			"region":  map[string]any{"type": "string", "description": "Optional AWS region"},
 		}, nil),
 		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata: toolMetadata{
+			RequiredPermissions: []string{"backup:ListBackupVaults", "backup:ListRecoveryPointsByBackupVault", "backup:ListProtectedResourcesByBackupVault", "backup:ListBackupJobs"},
+			OutputContract:      "unic.resources.backup-vaults.v1", Paginated: true, PartialResults: true,
+		},
 	},
 	{
 		Name: "plan_context_sync", Description: "Preview an SSO context sync plan. This tool never writes configuration.",
@@ -86,6 +106,10 @@ var tools = []tool{
 			"prune":        map[string]any{"type": "boolean", "default": false, "description": "Show orphaned managed contexts as removals"},
 		}, nil),
 		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata: toolMetadata{
+			RequiredPermissions: []string{"sso:ListAccounts", "sso:ListAccountRoles"},
+			OutputContract:      "unic.context-sync.v1", Paginated: true,
+		},
 	},
 }
 
@@ -200,6 +224,14 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, *rpcEr
 	if err := decodeParams(raw, &call); err != nil || call.Name == "" {
 		return nil, &rpcError{Code: -32602, Message: "Invalid tool call parameters"}
 	}
+	if call.Name == "get_mcp_capabilities" {
+		if err := decodeArguments(call.Arguments, &struct{}{}); err != nil {
+			return toolError(err), nil
+		}
+		structured := mcpCapabilities()
+		text, _ := json.Marshal(structured)
+		return successfulToolResult(text, structured), nil
+	}
 
 	args, err := toolArgs(call.Name, call.Arguments)
 	if err != nil {
@@ -221,11 +253,39 @@ func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (any, *rpcEr
 	if err := json.Unmarshal(output, &structured); err != nil {
 		return toolError(fmt.Errorf("unic command returned invalid JSON: %w", err)), nil
 	}
+	if executeErr != nil {
+		return map[string]any{
+			"content":           []map[string]string{{"type": "text", "text": string(output)}},
+			"structuredContent": structured, "isError": true,
+		}, nil
+	}
+	return successfulToolResult(output, structured), nil
+}
+
+func successfulToolResult(text []byte, structured map[string]any) map[string]any {
 	return map[string]any{
-		"content":           []map[string]string{{"type": "text", "text": string(output)}},
+		"content":           []map[string]string{{"type": "text", "text": string(text)}},
 		"structuredContent": structured,
-		"isError":           executeErr != nil,
-	}, nil
+		"isError":           false,
+	}
+}
+
+func mcpCapabilities() map[string]any {
+	capabilities := make([]map[string]any, 0, len(tools))
+	for _, registered := range tools {
+		permissions := registered.Metadata.RequiredPermissions
+		if permissions == nil {
+			permissions = []string{}
+		}
+		capabilities = append(capabilities, map[string]any{
+			"name": registered.Name, "description": registered.Description,
+			"input_schema": registered.InputSchema, "annotations": registered.Annotations,
+			"required_permissions": permissions,
+			"output_contract":      registered.Metadata.OutputContract,
+			"paginated":            registered.Metadata.Paginated, "partial_results": registered.Metadata.PartialResults,
+		})
+	}
+	return map[string]any{"schema_version": "v1", "tools": capabilities}
 }
 
 var errUnknownTool = errors.New("unknown tool")
