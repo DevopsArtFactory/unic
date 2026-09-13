@@ -75,9 +75,9 @@ func TestAssumeRoleEnvMFAReusesCachedSessionWithoutPrompt(t *testing.T) {
 	prompted, assumed := stubMFASeams(t)
 	cachedMFASessionFn = func(*config.Config) (awsservice.AssumeRoleSession, bool) {
 		return awsservice.AssumeRoleSession{
-			AccessKeyID:     "cached-access-key",
-			SecretAccessKey: "cached-credential",
-			SessionToken:    "cached-session",
+			AccessKeyID:     "AKIA-CACHED",
+			SecretAccessKey: "secret",
+			SessionToken:    "cached-token",
 			Expiration:      time.Now().Add(time.Hour),
 		}, true
 	}
@@ -89,7 +89,7 @@ func TestAssumeRoleEnvMFAReusesCachedSessionWithoutPrompt(t *testing.T) {
 	if *prompted || *assumed {
 		t.Fatalf("expected cached session to skip prompting, prompted=%v assumed=%v", *prompted, *assumed)
 	}
-	if values["AWS_ACCESS_KEY_ID"] != "cached-access-key" {
+	if values["AWS_ACCESS_KEY_ID"] != "AKIA-CACHED" {
 		t.Fatalf("expected cached session exports, got %+v", values)
 	}
 }

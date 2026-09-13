@@ -109,6 +109,8 @@ Prefer tests for:
 
 `.github/workflows/hol-plugin-scanner.yml` runs the SHA-pinned [HOL Plugin Scanner action](https://github.com/hashgraph-online/ai-plugin-scanner-action/tree/caba2e96aa8ad2feb6cf6fca52442b52e22e779f) on pull requests to `main` and pushes to `main`. It uses static `scan` mode with the default profile and ecosystem detection, a minimum score of 80, and failure on high or critical findings. A failed threshold keeps the job failed; the report upload does not override the result.
 
+The trusted `.plugin-scanner.toml` excludes four credential-fixture test files that produce field-name-based false positives. Production code and all other paths remain subject to the high-severity gate; review changes to this allowlist like workflow policy changes.
+
 The job needs only `contents: read`, does not persist checkout credentials, and requires no repository or AWS secrets. Online probing, runtime `verify`, PR comments, and SARIF upload are disabled. After a report is produced, a separate step renders its score, analyzer status, and finding rules/locations into the job summary, including when the scanner fails its gate. Finding descriptions remain in the full `hol-plugin-scanner-report` JSON artifact, retained for 14 days. Setup errors before report generation may leave no summary or artifact. The workflow checks the renderer with `python3 -m unittest discover -s .github/scripts -p 'test_*.py'` before scanning; run the same command locally when changing it.
 
 If a saved report is unreadable or malformed, the publisher writes an error summary and fails; artifact retention still runs.

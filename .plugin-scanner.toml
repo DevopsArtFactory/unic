@@ -1,0 +1,7 @@
+[scanner]
+ignore_paths = [
+  "internal/app/app_test.go",
+  "internal/auth/env_mfa_test.go",
+  "internal/services/aws/iam_test.go",
+  "internal/services/aws/sso_test.go",
+]

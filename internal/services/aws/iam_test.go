@@ -491,7 +491,7 @@ func TestCreateAccessKey_Success(t *testing.T) {
 		createAccessKeyFunc: func(_ context.Context, _ *iam.CreateAccessKeyInput, _ ...func(*iam.Options)) (*iam.CreateAccessKeyOutput, error) {
 			return &iam.CreateAccessKeyOutput{
 				AccessKey: &iamtypes.AccessKey{
-					AccessKeyId:     awssdk.String("new-access-key"),
+					AccessKeyId:     awssdk.String("AKIANEWKEY1234567890"),
 					SecretAccessKey: awssdk.String("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"),
 				},
 			}, nil
@@ -503,7 +503,7 @@ func TestCreateAccessKey_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if newKey.AccessKeyID != "new-access-key" {
+	if newKey.AccessKeyID != "AKIANEWKEY1234567890" {
 		t.Errorf("expected new key ID 'AKIANEWKEY1234567890', got %q", newKey.AccessKeyID)
 	}
 	if newKey.SecretAccessKey != "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" {
