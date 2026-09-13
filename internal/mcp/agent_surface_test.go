@@ -77,10 +77,10 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 		}
 	}
 
-	registeredResourceTools := make(map[string]bool)
+	registeredResourceTools := make(map[string]string)
 	for _, registered := range tools {
 		if strings.HasPrefix(registered.Metadata.OutputContract, "unic.resources.") {
-			registeredResourceTools[registered.Name] = true
+			registeredResourceTools[registered.Name] = registered.Metadata.OutputContract
 		}
 	}
 
@@ -119,8 +119,11 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 					t.Errorf("resource command %q must provide JSON output", surface.command)
 				}
 			}
-			if !registeredResourceTools[surface.tool] {
+			toolContract, registered := registeredResourceTools[surface.tool]
+			if !registered {
 				t.Errorf("catalog feature %q maps to unregistered MCP tool %q", feature.Kind, surface.tool)
+			} else if want := "unic.resources." + surface.command + ".v1"; toolContract != want {
+				t.Errorf("MCP tool %q has output contract %q, want %q", surface.tool, toolContract, want)
 			}
 			mappedCommands[surface.command] = true
 			mappedTools[surface.tool] = true
