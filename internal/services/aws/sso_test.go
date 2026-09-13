@@ -35,7 +35,7 @@ func writeTestSSOToken(t *testing.T, home string, startURL string, expiresAt tim
 	}
 
 	token := ssoTokenCache{
-		AccessToken: "cached-token",
+		AccessToken: "cached-session",
 		ExpiresAt:   expiresAt.UTC().Format(time.RFC3339),
 		Region:      "us-east-1",
 		StartURL:    startURL,

@@ -2078,7 +2078,7 @@ func TestBedrockKeyResultEscReloadsList(t *testing.T) {
 	m.screen = screenBedrockKeyResult
 	m.bedrock.generatedKey = &awsservice.GeneratedBedrockAPIKey{
 		BedrockAPIKey: awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user"},
-		Secret:        "secret-token",
+		Secret:        "bedrock-fixture",
 	}
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -2099,14 +2099,14 @@ func TestBedrockKeyResultDoesNotRenderSecret(t *testing.T) {
 	m.screen = screenBedrockKeyResult
 	m.bedrock.generatedKey = &awsservice.GeneratedBedrockAPIKey{
 		BedrockAPIKey: awsservice.BedrockAPIKey{CredentialID: "ACCA123", UserName: "bedrock-user"},
-		Secret:        "secret-token",
+		Secret:        "bedrock-fixture",
 	}
 
 	view := m.bedrock.viewResult(m)
-	if strings.Contains(view, "secret-token") {
+	if strings.Contains(view, "bedrock-fixture") {
 		t.Fatalf("result view should not render raw secret, got %q", view)
 	}
-	if strings.Contains(view, "AWS_BEARER_TOKEN_BEDROCK=secret-token") {
+	if strings.Contains(view, "AWS_BEARER_TOKEN_BEDROCK=bedrock-fixture") {
 		t.Fatalf("result view should not render raw env export, got %q", view)
 	}
 	for _, want := range []string{"copy-only", "[hidden] press c to copy", "[hidden] press e to copy export"} {
