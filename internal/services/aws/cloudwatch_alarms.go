@@ -15,24 +15,24 @@ import (
 
 // CloudWatchAlarm is a metric alarm with the state fields operators triage by.
 type CloudWatchAlarm struct {
-	Name               string
-	State              string
-	StateReason        string
-	StateUpdated       time.Time
-	MetricName         string
-	Namespace          string
-	Dimensions         []CloudWatchAlarmDimension
-	Threshold          float64
-	ComparisonOperator string
-	ActionsEnabled     bool
+	Name               string                     `json:"name"`
+	State              string                     `json:"state"`
+	StateReason        string                     `json:"state_reason"`
+	StateUpdated       time.Time                  `json:"state_updated"`
+	MetricName         string                     `json:"metric_name"`
+	Namespace          string                     `json:"namespace"`
+	Dimensions         []CloudWatchAlarmDimension `json:"dimensions"`
+	Threshold          float64                    `json:"threshold"`
+	ComparisonOperator string                     `json:"comparison_operator"`
+	ActionsEnabled     bool                       `json:"actions_enabled"`
 	// Composite marks alarms whose state derives from a rule over other
 	// alarms; they carry no metric, dimensions, or threshold.
-	Composite bool
+	Composite bool `json:"composite"`
 }
 
 type CloudWatchAlarmDimension struct {
-	Name  string
-	Value string
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // DisplayTitle returns a formatted string for list display.

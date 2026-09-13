@@ -44,24 +44,24 @@ func (s ECSService) FilterText() string {
 
 // ECSDeployment represents one deployment within an ECS service.
 type ECSDeployment struct {
-	ID                 string
-	Status             string
-	RolloutState       string
-	RolloutStateReason string
-	TaskDefinition     string
-	RunningCount       int32
-	DesiredCount       int32
-	PendingCount       int32
-	FailedTasks        int32
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                 string    `json:"id"`
+	Status             string    `json:"status"`
+	RolloutState       string    `json:"rollout_state"`
+	RolloutStateReason string    `json:"rollout_state_reason"`
+	TaskDefinition     string    `json:"task_definition"`
+	RunningCount       int32     `json:"running_count"`
+	DesiredCount       int32     `json:"desired_count"`
+	PendingCount       int32     `json:"pending_count"`
+	FailedTasks        int32     `json:"failed_tasks"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // ECSServiceEvent represents a recent event attached to an ECS service.
 type ECSServiceEvent struct {
-	ID        string
-	CreatedAt time.Time
-	Message   string
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	Message   string    `json:"message"`
 }
 
 func (e ECSServiceEvent) DisplayTitle() string {
@@ -73,31 +73,31 @@ func (e ECSServiceEvent) DisplayTitle() string {
 
 // ECSContainerImage represents a task definition container/image pair.
 type ECSContainerImage struct {
-	Name  string
-	Image string
+	Name  string `json:"name"`
+	Image string `json:"image"`
 }
 
 // ECSServiceDetail captures rollout, task definition, and event context for a service.
 type ECSServiceDetail struct {
-	Name                     string
-	ARN                      string
-	Status                   string
-	LaunchType               string
-	SchedulingStrategy       string
-	DeploymentControllerType string
-	DesiredCount             int32
-	RunningCount             int32
-	PendingCount             int32
-	EnableExecuteCommand     bool
-	PlatformVersion          string
-	TaskDefinitionARN        string
-	TaskDefinitionFamily     string
-	TaskDefinitionRevision   int32
-	NetworkMode              string
-	RequiresCompatibilities  []string
-	ContainerImages          []ECSContainerImage
-	Deployments              []ECSDeployment
-	Events                   []ECSServiceEvent
+	Name                     string              `json:"name"`
+	ARN                      string              `json:"arn"`
+	Status                   string              `json:"status"`
+	LaunchType               string              `json:"launch_type"`
+	SchedulingStrategy       string              `json:"scheduling_strategy"`
+	DeploymentControllerType string              `json:"deployment_controller_type"`
+	DesiredCount             int32               `json:"desired_count"`
+	RunningCount             int32               `json:"running_count"`
+	PendingCount             int32               `json:"pending_count"`
+	EnableExecuteCommand     bool                `json:"enable_execute_command"`
+	PlatformVersion          string              `json:"platform_version"`
+	TaskDefinitionARN        string              `json:"task_definition_arn"`
+	TaskDefinitionFamily     string              `json:"task_definition_family"`
+	TaskDefinitionRevision   int32               `json:"task_definition_revision"`
+	NetworkMode              string              `json:"network_mode"`
+	RequiresCompatibilities  []string            `json:"requires_compatibilities"`
+	ContainerImages          []ECSContainerImage `json:"container_images"`
+	Deployments              []ECSDeployment     `json:"deployments"`
+	Events                   []ECSServiceEvent   `json:"events"`
 }
 
 func (d ECSServiceDetail) Summary() ECSService {

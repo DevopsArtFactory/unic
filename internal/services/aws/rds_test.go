@@ -291,6 +291,27 @@ func TestListDBInstances_SortedByIdentifier(t *testing.T) {
 	}
 }
 
+func TestListDBInstances_FollowsPagination(t *testing.T) {
+	var calls int
+	mock := &mockRDSClient{describeDBInstancesFunc: func(_ context.Context, params *rds.DescribeDBInstancesInput, _ ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {
+		calls++
+		if calls == 1 {
+			return &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{{DBInstanceIdentifier: awssdk.String("zeta")}}, Marker: awssdk.String("next")}, nil
+		}
+		if awssdk.ToString(params.Marker) != "next" {
+			t.Fatalf("marker = %q", awssdk.ToString(params.Marker))
+		}
+		return &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{{DBInstanceIdentifier: awssdk.String("alpha")}}}, nil
+	}}
+	instances, err := (&AwsRepository{RDSClient: mock}).ListDBInstances(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 || len(instances) != 2 || instances[0].DBInstanceID != "alpha" {
+		t.Fatalf("calls=%d instances=%+v", calls, instances)
+	}
+}
+
 // --- DescribeDBInstance tests ---
 
 func TestDescribeDBInstance_Success(t *testing.T) {

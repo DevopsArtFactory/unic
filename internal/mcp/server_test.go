@@ -35,7 +35,7 @@ func TestServerLifecycleAndTools(t *testing.T) {
 		t.Fatalf("protocolVersion = %v", got)
 	}
 	listed := responses[1].Result.(map[string]any)["tools"].([]any)
-	if len(listed) != 5 {
+	if len(listed) != len(tools) {
 		t.Fatalf("listed %d tools", len(listed))
 	}
 	wantCall := []string{"resources", "backup-vaults", "--json", "--profile", "prod", "--region", "us-east-1"}
@@ -45,6 +45,39 @@ func TestServerLifecycleAndTools(t *testing.T) {
 	result := responses[2].Result.(map[string]any)
 	if result["isError"] != false || result["structuredContent"].(map[string]any)["schema_version"] != "v1" {
 		t.Fatalf("unexpected tool result: %#v", result)
+	}
+}
+
+func TestReadOnlyOperationToolArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want []string
+	}{
+		{"list_ec2_instances", `{"profile":"prod","region":"eu-west-1"}`, []string{"resources", "ec2-instances", "--json", "--profile", "prod", "--region", "eu-west-1"}},
+		{"get_ecs_service_rollout", `{"cluster":"prod","service":"api"}`, []string{"resources", "ecs-rollout", "--cluster", "prod", "--service", "api", "--json"}},
+		{"list_cloudtrail_events", `{"since":"6h","mutations_only":true}`, []string{"resources", "cloudtrail-events", "--since", "6h", "--json", "--mutations-only"}},
+		{"get_elb_target_health", `{"load_balancer":"arn:lb"}`, []string{"resources", "elb-target-health", "--load-balancer", "arn:lb", "--json"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := toolArgs(test.name, json.RawMessage(test.raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("args = %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestReadOnlyOperationToolValidation(t *testing.T) {
+	if _, err := toolArgs("get_ecs_service_rollout", json.RawMessage(`{"cluster":"prod"}`)); err == nil {
+		t.Fatal("missing service must fail")
+	}
+	if _, err := toolArgs("get_elb_target_health", json.RawMessage(`{"load_balancer":""}`)); err == nil {
+		t.Fatal("empty load balancer must fail")
 	}
 }
 
@@ -60,6 +93,9 @@ func TestMCPCapabilitiesStayAlignedWithRegisteredTools(t *testing.T) {
 		}
 		if listed[i]["output_contract"] == "" {
 			t.Fatalf("tool %s has no output contract", registered.Name)
+		}
+		if listed[i]["input_contract"] == "" {
+			t.Fatalf("tool %s has no input contract", registered.Name)
 		}
 		if _, ok := listed[i]["required_permissions"].([]string); !ok {
 			t.Fatalf("tool %s permissions are not a stable array", registered.Name)

@@ -156,12 +156,15 @@ func TestLookupEventsCapsAtMaxAcrossPages(t *testing.T) {
 	}
 	repo := &AwsRepository{CloudTrailClient: mock}
 
-	events, err := repo.LookupEvents(context.Background(), CloudTrailLookup{Since: time.Hour})
+	events, complete, err := repo.LookupEventsWithStatus(context.Background(), CloudTrailLookup{Since: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(events) != cloudTrailMaxEvents {
 		t.Fatalf("expected result cap at %d events, got %d", cloudTrailMaxEvents, len(events))
+	}
+	if complete {
+		t.Fatal("capped results must be incomplete")
 	}
 	if page > 2 {
 		t.Fatalf("expected pagination to stop once capped, fetched %d pages", page)

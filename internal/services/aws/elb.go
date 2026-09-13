@@ -36,15 +36,15 @@ func (lb ELBLoadBalancer) FilterText() string {
 
 // ELBTargetGroupHealth is a target group with aggregated target health.
 type ELBTargetGroupHealth struct {
-	Name           string
-	ARN            string
-	Protocol       string
-	Port           int32
-	TargetType     string
-	HealthyCount   int
-	UnhealthyCount int
-	OtherCount     int // draining, initial, unavailable, unused
-	Targets        []ELBTargetHealth
+	Name           string            `json:"name"`
+	ARN            string            `json:"arn"`
+	Protocol       string            `json:"protocol"`
+	Port           int32             `json:"port"`
+	TargetType     string            `json:"target_type"`
+	HealthyCount   int               `json:"healthy_count"`
+	UnhealthyCount int               `json:"unhealthy_count"`
+	OtherCount     int               `json:"other_count"` // draining, initial, unavailable, unused
+	Targets        []ELBTargetHealth `json:"targets"`
 }
 
 // DisplayTitle returns a formatted string for list display.
@@ -64,11 +64,11 @@ func (tg ELBTargetGroupHealth) FilterText() string {
 
 // ELBTargetHealth is one registered target's health.
 type ELBTargetHealth struct {
-	ID          string
-	Port        int32
-	State       string
-	Reason      string
-	Description string
+	ID          string `json:"id"`
+	Port        int32  `json:"port"`
+	State       string `json:"state"`
+	Reason      string `json:"reason"`
+	Description string `json:"description"`
 }
 
 // DisplayTitle returns a formatted string for list display.

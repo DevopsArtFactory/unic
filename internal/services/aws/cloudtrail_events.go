@@ -15,21 +15,21 @@ import (
 
 // CloudTrailEvent is one recorded API call with the fields operators triage by.
 type CloudTrailEvent struct {
-	ID        string
-	Name      string
-	Time      time.Time
-	Username  string
-	Source    string
-	Region    string
-	SourceIP  string
-	ReadOnly  bool
-	Resources []CloudTrailEventResource
-	RawJSON   string
+	ID        string                    `json:"id"`
+	Name      string                    `json:"name"`
+	Time      time.Time                 `json:"time"`
+	Username  string                    `json:"username"`
+	Source    string                    `json:"source"`
+	Region    string                    `json:"region"`
+	SourceIP  string                    `json:"source_ip"`
+	ReadOnly  bool                      `json:"read_only"`
+	Resources []CloudTrailEventResource `json:"resources"`
+	RawJSON   string                    `json:"raw_json"`
 }
 
 type CloudTrailEventResource struct {
-	Type string
-	Name string
+	Type string `json:"type"`
+	Name string `json:"name"`
 }
 
 // DisplayTitle returns a formatted string for list display.
@@ -70,6 +70,12 @@ const cloudTrailMaxEvents = 100
 
 // LookupEvents returns recent CloudTrail events, newest first.
 func (r *AwsRepository) LookupEvents(ctx context.Context, lookup CloudTrailLookup) ([]CloudTrailEvent, error) {
+	events, _, err := r.LookupEventsWithStatus(ctx, lookup)
+	return events, err
+}
+
+// LookupEventsWithStatus also reports whether the 100-event cap truncated results.
+func (r *AwsRepository) LookupEventsWithStatus(ctx context.Context, lookup CloudTrailLookup) ([]CloudTrailEvent, bool, error) {
 	uniclog.Debug("aws", "LookupEvents called", "since", lookup.Since.String(), "resource", lookup.ResourceName, "mutations_only", lookup.MutationsOnly)
 
 	startTime := time.Now().Add(-lookup.Since)
@@ -93,7 +99,7 @@ func (r *AwsRepository) LookupEvents(ctx context.Context, lookup CloudTrailLooku
 	for paginator.HasMorePages() && len(events) < cloudTrailMaxEvents {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to look up CloudTrail events: %w", err)
+			return nil, false, fmt.Errorf("failed to look up CloudTrail events: %w", err)
 		}
 		for _, event := range page.Events {
 			mapped := CloudTrailEvent{
@@ -129,7 +135,7 @@ func (r *AwsRepository) LookupEvents(ctx context.Context, lookup CloudTrailLooku
 			}
 		}
 	}
-	return events, nil
+	return events, !paginator.HasMorePages(), nil
 }
 
 // PrettyRawJSON returns the raw event indented for the detail screen.
