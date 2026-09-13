@@ -9,6 +9,12 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 )
 
+const (
+	accessKeyIDEnv     = "AWS_ACCESS_KEY_ID"
+	secretAccessKeyEnv = "AWS_SECRET_ACCESS_KEY"
+	sessionTokenEnv    = "AWS_SESSION_TOKEN"
+)
+
 const awsCLIBinary = "aws"
 
 // CheckAWSCLIInstalled verifies that the aws CLI is available in PATH.
@@ -34,11 +40,11 @@ func CredentialEnv(creds awssdk.Credentials) []string {
 		env = append(env, e)
 	}
 	env = append(env,
-		"AWS_ACCESS_KEY_ID="+creds.AccessKeyID,
-		"AWS_SECRET_ACCESS_KEY="+creds.SecretAccessKey,
+		accessKeyIDEnv+"="+creds.AccessKeyID,
+		secretAccessKeyEnv+"="+creds.SecretAccessKey,
 	)
 	if creds.SessionToken != "" {
-		env = append(env, "AWS_SESSION_TOKEN="+creds.SessionToken)
+		env = append(env, sessionTokenEnv+"="+creds.SessionToken)
 	}
 	return env
 }
