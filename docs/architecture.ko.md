@@ -311,9 +311,10 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 
 1. `internal/domain/model.go`에 service/feature 상수 추가
 2. `internal/domain/catalog.go`에 등록
-3. `internal/services/aws/`에 repository 메서드와 모델 추가
-4. cross-service inspector 작업이면 `internal/inspector/`에 workflow/rule 로직 추가
-5. 일반 AWS feature browser는 `internal/app/`의 feature submodel로 연결
-6. 별도 shell abstraction이 도입되기 전까지 app-shell flow는 루트에 유지
-7. repository 로직과 app 전환 테스트 작성
-8. 사용자에게 보이는 동작이면 README와 `docs/` 갱신
+3. `internal/mcp/agent_surface_test.go`에서 해당 feature를 `unic resources` 명령과 MCP tool 양쪽에 연결하거나, `agentSurfaceExempt`에 한 줄 사유 기록
+4. `internal/services/aws/`에 repository 메서드와 모델 추가
+5. cross-service inspector 작업이면 `internal/inspector/`에 workflow/rule 로직 추가
+6. 일반 AWS feature browser는 `internal/app/`의 feature submodel로 연결
+7. 별도 shell abstraction이 도입되기 전까지 app-shell flow는 루트에 유지
+8. repository 로직과 app 전환 테스트 작성
+9. 사용자에게 보이는 동작이면 README와 `docs/` 갱신
