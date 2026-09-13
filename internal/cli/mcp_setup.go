@@ -72,7 +72,7 @@ func newMCPSetupCmd() *cobra.Command {
 				return err
 			}
 			if len(before) > 0 {
-				backup := path + ".bak-" + time.Now().Format("20060102-150405")
+				backup := path + ".bak-" + time.Now().Format("20060102-150405.000000000")
 				if err := os.WriteFile(backup, before, 0o600); err != nil {
 					return fmt.Errorf("back up config: %w", err)
 				}
