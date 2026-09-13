@@ -402,6 +402,9 @@ func extractBinariesFromTarGz(r io.Reader) (map[string][]byte, error) {
 			binaries[name] = contents
 		}
 	}
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		return nil, err
+	}
 	for _, name := range []string{"unic", "unic-mcp"} {
 		if len(binaries[name]) == 0 {
 			return nil, fmt.Errorf("binary %q not found in archive", name)

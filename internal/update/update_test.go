@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -188,6 +189,18 @@ func TestExtractBinariesFromTarGzRequiresCompletePair(t *testing.T) {
 				t.Fatalf("unexpected binaries: %q, %q", got["unic"], got["unic-mcp"])
 			}
 		})
+	}
+}
+
+func TestExtractBinariesFromTarGzRejectsCorruptGzip(t *testing.T) {
+	archive := testUpdateArchive(t, map[string]string{"unic": "tui", "unic-mcp": "mcp"})
+	data, err := io.ReadAll(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data[len(data)-8] ^= 0xff
+	if _, err = extractBinariesFromTarGz(bytes.NewReader(data)); err == nil {
+		t.Fatal("expected corrupt gzip trailer to fail")
 	}
 }
 
