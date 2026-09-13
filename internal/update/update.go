@@ -310,9 +310,11 @@ func replaceBinaries(execPath string, binaries map[string][]byte) error {
 	}
 	delete(staged, "unic-mcp")
 	if err := os.Rename(staged["unic"], execPath); err != nil {
-		rollbackErr := os.Remove(mcpPath)
+		var rollbackErr error
 		if hadMCP {
-			rollbackErr = errors.Join(rollbackErr, os.Rename(backupPath, mcpPath))
+			rollbackErr = os.Rename(backupPath, mcpPath)
+		} else {
+			rollbackErr = os.Remove(mcpPath)
 		}
 		return errors.Join(fmt.Errorf("replace unic failed (may need sudo): %w", err), rollbackErr)
 	}
