@@ -35,6 +35,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newEnvCmd())
 	cmd.AddCommand(newUpdateCmd())
 	cmd.AddCommand(newDoctorCmd())
+	cmd.AddCommand(newMCPCmd())
 	cmd.AddCommand(newCapabilitiesCmd(cmd))
 	cmd.AddCommand(newSchemaCmd(cmd))
 
