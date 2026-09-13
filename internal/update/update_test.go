@@ -1,7 +1,12 @@
 package update
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -156,4 +161,111 @@ func TestCheckForUpdate_ReturnsNewerVersion(t *testing.T) {
 	if result != "v0.2.0" {
 		t.Errorf("expected v0.2.0, got %q", result)
 	}
+}
+
+func TestExtractBinariesFromTarGzRequiresCompletePair(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		files map[string]string
+		want  string
+	}{
+		{"complete", map[string]string{"unic": "tui", "unic-mcp": "mcp"}, ""},
+		{"missing mcp", map[string]string{"unic": "tui"}, "unic-mcp"},
+		{"empty mcp", map[string]string{"unic": "tui", "unic-mcp": ""}, "empty"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := extractBinariesFromTarGz(testUpdateArchive(t, tc.files))
+			if tc.want != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.want) {
+					t.Fatalf("error = %v, want substring %q", err, tc.want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got["unic"]) != "tui" || string(got["unic-mcp"]) != "mcp" {
+				t.Fatalf("unexpected binaries: %q, %q", got["unic"], got["unic-mcp"])
+			}
+		})
+	}
+}
+
+func TestReplaceBinariesUpdatesPair(t *testing.T) {
+	dir := t.TempDir()
+	unicPath := filepath.Join(dir, "unic")
+	mcpPath := filepath.Join(dir, "unic-mcp")
+	for path, contents := range map[string]string{unicPath: "old tui", mcpPath: "old mcp"} {
+		if err := os.WriteFile(path, []byte(contents), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := replaceBinaries(unicPath, map[string][]byte{"unic": []byte("new tui"), "unic-mcp": []byte("new mcp")}); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{unicPath: "new tui", mcpPath: "new mcp"} {
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != want {
+			t.Errorf("%s = %q, want %q", filepath.Base(path), got, want)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0755 {
+			t.Errorf("%s mode = %04o, want 0755", filepath.Base(path), info.Mode().Perm())
+		}
+	}
+}
+
+func TestReplaceBinariesRollsBackMCPWhenUnicReplacementFails(t *testing.T) {
+	dir := t.TempDir()
+	unicPath := filepath.Join(dir, "unic")
+	mcpPath := filepath.Join(dir, "unic-mcp")
+	if err := os.Mkdir(unicPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(unicPath, "keep"), []byte("old tui"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mcpPath, []byte("old mcp"), 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	err := replaceBinaries(unicPath, map[string][]byte{"unic": []byte("new tui"), "unic-mcp": []byte("new mcp")})
+	if err == nil {
+		t.Fatal("expected unic replacement to fail")
+	}
+	got, readErr := os.ReadFile(mcpPath)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(got) != "old mcp" {
+		t.Fatalf("unic-mcp = %q, want rollback to old mcp", got)
+	}
+}
+
+func testUpdateArchive(t *testing.T, files map[string]string) *bytes.Reader {
+	t.Helper()
+	var archive bytes.Buffer
+	gz := gzip.NewWriter(&archive)
+	tw := tar.NewWriter(gz)
+	for name, contents := range files {
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0755, Size: int64(len(contents))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(contents)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return bytes.NewReader(archive.Bytes())
 }
