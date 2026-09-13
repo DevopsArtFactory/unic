@@ -93,6 +93,8 @@ unic init --force
 unic update
 ```
 
+For direct binary installations, updates install `unic` and `unic-mcp` together. If the installed version predates MCP packaging (including v0.3.1), run the install script once after a newer release is published; the older updater can replace only `unic`. Homebrew installations should continue to use `brew upgrade unic`.
+
 ### Shell environment helpers
 
 ```bash
@@ -656,6 +658,8 @@ make build
 The HOL Plugin Scanner checks the agent-plugin package on pull requests to `main` and pushes to `main`. Its job summary shows the score, analyzer status, and finding locations, including failed scans; the downloadable JSON report contains full details. See the [scanner workflow guidance](docs/development.md#plugin-scanner-ci) for thresholds and local reproduction.
 
 Release artifacts are produced through GoReleaser and the `dist/` outputs.
+
+GitHub Actions use full commit SHA pins; see the [maintenance guidance](docs/development.md#github-actions).
 
 ## Community Standards
 

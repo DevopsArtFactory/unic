@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -258,8 +259,8 @@ func DownloadAndReplace(version string) error {
 		return fmt.Errorf("download returned status %d", resp.StatusCode)
 	}
 
-	// Extract binary from tar.gz
-	binary, err := extractBinaryFromTarGz(resp.Body)
+	// Validate the complete release pair before replacing either executable.
+	binaries, err := extractBinariesFromTarGz(resp.Body)
 	if err != nil {
 		return fmt.Errorf("extract failed: %w", err)
 	}
@@ -273,43 +274,113 @@ func DownloadAndReplace(version string) error {
 	if err != nil {
 		return fmt.Errorf("could not resolve symlinks: %w", err)
 	}
+	return replaceBinaries(execPath, binaries)
+}
 
-	// Write to temp file in same directory, then atomic rename
+func replaceBinaries(execPath string, binaries map[string][]byte) error {
 	dir := filepath.Dir(execPath)
-	tmp, err := os.CreateTemp(dir, "unic-update-*")
+	mcpPath := filepath.Join(dir, "unic-mcp")
+	staged := make(map[string]string, len(binaries))
+	for _, name := range []string{"unic", "unic-mcp"} {
+		path, err := stageBinary(dir, name, binaries[name])
+		if err != nil {
+			for _, stagedPath := range staged {
+				_ = os.Remove(stagedPath)
+			}
+			return err
+		}
+		staged[name] = path
+	}
+	defer func() {
+		for _, path := range staged {
+			_ = os.Remove(path)
+		}
+	}()
+
+	backupPath, hadMCP, err := backupBinary(mcpPath)
 	if err != nil {
-		return fmt.Errorf("could not create temp file: %w", err)
+		return fmt.Errorf("could not prepare unic-mcp replacement: %w", err)
 	}
-	tmpPath := tmp.Name()
-
-	if _, err := tmp.Write(binary); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
-		return fmt.Errorf("write failed: %w", err)
+	if err := os.Rename(staged["unic-mcp"], mcpPath); err != nil {
+		var rollbackErr error
+		if hadMCP {
+			rollbackErr = os.Rename(backupPath, mcpPath)
+		}
+		return errors.Join(fmt.Errorf("replace unic-mcp failed (may need sudo): %w", err), rollbackErr)
 	}
-	tmp.Close()
-
-	if err := os.Chmod(tmpPath, 0755); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("chmod failed: %w", err)
+	delete(staged, "unic-mcp")
+	if err := os.Rename(staged["unic"], execPath); err != nil {
+		var rollbackErr error
+		if hadMCP {
+			rollbackErr = os.Rename(backupPath, mcpPath)
+		} else {
+			rollbackErr = os.Remove(mcpPath)
+		}
+		return errors.Join(fmt.Errorf("replace unic failed (may need sudo): %w", err), rollbackErr)
 	}
-
-	if err := os.Rename(tmpPath, execPath); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("replace failed (may need sudo): %w", err)
+	delete(staged, "unic")
+	if hadMCP {
+		_ = os.Remove(backupPath)
 	}
 
 	return nil
 }
 
-// extractBinaryFromTarGz reads a tar.gz stream and returns the "unic" binary contents.
-func extractBinaryFromTarGz(r io.Reader) ([]byte, error) {
+func stageBinary(dir, name string, contents []byte) (string, error) {
+	tmp, err := os.CreateTemp(dir, name+"-update-*")
+	if err != nil {
+		return "", fmt.Errorf("could not create temporary %s: %w", name, err)
+	}
+	path := tmp.Name()
+	if _, err := tmp.Write(contents); err != nil {
+		tmp.Close()
+		os.Remove(path)
+		return "", fmt.Errorf("write %s failed: %w", name, err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(path)
+		return "", fmt.Errorf("close %s failed: %w", name, err)
+	}
+	if err := os.Chmod(path, 0755); err != nil {
+		os.Remove(path)
+		return "", fmt.Errorf("chmod %s failed: %w", name, err)
+	}
+	return path, nil
+}
+
+func backupBinary(path string) (string, bool, error) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	} else if err != nil {
+		return "", false, err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), "unic-mcp-backup-*")
+	if err != nil {
+		return "", false, err
+	}
+	backupPath := tmp.Name()
+	if err := tmp.Close(); err != nil {
+		os.Remove(backupPath)
+		return "", false, err
+	}
+	if err := os.Remove(backupPath); err != nil {
+		return "", false, err
+	}
+	if err := os.Rename(path, backupPath); err != nil {
+		return "", false, err
+	}
+	return backupPath, true, nil
+}
+
+// extractBinariesFromTarGz validates and returns the released executable pair.
+func extractBinariesFromTarGz(r io.Reader) (map[string][]byte, error) {
 	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, err
 	}
 	defer gz.Close()
 
+	binaries := make(map[string][]byte, 2)
 	tr := tar.NewReader(gz)
 	for {
 		hdr, err := tr.Next()
@@ -319,9 +390,25 @@ func extractBinaryFromTarGz(r io.Reader) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if filepath.Base(hdr.Name) == "unic" && hdr.Typeflag == tar.TypeReg {
-			return io.ReadAll(tr)
+		name := filepath.Base(hdr.Name)
+		if (name == "unic" || name == "unic-mcp") && hdr.Typeflag == tar.TypeReg {
+			contents, err := io.ReadAll(tr)
+			if err != nil {
+				return nil, err
+			}
+			if len(contents) == 0 {
+				return nil, fmt.Errorf("binary %q is empty", name)
+			}
+			binaries[name] = contents
 		}
 	}
-	return nil, fmt.Errorf("binary 'unic' not found in archive")
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		return nil, err
+	}
+	for _, name := range []string{"unic", "unic-mcp"} {
+		if len(binaries[name]) == 0 {
+			return nil, fmt.Errorf("binary %q not found in archive", name)
+		}
+	}
+	return binaries, nil
 }
