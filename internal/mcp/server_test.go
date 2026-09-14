@@ -58,6 +58,8 @@ func TestReadOnlyOperationToolArgs(t *testing.T) {
 		{"get_ecs_service_rollout", `{"cluster":"prod","service":"api"}`, []string{"resources", "ecs-rollout", "--cluster", "prod", "--service", "api", "--json"}},
 		{"list_cloudtrail_events", `{"since":"6h","mutations_only":true}`, []string{"resources", "cloudtrail-events", "--since", "6h", "--json", "--mutations-only"}},
 		{"get_elb_target_health", `{"load_balancer":"arn:lb"}`, []string{"resources", "elb-target-health", "--load-balancer", "arn:lb", "--json"}},
+		{"run_security_inspector", `{}`, []string{"inspect", "--json"}},
+		{"run_security_inspector", `{"profile":"prod","region":"eu-west-1"}`, []string{"inspect", "--json", "--profile", "prod", "--region", "eu-west-1"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -188,4 +190,28 @@ func decodeResponses(t *testing.T, output string) []responseForTest {
 type responseForTest struct {
 	Result any       `json:"result"`
 	Error  *rpcError `json:"error"`
+}
+
+func TestSecurityInspectorToolIsReadOnlyAndNotAResourceContract(t *testing.T) {
+	var found bool
+	for _, registered := range tools {
+		if registered.Name != "run_security_inspector" {
+			continue
+		}
+		found = true
+		if !registered.Annotations.ReadOnlyHint {
+			t.Error("the inspector scan must advertise read-only")
+		}
+		if registered.Metadata.OutputContract != "unic.inspect.v1" {
+			t.Errorf("output contract = %q, want unic.inspect.v1", registered.Metadata.OutputContract)
+		}
+		// Inspector is a workflow, not a catalog feature, so it must stay out
+		// of the unic.resources.* namespace the catalog parity test walks.
+		if strings.HasPrefix(registered.Metadata.OutputContract, "unic.resources.") {
+			t.Error("the inspector scan must not claim a unic.resources.* contract")
+		}
+	}
+	if !found {
+		t.Fatal("run_security_inspector is not registered")
+	}
 }

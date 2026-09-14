@@ -312,6 +312,7 @@ When adding a feature:
 1. add service or feature constants in `internal/domain/model.go`
 2. register them in `internal/domain/catalog.go`
 3. in `internal/mcp/agent_surface_test.go`, map the feature to both its `unic resources` command and MCP tool, or record a one-line `agentSurfaceExempt` reason
+- `unic inspect --json` runs the inspector rule packs through the same v1 envelope; it sits outside `unic resources` because Inspector is a workflow, not a catalog feature, so the catalog parity test does not cover it
 4. add repository methods and models under `internal/services/aws/`
 5. for cross-service inspector work, add workflow/rule logic under `internal/inspector/`
 6. wire normal AWS feature browsers as feature submodels in `internal/app/`

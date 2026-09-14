@@ -312,6 +312,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 1. `internal/domain/model.go`에 service/feature 상수 추가
 2. `internal/domain/catalog.go`에 등록
 3. `internal/mcp/agent_surface_test.go`에서 해당 feature를 `unic resources` 명령과 MCP tool 양쪽에 연결하거나, `agentSurfaceExempt`에 한 줄 사유 기록
+- `unic inspect --json`은 동일한 v1 envelope으로 inspector rule pack을 실행한다. Inspector는 catalog feature가 아니라 workflow이므로 `unic resources` 바깥에 있고, catalog parity 테스트의 적용 대상이 아니다
 4. `internal/services/aws/`에 repository 메서드와 모델 추가
 5. cross-service inspector 작업이면 `internal/inspector/`에 workflow/rule 로직 추가
 6. 일반 AWS feature browser는 `internal/app/`의 feature submodel로 연결

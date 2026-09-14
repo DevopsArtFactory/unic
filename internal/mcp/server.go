@@ -88,6 +88,15 @@ var tools = []tool{
 		Metadata:    toolMetadata{OutputContract: "unic.command-schema.v1"},
 	},
 	{
+		Name: "run_security_inspector", Description: "Run unic's built-in security and cost/waste rule packs and return the findings.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, OpenWorldHint: true},
+		Metadata: toolMetadata{
+			RequiredPermissions: []string{"read-only access to the services covered by the enabled rule packs"},
+			OutputContract:      "unic.inspect.v1",
+		},
+	},
+	{
 		Name: "list_backup_vaults", Description: "List AWS Backup vaults using unic's active or selected AWS context.",
 		InputSchema: objectSchema(map[string]any{
 			"profile": map[string]any{"type": "string", "description": "Optional unic context or AWS profile"},
@@ -364,6 +373,22 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 			return nil, errors.New("command is required")
 		}
 		return append(append([]string{"schema"}, command...), "--json"), nil
+	case "run_security_inspector":
+		var args struct {
+			Profile string `json:"profile"`
+			Region  string `json:"region"`
+		}
+		if err := decodeArguments(raw, &args); err != nil {
+			return nil, err
+		}
+		result := []string{"inspect", "--json"}
+		if args.Profile != "" {
+			result = append(result, "--profile", args.Profile)
+		}
+		if args.Region != "" {
+			result = append(result, "--region", args.Region)
+		}
+		return result, nil
 	case "list_backup_vaults":
 		var args struct {
 			Profile string `json:"profile"`
