@@ -27,6 +27,10 @@ When implementation changes affect user-visible behavior, config/auth behavior, 
 
 A feature change is not considered complete until the related docs are reviewed and updated when needed.
 
+## Agent Surface Parity
+
+For every feature added to `domain.Catalog()`, update `internal/mcp/agent_surface_test.go`: map it to both a `unic resources` command and MCP tool, or add a one-line `agentSurfaceExempt` reason.
+
 ## Branch Naming Harness
 
 When creating a working branch for repository work, prefer the convention defined in [`docs/branch-naming-harness.md`](docs/branch-naming-harness.md).

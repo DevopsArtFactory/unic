@@ -311,9 +311,10 @@ When adding a feature:
 
 1. add service or feature constants in `internal/domain/model.go`
 2. register them in `internal/domain/catalog.go`
-3. add repository methods and models under `internal/services/aws/`
-4. for cross-service inspector work, add workflow/rule logic under `internal/inspector/`
-5. wire normal AWS feature browsers as feature submodels in `internal/app/`
-6. keep app-shell flows root-owned unless a separate shell abstraction is introduced
-7. add tests for repository logic and app transitions
-8. update README and `docs/` if behavior is user-visible
+3. in `internal/mcp/agent_surface_test.go`, map the feature to both its `unic resources` command and MCP tool, or record a one-line `agentSurfaceExempt` reason
+4. add repository methods and models under `internal/services/aws/`
+5. for cross-service inspector work, add workflow/rule logic under `internal/inspector/`
+6. wire normal AWS feature browsers as feature submodels in `internal/app/`
+7. keep app-shell flows root-owned unless a separate shell abstraction is introduced
+8. add tests for repository logic and app transitions
+9. update README and `docs/` if behavior is user-visible

@@ -14,6 +14,7 @@
 - Use lipgloss for styled TUI output — column-aligned tables with dimmed labels
 - Tests use mock client interfaces (see `rds_test.go` pattern)
 - Scroll windowing: `visibleLines := max(m.height-N, 5)`
+- For every feature added to `domain.Catalog()`, update `internal/mcp/agent_surface_test.go`: map it to both a `unic resources` command and MCP tool, or add a one-line `agentSurfaceExempt` reason
 
 ## README Maintenance
 
