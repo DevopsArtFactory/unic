@@ -133,6 +133,9 @@ func TestListQueuesAggregatesPages(t *testing.T) {
 	page := 0
 	mock := &mockSQSClient{
 		listQueuesFunc: func(_ context.Context, params *sqs.ListQueuesInput, _ ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error) {
+			if got := awssdk.ToInt32(params.MaxResults); got != 1000 {
+				t.Fatalf("expected max SQS page size, got %d", got)
+			}
 			page++
 			if page == 1 {
 				token := "next"

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
@@ -69,7 +70,7 @@ func (r *AwsRepository) ListQueues(ctx context.Context) ([]SQSQueue, error) {
 	uniclog.Debug("aws", "ListQueues called")
 
 	var urls []string
-	paginator := sqs.NewListQueuesPaginator(r.SQSClient, &sqs.ListQueuesInput{})
+	paginator := sqs.NewListQueuesPaginator(r.SQSClient, &sqs.ListQueuesInput{MaxResults: awssdk.Int32(1000)})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
