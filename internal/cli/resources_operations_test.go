@@ -66,6 +66,43 @@ func TestEC2InstancesEmptyDataIsArrayAndDiscoveryIsReadOnlyV1(t *testing.T) {
 	}
 }
 
+func TestSQSQueuesJSONContract(t *testing.T) {
+	original := loadSQSQueues
+	defer func() { loadSQSQueues = original }()
+	loadSQSQueues = func(context.Context) ([]awsservice.SQSQueue, error) {
+		return []awsservice.SQSQueue{{
+			Name: "orders-dlq", ARN: "arn:aws:sqs:us-east-1:123456789012:orders-dlq",
+			Region: "us-east-1", Depth: 42, SourceQueueARNs: []string{"arn:aws:sqs:us-east-1:123456789012:orders"}, SourceQueueCount: 1,
+		}}, nil
+	}
+	cmd := NewRootCmd()
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetArgs([]string{"resources", "sqs-queues", "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		SchemaVersion string `json:"schema_version"`
+		Data          []struct {
+			Name             string   `json:"name"`
+			Depth            int      `json:"depth"`
+			SourceQueueARNs  []string `json:"source_queue_arns"`
+			SourceQueueCount int      `json:"source_queue_count"`
+		} `json:"data"`
+		Warnings   []string       `json:"warnings"`
+		Pagination jsonPagination `json:"pagination"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.SchemaVersion != "v1" || len(result.Data) != 1 || result.Data[0].Name != "orders-dlq" ||
+		result.Data[0].Depth != 42 || len(result.Data[0].SourceQueueARNs) != 1 || result.Data[0].SourceQueueCount != 1 ||
+		result.Warnings == nil || !result.Pagination.Complete {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
 func TestCloudTrailEventsReportsCapAsIncomplete(t *testing.T) {
 	original := loadCloudTrailEvents
 	defer func() { loadCloudTrailEvents = original }()
