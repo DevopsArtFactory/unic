@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -61,6 +62,9 @@ func TestListQueuesSortsByBacklogAndResolvesDLQ(t *testing.T) {
 			map[string]string{"RedrivePolicy": `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:1:orders-dlq","maxReceiveCount":3}`}),
 		"https://sqs.us-east-1.amazonaws.com/1/orders-dlq": sqsQueueAttrs(
 			"arn:aws:sqs:us-east-1:1:orders-dlq", "120", nil),
+		"https://sqs.us-east-1.amazonaws.com/1/payments": sqsQueueAttrs(
+			"arn:aws:sqs:us-east-1:1:payments", "3",
+			map[string]string{"RedrivePolicy": `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:1:orders-dlq","maxReceiveCount":5}`}),
 		"https://sqs.us-east-1.amazonaws.com/1/idle": sqsQueueAttrs(
 			"arn:aws:sqs:us-east-1:1:idle", "0", nil),
 	}
@@ -82,23 +86,34 @@ func TestListQueuesSortsByBacklogAndResolvesDLQ(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(queues) != 3 {
-		t.Fatalf("expected 3 queues, got %d", len(queues))
+	if len(queues) != 4 {
+		t.Fatalf("expected 4 queues, got %d", len(queues))
 	}
 	if queues[0].Name != "orders-dlq" || queues[0].Depth != 120 {
 		t.Fatalf("expected deepest backlog first, got %+v", queues[0])
 	}
-	if !queues[0].IsDLQ() || queues[0].SourceQueueCount != 1 {
-		t.Fatalf("expected orders-dlq marked as DLQ with one source, got %+v", queues[0])
+	if !queues[0].IsDLQ() || queues[0].SourceQueueCount != 2 {
+		t.Fatalf("expected orders-dlq marked as DLQ with two sources, got %+v", queues[0])
+	}
+	wantSources := []string{"arn:aws:sqs:us-east-1:1:orders", "arn:aws:sqs:us-east-1:1:payments"}
+	if !slices.Equal(queues[0].SourceQueueARNs, wantSources) {
+		t.Fatalf("expected sorted source queue ARNs %v, got %v", wantSources, queues[0].SourceQueueARNs)
 	}
 	var orders SQSQueue
+	var idle SQSQueue
 	for _, queue := range queues {
 		if queue.Name == "orders" {
 			orders = queue
 		}
+		if queue.Name == "idle" {
+			idle = queue
+		}
 	}
 	if orders.DLQTargetARN != "arn:aws:sqs:us-east-1:1:orders-dlq" || orders.MaxReceiveCount != 3 {
 		t.Fatalf("expected redrive policy parsed, got %+v", orders)
+	}
+	if idle.SourceQueueARNs == nil || idle.SourceQueueCount != 0 {
+		t.Fatalf("expected empty source queue array, got %+v", idle)
 	}
 	if !strings.Contains(queues[0].DisplayTitle(), "!") {
 		t.Fatalf("expected DLQ marker in display title, got %q", queues[0].DisplayTitle())

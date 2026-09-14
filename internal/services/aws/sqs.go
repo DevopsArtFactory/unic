@@ -109,7 +109,8 @@ func (r *AwsRepository) ListQueues(ctx context.Context) ([]SQSQueue, error) {
 		}
 	}
 	for i := range queues {
-		queues[i].SourceQueueARNs = sources[queues[i].ARN]
+		queues[i].SourceQueueARNs = append([]string{}, sources[queues[i].ARN]...)
+		sort.Strings(queues[i].SourceQueueARNs)
 		queues[i].SourceQueueCount = len(queues[i].SourceQueueARNs)
 	}
 
