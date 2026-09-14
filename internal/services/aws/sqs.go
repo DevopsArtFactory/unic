@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
@@ -17,20 +18,20 @@ import (
 
 // SQSQueue is one queue with the backlog fields operators triage by.
 type SQSQueue struct {
-	Name             string
-	URL              string
-	ARN              string
-	Region           string
-	Depth            int // ApproximateNumberOfMessages
-	InFlight         int // ApproximateNumberOfMessagesNotVisible
-	Delayed          int
-	VisibilitySec    int
-	RetentionSec     int
-	Fifo             bool
-	DLQTargetARN     string // where this queue's failures go
-	MaxReceiveCount  int
-	SourceQueueARNs  []string // queues that dead-letter into this one
-	SourceQueueCount int      // len(SourceQueueARNs), kept for display
+	Name             string   `json:"name"`
+	URL              string   `json:"url"`
+	ARN              string   `json:"arn"`
+	Region           string   `json:"region"`
+	Depth            int      `json:"depth"`     // ApproximateNumberOfMessages
+	InFlight         int      `json:"in_flight"` // ApproximateNumberOfMessagesNotVisible
+	Delayed          int      `json:"delayed"`
+	VisibilitySec    int      `json:"visibility_seconds"`
+	RetentionSec     int      `json:"retention_seconds"`
+	Fifo             bool     `json:"fifo"`
+	DLQTargetARN     string   `json:"dlq_target_arn,omitempty"` // where this queue's failures go
+	MaxReceiveCount  int      `json:"max_receive_count,omitempty"`
+	SourceQueueARNs  []string `json:"source_queue_arns"`  // queues that dead-letter into this one
+	SourceQueueCount int      `json:"source_queue_count"` // len(SourceQueueARNs), kept for display
 }
 
 // IsDLQ reports whether other queues dead-letter into this queue.
@@ -69,7 +70,7 @@ func (r *AwsRepository) ListQueues(ctx context.Context) ([]SQSQueue, error) {
 	uniclog.Debug("aws", "ListQueues called")
 
 	var urls []string
-	paginator := sqs.NewListQueuesPaginator(r.SQSClient, &sqs.ListQueuesInput{})
+	paginator := sqs.NewListQueuesPaginator(r.SQSClient, &sqs.ListQueuesInput{MaxResults: awssdk.Int32(1000)})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -108,7 +109,8 @@ func (r *AwsRepository) ListQueues(ctx context.Context) ([]SQSQueue, error) {
 		}
 	}
 	for i := range queues {
-		queues[i].SourceQueueARNs = sources[queues[i].ARN]
+		queues[i].SourceQueueARNs = append([]string{}, sources[queues[i].ARN]...)
+		sort.Strings(queues[i].SourceQueueARNs)
 		queues[i].SourceQueueCount = len(queues[i].SourceQueueARNs)
 	}
 

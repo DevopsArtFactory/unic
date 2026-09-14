@@ -29,6 +29,7 @@ var agentSurfaceByFeature = map[domain.FeatureKind]agentSurface{
 	domain.FeatureECSExec:            {command: "ecs-rollout", tool: "get_ecs_service_rollout", arguments: json.RawMessage(`{"cluster":"cluster","service":"service"}`)},
 	domain.FeatureELBBrowser:         {command: "elb-target-health", tool: "get_elb_target_health", arguments: json.RawMessage(`{"load_balancer":"load-balancer"}`)},
 	domain.FeatureRDSBrowser:         {command: "rds-instances", tool: "list_rds_instances"},
+	domain.FeatureSQSBrowser:         {command: "sqs-queues", tool: "list_sqs_queues"},
 }
 
 var agentSurfaceExempt = map[domain.FeatureKind]string{
@@ -57,7 +58,6 @@ var agentSurfaceExempt = map[domain.FeatureKind]string{
 	domain.FeatureSecurityGroupBrowser:  "no curated security-group rule query is defined yet",
 	domain.FeatureSecretsBrowser:        "secret values require operator-controlled reveal and copy handling",
 	domain.FeatureSNSBrowser:            "the joined topic and subscription view has no agent contract yet",
-	domain.FeatureSQSBrowser:            "queue mutations are confirmation-gated and no separate read-only contract exists yet",
 	domain.FeatureSSMParameterBrowser:   "parameter values require operator-controlled reveal and copy handling",
 	domain.FeatureSSMSession:            "starts an interactive shell session instead of returning resource data",
 	domain.FeatureStepFunctionsBrowser:  "the failure-first execution view has no curated agent contract yet",
