@@ -157,6 +157,22 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 				t.Errorf("resource MCP tool %q is not callable: %v", surface.tool, err)
 			} else if len(args) < 2 || args[0] != "resources" || args[1] != surface.command {
 				t.Errorf("resource MCP tool %q dispatches to %q, want resources %s", surface.tool, args, surface.command)
+			} else {
+				root := cli.NewRootCmd()
+				command, remaining, err := root.Find(args)
+				if err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ParseFlags(remaining); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateArgs(command.Flags().Args()); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateRequiredFlags(); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateFlagGroups(); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if jsonFlag := command.Flags().Lookup("json"); jsonFlag == nil || !jsonFlag.Changed || jsonFlag.Value.String() != "true" {
+					t.Errorf("resource MCP tool %q must dispatch with --json", surface.tool)
+				}
 			}
 		}
 	}
