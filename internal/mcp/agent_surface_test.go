@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -9,8 +10,9 @@ import (
 )
 
 type agentSurface struct {
-	command string
-	tool    string
+	command   string
+	tool      string
+	arguments json.RawMessage
 }
 
 type agentCommandContract struct {
@@ -24,8 +26,8 @@ var agentSurfaceByFeature = map[domain.FeatureKind]agentSurface{
 	domain.FeatureCloudTrailEvents:   {command: "cloudtrail-events", tool: "list_cloudtrail_events"},
 	domain.FeatureCloudWatchAlarms:   {command: "alarms", tool: "list_cloudwatch_alarms"},
 	domain.FeatureEC2InstanceBrowser: {command: "ec2-instances", tool: "list_ec2_instances"},
-	domain.FeatureECSExec:            {command: "ecs-rollout", tool: "get_ecs_service_rollout"},
-	domain.FeatureELBBrowser:         {command: "elb-target-health", tool: "get_elb_target_health"},
+	domain.FeatureECSExec:            {command: "ecs-rollout", tool: "get_ecs_service_rollout", arguments: json.RawMessage(`{"cluster":"cluster","service":"service"}`)},
+	domain.FeatureELBBrowser:         {command: "elb-target-health", tool: "get_elb_target_health", arguments: json.RawMessage(`{"load_balancer":"load-balancer"}`)},
 	domain.FeatureRDSBrowser:         {command: "rds-instances", tool: "list_rds_instances"},
 }
 
@@ -149,6 +151,12 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 				t.Errorf("resource MCP tool %q is mapped by catalog features %q and %q", surface.tool, owner, feature.Kind)
 			} else {
 				mappedTools[surface.tool] = feature.Kind
+			}
+			args, err := toolArgs(surface.tool, surface.arguments)
+			if err != nil {
+				t.Errorf("resource MCP tool %q is not callable: %v", surface.tool, err)
+			} else if len(args) < 2 || args[0] != "resources" || args[1] != surface.command {
+				t.Errorf("resource MCP tool %q dispatches to %q, want resources %s", surface.tool, args, surface.command)
 			}
 		}
 	}
