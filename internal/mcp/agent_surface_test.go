@@ -162,6 +162,8 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 				command, remaining, err := root.Find(args)
 				if err != nil {
 					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if !command.Runnable() {
+					t.Errorf("resource MCP tool %q dispatches to non-runnable command %q", surface.tool, command.CommandPath())
 				} else if err := command.ParseFlags(remaining); err != nil {
 					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
 				} else if err := command.ValidateArgs(command.Flags().Args()); err != nil {
