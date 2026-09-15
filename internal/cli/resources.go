@@ -35,6 +35,16 @@ type backupVaultJSON struct {
 	Locked             bool   `json:"locked"`
 }
 
+type stepFunctionExecutionJSON struct {
+	ARN             string `json:"arn"`
+	Name            string `json:"name"`
+	StateMachineARN string `json:"state_machine_arn"`
+	Status          string `json:"status"`
+	StartedAt       string `json:"started_at"`
+	StoppedAt       string `json:"stopped_at,omitempty"`
+	NeedsAttention  bool   `json:"needs_attention"`
+}
+
 var loadBackupVaults = func(ctx context.Context) ([]awsservice.BackupVault, []error, error) {
 	configPath, err := config.DefaultPath()
 	if err != nil {
@@ -58,7 +68,7 @@ func newResourcesCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "resources", Short: "Read-only resource queries for automation"}
 	cmd.AddCommand(newBackupVaultsCmd())
 	cmd.AddCommand(newEC2InstancesCmd(), newRDSInstancesCmd(), newAlarmsCmd())
-	cmd.AddCommand(newECSRolloutCmd(), newCloudTrailEventsCmd(), newELBTargetHealthCmd())
+	cmd.AddCommand(newECSRolloutCmd(), newCloudTrailEventsCmd(), newELBTargetHealthCmd(), newStepFunctionExecutionsCmd())
 	return cmd
 }
 

@@ -58,6 +58,7 @@ func TestReadOnlyOperationToolArgs(t *testing.T) {
 		{"get_ecs_service_rollout", `{"cluster":"prod","service":"api"}`, []string{"resources", "ecs-rollout", "--cluster", "prod", "--service", "api", "--json"}},
 		{"list_cloudtrail_events", `{"since":"6h","mutations_only":true}`, []string{"resources", "cloudtrail-events", "--since", "6h", "--json", "--mutations-only"}},
 		{"get_elb_target_health", `{"load_balancer":"arn:lb"}`, []string{"resources", "elb-target-health", "--load-balancer", "arn:lb", "--json"}},
+		{"list_step_function_executions", `{"state_machine":"arn:machine","profile":"prod","region":"eu-west-1"}`, []string{"resources", "step-function-executions", "--state-machine", "arn:machine", "--json", "--profile", "prod", "--region", "eu-west-1"}},
 		{"run_security_inspector", `{}`, []string{"inspect", "--json"}},
 		{"run_security_inspector", `{"profile":"prod","region":"eu-west-1"}`, []string{"inspect", "--json", "--profile", "prod", "--region", "eu-west-1"}},
 	}
@@ -81,6 +82,9 @@ func TestReadOnlyOperationToolValidation(t *testing.T) {
 	if _, err := toolArgs("get_elb_target_health", json.RawMessage(`{"load_balancer":""}`)); err == nil {
 		t.Fatal("empty load balancer must fail")
 	}
+	if _, err := toolArgs("list_step_function_executions", json.RawMessage(`{"state_machine":" "}`)); err == nil {
+		t.Fatal("empty state machine must fail")
+	}
 }
 
 func TestMCPCapabilitiesStayAlignedWithRegisteredTools(t *testing.T) {
@@ -101,6 +105,12 @@ func TestMCPCapabilitiesStayAlignedWithRegisteredTools(t *testing.T) {
 		}
 		if _, ok := listed[i]["required_permissions"].([]string); !ok {
 			t.Fatalf("tool %s permissions are not a stable array", registered.Name)
+		}
+		if registered.Name == "list_step_function_executions" {
+			want := []string{"states:ListExecutions"}
+			if !reflect.DeepEqual(listed[i]["required_permissions"], want) {
+				t.Fatalf("tool %s permissions = %#v, want %#v", registered.Name, listed[i]["required_permissions"], want)
+			}
 		}
 	}
 }

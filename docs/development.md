@@ -25,11 +25,14 @@ Use the registered Cobra command tree and domain catalog as the source of truth 
 ```bash
 unic capabilities --json
 unic schema context sync --json
+unic schema resources step-function-executions --json
 ```
 
 Discovery output is deterministic, versioned JSON. New executable commands should set the `unic.dev/read-only`, `unic.dev/destructive`, and `unic.dev/output-version` annotations when their defaults do not describe the command accurately.
 
 Read-only automation commands live under `internal/cli/`; keep their `--json` output versioned and deterministic, write only JSON to stdout, and cover human and JSON output paths with CLI tests.
+
+`unic resources step-function-executions --state-machine <arn> --json` reuses the browser's failure-first ordering for up to 200 recent STANDARD workflow executions. The JSON pagination metadata reports the cap; EXPRESS workflow execution history is not available through this API.
 
 The stdio MCP entry point lives at `cmd/unic-mcp` and delegates tool calls to those same CLI commands through `internal/cli.ExecuteAutomation`. Keep the MCP layer limited to protocol handling and argument mapping; AWS and config behavior belongs in the existing CLI, auth, and service packages. MCP mutation tools remain preview-only until their trust boundary is reviewed.
 
