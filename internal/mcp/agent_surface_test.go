@@ -27,6 +27,7 @@ var agentSurfaceByFeature = map[domain.FeatureKind]agentSurface{
 	domain.FeatureCloudWatchAlarms:   {command: "alarms", tool: "list_cloudwatch_alarms"},
 	domain.FeatureEC2InstanceBrowser: {command: "ec2-instances", tool: "list_ec2_instances"},
 	domain.FeatureECSExec:            {command: "ecs-rollout", tool: "get_ecs_service_rollout", arguments: json.RawMessage(`{"cluster":"cluster","service":"service"}`)},
+	domain.FeatureElastiCacheBrowser: {command: "elasticache-resources", tool: "list_elasticache_resources"},
 	domain.FeatureELBBrowser:         {command: "elb-target-health", tool: "get_elb_target_health", arguments: json.RawMessage(`{"load_balancer":"load-balancer"}`)},
 	domain.FeatureRDSBrowser:         {command: "rds-instances", tool: "list_rds_instances"},
 }
@@ -43,7 +44,6 @@ var agentSurfaceExempt = map[domain.FeatureKind]string{
 	domain.FeatureECRLoginHelper:        "the credential-bearing shell handoff is not an agent resource query",
 	domain.FeatureECRRepositoryBrowser:  "no curated repository and image query is defined yet",
 	domain.FeatureEKSBrowser:            "no curated cluster and node-group query is defined yet",
-	domain.FeatureElastiCacheBrowser:    "the joined replication-group and node view has no agent contract yet",
 	domain.FeatureEventBridgeRules:      "rule mutations are confirmation-gated and no separate read-only contract exists yet",
 	domain.FeatureFISTemplateBrowser:    "no curated experiment-template and history query is defined yet",
 	domain.FeatureIAMUsersBrowser:       "no curated IAM user posture query is defined yet",
