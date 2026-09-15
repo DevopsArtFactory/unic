@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -35,6 +36,46 @@ type backupVaultJSON struct {
 	Locked             bool   `json:"locked"`
 }
 
+type cloudFormationStackJSON struct {
+	ID                    string                    `json:"id"`
+	Name                  string                    `json:"name"`
+	Description           string                    `json:"description,omitempty"`
+	Status                string                    `json:"status"`
+	StatusReason          string                    `json:"status_reason,omitempty"`
+	DriftStatus           string                    `json:"drift_status"`
+	Region                string                    `json:"region"`
+	LastDriftCheck        string                    `json:"last_drift_check,omitempty"`
+	CreatedAt             string                    `json:"created_at"`
+	UpdatedAt             string                    `json:"updated_at,omitempty"`
+	TerminationProtection bool                      `json:"termination_protection"`
+	Parameters            []cloudFormationValueJSON `json:"parameters"`
+	Outputs               []cloudFormationValueJSON `json:"outputs"`
+}
+
+type cloudFormationValueJSON struct {
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Description string `json:"description,omitempty"`
+	ExportName  string `json:"export_name,omitempty"`
+}
+
+func cloudFormationValuesJSON(values []awsservice.CloudFormationValue) []cloudFormationValueJSON {
+	result := make([]cloudFormationValueJSON, 0, len(values))
+	for _, value := range values {
+		result = append(result, cloudFormationValueJSON{
+			Key: value.Key, Value: value.Value, Description: value.Description, ExportName: value.ExportName,
+		})
+	}
+	return result
+}
+
+func cloudFormationTimeJSON(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
+}
+
 var loadBackupVaults = func(ctx context.Context) ([]awsservice.BackupVault, []error, error) {
 	configPath, err := config.DefaultPath()
 	if err != nil {
@@ -57,7 +98,7 @@ var loadBackupVaults = func(ctx context.Context) ([]awsservice.BackupVault, []er
 func newResourcesCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "resources", Short: "Read-only resource queries for automation"}
 	cmd.AddCommand(newBackupVaultsCmd())
-	cmd.AddCommand(newEC2InstancesCmd(), newRDSInstancesCmd(), newAlarmsCmd())
+	cmd.AddCommand(newEC2InstancesCmd(), newRDSInstancesCmd(), newCloudFormationStacksCmd(), newAlarmsCmd())
 	cmd.AddCommand(newECSRolloutCmd(), newCloudTrailEventsCmd(), newELBTargetHealthCmd())
 	return cmd
 }
