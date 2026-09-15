@@ -121,6 +121,15 @@ var tools = []tool{
 		Metadata:    toolMetadata{RequiredPermissions: []string{"rds:DescribeDBInstances"}, OutputContract: "unic.resources.rds-instances.v1", Paginated: true},
 	},
 	{
+		Name: "list_elasticache_resources", Description: "List ElastiCache replication groups and standalone clusters with node status and endpoints.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata: toolMetadata{
+			RequiredPermissions: []string{"elasticache:DescribeCacheClusters", "elasticache:DescribeReplicationGroups"},
+			OutputContract:      "unic.resources.elasticache-resources.v1", Paginated: true,
+		},
+	},
+	{
 		Name: "list_cloudwatch_alarms", Description: "List CloudWatch alarms with firing alarms first.",
 		InputSchema: awsContextSchema(nil, nil),
 		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
@@ -405,7 +414,7 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 			result = append(result, "--region", args.Region)
 		}
 		return result, nil
-	case "list_ec2_instances", "list_rds_instances", "list_cloudwatch_alarms":
+	case "list_ec2_instances", "list_rds_instances", "list_elasticache_resources", "list_cloudwatch_alarms":
 		var args struct {
 			Profile string `json:"profile"`
 			Region  string `json:"region"`
@@ -413,7 +422,7 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 		if err := decodeArguments(raw, &args); err != nil {
 			return nil, err
 		}
-		command := map[string]string{"list_ec2_instances": "ec2-instances", "list_rds_instances": "rds-instances", "list_cloudwatch_alarms": "alarms"}[name]
+		command := map[string]string{"list_ec2_instances": "ec2-instances", "list_rds_instances": "rds-instances", "list_elasticache_resources": "elasticache-resources", "list_cloudwatch_alarms": "alarms"}[name]
 		return withAWSContext([]string{"resources", command, "--json"}, args.Profile, args.Region), nil
 	case "get_ecs_service_rollout":
 		var args struct {

@@ -25,6 +25,7 @@ Use the registered Cobra command tree and domain catalog as the source of truth 
 ```bash
 unic capabilities --json
 unic schema context sync --json
+unic schema resources elasticache-resources --json
 ```
 
 Discovery output is deterministic, versioned JSON. New executable commands should set the `unic.dev/read-only`, `unic.dev/destructive`, and `unic.dev/output-version` annotations when their defaults do not describe the command accurately.

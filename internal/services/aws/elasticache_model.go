@@ -7,14 +7,15 @@ import (
 
 // ElastiCacheResource is either a replication group or a standalone cache cluster.
 type ElastiCacheResource struct {
-	ID            string
-	Kind          string
-	Engine        string
-	EngineVersion string
-	Status        string
-	NodeType      string
-	Endpoint      string
-	Nodes         []ElastiCacheNode
+	ID            string            `json:"id"`
+	Kind          string            `json:"kind"`
+	Engine        string            `json:"engine"`
+	EngineVersion string            `json:"engine_version"`
+	Status        string            `json:"status"`
+	NodeType      string            `json:"node_type"`
+	Endpoint      string            `json:"endpoint"`
+	Region        string            `json:"region"`
+	Nodes         []ElastiCacheNode `json:"nodes"`
 }
 
 // FilterText returns a lowercase string for shared list filtering.
@@ -25,11 +26,11 @@ func (r ElastiCacheResource) FilterText() string {
 
 // ElastiCacheNode holds node-level connection and placement metadata.
 type ElastiCacheNode struct {
-	ID        string
-	ClusterID string
-	ShardID   string
-	Role      string
-	Status    string
-	AZ        string
-	Endpoint  string
+	ID        string `json:"id"`
+	ClusterID string `json:"cluster_id"`
+	ShardID   string `json:"shard_id"`
+	Role      string `json:"role"`
+	Status    string `json:"status"`
+	AZ        string `json:"availability_zone"`
+	Endpoint  string `json:"endpoint"`
 }
