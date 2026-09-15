@@ -103,6 +103,12 @@ func TestMCPCapabilitiesStayAlignedWithRegisteredTools(t *testing.T) {
 		if _, ok := listed[i]["required_permissions"].([]string); !ok {
 			t.Fatalf("tool %s permissions are not a stable array", registered.Name)
 		}
+		if registered.Name == "list_cloudformation_stacks" {
+			want := []string{"cloudformation:DescribeStacks", "cloudformation:ListStacks"}
+			if !reflect.DeepEqual(listed[i]["required_permissions"], want) {
+				t.Fatalf("tool %s permissions = %#v, want %#v", registered.Name, listed[i]["required_permissions"], want)
+			}
+		}
 	}
 }
 

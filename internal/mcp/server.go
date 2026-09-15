@@ -124,7 +124,7 @@ var tools = []tool{
 		Name: "list_cloudformation_stacks", Description: "List CloudFormation stacks in failure-first triage order with status, drift, parameters, and outputs.",
 		InputSchema: awsContextSchema(nil, nil),
 		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
-		Metadata:    toolMetadata{RequiredPermissions: []string{"cloudformation:DescribeStacks"}, OutputContract: "unic.resources.cloudformation-stacks.v1", Paginated: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"cloudformation:DescribeStacks", "cloudformation:ListStacks"}, OutputContract: "unic.resources.cloudformation-stacks.v1", Paginated: true},
 	},
 	{
 		Name: "list_cloudwatch_alarms", Description: "List CloudWatch alarms with firing alarms first.",
