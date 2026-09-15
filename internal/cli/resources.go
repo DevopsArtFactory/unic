@@ -35,6 +35,37 @@ type backupVaultJSON struct {
 	Locked             bool   `json:"locked"`
 }
 
+type snsTopicJSON struct {
+	ARN                       string                `json:"arn"`
+	Name                      string                `json:"name"`
+	DisplayName               string                `json:"display_name,omitempty"`
+	Region                    string                `json:"region"`
+	Type                      string                `json:"type"`
+	KMSMasterKeyID            string                `json:"kms_master_key_id,omitempty"`
+	DeliveryPolicy            string                `json:"delivery_policy,omitempty"`
+	EffectiveDeliveryPolicy   string                `json:"effective_delivery_policy,omitempty"`
+	SubscriptionsConfirmed    int                   `json:"subscriptions_confirmed"`
+	SubscriptionsPending      int                   `json:"subscriptions_pending"`
+	SubscriptionsDeleted      int                   `json:"subscriptions_deleted"`
+	ContentBasedDeduplication bool                  `json:"content_based_deduplication"`
+	AttributesKnown           bool                  `json:"attributes_known"`
+	Subscriptions             []snsSubscriptionJSON `json:"subscriptions"`
+}
+
+type snsSubscriptionJSON struct {
+	ARN                 string `json:"arn"`
+	Protocol            string `json:"protocol"`
+	Endpoint            string `json:"endpoint"`
+	Owner               string `json:"owner"`
+	TopicARN            string `json:"topic_arn"`
+	Status              string `json:"status"`
+	RawMessageDelivery  bool   `json:"raw_message_delivery"`
+	DeadLetterTargetARN string `json:"dead_letter_target_arn,omitempty"`
+	FilterPolicy        string `json:"filter_policy,omitempty"`
+	FilterPolicyScope   string `json:"filter_policy_scope,omitempty"`
+	AttributesKnown     bool   `json:"attributes_known"`
+}
+
 var loadBackupVaults = func(ctx context.Context) ([]awsservice.BackupVault, []error, error) {
 	configPath, err := config.DefaultPath()
 	if err != nil {
@@ -58,7 +89,7 @@ func newResourcesCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "resources", Short: "Read-only resource queries for automation"}
 	cmd.AddCommand(newBackupVaultsCmd())
 	cmd.AddCommand(newEC2InstancesCmd(), newRDSInstancesCmd(), newAlarmsCmd())
-	cmd.AddCommand(newECSRolloutCmd(), newCloudTrailEventsCmd(), newELBTargetHealthCmd())
+	cmd.AddCommand(newECSRolloutCmd(), newCloudTrailEventsCmd(), newELBTargetHealthCmd(), newSNSTopicsCmd())
 	return cmd
 }
 
