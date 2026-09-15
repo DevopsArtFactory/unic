@@ -208,7 +208,8 @@ func newSNSTopicsCmd() *cobra.Command {
 						ARN: subscription.ARN, Protocol: subscription.Protocol, Endpoint: subscription.Endpoint,
 						Owner: subscription.Owner, TopicARN: subscription.TopicARN, Status: subscription.Status(),
 						RawMessageDelivery: subscription.RawMessageDelivery, DeadLetterTargetARN: subscription.DeadLetterTargetARN(),
-						FilterPolicy: subscription.FilterPolicy, AttributesKnown: subscription.AttributesKnown,
+						FilterPolicy: subscription.FilterPolicy, FilterPolicyScope: subscription.FilterPolicyScope,
+						AttributesKnown: subscription.AttributesKnown,
 					})
 				}
 				topic := resource.Topic

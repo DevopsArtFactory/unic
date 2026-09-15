@@ -160,6 +160,7 @@ func TestListSNSSubscriptionsSkipsPendingAttributesAndSortsPendingFirst(t *testi
 			}
 			return &sns.GetSubscriptionAttributesOutput{Attributes: map[string]string{
 				"RawMessageDelivery": "true", "RedrivePolicy": `{"deadLetterTargetArn":"arn:dlq"}`,
+				"FilterPolicy": `{"event":["created"]}`, "FilterPolicyScope": "MessageBody",
 			}}, nil
 		},
 	}
@@ -191,8 +192,16 @@ func TestListSNSSubscriptionsSkipsPendingAttributesAndSortsPendingFirst(t *testi
 			confirmed = sub
 		}
 	}
-	if !confirmed.Confirmed() || confirmed.Status() != "confirmed" || !confirmed.HasRedrive() || !confirmed.RawMessageDelivery {
+	if !confirmed.Confirmed() || confirmed.Status() != "confirmed" || !confirmed.HasRedrive() || !confirmed.RawMessageDelivery || confirmed.FilterPolicyScope != "MessageBody" {
 		t.Fatalf("expected confirmed subscription attributes mapped, got %+v", confirmed)
+	}
+}
+
+func TestApplySNSSubscriptionAttributesDefaultsFilterPolicyScope(t *testing.T) {
+	subscription := SNSSubscription{}
+	applySNSSubscriptionAttributes(&subscription, map[string]string{"FilterPolicy": `{"event":["created"]}`})
+	if subscription.FilterPolicyScope != "MessageAttributes" {
+		t.Fatalf("expected the AWS default filter policy scope, got %q", subscription.FilterPolicyScope)
 	}
 }
 

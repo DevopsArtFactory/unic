@@ -80,7 +80,8 @@ func TestSNSTopicsJSONContractPreservesWarningsAndEmptyArrays(t *testing.T) {
 				},
 				Subscriptions: []awsservice.SNSSubscription{{
 					ARN: "arn:sub:orders", Protocol: "sqs", Endpoint: "arn:queue", TopicARN: "arn:aws:sns:eu-west-1:1:orders.fifo",
-					RedrivePolicy: `{"deadLetterTargetArn":"arn:dlq"}`, AttributesKnown: true,
+					RedrivePolicy: `{"deadLetterTargetArn":"arn:dlq"}`, FilterPolicy: `{"event":["created"]}`,
+					FilterPolicyScope: "MessageBody", AttributesKnown: true,
 				}},
 			},
 			{Topic: awsservice.SNSTopic{ARN: "arn:aws:sns:eu-west-1:1:locked", Name: "locked", Region: "eu-west-1"}, Subscriptions: []awsservice.SNSSubscription{}},
@@ -102,6 +103,7 @@ func TestSNSTopicsJSONContractPreservesWarningsAndEmptyArrays(t *testing.T) {
 			Subscriptions []struct {
 				Status              string `json:"status"`
 				DeadLetterTargetARN string `json:"dead_letter_target_arn"`
+				FilterPolicyScope   string `json:"filter_policy_scope"`
 			} `json:"subscriptions"`
 		} `json:"data"`
 		Warnings   []string       `json:"warnings"`
@@ -112,6 +114,7 @@ func TestSNSTopicsJSONContractPreservesWarningsAndEmptyArrays(t *testing.T) {
 	}
 	if result.SchemaVersion != "v1" || len(result.Data) != 2 || result.Data[0].Name != "orders.fifo" || result.Data[0].Type != "FIFO" ||
 		len(result.Data[0].Subscriptions) != 1 || result.Data[0].Subscriptions[0].Status != "confirmed" || result.Data[0].Subscriptions[0].DeadLetterTargetARN != "arn:dlq" ||
+		result.Data[0].Subscriptions[0].FilterPolicyScope != "MessageBody" ||
 		result.Data[1].Subscriptions == nil || len(result.Warnings) != 1 || result.Pagination.Complete {
 		t.Fatalf("unexpected result: %+v", result)
 	}

@@ -80,6 +80,7 @@ type SNSSubscription struct {
 	RawMessageDelivery bool
 	RedrivePolicy      string
 	FilterPolicy       string
+	FilterPolicyScope  string
 	AttributesKnown    bool
 }
 

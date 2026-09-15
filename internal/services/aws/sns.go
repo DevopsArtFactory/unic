@@ -215,6 +215,10 @@ func applySNSSubscriptionAttributes(subscription *SNSSubscription, attributes ma
 	subscription.RawMessageDelivery = snsAttributeBool(attributes["RawMessageDelivery"])
 	subscription.RedrivePolicy = attributes["RedrivePolicy"]
 	subscription.FilterPolicy = attributes["FilterPolicy"]
+	subscription.FilterPolicyScope = attributes["FilterPolicyScope"]
+	if subscription.FilterPolicy != "" && subscription.FilterPolicyScope == "" {
+		subscription.FilterPolicyScope = "MessageAttributes"
+	}
 	if subscription.Owner == "" {
 		subscription.Owner = attributes["Owner"]
 	}

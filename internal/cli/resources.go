@@ -62,6 +62,7 @@ type snsSubscriptionJSON struct {
 	RawMessageDelivery  bool   `json:"raw_message_delivery"`
 	DeadLetterTargetARN string `json:"dead_letter_target_arn,omitempty"`
 	FilterPolicy        string `json:"filter_policy,omitempty"`
+	FilterPolicyScope   string `json:"filter_policy_scope,omitempty"`
 	AttributesKnown     bool   `json:"attributes_known"`
 }
 
