@@ -154,6 +154,14 @@ var tools = []tool{
 		Metadata:    toolMetadata{RequiredPermissions: []string{"elasticloadbalancing:DescribeTargetGroups", "elasticloadbalancing:DescribeTargetHealth"}, OutputContract: "unic.resources.elb-target-health.v1", Paginated: true},
 	},
 	{
+		Name: "list_step_function_executions", Description: "List up to 200 recent STANDARD Step Functions executions in failure-first triage order.",
+		InputSchema: awsContextSchema(map[string]any{
+			"state_machine": map[string]any{"type": "string", "minLength": 1, "description": "STANDARD state machine ARN"},
+		}, []string{"state_machine"}),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"states:ListExecutions"}, OutputContract: "unic.resources.step-function-executions.v1", Paginated: true},
+	},
+	{
 		Name: "plan_context_sync", Description: "Preview an SSO context sync plan. This tool never writes configuration.",
 		InputSchema: objectSchema(map[string]any{
 			"base_context": map[string]any{"type": "string", "description": "Optional SSO base context"},
@@ -464,6 +472,19 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 			return nil, errors.New("load_balancer is required")
 		}
 		return withAWSContext([]string{"resources", "elb-target-health", "--load-balancer", args.LoadBalancer, "--json"}, args.Profile, args.Region), nil
+	case "list_step_function_executions":
+		var args struct {
+			StateMachine string `json:"state_machine"`
+			Profile      string `json:"profile"`
+			Region       string `json:"region"`
+		}
+		if err := decodeArguments(raw, &args); err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(args.StateMachine) == "" {
+			return nil, errors.New("state_machine is required")
+		}
+		return withAWSContext([]string{"resources", "step-function-executions", "--state-machine", args.StateMachine, "--json"}, args.Profile, args.Region), nil
 	case "plan_context_sync":
 		var args struct {
 			BaseContext string `json:"base_context"`

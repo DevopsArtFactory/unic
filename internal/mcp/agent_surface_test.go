@@ -22,13 +22,14 @@ type agentCommandContract struct {
 }
 
 var agentSurfaceByFeature = map[domain.FeatureKind]agentSurface{
-	domain.FeatureBackupBrowser:      {command: "backup-vaults", tool: "list_backup_vaults"},
-	domain.FeatureCloudTrailEvents:   {command: "cloudtrail-events", tool: "list_cloudtrail_events"},
-	domain.FeatureCloudWatchAlarms:   {command: "alarms", tool: "list_cloudwatch_alarms"},
-	domain.FeatureEC2InstanceBrowser: {command: "ec2-instances", tool: "list_ec2_instances"},
-	domain.FeatureECSExec:            {command: "ecs-rollout", tool: "get_ecs_service_rollout", arguments: json.RawMessage(`{"cluster":"cluster","service":"service"}`)},
-	domain.FeatureELBBrowser:         {command: "elb-target-health", tool: "get_elb_target_health", arguments: json.RawMessage(`{"load_balancer":"load-balancer"}`)},
-	domain.FeatureRDSBrowser:         {command: "rds-instances", tool: "list_rds_instances"},
+	domain.FeatureBackupBrowser:        {command: "backup-vaults", tool: "list_backup_vaults"},
+	domain.FeatureCloudTrailEvents:     {command: "cloudtrail-events", tool: "list_cloudtrail_events"},
+	domain.FeatureCloudWatchAlarms:     {command: "alarms", tool: "list_cloudwatch_alarms"},
+	domain.FeatureEC2InstanceBrowser:   {command: "ec2-instances", tool: "list_ec2_instances"},
+	domain.FeatureECSExec:              {command: "ecs-rollout", tool: "get_ecs_service_rollout", arguments: json.RawMessage(`{"cluster":"cluster","service":"service"}`)},
+	domain.FeatureELBBrowser:           {command: "elb-target-health", tool: "get_elb_target_health", arguments: json.RawMessage(`{"load_balancer":"load-balancer"}`)},
+	domain.FeatureRDSBrowser:           {command: "rds-instances", tool: "list_rds_instances"},
+	domain.FeatureStepFunctionsBrowser: {command: "step-function-executions", tool: "list_step_function_executions", arguments: json.RawMessage(`{"state_machine":"arn:machine"}`)},
 }
 
 var agentSurfaceExempt = map[domain.FeatureKind]string{
@@ -60,7 +61,6 @@ var agentSurfaceExempt = map[domain.FeatureKind]string{
 	domain.FeatureSQSBrowser:            "queue mutations are confirmation-gated and no separate read-only contract exists yet",
 	domain.FeatureSSMParameterBrowser:   "parameter values require operator-controlled reveal and copy handling",
 	domain.FeatureSSMSession:            "starts an interactive shell session instead of returning resource data",
-	domain.FeatureStepFunctionsBrowser:  "the failure-first execution view has no curated agent contract yet",
 	domain.FeatureVPCBrowser:            "no bounded VPC and subnet query is defined yet",
 	domain.FeatureWAFWebACLBrowser:      "the regional and global joined view has no agent contract yet",
 }

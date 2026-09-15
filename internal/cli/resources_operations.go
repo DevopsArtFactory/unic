@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -69,6 +70,13 @@ var (
 			return nil, err
 		}
 		return repo.ListTargetGroupHealth(ctx, arn)
+	}
+	loadStepFunctionExecutions = func(ctx context.Context, stateMachineARN string) ([]awsservice.StepFunctionExecution, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return repo.ListStepFunctionExecutions(ctx, stateMachineARN)
 	}
 )
 
@@ -179,4 +187,52 @@ func newELBTargetHealthCmd() *cobra.Command {
 	cmd.Flags().StringVar(&arn, "load-balancer", "", "Load balancer ARN")
 	_ = cmd.MarkFlagRequired("load-balancer")
 	return cmd
+}
+
+func newStepFunctionExecutionsCmd() *cobra.Command {
+	var stateMachineARN string
+	var jsonOutput bool
+	cmd := &cobra.Command{
+		Use:   "step-function-executions",
+		Short: "List recent Step Functions executions in triage order as JSON",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !jsonOutput {
+				return errors.New("this automation command supports JSON output only")
+			}
+			if strings.TrimSpace(stateMachineARN) == "" {
+				return errors.New("state-machine is required")
+			}
+			executions, err := loadStepFunctionExecutions(cmd.Context(), stateMachineARN)
+			if err != nil {
+				return err
+			}
+			data := make([]stepFunctionExecutionJSON, 0, len(executions))
+			for _, execution := range executions {
+				data = append(data, stepFunctionExecutionJSON{
+					ARN: execution.ARN, Name: execution.Name, StateMachineARN: execution.StateMachineARN,
+					Status: execution.Status, StartedAt: resourceTimeJSON(execution.StartDate),
+					StoppedAt: resourceTimeJSON(execution.StopDate), NeedsAttention: execution.NeedsAttention(),
+				})
+			}
+			complete := len(data) < 200
+			warnings := []string{}
+			if !complete {
+				warnings = append(warnings, "results reached the 200-execution limit")
+			}
+			return writeResourceJSON(cmd, data, complete, warnings)
+		},
+	}
+	cmd.Annotations = map[string]string{annotationReadOnly: "true", annotationOutputVersion: "v1"}
+	cmd.Flags().StringVar(&stateMachineARN, "state-machine", "", "STANDARD state machine ARN")
+	cmd.Flags().BoolVar(&jsonOutput, "json", true, "Emit stable machine-readable JSON")
+	_ = cmd.MarkFlagRequired("state-machine")
+	return cmd
+}
+
+func resourceTimeJSON(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
 }
