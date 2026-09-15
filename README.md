@@ -250,7 +250,7 @@ For Claude Desktop and other JSON-configured MCP clients, use:
 
 In Kiro, open **Powers**, choose **Add Custom Power**, and import this repository from GitHub. The root `plugin.json`, `mcp.json`, and `skills/` directory follow the Agent Plugins format used by Kiro Powers.
 
-The server provides `get_mcp_capabilities`, `get_capabilities`, `get_command_schema`, `list_backup_vaults`, `run_security_inspector`, and `plan_context_sync`. Agents should call `get_mcp_capabilities` first because it describes only operations callable through MCP, including permissions and output contracts. Example prompts:
+The server exposes the read-only resource operations listed above—including `list_elasticache_resources`—plus capability discovery, Security Inspector, and context-sync preview tools. Agents should call `get_mcp_capabilities` first because it describes only operations callable through MCP, including permissions and output contracts. Example prompts:
 
 - `Show the AWS capabilities available through unic.`
 - `List my AWS Backup vaults in ap-northeast-2.`
