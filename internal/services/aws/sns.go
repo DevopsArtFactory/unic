@@ -149,6 +149,33 @@ func (r *AwsRepository) ListSNSSubscriptionsByTopic(ctx context.Context, topicAR
 	return subscriptions, warnings, nil
 }
 
+// ListSNSTopicResources joins topics with their subscriptions for read-only
+// automation. A subscription-list failure remains a warning so one restrictive
+// topic policy cannot hide resources that loaded successfully.
+func (r *AwsRepository) ListSNSTopicResources(ctx context.Context) ([]SNSTopicResource, []error, error) {
+	topics, warnings, err := r.ListSNSTopics(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resources := make([]SNSTopicResource, 0, len(topics))
+	for _, topic := range topics {
+		subscriptions, subscriptionWarnings, err := r.ListSNSSubscriptionsByTopic(ctx, topic.ARN)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, nil, ctx.Err()
+			}
+			warnings = append(warnings, err)
+			subscriptions = []SNSSubscription{}
+		} else if subscriptions == nil {
+			subscriptions = []SNSSubscription{}
+		}
+		warnings = append(warnings, subscriptionWarnings...)
+		resources = append(resources, SNSTopicResource{Topic: topic, Subscriptions: subscriptions})
+	}
+	return resources, warnings, nil
+}
+
 func snsSubscriptionSortRank(subscription SNSSubscription) int {
 	switch subscription.Status() {
 	case "pending":
