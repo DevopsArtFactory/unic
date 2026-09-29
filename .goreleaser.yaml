@@ -66,12 +66,13 @@ release:
 
     ```bash
     brew tap DevopsArtFactory/unic
-    brew trust DevopsArtFactory/unic   # Homebrew 7.0+ only
+    brew trust --formula DevopsArtFactory/unic/unic
     brew install unic
     ```
 
-    Homebrew 7.0 refuses to load formulae from untrusted taps, so `brew install` fails
-    without the `trust` step. The subcommand does not exist before 7.0 — skip it there.
+    Homebrew 6.0.0 and later require explicit trust before loading formulae from
+    non-official taps; without it `brew install` fails with
+    `Refusing to load formula ... from untrusted tap`.
 
     ```bash
     curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.sh | sh

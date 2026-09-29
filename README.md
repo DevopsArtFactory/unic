@@ -47,7 +47,8 @@ brew trust --formula DevopsArtFactory/unic/unic
 brew install unic
 ```
 
-Homebrew 6.0.0 and later require explicit trust before loading formulae from non-official taps. The formula-scoped command trusts only `unic`, rather than every item in the tap.
+Homebrew 6.0.0 and later require explicit trust before loading formulae from non-official taps; without the trust step `brew install unic` fails with `Refusing to load formula ... from untrusted tap`. The formula-scoped command trusts only `unic`, rather than every current and future item in the tap, which is what `brew trust DevopsArtFactory/unic` would grant.
+
 Homebrew and release archives install both the `unic` TUI and the `unic-mcp` stdio server.
 
 ### Install Script
