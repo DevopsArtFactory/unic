@@ -4,3 +4,5 @@
 .claude/reports/
 # SSM session-manager-plugin temp files (ecs exec session state)
 cs.json
+# Stray logs from tools run in the repo root; unic writes its own to ~/.config/unic/logs/
+*.log
