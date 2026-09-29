@@ -34,6 +34,11 @@ func newUpdateCmd() *cobra.Command {
 			if method == update.InstallBrew {
 				fmt.Println("\nunic was installed via Homebrew. To update, run:")
 				fmt.Println("  brew upgrade unic")
+				// Homebrew 6.0.0 and later refuse to load formulae from
+				// untrusted taps. Installs predating that release leave the
+				// tap untrusted, so point at the fix instead of a dead end.
+				fmt.Println("\nIf Homebrew reports an untrusted tap, trust the formula once:")
+				fmt.Println("  brew trust --formula DevopsArtFactory/unic/unic")
 				return nil
 			}
 

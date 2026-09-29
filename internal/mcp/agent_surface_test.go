@@ -30,6 +30,7 @@ var agentSurfaceByFeature = map[domain.FeatureKind]agentSurface{
 	domain.FeatureElastiCacheBrowser: {command: "elasticache-resources", tool: "list_elasticache_resources"},
 	domain.FeatureELBBrowser:         {command: "elb-target-health", tool: "get_elb_target_health", arguments: json.RawMessage(`{"load_balancer":"load-balancer"}`)},
 	domain.FeatureRDSBrowser:         {command: "rds-instances", tool: "list_rds_instances"},
+	domain.FeatureSQSBrowser:         {command: "sqs-queues", tool: "list_sqs_queues"},
 }
 
 var agentSurfaceExempt = map[domain.FeatureKind]string{
@@ -57,7 +58,6 @@ var agentSurfaceExempt = map[domain.FeatureKind]string{
 	domain.FeatureSecurityGroupBrowser:  "no curated security-group rule query is defined yet",
 	domain.FeatureSecretsBrowser:        "secret values require operator-controlled reveal and copy handling",
 	domain.FeatureSNSBrowser:            "the joined topic and subscription view has no agent contract yet",
-	domain.FeatureSQSBrowser:            "queue mutations are confirmation-gated and no separate read-only contract exists yet",
 	domain.FeatureSSMParameterBrowser:   "parameter values require operator-controlled reveal and copy handling",
 	domain.FeatureSSMSession:            "starts an interactive shell session instead of returning resource data",
 	domain.FeatureStepFunctionsBrowser:  "the failure-first execution view has no curated agent contract yet",
@@ -157,6 +157,24 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 				t.Errorf("resource MCP tool %q is not callable: %v", surface.tool, err)
 			} else if len(args) < 2 || args[0] != "resources" || args[1] != surface.command {
 				t.Errorf("resource MCP tool %q dispatches to %q, want resources %s", surface.tool, args, surface.command)
+			} else {
+				root := cli.NewRootCmd()
+				command, remaining, err := root.Find(args)
+				if err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if !command.Runnable() {
+					t.Errorf("resource MCP tool %q dispatches to non-runnable command %q", surface.tool, command.CommandPath())
+				} else if err := command.ParseFlags(remaining); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateArgs(command.Flags().Args()); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateRequiredFlags(); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateFlagGroups(); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if jsonFlag := command.Flags().Lookup("json"); jsonFlag == nil || !jsonFlag.Changed || jsonFlag.Value.String() != "true" {
+					t.Errorf("resource MCP tool %q must dispatch with --json", surface.tool)
+				}
 			}
 		}
 	}
