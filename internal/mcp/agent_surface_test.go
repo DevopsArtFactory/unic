@@ -33,6 +33,7 @@ var agentSurfaceByFeature = map[domain.FeatureKind]agentSurface{
 	domain.FeatureRDSBrowser:            {command: "rds-instances", tool: "list_rds_instances"},
 	domain.FeatureSQSBrowser:            {command: "sqs-queues", tool: "list_sqs_queues"},
 	domain.FeatureSNSBrowser:            {command: "sns-topics", tool: "list_sns_topics"},
+	domain.FeatureStepFunctionsBrowser:  {command: "step-function-executions", tool: "list_step_function_executions", arguments: json.RawMessage(`{"state_machine":"arn:machine"}`)},
 }
 
 var agentSurfaceExempt = map[domain.FeatureKind]string{
@@ -60,7 +61,6 @@ var agentSurfaceExempt = map[domain.FeatureKind]string{
 	domain.FeatureSecretsBrowser:        "secret values require operator-controlled reveal and copy handling",
 	domain.FeatureSSMParameterBrowser:   "parameter values require operator-controlled reveal and copy handling",
 	domain.FeatureSSMSession:            "starts an interactive shell session instead of returning resource data",
-	domain.FeatureStepFunctionsBrowser:  "the failure-first execution view has no curated agent contract yet",
 	domain.FeatureVPCBrowser:            "no bounded VPC and subnet query is defined yet",
 	domain.FeatureWAFWebACLBrowser:      "the regional and global joined view has no agent contract yet",
 }

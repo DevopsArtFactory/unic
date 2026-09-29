@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -90,6 +91,13 @@ var (
 			return nil, err
 		}
 		return repo.ListCloudFormationStacks(ctx)
+	}
+	loadStepFunctionExecutions = func(ctx context.Context, stateMachineARN string) ([]awsservice.StepFunctionExecution, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return repo.ListStepFunctionExecutions(ctx, stateMachineARN)
 	}
 	loadSQSQueues = func(ctx context.Context) ([]awsservice.SQSQueue, error) {
 		repo, err := resourceRepository(ctx)
@@ -287,11 +295,52 @@ func newCloudFormationStacksCmd() *cobra.Command {
 			data = append(data, cloudFormationStackJSON{
 				ID: stack.ID, Name: stack.Name, Description: stack.Description,
 				Status: stack.Status, StatusReason: stack.StatusReason, DriftStatus: stack.DriftStatus, Region: stack.Region,
-				LastDriftCheck: cloudFormationTimeJSON(stack.LastDriftCheck), CreatedAt: cloudFormationTimeJSON(stack.CreatedAt), UpdatedAt: cloudFormationTimeJSON(stack.UpdatedAt),
+				LastDriftCheck: resourceTimeJSON(stack.LastDriftCheck), CreatedAt: resourceTimeJSON(stack.CreatedAt), UpdatedAt: resourceTimeJSON(stack.UpdatedAt),
 				TerminationProtection: stack.TerminationProtection,
 				Parameters:            cloudFormationValuesJSON(stack.Parameters), Outputs: cloudFormationValuesJSON(stack.Outputs),
 			})
 		}
 		return data, err
 	})
+}
+
+func newStepFunctionExecutionsCmd() *cobra.Command {
+	var stateMachineARN string
+	var jsonOutput bool
+	cmd := &cobra.Command{
+		Use:   "step-function-executions",
+		Short: "List recent Step Functions executions in triage order as JSON",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !jsonOutput {
+				return errors.New("this automation command supports JSON output only")
+			}
+			if strings.TrimSpace(stateMachineARN) == "" {
+				return errors.New("state-machine is required")
+			}
+			executions, err := loadStepFunctionExecutions(cmd.Context(), stateMachineARN)
+			if err != nil {
+				return err
+			}
+			data := make([]stepFunctionExecutionJSON, 0, len(executions))
+			for _, execution := range executions {
+				data = append(data, stepFunctionExecutionJSON{
+					ARN: execution.ARN, Name: execution.Name, StateMachineARN: execution.StateMachineARN,
+					Status: execution.Status, StartedAt: resourceTimeJSON(execution.StartDate),
+					StoppedAt: resourceTimeJSON(execution.StopDate), NeedsAttention: execution.NeedsAttention(),
+				})
+			}
+			complete := len(data) < 200
+			warnings := []string{}
+			if !complete {
+				warnings = append(warnings, "results reached the 200-execution limit")
+			}
+			return writeResourceJSON(cmd, data, complete, warnings)
+		},
+	}
+	cmd.Annotations = map[string]string{annotationReadOnly: "true", annotationOutputVersion: "v1"}
+	cmd.Flags().StringVar(&stateMachineARN, "state-machine", "", "STANDARD state machine ARN")
+	cmd.Flags().BoolVar(&jsonOutput, "json", true, "Emit stable machine-readable JSON")
+	_ = cmd.MarkFlagRequired("state-machine")
+	return cmd
 }
