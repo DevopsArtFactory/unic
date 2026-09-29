@@ -39,6 +39,16 @@ This is the closest structure to a "harness-like" doc hub in this repository: on
 
 ## Installation
 
+### Install Script
+
+```bash
+curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.sh | sh
+```
+
+Set `INSTALL_DIR` to override the default install path.
+
+The script checks that the downloaded archive contains both binaries before replacing either installation. If an older release lacks `unic-mcp`, build from source until a release containing both is available.
+
 ### Homebrew
 
 ```bash
@@ -50,16 +60,6 @@ brew install unic
 Homebrew 6.0.0 and later require explicit trust before loading formulae from non-official taps; without the trust step `brew install unic` fails with `Refusing to load formula ... from untrusted tap`. The formula-scoped command trusts only `unic`, rather than every current and future item in the tap, which is what `brew trust DevopsArtFactory/unic` would grant.
 
 Homebrew and release archives install both the `unic` TUI and the `unic-mcp` stdio server.
-
-### Install Script
-
-```bash
-curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.sh | sh
-```
-
-Set `INSTALL_DIR` to override the default install path.
-
-The script checks that the downloaded archive contains both binaries before replacing either installation. If an older release lacks `unic-mcp`, build from source until a release containing both is available.
 
 ### Build From Source
 
@@ -261,15 +261,7 @@ The server provides the read-only resource operations listed above plus capabili
 - `Show the AWS capabilities available through unic.`
 - `List my AWS Backup vaults in ap-northeast-2.`
 - `Show my deepest SQS backlogs and their dead-letter queue relationships.`
-The server exposes the read-only resource operations listed above—including `list_cloudformation_stacks`—plus capability discovery, Security Inspector, and context-sync preview tools. Agents should call `get_mcp_capabilities` first because it describes only operations callable through MCP, including permissions and output contracts. Example prompts:
-
-- `Show the AWS capabilities available through unic.`
-- `List my AWS Backup vaults in ap-northeast-2.`
 - `Show failed or rollback CloudFormation stacks and their status reasons.`
-The server exposes the read-only resource operations listed above—including `list_step_function_executions`—plus capability discovery, Security Inspector, and context-sync preview tools. Agents should call `get_mcp_capabilities` first because it describes only operations callable through MCP, including permissions and output contracts. Example prompts:
-
-- `Show the AWS capabilities available through unic.`
-- `List my AWS Backup vaults in ap-northeast-2.`
 - `Show the recent failed executions for this STANDARD Step Functions state machine ARN.`
 - `Preview a unic context sync without changing config.`
 
