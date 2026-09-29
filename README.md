@@ -43,11 +43,11 @@ This is the closest structure to a "harness-like" doc hub in this repository: on
 
 ```bash
 brew tap DevopsArtFactory/unic
-brew trust DevopsArtFactory/unic
+brew trust --formula DevopsArtFactory/unic/unic
 brew install unic
 ```
 
-Homebrew 7 and later require explicit trust before loading formulae from non-official taps.
+Homebrew 6.0.0 and later require explicit trust before loading formulae from non-official taps.
 Homebrew and release archives install both the `unic` TUI and the `unic-mcp` stdio server.
 
 ### Install Script
