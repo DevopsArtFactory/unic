@@ -9,6 +9,7 @@ If a user-facing behavior, architecture boundary, or development workflow change
 - [Project Overview (KO)](project-overview.ko.md)
 - [Architecture (EN)](architecture.en.md)
 - [Architecture (KO)](architecture.ko.md)
+- [Service-Specific Highlights](service-specific-highlights.md)
 - [Development Guide](development.md)
 - [Branch Naming Harness](branch-naming-harness.md)
 - [Documentation Harness](documentation-harness.md)
