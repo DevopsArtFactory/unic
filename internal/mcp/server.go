@@ -154,6 +154,15 @@ var tools = []tool{
 		Metadata:    toolMetadata{RequiredPermissions: []string{"elasticloadbalancing:DescribeTargetGroups", "elasticloadbalancing:DescribeTargetHealth"}, OutputContract: "unic.resources.elb-target-health.v1", Paginated: true},
 	},
 	{
+		Name: "list_sqs_queues", Description: "List SQS queues by backlog with dead-letter queue relationships.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata: toolMetadata{
+			RequiredPermissions: []string{"sqs:ListQueues", "sqs:GetQueueAttributes"},
+			OutputContract:      "unic.resources.sqs-queues.v1", Paginated: true,
+		},
+	},
+	{
 		Name: "plan_context_sync", Description: "Preview an SSO context sync plan. This tool never writes configuration.",
 		InputSchema: objectSchema(map[string]any{
 			"base_context": map[string]any{"type": "string", "description": "Optional SSO base context"},
@@ -405,7 +414,7 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 			result = append(result, "--region", args.Region)
 		}
 		return result, nil
-	case "list_ec2_instances", "list_rds_instances", "list_cloudwatch_alarms":
+	case "list_ec2_instances", "list_rds_instances", "list_cloudwatch_alarms", "list_sqs_queues":
 		var args struct {
 			Profile string `json:"profile"`
 			Region  string `json:"region"`
@@ -413,7 +422,7 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 		if err := decodeArguments(raw, &args); err != nil {
 			return nil, err
 		}
-		command := map[string]string{"list_ec2_instances": "ec2-instances", "list_rds_instances": "rds-instances", "list_cloudwatch_alarms": "alarms"}[name]
+		command := map[string]string{"list_ec2_instances": "ec2-instances", "list_rds_instances": "rds-instances", "list_cloudwatch_alarms": "alarms", "list_sqs_queues": "sqs-queues"}[name]
 		return withAWSContext([]string{"resources", command, "--json"}, args.Profile, args.Region), nil
 	case "get_ecs_service_rollout":
 		var args struct {

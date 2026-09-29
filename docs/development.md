@@ -31,6 +31,8 @@ Discovery output is deterministic, versioned JSON. New executable commands shoul
 
 Read-only automation commands live under `internal/cli/`; keep their `--json` output versioned and deterministic, write only JSON to stdout, and cover human and JSON output paths with CLI tests.
 
+`unic resources sqs-queues --json` reuses the backlog ordering and DLQ relationships from `AwsRepository.ListQueues`. Keep that CLI/MCP contract read-only; SQS purge and redrive remain confirmation-gated TUI mutations.
+
 The stdio MCP entry point lives at `cmd/unic-mcp` and delegates tool calls to those same CLI commands through `internal/cli.ExecuteAutomation`. Keep the MCP layer limited to protocol handling and argument mapping; AWS and config behavior belongs in the existing CLI, auth, and service packages. MCP mutation tools remain preview-only until their trust boundary is reviewed.
 
 The repository root is also the portable agent-plugin package. Keep shared MCP guidance in `skills/unic-aws`, Kiro metadata in `plugin.json` and `mcp.json`, and client-specific manifests in `.codex-plugin`, `.claude-plugin`, and `.mcp.json`. All clients must launch the released `unic-mcp` binary from `PATH`; do not add client-specific MCP implementations.

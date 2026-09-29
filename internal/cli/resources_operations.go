@@ -70,6 +70,13 @@ var (
 		}
 		return repo.ListTargetGroupHealth(ctx, arn)
 	}
+	loadSQSQueues = func(ctx context.Context) ([]awsservice.SQSQueue, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return repo.ListQueues(ctx)
+	}
 )
 
 func writeResourceJSON(cmd *cobra.Command, data any, complete bool, warnings []string) error {
@@ -179,4 +186,14 @@ func newELBTargetHealthCmd() *cobra.Command {
 	cmd.Flags().StringVar(&arn, "load-balancer", "", "Load balancer ARN")
 	_ = cmd.MarkFlagRequired("load-balancer")
 	return cmd
+}
+
+func newSQSQueuesCmd() *cobra.Command {
+	return jsonResourceCommand("sqs-queues", "List SQS queues by backlog as JSON", func(ctx context.Context) (any, error) {
+		items, err := loadSQSQueues(ctx)
+		if items == nil {
+			items = []awsservice.SQSQueue{}
+		}
+		return items, err
+	})
 }

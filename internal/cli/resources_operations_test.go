@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	awsservice "unic/internal/services/aws"
@@ -63,6 +64,65 @@ func TestEC2InstancesEmptyDataIsArrayAndDiscoveryIsReadOnlyV1(t *testing.T) {
 	resource := newEC2InstancesCmd()
 	if resource.Annotations[annotationReadOnly] != "true" || resource.Annotations[annotationOutputVersion] != "v1" {
 		t.Fatalf("annotations=%v", resource.Annotations)
+	}
+}
+
+func TestSQSQueuesJSONContract(t *testing.T) {
+	original := loadSQSQueues
+	defer func() { loadSQSQueues = original }()
+	loadSQSQueues = func(context.Context) ([]awsservice.SQSQueue, error) {
+		return []awsservice.SQSQueue{
+			{
+				Name: "orders-dlq", ARN: "arn:aws:sqs:us-east-1:123456789012:orders-dlq",
+				Region: "us-east-1", Depth: 42,
+				SourceQueueARNs: []string{"arn:aws:sqs:us-east-1:123456789012:orders", "arn:aws:sqs:us-east-1:123456789012:payments"}, SourceQueueCount: 2,
+			},
+			{Name: "idle", SourceQueueARNs: []string{}},
+		}, nil
+	}
+	cmd := NewRootCmd()
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetArgs([]string{"resources", "sqs-queues", "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		SchemaVersion string `json:"schema_version"`
+		Data          []struct {
+			Name             string   `json:"name"`
+			Depth            int      `json:"depth"`
+			SourceQueueARNs  []string `json:"source_queue_arns"`
+			SourceQueueCount int      `json:"source_queue_count"`
+		} `json:"data"`
+		Warnings   []string       `json:"warnings"`
+		Pagination jsonPagination `json:"pagination"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.SchemaVersion != "v1" || len(result.Data) != 2 || result.Data[0].Name != "orders-dlq" ||
+		result.Data[0].Depth != 42 || len(result.Data[0].SourceQueueARNs) != 2 || result.Data[0].SourceQueueCount != 2 ||
+		result.Data[1].Name != "idle" || result.Data[1].SourceQueueARNs == nil || len(result.Data[1].SourceQueueARNs) != 0 || result.Data[1].SourceQueueCount != 0 ||
+		result.Warnings == nil || !result.Pagination.Complete {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestSQSQueuesReturnsLoaderErrorWithoutJSON(t *testing.T) {
+	original := loadSQSQueues
+	defer func() { loadSQSQueues = original }()
+	wantErr := errors.New("queue lookup failed")
+	loadSQSQueues = func(context.Context) ([]awsservice.SQSQueue, error) { return nil, wantErr }
+	cmd := NewRootCmd()
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetArgs([]string{"resources", "sqs-queues", "--json"})
+	if err := cmd.Execute(); !errors.Is(err, wantErr) {
+		t.Fatalf("expected loader error, got %v", err)
+	}
+	if output.Len() != 0 {
+		t.Fatalf("expected no success envelope, got %s", output.String())
 	}
 }
 
