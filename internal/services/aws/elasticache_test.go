@@ -106,7 +106,7 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 			}}}, nil
 		},
 	}
-	repo := &AwsRepository{ElastiCacheClient: client}
+	repo := &AwsRepository{ElastiCacheClient: client, Region: "us-east-1"}
 
 	resources, err := repo.ListElastiCacheResources(context.Background())
 	if err != nil {
@@ -114,6 +114,11 @@ func TestListElastiCacheResourcesMapsReplicationGroupsAndStandaloneClusters(t *t
 	}
 	if len(resources) != 3 {
 		t.Fatalf("expected replication group and standalone clusters, got %+v", resources)
+	}
+	for _, resource := range resources {
+		if resource.Region != "us-east-1" || resource.Nodes == nil {
+			t.Fatalf("expected region and stable node arrays, got %+v", resource)
+		}
 	}
 	standalone, group := resources[0], resources[1]
 	if standalone.ID != "memcached-dev" || standalone.Kind != "cluster" || standalone.Endpoint != "memcached.cfg.cache.amazonaws.com:11211" {
