@@ -59,6 +59,28 @@ brews:
       system "#{bin}/unic", "--version"
       assert_predicate bin/"unic-mcp", :executable?
 
+release:
+  footer: |
+
+    ## Install
+
+    ```bash
+    brew tap DevopsArtFactory/unic
+    brew trust DevopsArtFactory/unic   # Homebrew 7.0+ only
+    brew install unic
+    ```
+
+    Homebrew 7.0 refuses to load formulae from untrusted taps, so `brew install` fails
+    without the `trust` step. The subcommand does not exist before 7.0 — skip it there.
+
+    ```bash
+    curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.sh | sh
+    ```
+
+    Both install the `unic` TUI and the `unic-mcp` stdio server. See the
+    [README](https://github.com/DevopsArtFactory/unic#installation) for configuration,
+    MCP client setup, and upgrade paths.
+
 changelog:
   sort: asc
   filters:
