@@ -121,6 +121,30 @@ var tools = []tool{
 		Metadata:    toolMetadata{RequiredPermissions: []string{"rds:DescribeDBInstances"}, OutputContract: "unic.resources.rds-instances.v1", Paginated: true},
 	},
 	{
+		Name: "list_elasticache_resources", Description: "List ElastiCache replication groups and standalone clusters with node status and endpoints.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata: toolMetadata{
+			RequiredPermissions: []string{"elasticache:DescribeCacheClusters", "elasticache:DescribeReplicationGroups"},
+			OutputContract:      "unic.resources.elasticache-resources.v1", Paginated: true,
+		},
+	},
+	{
+		Name: "list_sns_topics", Description: "List SNS topics with subscriptions, delivery settings, and dead-letter queue relationships.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata: toolMetadata{
+			RequiredPermissions: []string{"sns:ListTopics", "sns:GetTopicAttributes", "sns:ListSubscriptionsByTopic", "sns:GetSubscriptionAttributes"},
+			OutputContract:      "unic.resources.sns-topics.v1", Paginated: true, PartialResults: true,
+		},
+	},
+	{
+		Name: "list_cloudformation_stacks", Description: "List CloudFormation stacks in failure-first triage order with status, drift, parameters, and outputs.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata:    toolMetadata{RequiredPermissions: []string{"cloudformation:DescribeStacks", "cloudformation:ListStacks"}, OutputContract: "unic.resources.cloudformation-stacks.v1", Paginated: true},
+	},
+	{
 		Name: "list_cloudwatch_alarms", Description: "List CloudWatch alarms with firing alarms first.",
 		InputSchema: awsContextSchema(nil, nil),
 		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
@@ -152,6 +176,15 @@ var tools = []tool{
 		}, []string{"load_balancer"}),
 		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
 		Metadata:    toolMetadata{RequiredPermissions: []string{"elasticloadbalancing:DescribeTargetGroups", "elasticloadbalancing:DescribeTargetHealth"}, OutputContract: "unic.resources.elb-target-health.v1", Paginated: true},
+	},
+	{
+		Name: "list_sqs_queues", Description: "List SQS queues by backlog with dead-letter queue relationships.",
+		InputSchema: awsContextSchema(nil, nil),
+		Annotations: annotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: true},
+		Metadata: toolMetadata{
+			RequiredPermissions: []string{"sqs:ListQueues", "sqs:GetQueueAttributes"},
+			OutputContract:      "unic.resources.sqs-queues.v1", Paginated: true,
+		},
 	},
 	{
 		Name: "list_step_function_executions", Description: "List up to 200 recent STANDARD Step Functions executions in failure-first triage order.",
@@ -413,7 +446,7 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 			result = append(result, "--region", args.Region)
 		}
 		return result, nil
-	case "list_ec2_instances", "list_rds_instances", "list_cloudwatch_alarms":
+	case "list_ec2_instances", "list_rds_instances", "list_cloudwatch_alarms", "list_sqs_queues", "list_elasticache_resources", "list_sns_topics", "list_cloudformation_stacks":
 		var args struct {
 			Profile string `json:"profile"`
 			Region  string `json:"region"`
@@ -421,7 +454,7 @@ func toolArgs(name string, raw json.RawMessage) ([]string, error) {
 		if err := decodeArguments(raw, &args); err != nil {
 			return nil, err
 		}
-		command := map[string]string{"list_ec2_instances": "ec2-instances", "list_rds_instances": "rds-instances", "list_cloudwatch_alarms": "alarms"}[name]
+		command := map[string]string{"list_ec2_instances": "ec2-instances", "list_rds_instances": "rds-instances", "list_cloudwatch_alarms": "alarms", "list_sqs_queues": "sqs-queues", "list_elasticache_resources": "elasticache-resources", "list_sns_topics": "sns-topics", "list_cloudformation_stacks": "cloudformation-stacks"}[name]
 		return withAWSContext([]string{"resources", command, "--json"}, args.Profile, args.Region), nil
 	case "get_ecs_service_rollout":
 		var args struct {

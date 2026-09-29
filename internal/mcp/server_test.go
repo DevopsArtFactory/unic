@@ -55,6 +55,10 @@ func TestReadOnlyOperationToolArgs(t *testing.T) {
 		want []string
 	}{
 		{"list_ec2_instances", `{"profile":"prod","region":"eu-west-1"}`, []string{"resources", "ec2-instances", "--json", "--profile", "prod", "--region", "eu-west-1"}},
+		{"list_sqs_queues", `{"profile":"prod","region":"eu-west-1"}`, []string{"resources", "sqs-queues", "--json", "--profile", "prod", "--region", "eu-west-1"}},
+		{"list_elasticache_resources", `{"profile":"prod","region":"eu-west-1"}`, []string{"resources", "elasticache-resources", "--json", "--profile", "prod", "--region", "eu-west-1"}},
+		{"list_sns_topics", `{"profile":"prod","region":"eu-west-1"}`, []string{"resources", "sns-topics", "--json", "--profile", "prod", "--region", "eu-west-1"}},
+		{"list_cloudformation_stacks", `{"profile":"prod","region":"eu-west-1"}`, []string{"resources", "cloudformation-stacks", "--json", "--profile", "prod", "--region", "eu-west-1"}},
 		{"get_ecs_service_rollout", `{"cluster":"prod","service":"api"}`, []string{"resources", "ecs-rollout", "--cluster", "prod", "--service", "api", "--json"}},
 		{"list_cloudtrail_events", `{"since":"6h","mutations_only":true}`, []string{"resources", "cloudtrail-events", "--since", "6h", "--json", "--mutations-only"}},
 		{"get_elb_target_health", `{"load_balancer":"arn:lb"}`, []string{"resources", "elb-target-health", "--load-balancer", "arn:lb", "--json"}},
@@ -106,8 +110,11 @@ func TestMCPCapabilitiesStayAlignedWithRegisteredTools(t *testing.T) {
 		if _, ok := listed[i]["required_permissions"].([]string); !ok {
 			t.Fatalf("tool %s permissions are not a stable array", registered.Name)
 		}
-		if registered.Name == "list_step_function_executions" {
-			want := []string{"states:ListExecutions"}
+		wantPermissions := map[string][]string{
+			"list_cloudformation_stacks":    {"cloudformation:DescribeStacks", "cloudformation:ListStacks"},
+			"list_step_function_executions": {"states:ListExecutions"},
+		}
+		if want, ok := wantPermissions[registered.Name]; ok {
 			if !reflect.DeepEqual(listed[i]["required_permissions"], want) {
 				t.Fatalf("tool %s permissions = %#v, want %#v", registered.Name, listed[i]["required_permissions"], want)
 			}

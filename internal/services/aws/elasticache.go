@@ -37,6 +37,9 @@ func (r *AwsRepository) ListElastiCacheResources(ctx context.Context) ([]ElastiC
 		}
 		resources = append(resources, mapElastiCacheCluster(cluster))
 	}
+	for i := range resources {
+		resources[i].Region = r.Region
+	}
 
 	sort.Slice(resources, func(i, j int) bool {
 		left := normalizedSortKey(resources[i].ID)
@@ -85,6 +88,7 @@ func mapElastiCacheReplicationGroup(group elasticachetypes.ReplicationGroup, clu
 		Status:   awssdk.ToString(group.Status),
 		NodeType: awssdk.ToString(group.CacheNodeType),
 		Endpoint: formatElastiCacheEndpoint(group.ConfigurationEndpoint),
+		Nodes:    []ElastiCacheNode{},
 	}
 	for _, nodeGroup := range group.NodeGroups {
 		if resource.Endpoint == "" {
@@ -122,6 +126,7 @@ func mapElastiCacheCluster(cluster elasticachetypes.CacheCluster) ElastiCacheRes
 		Status:        awssdk.ToString(cluster.CacheClusterStatus),
 		NodeType:      awssdk.ToString(cluster.CacheNodeType),
 		Endpoint:      formatElastiCacheEndpoint(cluster.ConfigurationEndpoint),
+		Nodes:         []ElastiCacheNode{},
 	}
 	for _, cacheNode := range cluster.CacheNodes {
 		role := "primary"

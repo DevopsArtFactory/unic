@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -33,6 +34,77 @@ type backupVaultJSON struct {
 	EncryptionKeyARN   string `json:"encryption_key_arn,omitempty"`
 	RecoveryPointCount int64  `json:"recovery_point_count"`
 	Locked             bool   `json:"locked"`
+}
+
+type snsTopicJSON struct {
+	ARN                       string                `json:"arn"`
+	Name                      string                `json:"name"`
+	DisplayName               string                `json:"display_name,omitempty"`
+	Region                    string                `json:"region"`
+	Type                      string                `json:"type"`
+	KMSMasterKeyID            string                `json:"kms_master_key_id,omitempty"`
+	DeliveryPolicy            string                `json:"delivery_policy,omitempty"`
+	EffectiveDeliveryPolicy   string                `json:"effective_delivery_policy,omitempty"`
+	SubscriptionsConfirmed    int                   `json:"subscriptions_confirmed"`
+	SubscriptionsPending      int                   `json:"subscriptions_pending"`
+	SubscriptionsDeleted      int                   `json:"subscriptions_deleted"`
+	ContentBasedDeduplication bool                  `json:"content_based_deduplication"`
+	AttributesKnown           bool                  `json:"attributes_known"`
+	Subscriptions             []snsSubscriptionJSON `json:"subscriptions"`
+}
+
+type snsSubscriptionJSON struct {
+	ARN                 string `json:"arn"`
+	Protocol            string `json:"protocol"`
+	Endpoint            string `json:"endpoint"`
+	Owner               string `json:"owner"`
+	TopicARN            string `json:"topic_arn"`
+	Status              string `json:"status"`
+	RawMessageDelivery  bool   `json:"raw_message_delivery"`
+	DeadLetterTargetARN string `json:"dead_letter_target_arn,omitempty"`
+	FilterPolicy        string `json:"filter_policy,omitempty"`
+	FilterPolicyScope   string `json:"filter_policy_scope,omitempty"`
+	AttributesKnown     bool   `json:"attributes_known"`
+}
+
+type cloudFormationStackJSON struct {
+	ID                    string                    `json:"id"`
+	Name                  string                    `json:"name"`
+	Description           string                    `json:"description,omitempty"`
+	Status                string                    `json:"status"`
+	StatusReason          string                    `json:"status_reason,omitempty"`
+	DriftStatus           string                    `json:"drift_status"`
+	Region                string                    `json:"region"`
+	LastDriftCheck        string                    `json:"last_drift_check,omitempty"`
+	CreatedAt             string                    `json:"created_at"`
+	UpdatedAt             string                    `json:"updated_at,omitempty"`
+	TerminationProtection bool                      `json:"termination_protection"`
+	Parameters            []cloudFormationValueJSON `json:"parameters"`
+	Outputs               []cloudFormationValueJSON `json:"outputs"`
+}
+
+type cloudFormationValueJSON struct {
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Description string `json:"description,omitempty"`
+	ExportName  string `json:"export_name,omitempty"`
+}
+
+func cloudFormationValuesJSON(values []awsservice.CloudFormationValue) []cloudFormationValueJSON {
+	result := make([]cloudFormationValueJSON, 0, len(values))
+	for _, value := range values {
+		result = append(result, cloudFormationValueJSON{
+			Key: value.Key, Value: value.Value, Description: value.Description, ExportName: value.ExportName,
+		})
+	}
+	return result
+}
+
+func resourceTimeJSON(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
 }
 
 type stepFunctionExecutionJSON struct {
@@ -67,8 +139,8 @@ var loadBackupVaults = func(ctx context.Context) ([]awsservice.BackupVault, []er
 func newResourcesCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "resources", Short: "Read-only resource queries for automation"}
 	cmd.AddCommand(newBackupVaultsCmd())
-	cmd.AddCommand(newEC2InstancesCmd(), newRDSInstancesCmd(), newAlarmsCmd())
-	cmd.AddCommand(newECSRolloutCmd(), newCloudTrailEventsCmd(), newELBTargetHealthCmd(), newStepFunctionExecutionsCmd())
+	cmd.AddCommand(newEC2InstancesCmd(), newRDSInstancesCmd(), newCloudFormationStacksCmd(), newAlarmsCmd())
+	cmd.AddCommand(newECSRolloutCmd(), newCloudTrailEventsCmd(), newELBTargetHealthCmd(), newSQSQueuesCmd(), newElastiCacheResourcesCmd(), newSNSTopicsCmd(), newStepFunctionExecutionsCmd())
 	return cmd
 }
 

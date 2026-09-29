@@ -160,6 +160,7 @@ func TestListSNSSubscriptionsSkipsPendingAttributesAndSortsPendingFirst(t *testi
 			}
 			return &sns.GetSubscriptionAttributesOutput{Attributes: map[string]string{
 				"RawMessageDelivery": "true", "RedrivePolicy": `{"deadLetterTargetArn":"arn:dlq"}`,
+				"FilterPolicy": `{"event":["created"]}`, "FilterPolicyScope": "MessageBody",
 			}}, nil
 		},
 	}
@@ -191,8 +192,52 @@ func TestListSNSSubscriptionsSkipsPendingAttributesAndSortsPendingFirst(t *testi
 			confirmed = sub
 		}
 	}
-	if !confirmed.Confirmed() || confirmed.Status() != "confirmed" || !confirmed.HasRedrive() || !confirmed.RawMessageDelivery {
+	if !confirmed.Confirmed() || confirmed.Status() != "confirmed" || !confirmed.HasRedrive() || !confirmed.RawMessageDelivery || confirmed.FilterPolicyScope != "MessageBody" {
 		t.Fatalf("expected confirmed subscription attributes mapped, got %+v", confirmed)
+	}
+}
+
+func TestApplySNSSubscriptionAttributesDefaultsFilterPolicyScope(t *testing.T) {
+	subscription := SNSSubscription{}
+	applySNSSubscriptionAttributes(&subscription, map[string]string{"FilterPolicy": `{"event":["created"]}`})
+	if subscription.FilterPolicyScope != "MessageAttributes" {
+		t.Fatalf("expected the AWS default filter policy scope, got %q", subscription.FilterPolicyScope)
+	}
+}
+
+func TestListSNSTopicResourcesKeepsPartialSubscriptionResults(t *testing.T) {
+	client := &mockSNSClient{
+		listTopicsFunc: func(context.Context, *sns.ListTopicsInput, ...func(*sns.Options)) (*sns.ListTopicsOutput, error) {
+			return &sns.ListTopicsOutput{Topics: []snstypes.Topic{
+				{TopicArn: awssdk.String("arn:aws:sns:us-east-1:1:alpha")},
+				{TopicArn: awssdk.String("arn:aws:sns:us-east-1:1:locked")},
+			}}, nil
+		},
+		getTopicAttributesFunc: func(context.Context, *sns.GetTopicAttributesInput, ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
+			return &sns.GetTopicAttributesOutput{Attributes: map[string]string{}}, nil
+		},
+		listSubscriptionsByTopicFunc: func(_ context.Context, in *sns.ListSubscriptionsByTopicInput, _ ...func(*sns.Options)) (*sns.ListSubscriptionsByTopicOutput, error) {
+			if awssdk.ToString(in.TopicArn) == "arn:aws:sns:us-east-1:1:locked" {
+				return nil, errors.New("AuthorizationError")
+			}
+			return &sns.ListSubscriptionsByTopicOutput{Subscriptions: []snstypes.Subscription{{
+				SubscriptionArn: awssdk.String("arn:sub:alpha"), Protocol: awssdk.String("sqs"), Endpoint: awssdk.String("arn:queue"),
+			}}}, nil
+		},
+		getSubscriptionAttributesFunc: func(context.Context, *sns.GetSubscriptionAttributesInput, ...func(*sns.Options)) (*sns.GetSubscriptionAttributesOutput, error) {
+			return &sns.GetSubscriptionAttributesOutput{Attributes: map[string]string{}}, nil
+		},
+	}
+
+	resources, warnings, err := (&AwsRepository{SNSClient: client, Region: "us-east-1"}).ListSNSTopicResources(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resources) != 2 || len(resources[0].Subscriptions) != 1 || resources[1].Subscriptions == nil {
+		t.Fatalf("expected successful and denied topics to remain in stable arrays, got %+v", resources)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0].Error(), "locked") {
+		t.Fatalf("expected the denied subscription list as one warning, got %v", warnings)
 	}
 }
 

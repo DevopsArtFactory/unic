@@ -25,6 +25,14 @@ type SNSTopic struct {
 	AttributesKnown           bool
 }
 
+// SNSTopicResource joins one topic with the subscriptions operators inspect
+// beneath it. It is shared by read-only automation without changing the TUI's
+// lazy per-topic loading flow.
+type SNSTopicResource struct {
+	Topic         SNSTopic
+	Subscriptions []SNSSubscription
+}
+
 // IsFIFO reports whether the topic is a FIFO topic. SNS marks these with a
 // .fifo ARN suffix as well as the FifoTopic attribute, so the name is used as
 // a fallback when attributes could not be read.
@@ -72,6 +80,7 @@ type SNSSubscription struct {
 	RawMessageDelivery bool
 	RedrivePolicy      string
 	FilterPolicy       string
+	FilterPolicyScope  string
 	AttributesKnown    bool
 }
 
