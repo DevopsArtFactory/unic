@@ -84,6 +84,13 @@ var (
 		}
 		return repo.ListSNSTopicResources(ctx)
 	}
+	loadCloudFormationStacks = func(ctx context.Context) ([]awsservice.CloudFormationStack, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return repo.ListCloudFormationStacks(ctx)
+	}
 	loadSQSQueues = func(ctx context.Context) ([]awsservice.SQSQueue, error) {
 		repo, err := resourceRepository(ctx)
 		if err != nil {
@@ -270,4 +277,21 @@ func newSNSTopicsCmd() *cobra.Command {
 	cmd.Annotations = map[string]string{annotationReadOnly: "true", annotationOutputVersion: "v1"}
 	cmd.Flags().BoolVar(&jsonOutput, "json", true, "Emit stable machine-readable JSON")
 	return cmd
+}
+
+func newCloudFormationStacksCmd() *cobra.Command {
+	return jsonResourceCommand("cloudformation-stacks", "List CloudFormation stacks in triage order as JSON", func(ctx context.Context) (any, error) {
+		stacks, err := loadCloudFormationStacks(ctx)
+		data := make([]cloudFormationStackJSON, 0, len(stacks))
+		for _, stack := range stacks {
+			data = append(data, cloudFormationStackJSON{
+				ID: stack.ID, Name: stack.Name, Description: stack.Description,
+				Status: stack.Status, StatusReason: stack.StatusReason, DriftStatus: stack.DriftStatus, Region: stack.Region,
+				LastDriftCheck: cloudFormationTimeJSON(stack.LastDriftCheck), CreatedAt: cloudFormationTimeJSON(stack.CreatedAt), UpdatedAt: cloudFormationTimeJSON(stack.UpdatedAt),
+				TerminationProtection: stack.TerminationProtection,
+				Parameters:            cloudFormationValuesJSON(stack.Parameters), Outputs: cloudFormationValuesJSON(stack.Outputs),
+			})
+		}
+		return data, err
+	})
 }

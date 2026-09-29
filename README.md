@@ -165,6 +165,7 @@ For automation, `unic resources <query> --json` runs a read-only AWS query using
 - `rds-instances`
 - `elasticache-resources`
 - `sns-topics`
+- `cloudformation-stacks`
 - `alarms`
 - `ecs-rollout --cluster <name-or-arn> --service <name-or-arn>`
 - `cloudtrail-events [--since 24h] [--resource <name>] [--mutations-only]`
@@ -173,7 +174,7 @@ For automation, `unic resources <query> --json` runs a read-only AWS query using
 
 Inspector runs outside `resources` because it is a scan, not a resource listing. `unic inspect --json` runs every built-in security and cost/waste rule pack against the active context and returns the same v1 envelope, with `data` carrying `scanned_at`, `scanner_count`, `finding_count`, `severity_counts`, and the `findings` array. Rule packs that fail — most often a denied API call — appear in `warnings` rather than being dropped, so a partially blocked scan is never reported as a clean one. The equivalent MCP tool is `run_security_inspector`. The root `--checklist` flag is inherited but rejected here: Checklist Inspector produces a different report shape and has no agent contract yet, so it fails loudly rather than returning security findings in its place.
 
-The same operations are exposed by `unic-mcp` as read-only tools. Call `get_mcp_capabilities` to discover their versioned input contracts, strict input schemas, output contracts, pagination behavior, and required IAM permissions. The operation permissions are `ec2:DescribeInstances`, `rds:DescribeDBInstances`, `elasticache:DescribeCacheClusters`, `elasticache:DescribeReplicationGroups`, `cloudwatch:DescribeAlarms`, `ecs:DescribeServices`, `ecs:DescribeTaskDefinition`, `cloudtrail:LookupEvents`, `elasticloadbalancing:DescribeTargetGroups`, `elasticloadbalancing:DescribeTargetHealth`, `sns:ListTopics`, `sns:GetTopicAttributes`, `sns:ListSubscriptionsByTopic`, `sns:GetSubscriptionAttributes`, `sqs:ListQueues`, and `sqs:GetQueueAttributes`; AWS Backup retains the permissions documented below. CLI and MCP output never includes resolved credentials.
+The same operations are exposed by `unic-mcp` as read-only tools. Call `get_mcp_capabilities` to discover their versioned input contracts, strict input schemas, output contracts, pagination behavior, and required IAM permissions. The operation permissions are `ec2:DescribeInstances`, `rds:DescribeDBInstances`, `elasticache:DescribeCacheClusters`, `elasticache:DescribeReplicationGroups`, `cloudwatch:DescribeAlarms`, `ecs:DescribeServices`, `ecs:DescribeTaskDefinition`, `cloudtrail:LookupEvents`, `cloudformation:DescribeStacks`, `elasticloadbalancing:DescribeTargetGroups`, `elasticloadbalancing:DescribeTargetHealth`, `sns:ListTopics`, `sns:GetTopicAttributes`, `sns:ListSubscriptionsByTopic`, `sns:GetSubscriptionAttributes`, `sqs:ListQueues`, and `sqs:GetQueueAttributes`; AWS Backup retains the permissions documented below. CLI and MCP output never includes resolved credentials.
 
 ### MCP server
 
@@ -260,6 +261,11 @@ The server provides the read-only resource operations listed above plus capabili
 - `Show the AWS capabilities available through unic.`
 - `List my AWS Backup vaults in ap-northeast-2.`
 - `Show my deepest SQS backlogs and their dead-letter queue relationships.`
+The server exposes the read-only resource operations listed above—including `list_cloudformation_stacks`—plus capability discovery, Security Inspector, and context-sync preview tools. Agents should call `get_mcp_capabilities` first because it describes only operations callable through MCP, including permissions and output contracts. Example prompts:
+
+- `Show the AWS capabilities available through unic.`
+- `List my AWS Backup vaults in ap-northeast-2.`
+- `Show failed or rollback CloudFormation stacks and their status reasons.`
 - `Preview a unic context sync without changing config.`
 
 The context-sync tool is preview-only: it never passes `--apply` or writes configuration. If a client cannot start the server, verify `unic-mcp` is on the client's `PATH` and that the required AWS profile or SSO session is available in the client process environment.
