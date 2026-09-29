@@ -77,6 +77,13 @@ var (
 		}
 		return repo.ListTargetGroupHealth(ctx, arn)
 	}
+	loadSNSTopicResources = func(ctx context.Context) ([]awsservice.SNSTopicResource, []error, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		return repo.ListSNSTopicResources(ctx)
+	}
 	loadSQSQueues = func(ctx context.Context) ([]awsservice.SQSQueue, error) {
 		repo, err := resourceRepository(ctx)
 		if err != nil {
@@ -218,4 +225,49 @@ func newSQSQueuesCmd() *cobra.Command {
 		}
 		return items, err
 	})
+}
+
+func newSNSTopicsCmd() *cobra.Command {
+	var jsonOutput bool
+	cmd := &cobra.Command{
+		Use: "sns-topics", Short: "List SNS topics and subscriptions as JSON", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !jsonOutput {
+				return errors.New("this automation command supports JSON output only")
+			}
+			resources, warningErrors, err := loadSNSTopicResources(cmd.Context())
+			if err != nil {
+				return err
+			}
+			data := make([]snsTopicJSON, 0, len(resources))
+			for _, resource := range resources {
+				subscriptions := make([]snsSubscriptionJSON, 0, len(resource.Subscriptions))
+				for _, subscription := range resource.Subscriptions {
+					subscriptions = append(subscriptions, snsSubscriptionJSON{
+						ARN: subscription.ARN, Protocol: subscription.Protocol, Endpoint: subscription.Endpoint,
+						Owner: subscription.Owner, TopicARN: subscription.TopicARN, Status: subscription.Status(),
+						RawMessageDelivery: subscription.RawMessageDelivery, DeadLetterTargetARN: subscription.DeadLetterTargetARN(),
+						FilterPolicy: subscription.FilterPolicy, FilterPolicyScope: subscription.FilterPolicyScope,
+						AttributesKnown: subscription.AttributesKnown,
+					})
+				}
+				topic := resource.Topic
+				data = append(data, snsTopicJSON{
+					ARN: topic.ARN, Name: topic.Name, DisplayName: topic.DisplayName, Region: topic.Region, Type: topic.KindLabel(),
+					KMSMasterKeyID: topic.KMSMasterKeyID, DeliveryPolicy: topic.DeliveryPolicy, EffectiveDeliveryPolicy: topic.EffectiveDeliveryPolicy,
+					SubscriptionsConfirmed: topic.SubscriptionsConfirmed, SubscriptionsPending: topic.SubscriptionsPending,
+					SubscriptionsDeleted: topic.SubscriptionsDeleted, ContentBasedDeduplication: topic.ContentBasedDeduplication,
+					AttributesKnown: topic.AttributesKnown, Subscriptions: subscriptions,
+				})
+			}
+			warnings := make([]string, 0, len(warningErrors))
+			for _, warning := range warningErrors {
+				warnings = append(warnings, warning.Error())
+			}
+			return writeResourceJSON(cmd, data, len(warnings) == 0, warnings)
+		},
+	}
+	cmd.Annotations = map[string]string{annotationReadOnly: "true", annotationOutputVersion: "v1"}
+	cmd.Flags().BoolVar(&jsonOutput, "json", true, "Emit stable machine-readable JSON")
+	return cmd
 }
