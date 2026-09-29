@@ -42,12 +42,12 @@ var (
 		}
 		return repo.ListDBInstances(ctx)
 	}
-	loadCloudFormationStacks = func(ctx context.Context) ([]awsservice.CloudFormationStack, error) {
+	loadElastiCacheResources = func(ctx context.Context) ([]awsservice.ElastiCacheResource, error) {
 		repo, err := resourceRepository(ctx)
 		if err != nil {
 			return nil, err
 		}
-		return repo.ListCloudFormationStacks(ctx)
+		return repo.ListElastiCacheResources(ctx)
 	}
 	loadAlarms = func(ctx context.Context) ([]awsservice.CloudWatchAlarm, error) {
 		repo, err := resourceRepository(ctx)
@@ -76,6 +76,27 @@ var (
 			return nil, err
 		}
 		return repo.ListTargetGroupHealth(ctx, arn)
+	}
+	loadSNSTopicResources = func(ctx context.Context) ([]awsservice.SNSTopicResource, []error, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		return repo.ListSNSTopicResources(ctx)
+	}
+	loadCloudFormationStacks = func(ctx context.Context) ([]awsservice.CloudFormationStack, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return repo.ListCloudFormationStacks(ctx)
+	}
+	loadSQSQueues = func(ctx context.Context) ([]awsservice.SQSQueue, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return repo.ListQueues(ctx)
 	}
 )
 
@@ -123,20 +144,18 @@ func newRDSInstancesCmd() *cobra.Command {
 	})
 }
 
-func newCloudFormationStacksCmd() *cobra.Command {
-	return jsonResourceCommand("cloudformation-stacks", "List CloudFormation stacks in triage order as JSON", func(ctx context.Context) (any, error) {
-		stacks, err := loadCloudFormationStacks(ctx)
-		data := make([]cloudFormationStackJSON, 0, len(stacks))
-		for _, stack := range stacks {
-			data = append(data, cloudFormationStackJSON{
-				ID: stack.ID, Name: stack.Name, Description: stack.Description,
-				Status: stack.Status, StatusReason: stack.StatusReason, DriftStatus: stack.DriftStatus, Region: stack.Region,
-				LastDriftCheck: cloudFormationTimeJSON(stack.LastDriftCheck), CreatedAt: cloudFormationTimeJSON(stack.CreatedAt), UpdatedAt: cloudFormationTimeJSON(stack.UpdatedAt),
-				TerminationProtection: stack.TerminationProtection,
-				Parameters:            cloudFormationValuesJSON(stack.Parameters), Outputs: cloudFormationValuesJSON(stack.Outputs),
-			})
+func newElastiCacheResourcesCmd() *cobra.Command {
+	return jsonResourceCommand("elasticache-resources", "List ElastiCache replication groups and standalone clusters as JSON", func(ctx context.Context) (any, error) {
+		items, err := loadElastiCacheResources(ctx)
+		if items == nil {
+			items = []awsservice.ElastiCacheResource{}
 		}
-		return data, err
+		for i := range items {
+			if items[i].Nodes == nil {
+				items[i].Nodes = []awsservice.ElastiCacheNode{}
+			}
+		}
+		return items, err
 	})
 }
 
@@ -203,4 +222,76 @@ func newELBTargetHealthCmd() *cobra.Command {
 	cmd.Flags().StringVar(&arn, "load-balancer", "", "Load balancer ARN")
 	_ = cmd.MarkFlagRequired("load-balancer")
 	return cmd
+}
+
+func newSQSQueuesCmd() *cobra.Command {
+	return jsonResourceCommand("sqs-queues", "List SQS queues by backlog as JSON", func(ctx context.Context) (any, error) {
+		items, err := loadSQSQueues(ctx)
+		if items == nil {
+			items = []awsservice.SQSQueue{}
+		}
+		return items, err
+	})
+}
+
+func newSNSTopicsCmd() *cobra.Command {
+	var jsonOutput bool
+	cmd := &cobra.Command{
+		Use: "sns-topics", Short: "List SNS topics and subscriptions as JSON", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !jsonOutput {
+				return errors.New("this automation command supports JSON output only")
+			}
+			resources, warningErrors, err := loadSNSTopicResources(cmd.Context())
+			if err != nil {
+				return err
+			}
+			data := make([]snsTopicJSON, 0, len(resources))
+			for _, resource := range resources {
+				subscriptions := make([]snsSubscriptionJSON, 0, len(resource.Subscriptions))
+				for _, subscription := range resource.Subscriptions {
+					subscriptions = append(subscriptions, snsSubscriptionJSON{
+						ARN: subscription.ARN, Protocol: subscription.Protocol, Endpoint: subscription.Endpoint,
+						Owner: subscription.Owner, TopicARN: subscription.TopicARN, Status: subscription.Status(),
+						RawMessageDelivery: subscription.RawMessageDelivery, DeadLetterTargetARN: subscription.DeadLetterTargetARN(),
+						FilterPolicy: subscription.FilterPolicy, FilterPolicyScope: subscription.FilterPolicyScope,
+						AttributesKnown: subscription.AttributesKnown,
+					})
+				}
+				topic := resource.Topic
+				data = append(data, snsTopicJSON{
+					ARN: topic.ARN, Name: topic.Name, DisplayName: topic.DisplayName, Region: topic.Region, Type: topic.KindLabel(),
+					KMSMasterKeyID: topic.KMSMasterKeyID, DeliveryPolicy: topic.DeliveryPolicy, EffectiveDeliveryPolicy: topic.EffectiveDeliveryPolicy,
+					SubscriptionsConfirmed: topic.SubscriptionsConfirmed, SubscriptionsPending: topic.SubscriptionsPending,
+					SubscriptionsDeleted: topic.SubscriptionsDeleted, ContentBasedDeduplication: topic.ContentBasedDeduplication,
+					AttributesKnown: topic.AttributesKnown, Subscriptions: subscriptions,
+				})
+			}
+			warnings := make([]string, 0, len(warningErrors))
+			for _, warning := range warningErrors {
+				warnings = append(warnings, warning.Error())
+			}
+			return writeResourceJSON(cmd, data, len(warnings) == 0, warnings)
+		},
+	}
+	cmd.Annotations = map[string]string{annotationReadOnly: "true", annotationOutputVersion: "v1"}
+	cmd.Flags().BoolVar(&jsonOutput, "json", true, "Emit stable machine-readable JSON")
+	return cmd
+}
+
+func newCloudFormationStacksCmd() *cobra.Command {
+	return jsonResourceCommand("cloudformation-stacks", "List CloudFormation stacks in triage order as JSON", func(ctx context.Context) (any, error) {
+		stacks, err := loadCloudFormationStacks(ctx)
+		data := make([]cloudFormationStackJSON, 0, len(stacks))
+		for _, stack := range stacks {
+			data = append(data, cloudFormationStackJSON{
+				ID: stack.ID, Name: stack.Name, Description: stack.Description,
+				Status: stack.Status, StatusReason: stack.StatusReason, DriftStatus: stack.DriftStatus, Region: stack.Region,
+				LastDriftCheck: cloudFormationTimeJSON(stack.LastDriftCheck), CreatedAt: cloudFormationTimeJSON(stack.CreatedAt), UpdatedAt: cloudFormationTimeJSON(stack.UpdatedAt),
+				TerminationProtection: stack.TerminationProtection,
+				Parameters:            cloudFormationValuesJSON(stack.Parameters), Outputs: cloudFormationValuesJSON(stack.Outputs),
+			})
+		}
+		return data, err
+	})
 }

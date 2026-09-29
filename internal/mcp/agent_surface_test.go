@@ -28,8 +28,11 @@ var agentSurfaceByFeature = map[domain.FeatureKind]agentSurface{
 	domain.FeatureCloudWatchAlarms:      {command: "alarms", tool: "list_cloudwatch_alarms"},
 	domain.FeatureEC2InstanceBrowser:    {command: "ec2-instances", tool: "list_ec2_instances"},
 	domain.FeatureECSExec:               {command: "ecs-rollout", tool: "get_ecs_service_rollout", arguments: json.RawMessage(`{"cluster":"cluster","service":"service"}`)},
+	domain.FeatureElastiCacheBrowser:    {command: "elasticache-resources", tool: "list_elasticache_resources"},
 	domain.FeatureELBBrowser:            {command: "elb-target-health", tool: "get_elb_target_health", arguments: json.RawMessage(`{"load_balancer":"load-balancer"}`)},
 	domain.FeatureRDSBrowser:            {command: "rds-instances", tool: "list_rds_instances"},
+	domain.FeatureSQSBrowser:            {command: "sqs-queues", tool: "list_sqs_queues"},
+	domain.FeatureSNSBrowser:            {command: "sns-topics", tool: "list_sns_topics"},
 }
 
 var agentSurfaceExempt = map[domain.FeatureKind]string{
@@ -43,7 +46,6 @@ var agentSurfaceExempt = map[domain.FeatureKind]string{
 	domain.FeatureECRLoginHelper:        "the credential-bearing shell handoff is not an agent resource query",
 	domain.FeatureECRRepositoryBrowser:  "no curated repository and image query is defined yet",
 	domain.FeatureEKSBrowser:            "no curated cluster and node-group query is defined yet",
-	domain.FeatureElastiCacheBrowser:    "the joined replication-group and node view has no agent contract yet",
 	domain.FeatureEventBridgeRules:      "rule mutations are confirmation-gated and no separate read-only contract exists yet",
 	domain.FeatureFISTemplateBrowser:    "no curated experiment-template and history query is defined yet",
 	domain.FeatureIAMUsersBrowser:       "no curated IAM user posture query is defined yet",
@@ -56,8 +58,6 @@ var agentSurfaceExempt = map[domain.FeatureKind]string{
 	domain.FeatureS3Browser:             "object browsing needs an explicitly bounded pagination contract",
 	domain.FeatureSecurityGroupBrowser:  "no curated security-group rule query is defined yet",
 	domain.FeatureSecretsBrowser:        "secret values require operator-controlled reveal and copy handling",
-	domain.FeatureSNSBrowser:            "the joined topic and subscription view has no agent contract yet",
-	domain.FeatureSQSBrowser:            "queue mutations are confirmation-gated and no separate read-only contract exists yet",
 	domain.FeatureSSMParameterBrowser:   "parameter values require operator-controlled reveal and copy handling",
 	domain.FeatureSSMSession:            "starts an interactive shell session instead of returning resource data",
 	domain.FeatureStepFunctionsBrowser:  "the failure-first execution view has no curated agent contract yet",
@@ -157,6 +157,24 @@ func TestCatalogFeaturesHaveAgentSurfaceDecision(t *testing.T) {
 				t.Errorf("resource MCP tool %q is not callable: %v", surface.tool, err)
 			} else if len(args) < 2 || args[0] != "resources" || args[1] != surface.command {
 				t.Errorf("resource MCP tool %q dispatches to %q, want resources %s", surface.tool, args, surface.command)
+			} else {
+				root := cli.NewRootCmd()
+				command, remaining, err := root.Find(args)
+				if err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if !command.Runnable() {
+					t.Errorf("resource MCP tool %q dispatches to non-runnable command %q", surface.tool, command.CommandPath())
+				} else if err := command.ParseFlags(remaining); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateArgs(command.Flags().Args()); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateRequiredFlags(); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if err := command.ValidateFlagGroups(); err != nil {
+					t.Errorf("resource MCP tool %q dispatches invalid CLI arguments %q: %v", surface.tool, args, err)
+				} else if jsonFlag := command.Flags().Lookup("json"); jsonFlag == nil || !jsonFlag.Changed || jsonFlag.Value.String() != "true" {
+					t.Errorf("resource MCP tool %q must dispatch with --json", surface.tool)
+				}
 			}
 		}
 	}
