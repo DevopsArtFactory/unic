@@ -43,8 +43,11 @@ This is the closest structure to a "harness-like" doc hub in this repository: on
 
 ```bash
 brew tap DevopsArtFactory/unic
+brew trust DevopsArtFactory/unic   # Homebrew 7.0+ only
 brew install unic
 ```
+
+Homebrew 7.0 refuses to load formulae from third-party taps until the tap is trusted, so `brew install unic` fails with `Refusing to load formula ... from untrusted tap` without the middle step. Trust is recorded per tap, so the step is not repeated for later installs from the same tap. On Homebrew 6.x and earlier the `trust` subcommand does not exist — skip that line, or `brew update` first if you want the newer behavior.
 
 Homebrew and release archives install both the `unic` TUI and the `unic-mcp` stdio server.
 
