@@ -42,6 +42,13 @@ var (
 		}
 		return repo.ListDBInstances(ctx)
 	}
+	loadElastiCacheResources = func(ctx context.Context) ([]awsservice.ElastiCacheResource, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return repo.ListElastiCacheResources(ctx)
+	}
 	loadAlarms = func(ctx context.Context) ([]awsservice.CloudWatchAlarm, error) {
 		repo, err := resourceRepository(ctx)
 		if err != nil {
@@ -76,6 +83,13 @@ var (
 			return nil, nil, err
 		}
 		return repo.ListSNSTopicResources(ctx)
+	}
+	loadSQSQueues = func(ctx context.Context) ([]awsservice.SQSQueue, error) {
+		repo, err := resourceRepository(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return repo.ListQueues(ctx)
 	}
 )
 
@@ -118,6 +132,21 @@ func newRDSInstancesCmd() *cobra.Command {
 		items, err := loadRDSInstances(ctx)
 		if items == nil {
 			items = []awsservice.RDSInstance{}
+		}
+		return items, err
+	})
+}
+
+func newElastiCacheResourcesCmd() *cobra.Command {
+	return jsonResourceCommand("elasticache-resources", "List ElastiCache replication groups and standalone clusters as JSON", func(ctx context.Context) (any, error) {
+		items, err := loadElastiCacheResources(ctx)
+		if items == nil {
+			items = []awsservice.ElastiCacheResource{}
+		}
+		for i := range items {
+			if items[i].Nodes == nil {
+				items[i].Nodes = []awsservice.ElastiCacheNode{}
+			}
 		}
 		return items, err
 	})
@@ -186,6 +215,16 @@ func newELBTargetHealthCmd() *cobra.Command {
 	cmd.Flags().StringVar(&arn, "load-balancer", "", "Load balancer ARN")
 	_ = cmd.MarkFlagRequired("load-balancer")
 	return cmd
+}
+
+func newSQSQueuesCmd() *cobra.Command {
+	return jsonResourceCommand("sqs-queues", "List SQS queues by backlog as JSON", func(ctx context.Context) (any, error) {
+		items, err := loadSQSQueues(ctx)
+		if items == nil {
+			items = []awsservice.SQSQueue{}
+		}
+		return items, err
+	})
 }
 
 func newSNSTopicsCmd() *cobra.Command {

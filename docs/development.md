@@ -25,12 +25,16 @@ Use the registered Cobra command tree and domain catalog as the source of truth 
 ```bash
 unic capabilities --json
 unic schema context sync --json
+unic schema resources elasticache-resources --json
+
 unic schema resources sns-topics --json
 ```
 
 Discovery output is deterministic, versioned JSON. New executable commands should set the `unic.dev/read-only`, `unic.dev/destructive`, and `unic.dev/output-version` annotations when their defaults do not describe the command accurately.
 
 Read-only automation commands live under `internal/cli/`; keep their `--json` output versioned and deterministic, write only JSON to stdout, and cover human and JSON output paths with CLI tests.
+
+`unic resources sqs-queues --json` reuses the backlog ordering and DLQ relationships from `AwsRepository.ListQueues`. Keep that CLI/MCP contract read-only; SQS purge and redrive remain confirmation-gated TUI mutations.
 
 `unic resources sns-topics --json` composes the existing topic and per-topic subscription reads. Keep partial lookup failures in the envelope's `warnings` array and keep the contract read-only; publishing and subscription changes remain outside the agent surface.
 
