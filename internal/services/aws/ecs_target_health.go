@@ -55,6 +55,9 @@ func (r *AwsRepository) ListECSServiceTargetHealth(ctx context.Context, clusterA
 			item.Warning = err.Error()
 		}
 		results = append(results, item)
+		if err := ctx.Err(); err != nil {
+			return results, err
+		}
 	}
 	return results, nil
 }
