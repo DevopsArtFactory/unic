@@ -231,3 +231,35 @@ func TestECSTargetHealthMissingSelectionAndObservation(t *testing.T) {
 		t.Fatal("zero observation timestamp rendered")
 	}
 }
+
+func TestECSTargetHealthSameContextSelectionPreservesLookup(t *testing.T) {
+	original := newECSTargetHealthRepository
+	t.Cleanup(func() { newECSTargetHealthRepository = original })
+	calls := 0
+	newECSTargetHealthRepository = func(ctx context.Context, _ *config.Config) (*awsservice.AwsRepository, error) {
+		calls++
+		return &awsservice.AwsRepository{ECSClient: ecsHealthClient{t: t}}, nil
+	}
+	m := New(testConfig(), "", "dev")
+	m.cfg.ContextName = "dev"
+	m.screen = screenECSServiceDetail
+	m.ecs.selectedCluster = &awsservice.ECSCluster{ARN: "cluster"}
+	m.ecs.selectedDetail = &awsservice.ECSServiceDetail{ARN: "service"}
+	updated, lookup := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	m = updated.(Model)
+	generation := m.commands.CurrentGen()
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("C")})
+	m = updated.(Model)
+	updated, _ = m.Update(contextsLoadedMsg{contexts: []config.ContextInfo{{Name: "dev", Current: true}}})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd != nil || m.screen != screenECSTargetHealth || !m.ecs.healthLoading || m.commands.CurrentGen() != generation {
+		t.Fatal("same-context selection superseded the pending target-health lookup")
+	}
+	updated, _ = m.Update(lookup())
+	m = updated.(Model)
+	if calls != 1 || m.ecs.healthLoading || m.ecs.healthError != nil || m.screen != screenECSTargetHealth {
+		t.Fatalf("preserved lookup did not complete: calls=%d state=%+v", calls, m.ecs)
+	}
+}
