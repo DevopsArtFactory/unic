@@ -161,7 +161,7 @@ def main():
         env = capture_environment(tmp, frames_path)
         subprocess.run(["go", "test", "-tags=productdemo", "./internal/app", "-run", "^TestProductDemo$", "-count=1"],
                        cwd=ROOT, env=env, check=True)
-        frames = json.loads(frames_path.read_text())
+        frames = json.loads(frames_path.read_text(encoding="utf-8"))
         validate_duration(frames)
         poster = select_poster(frames)
         timeline = []
@@ -172,7 +172,7 @@ def main():
                 image.save(out / "ecs-rollout.png")
             timeline.extend([f"file 'frame-{i:02d}.png'", f"duration {frame['seconds']}"])
         timeline.append(f"file 'frame-{len(frames) - 1:02d}.png'")
-        (tmp / "timeline.txt").write_text("\n".join(timeline) + "\n")
+        (tmp / "timeline.txt").write_text("\n".join(timeline) + "\n", encoding="utf-8")
         video = out / "ecs-rollout.mp4"
         subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(tmp / "timeline.txt"),
                         "-t", "30", "-vf", "fps=30", "-c:v", "libx264", "-preset", "slow", "-crf", "18",
