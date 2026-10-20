@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -55,6 +55,15 @@ class RenderTests(unittest.TestCase):
         for codes in ("38", "48", "38;5", "48;2;1;2", "38;5;256", "48;2;256;0;0", "38;1", "48;3"):
             with self.subTest(codes=codes), self.assertRaises(ValueError):
                 render.draw_terminal(draw, f"\x1b[{codes}mX", font, 0, 0)
+
+    def test_bright_sgr_colors(self):
+        font = ImageFont.load_default()
+        for index in range(8):
+            with self.subTest(index=index):
+                draw = Mock()
+                render.draw_terminal(draw, f"\x1b[{90 + index};{100 + index}mX", font, 0, 0)
+                self.assertEqual(draw.text.call_args.kwargs["fill"], render.BASE[8 + index])
+                self.assertEqual(draw.rectangle.call_args.kwargs["fill"], render.BASE[8 + index])
 
     def test_duration_validation(self):
         render.validate_duration([{"seconds": 4}, {"seconds": 26}])

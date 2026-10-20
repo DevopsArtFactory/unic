@@ -71,8 +71,12 @@ def draw_terminal(draw, text, font, x, y):
                     bg = None
                 elif 30 <= code <= 37:
                     fg = BASE[code - 30]
+                elif 90 <= code <= 97:
+                    fg = BASE[code - 90 + 8]
                 elif 40 <= code <= 47:
                     bg = BASE[code - 40]
+                elif 100 <= code <= 107:
+                    bg = BASE[code - 100 + 8]
                 elif code in (38, 48):
                     if i + 1 >= len(codes):
                         raise ValueError("truncated SGR color sequence")
