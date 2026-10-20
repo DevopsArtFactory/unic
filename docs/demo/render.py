@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -170,17 +171,19 @@ def main():
             image = render(frame, str(font))
             image.save(tmp / f"frame-{i:02d}.png")
             if frame is poster:
-                image.save(out / "ecs-rollout.png")
+                image.save(tmp / "ecs-rollout.png")
             timeline.extend([f"file 'frame-{i:02d}.png'", f"duration {frame['seconds']}"])
         timeline.append(f"file 'frame-{len(frames) - 1:02d}.png'")
         (tmp / "timeline.txt").write_text("\n".join(timeline) + "\n", encoding="utf-8")
-        video = out / "ecs-rollout.mp4"
+        video = tmp / "ecs-rollout.mp4"
         subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(tmp / "timeline.txt"),
                         "-t", "30", "-vf", "fps=30", "-c:v", "libx264", "-preset", "slow", "-crf", "18",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(video)], check=True)
         subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", str(video), "-filter_complex",
                         "fps=10,scale=1200:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=none",
-                        "-loop", "0", str(out / "ecs-rollout.gif")], check=True)
+                        "-loop", "0", str(tmp / "ecs-rollout.gif")], check=True)
+        for name in ("ecs-rollout.mp4", "ecs-rollout.gif", "ecs-rollout.png"):
+            shutil.copyfile(tmp / name, out / name)
         print(f"Rendered 30-second MP4, GIF and PNG in {out}")
 
 
