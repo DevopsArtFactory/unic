@@ -18,6 +18,26 @@ Local builds place both executables in the repository root. Follow the [source i
 
 For reproducible product media, see the [ECS walkthrough capture](demo/README.md). It exercises production TUI views with test-only synthetic data; its tagged capture test is not part of released binaries.
 
+## Offline ECS demo
+
+Run `go run ./cmd/unic demo` (or `./unic demo` after `make build`) without AWS
+setup. For repeatable screenshots or a short terminal recording:
+
+1. Use a terminal at least 100 columns by 30 rows; set `TZ=UTC` for consistent times.
+2. Start `unic demo`; the status bar identifies the synthetic offline context.
+3. Press Enter on `checkout-demo`. Observe desired:2/running:0 and the FAILED deployment.
+4. Press Page Down to read the timestamped service events: the image manifest for
+   `demo-42` is missing. The proposed next check is to verify that image tag.
+5. Press `?` for the guide, Esc to close it, Esc to return, then `q` to quit.
+
+The fixture is entirely synthetic and uses a fixed timestamp. Demo keys are
+Enter, arrows/j/k, Page Up/Down, `r` (reset scroll), Esc/`H` (service), `?`, and
+`q`/Ctrl+C. Live context, region, settings, palette, saved-view, watch, task/exec,
+and mutation shortcuts are unavailable. Logs, target health, and CloudTrail
+navigation are outside this initial scenario. To browse real AWS resources,
+exit and launch `unic` separately. No config, credentials, logger, update check,
+AWS client, or external process is initialized by the demo.
+
 ## GitHub Actions
 
 Pin external GitHub Actions in `.github/workflows/` to full commit SHAs and keep the corresponding release version in a comment. When updating an action, verify the SHA in its official upstream repository, update every reference to that action, and update the version comments together. Run `make test` and `make build` before opening the PR.

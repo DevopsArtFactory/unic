@@ -21,7 +21,13 @@ cmd/unic/main.go
   -> Bubble Tea event loop
 ```
 
-If a CLI subcommand is selected, the TUI is skipped.
+The `unic demo` subcommand starts a separate offline Bubble Tea model in
+`internal/app/demo.go`. It reuses the ECS rollout renderer with fixed synthetic
+data and a restricted keyboard dispatcher, without calling `app.New`, loading
+configuration, creating AWS clients, or enabling live actions. Its service picker,
+rollout, and help screens stay inside the demo; Esc returns and q exits.
+
+Other CLI subcommands skip the full application TUI.
 If no subcommand is selected, `unic` starts the full-screen TUI.
 
 ## Main Modules

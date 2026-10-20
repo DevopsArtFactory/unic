@@ -7,6 +7,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	awsservice "unic/internal/services/aws"
 )
@@ -306,33 +308,15 @@ func (em ecsModel) viewServiceList(m Model) string {
 
 // --- Service Detail ---
 
-func (em *ecsModel) updateServiceDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	lines := em.serviceDetailLines()
-	visibleLines := max(m.height-9, 5)
-	maxOffset := max(len(lines)-visibleLines, 0)
+const ecsServiceDetailHelp = "↑/↓: scroll • pgup/pgdn: page • W: watch • I: interval • enter: tasks • r: refresh • esc: back • H: home"
 
+func (em *ecsModel) updateServiceDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.stopWatch()
 		m.screen = screenECSServiceList
-	case "up", "k":
-		if em.detailScroll > 0 {
-			em.detailScroll--
-		}
-	case "down", "j":
-		if em.detailScroll < maxOffset {
-			em.detailScroll++
-		}
-	case "pgup":
-		em.detailScroll -= visibleLines
-		if em.detailScroll < 0 {
-			em.detailScroll = 0
-		}
-	case "pgdown":
-		em.detailScroll += visibleLines
-		if em.detailScroll > maxOffset {
-			em.detailScroll = maxOffset
-		}
+	case "up", "k", "down", "j", "pgup", "pgdown":
+		em.scrollServiceDetail(*m, msg.String(), ecsServiceDetailHelp)
 	case "r":
 		return m.startLoading(em.loadServiceDetail(*m))
 	case "enter":
@@ -341,7 +325,46 @@ func (em *ecsModel) updateServiceDetail(m *Model, msg tea.KeyMsg) (tea.Model, te
 	return *m, nil
 }
 
+// scrollServiceDetail only changes the viewport; it cannot load AWS data or
+// start a command, so the offline demo can share live scrolling safely.
+func (em *ecsModel) scrollServiceDetail(m Model, key, help string) {
+	lines, visibleLines := em.serviceDetailViewport(m, help)
+	maxOffset := max(len(lines)-visibleLines, 0)
+	em.detailScroll = min(max(em.detailScroll, 0), maxOffset)
+	switch key {
+	case "up", "k":
+		em.detailScroll--
+	case "down", "j":
+		em.detailScroll++
+	case "pgup":
+		em.detailScroll -= visibleLines
+	case "pgdown":
+		em.detailScroll += visibleLines
+	}
+	em.detailScroll = min(max(em.detailScroll, 0), maxOffset)
+}
+
+func (em ecsModel) serviceDetailViewport(m Model, help string) ([]string, int) {
+	lines := em.serviceDetailLines()
+	if m.width > 0 {
+		width := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize(), 1)
+		var wrapped []string
+		for _, line := range lines {
+			wrapped = append(wrapped, strings.Split(ansi.Hardwrap(line, width, true), "\n")...)
+		}
+		lines = wrapped
+	}
+	// Header (4), panel border (2), counter and spacer (2), footer gap (1),
+	// plus the help bar, which can occupy more than one physical line.
+	visibleLines := max(m.height-9-lipgloss.Height(m.renderHelpBar(help)), 5)
+	return lines, visibleLines
+}
+
 func (em ecsModel) viewServiceDetail(m Model) string {
+	return em.viewServiceDetailWithHelp(m, ecsServiceDetailHelp)
+}
+
+func (em ecsModel) viewServiceDetailWithHelp(m Model, help string) string {
 	if em.selectedDetail == nil {
 		return ""
 	}
@@ -355,12 +378,11 @@ func (em ecsModel) viewServiceDetail(m Model) string {
 	b.WriteString(m.watchBadge())
 	b.WriteString("\n\n")
 
-	lines := em.serviceDetailLines()
+	lines, visibleLines := em.serviceDetailViewport(m, help)
 	if len(lines) == 0 {
 		panel.WriteString(dimStyle.Render("  No rollout detail available"))
 		panel.WriteString("\n")
 	} else {
-		visibleLines := max(m.height-9, 5)
 		start := em.detailScroll
 		maxOffset := max(len(lines)-visibleLines, 0)
 		if start > maxOffset {
@@ -380,7 +402,7 @@ func (em ecsModel) viewServiceDetail(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • W: watch • I: interval • enter: tasks • r: refresh • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(help))
 	return b.String()
 }
 
