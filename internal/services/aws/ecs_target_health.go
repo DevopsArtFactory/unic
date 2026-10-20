@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -44,7 +45,12 @@ func (r *AwsRepository) ListECSServiceTargetHealth(ctx context.Context, clusterA
 			continue
 		}
 		seen[arn] = true
-		item := ECSServiceTargetHealth{Group: ELBTargetGroupHealth{ARN: arn, Name: arn}}
+		name := arn
+		parts := strings.Split(arn, "/")
+		if len(parts) == 3 && strings.HasSuffix(parts[0], ":targetgroup") && parts[1] != "" {
+			name = parts[1]
+		}
+		item := ECSServiceTargetHealth{Group: ELBTargetGroupHealth{ARN: arn, Name: name}}
 		if err := r.loadTargetHealth(ctx, &item.Group); err != nil {
 			item.Warning = err.Error()
 		}

@@ -14,6 +14,7 @@ import (
 )
 
 func TestECSServiceTargetHealthAssociationsAndPartialFailure(t *testing.T) {
+	deniedARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/denied/abc123"
 	calls := []string{}
 	repo := &AwsRepository{
 		ECSClient: &mockECSClient{describeServicesFunc: func(_ context.Context, in *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
@@ -21,13 +22,13 @@ func TestECSServiceTargetHealthAssociationsAndPartialFailure(t *testing.T) {
 				t.Fatalf("wrong ECS scope: %+v", in)
 			}
 			return &ecs.DescribeServicesOutput{Services: []ecstypes.Service{{ServiceArn: awssdk.String("service"), LoadBalancers: []ecstypes.LoadBalancer{
-				{TargetGroupArn: awssdk.String("good")}, {TargetGroupArn: awssdk.String("denied")}, {TargetGroupArn: awssdk.String("good")}, {TargetGroupArn: awssdk.String("empty")}, {LoadBalancerName: awssdk.String("classic")},
+				{TargetGroupArn: awssdk.String("good")}, {TargetGroupArn: awssdk.String(deniedARN)}, {TargetGroupArn: awssdk.String("good")}, {TargetGroupArn: awssdk.String("empty")}, {LoadBalancerName: awssdk.String("classic")},
 			}}}}, nil
 		}},
 		ELBv2Client: &mockELBv2Client{describeTargetHealthFunc: func(_ context.Context, in *elasticloadbalancingv2.DescribeTargetHealthInput, _ ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
 			arn := awssdk.ToString(in.TargetGroupArn)
 			calls = append(calls, arn)
-			if arn == "denied" {
+			if arn == deniedARN {
 				return nil, errors.New("AccessDenied")
 			}
 			if arn == "empty" {
@@ -40,8 +41,11 @@ func TestECSServiceTargetHealthAssociationsAndPartialFailure(t *testing.T) {
 		}},
 	}
 	results, err := repo.ListECSServiceTargetHealth(context.Background(), "cluster", "service")
-	if err != nil || len(results) != 4 || strings.Join(calls, ",") != "good,denied,empty" {
+	if err != nil || len(results) != 4 || strings.Join(calls, ",") != "good,"+deniedARN+",empty" {
 		t.Fatalf("unexpected results=%+v err=%v calls=%v", results, err, calls)
+	}
+	if results[1].Group.ARN != deniedARN || results[1].Group.Name != "denied" || strings.Contains(results[1].Warning, deniedARN) || !strings.Contains(results[1].Warning, "for denied:") {
+		t.Fatalf("expected short failure label with original ARN retained: %+v", results[1])
 	}
 	good := results[0].Group
 	if good.HealthyCount != 1 || good.UnhealthyCount != 1 || good.Targets[0].ID != "bad" || good.Targets[0].Reason != "Target.Timeout" || good.Targets[0].Description != "timed out" {
