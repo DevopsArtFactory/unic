@@ -85,8 +85,10 @@ class RenderTests(unittest.TestCase):
                   "AWS_SECRET_ACCESS_KEY": "synthetic-secret", "AWS_SESSION_TOKEN": "synthetic-token",
                   "AWS_PROFILE": "production", "AWS_CONFIG_FILE": "/real/config",
                   "AWS_SHARED_CREDENTIALS_FILE": "/real/credentials",
+                  "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE": "/synthetic/container-token",
                   "AWS_CONTAINER_CREDENTIALS_FULL_URI": "http://example.invalid",
                   "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/synthetic/credentials",
+                  "AWS_WEB_IDENTITY_TOKEN_FILE": "/synthetic/web-identity-token",
                   "UNIC_CONTEXT": "production", "UNIC_DEMO_FRAMES": "/stale/frames.json"}
         with patch.dict(os.environ, caller, clear=True):
             env = render.capture_environment(Path("/tmp/demo"), Path("/tmp/demo/frames.json"))
