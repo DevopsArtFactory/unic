@@ -21,7 +21,12 @@ cmd/unic/main.go
   -> Bubble Tea 이벤트 루프
 ```
 
-서브커맨드가 선택되면 TUI는 실행하지 않는다.
+`unic demo` 서브커맨드는 `internal/app/demo.go`의 독립적인 오프라인 Bubble Tea
+모델을 실행한다. 고정된 합성 데이터와 ECS rollout 렌더러를 재사용하며,
+`app.New`, 설정 로드, AWS 클라이언트 생성 및 실제 작업 실행 경로에 진입하지 않는다.
+서비스 선택, rollout, 도움말 화면 안에서만 이동하며 Esc는 뒤로, q는 종료한다.
+
+나머지 서브커맨드는 전체 애플리케이션 TUI를 실행하지 않는다.
 서브커맨드가 없으면 `unic`은 전체 화면 TUI로 진입한다.
 
 ## 주요 모듈

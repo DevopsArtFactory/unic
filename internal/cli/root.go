@@ -28,6 +28,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose debug logging")
 	cmd.PersistentFlags().StringVar(&checklist, "checklist", "", "Path to a checklist YAML file for Checklist Inspector")
 
+	cmd.AddCommand(newDemoCmd())
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newContextCmd())
 	cmd.AddCommand(newECRCmd())
