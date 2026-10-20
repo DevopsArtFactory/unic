@@ -30,13 +30,15 @@ python3 -m venv /tmp/unic-demo-venv
 
 `imageio-ffmpeg` supplies the encoder on supported platforms; alternatively point `IMAGEIO_FFMPEG_EXE` to an installed FFmpeg executable. Pass `--font /path/to/monospace.ttf` if automatic font selection fails. Use `--output-dir /tmp/unic-demo-preview` to preview without replacing checked-in media. The default output intentionally regenerates the three `docs/assets/ecs-rollout.*` files.
 
-The script runs only `TestProductDemo` with the `productdemo` build tag, writes frames to a temporary directory, renders PNGs, and encodes a 1600×1200 H.264 MP4 plus a smaller GIF. The tagged test is not shipped in either binary. It never calls `Init` or runs returned commands, so fixture navigation cannot start AWS queries. It asserts the filter result, detail navigation, expected evidence, terminal dimensions, and 30-second duration. Times render in UTC; font rasterization/encoder differences can change media bytes between platforms.
+The script runs only `TestProductDemo` with the `productdemo` build tag, writes frames to a temporary directory, renders PNGs, and encodes a 1600×1200 H.264 MP4 plus a smaller GIF. It strips inherited AWS environment variables and points AWS config/credential paths at the temporary directory. The tagged test is not shipped in either binary. It never calls `Init` or runs returned commands, so fixture navigation cannot start AWS queries. It asserts the filter result, detail navigation, expected evidence, terminal dimensions, and 30-second duration. Times render in UTC; font rasterization/encoder differences can change media bytes between platforms.
 
 The source is [product_demo_test.go](../../internal/app/product_demo_test.go) and [render.py](render.py). The existing tmux harness under `.agents/skills/unic-ux-review/scripts/` can capture an actual local terminal when tmux is available; this fixture renderer also works without it.
 
 After changing the fixture or rendering code, regenerate and inspect the video from start to finish, confirm captions match the screen, check small-size legibility, and run:
 
 ```bash
+/tmp/unic-demo-venv/bin/python -m unittest discover -s docs/demo -p 'test_*.py'
+/tmp/unic-demo-venv/bin/python -O -m unittest discover -s docs/demo -p 'test_*.py'
 make test
 make build
 ```

@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -24,6 +25,8 @@ BASE = ["#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#0080
 
 
 def indexed_color(n):
+    if not 0 <= n <= 255:
+        raise ValueError("SGR color index must be between 0 and 255")
     if n < 16:
         return BASE[n]
     if n >= 232:
@@ -70,11 +73,19 @@ def draw_terminal(draw, text, font, x, y):
                 elif 40 <= code <= 47:
                     bg = BASE[code - 40]
                 elif code in (38, 48):
+                    if i + 1 >= len(codes):
+                        raise ValueError("truncated SGR color sequence")
                     if codes[i + 1] == 5:
+                        if i + 2 >= len(codes):
+                            raise ValueError("truncated SGR indexed color")
                         color = indexed_color(codes[i + 2])
                         i += 2
                     elif codes[i + 1] == 2:
+                        if i + 4 >= len(codes):
+                            raise ValueError("truncated SGR RGB color")
                         color = tuple(codes[i + 2:i + 5])
+                        if any(channel > 255 for channel in color):
+                            raise ValueError("SGR RGB channels must be between 0 and 255")
                         i += 4
                     else:
                         raise ValueError("unsupported SGR color")
@@ -108,6 +119,22 @@ def render(frame, font_path):
     return image
 
 
+def capture_environment(tmp, frames_path):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
+    env.update(UNIC_DEMO_FRAMES=str(frames_path), TZ="UTC",
+               AWS_EC2_METADATA_DISABLED="true", XDG_CONFIG_HOME=str(tmp / "config"),
+               AWS_CONFIG_FILE=str(tmp / "aws-config"),
+               AWS_SHARED_CREDENTIALS_FILE=str(tmp / "aws-credentials"))
+    return env
+
+
+def validate_duration(frames):
+    durations = [f["seconds"] for f in frames]
+    total = sum(durations)
+    if any(not math.isfinite(d) or d <= 0 for d in durations) or abs(total - 30) >= 0.01:
+        raise ValueError(f"expected 30 seconds of positive finite frames, got {total}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "docs/assets")
@@ -124,12 +151,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix="unic-product-demo-") as temporary:
         tmp = Path(temporary)
         frames_path = tmp / "frames.json"
-        env = dict(os.environ, UNIC_DEMO_FRAMES=str(frames_path), TZ="UTC",
-                   AWS_EC2_METADATA_DISABLED="true", XDG_CONFIG_HOME=str(tmp / "config"))
+        env = capture_environment(tmp, frames_path)
         subprocess.run(["go", "test", "-tags=productdemo", "./internal/app", "-run", "^TestProductDemo$", "-count=1"],
                        cwd=ROOT, env=env, check=True)
         frames = json.loads(frames_path.read_text())
-        assert abs(sum(f["seconds"] for f in frames) - 30) < 0.01
+        validate_duration(frames)
         timeline = []
         for i, frame in enumerate(frames):
             image = render(frame, str(font))
