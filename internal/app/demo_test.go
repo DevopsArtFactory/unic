@@ -9,13 +9,22 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func requireDemoModel(t *testing.T, model tea.Model) demoModel {
+	t.Helper()
+	d, ok := model.(demoModel)
+	if !ok {
+		t.Fatalf("unexpected demo model type %T", model)
+	}
+	return d
+}
+
 func demoKey(t *testing.T, d demoModel, key tea.KeyMsg) demoModel {
 	t.Helper()
 	updated, cmd := d.Update(key)
 	if cmd != nil {
 		t.Fatal("demo navigation returned an asynchronous command")
 	}
-	return updated.(demoModel)
+	return requireDemoModel(t, updated)
 }
 
 func TestDemoOfflineNavigationAndIsolation(t *testing.T) {
@@ -36,7 +45,7 @@ func TestDemoOfflineNavigationAndIsolation(t *testing.T) {
 	}
 	t.Setenv("XDG_CONFIG_HOME", home)
 
-	d := NewDemo().(demoModel)
+	d := requireDemoModel(t, NewDemo())
 	if d.Init() != nil || d.shell.awsRepo != nil || d.shell.commands != nil || d.shell.configPath != "" {
 		t.Fatal("demo initialized live application dependencies")
 	}
@@ -77,7 +86,13 @@ func TestDemoOfflineNavigationAndIsolation(t *testing.T) {
 	if d.shell.ecs.detailScroll != 0 {
 		t.Fatal("restart did not reset scroll")
 	}
+	d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyDown})
+	scroll := d.shell.ecs.detailScroll
 	d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyEsc})
+	d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	if d.shell.ecs.detailScroll != scroll {
+		t.Fatal("restart key changed rollout state from service picker")
+	}
 	if d.shell.screen != screenECSServiceList {
 		t.Fatal("Esc did not return to service picker")
 	}
@@ -93,12 +108,12 @@ func TestDemoOfflineNavigationAndIsolation(t *testing.T) {
 
 func TestDemoResizeAndQuit(t *testing.T) {
 	for _, key := range []tea.KeyMsg{{Type: tea.KeyCtrlC}, {Type: tea.KeyRunes, Runes: []rune("q")}} {
-		d := NewDemo().(demoModel)
+		d := requireDemoModel(t, NewDemo())
 		updated, cmd := d.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 		if cmd != nil {
 			t.Fatal("resize returned a command")
 		}
-		d = updated.(demoModel)
+		d = requireDemoModel(t, updated)
 		if len(strings.Split(d.View(), "\n")) != 20 {
 			t.Fatal("demo did not fit terminal height")
 		}

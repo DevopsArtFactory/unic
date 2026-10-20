@@ -75,7 +75,9 @@ func (d demoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				d.shell.ecs.detailScroll = 0
 			}
 		case "r":
-			d.shell.ecs.detailScroll = 0
+			if d.shell.screen == screenECSServiceDetail {
+				d.shell.ecs.detailScroll = 0
+			}
 		case "up", "k", "down", "j", "pgup", "pgdown":
 			if d.shell.screen == screenECSServiceDetail {
 				// Only scrolling keys reach this handler; loading and exec keys
