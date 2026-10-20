@@ -1,12 +1,14 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func requireDemoModel(t *testing.T, model tea.Model) demoModel {
@@ -16,6 +18,63 @@ func requireDemoModel(t *testing.T, model tea.Model) demoModel {
 		t.Fatalf("unexpected demo model type %T", model)
 	}
 	return d
+}
+
+func TestDemoFailureEvidenceFitsViewport(t *testing.T) {
+	for _, size := range []tea.WindowSizeMsg{{Width: 100, Height: 30}, {Width: 80, Height: 24}, {Width: 60, Height: 20}} {
+		t.Run(fmt.Sprintf("%dx%d", size.Width, size.Height), func(t *testing.T) {
+			updated, _ := NewDemo().Update(size)
+			d := requireDemoModel(t, updated)
+			d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyEnter})
+			for range 30 {
+				d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyPgDown})
+			}
+			view := ansi.Strip(d.View())
+			compact := strings.NewReplacer(" ", "", "\n", "", "│", "").Replace(view)
+			evidence := "CannotPullContainerError:imagemanifestnotfoundfordemo-42."
+			if !strings.Contains(compact, evidence) {
+				t.Fatalf("complete failure evidence is unreachable:\n%s", view)
+			}
+			if !strings.Contains(view, "╰") || strings.Contains(view, "  ...") {
+				t.Fatalf("viewport was cropped instead of scrolled:\n%s", view)
+			}
+			if !strings.Contains(compact, "?:guide•q:quit") {
+				t.Fatalf("guide or quit shortcut is hidden:\n%s", view)
+			}
+			if len(strings.Split(view, "\n")) != size.Height {
+				t.Fatal("detail did not fit terminal height")
+			}
+			for _, line := range strings.Split(view, "\n") {
+				if ansi.StringWidth(line) > size.Width {
+					t.Fatalf("detail exceeds terminal width: %q", line)
+				}
+			}
+		})
+	}
+}
+
+func TestDemoScrollClampsAfterResize(t *testing.T) {
+	updated, _ := NewDemo().Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	d := demoKey(t, requireDemoModel(t, updated), tea.KeyMsg{Type: tea.KeyEnter})
+	for range 10 {
+		d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyPgDown})
+	}
+	updated, _ = d.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	d = requireDemoModel(t, updated)
+	lines, visible := d.shell.ecs.serviceDetailViewport(d.shell, demoRolloutHelp)
+	want := max(len(lines)-visible-1, 0)
+	d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyUp})
+	if d.shell.ecs.detailScroll != want {
+		t.Fatalf("first up after resize should move from visible position: got %d, want %d", d.shell.ecs.detailScroll, want)
+	}
+	d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyPgUp})
+	if d.shell.ecs.detailScroll != 0 {
+		t.Fatal("page up did not clamp at the first line")
+	}
+	d = demoKey(t, d, tea.KeyMsg{Type: tea.KeyUp})
+	if d.shell.ecs.detailScroll != 0 {
+		t.Fatal("up scrolled before the first line")
+	}
 }
 
 func demoKey(t *testing.T, d demoModel, key tea.KeyMsg) demoModel {

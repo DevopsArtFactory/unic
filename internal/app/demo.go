@@ -17,6 +17,8 @@ type demoModel struct {
 	help  bool
 }
 
+const demoRolloutHelp = "↑/↓/j/k: scroll • pgup/pgdn: page • r: restart • esc/H: service • ?: guide • q: quit"
+
 // NewDemo starts a fixed, synthetic incident without reading config or credentials.
 func NewDemo() tea.Model {
 	observed := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
@@ -80,9 +82,7 @@ func (d demoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "up", "k", "down", "j", "pgup", "pgdown":
 			if d.shell.screen == screenECSServiceDetail {
-				// Only scrolling keys reach this handler; loading and exec keys
-				// are deliberately excluded from the offline event loop.
-				d.shell.ecs.updateServiceDetail(&d.shell, msg)
+				d.shell.ecs.scrollServiceDetail(d.shell, key, demoRolloutHelp)
 			}
 		}
 	}
@@ -106,8 +106,7 @@ func (d demoModel) View() string {
 			m.renderHelpBar("?: close help • esc/enter: back • q/ctrl+c: quit"))
 	}
 	if m.screen == screenECSServiceDetail {
-		return m.fitToHeight(m.ecs.viewServiceDetailWithHelp(m,
-			"↑/↓/j/k: scroll • pgup/pgdn: page • r: restart • esc/H: service • ?: guide • q: quit"))
+		return m.fitToHeight(m.ecs.viewServiceDetailWithHelp(m, demoRolloutHelp))
 	}
 	var b strings.Builder
 	b.WriteString(m.renderStatusBar())

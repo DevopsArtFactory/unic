@@ -136,6 +136,34 @@ func TestECSServiceDetailEscReturnsToServiceList(t *testing.T) {
 	}
 }
 
+func TestECSServiceDetailScrollKeepsWrappedEventsAndFooter(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.width, m.height = 80, 24
+	m.screen = screenECSServiceDetail
+	m.ecs.selectedDetail = &awsservice.ECSServiceDetail{
+		Name: "api-service",
+		Events: []awsservice.ECSServiceEvent{{
+			Message: strings.Repeat("long-event ", 20) + "FINAL-EVIDENCE",
+		}},
+	}
+	for range 10 {
+		_, cmd := m.ecs.updateServiceDetail(&m, tea.KeyMsg{Type: tea.KeyPgDown})
+		if cmd != nil {
+			t.Fatal("scrolling started a command")
+		}
+	}
+	view := stripANSI(m.fitToHeight(m.ecs.viewServiceDetail(m)))
+	compact := strings.NewReplacer(" ", "", "\n", "", "│", "").Replace(view)
+	for _, want := range []string{"FINAL-EVIDENCE", "╰", "H:home"} {
+		if !strings.Contains(compact, want) {
+			t.Fatalf("scrolled live detail is missing %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "  ...") {
+		t.Fatalf("scrolled live detail was cropped:\n%s", view)
+	}
+}
+
 func TestECSTaskListEscReturnsToServiceDetail(t *testing.T) {
 	m := New(testConfig(), "", "dev")
 	m.screen = screenECSTaskList

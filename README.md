@@ -20,6 +20,8 @@ Run `unic demo` for a synthetic ECS deployment failure without credentials, SSO,
 network access, or existing configuration. Select `checkout-demo` with **Enter**,
 then scroll through the failed rollout and recent service events to find the
 image-pull error. Press **?** for guided steps, **Esc** to go back, and **q** to exit.
+Rollout details wrap to your terminal width; **PgUp/PgDn** scroll by page and
+**r** restarts the rollout view.
 The demo uses fixed sample data and never reads or changes your AWS/unic config.
 See [reproducible demo steps](docs/development.md#offline-ecs-demo).
 
