@@ -31,7 +31,8 @@ class RenderTests(unittest.TestCase):
                 render.select_poster(frames)
 
     def test_capture_environment_does_not_forward_aws_credentials(self):
-        caller = {"PATH": "/bin", "AWS_ACCESS_KEY_ID": "synthetic-key",
+        caller = {"PATH": "/bin", "XDG_CONFIG_HOME": "/real/unic", "TZ": "Asia/Seoul",
+                  "AWS_ACCESS_KEY_ID": "synthetic-key",
                   "AWS_SECRET_ACCESS_KEY": "synthetic-secret", "AWS_SESSION_TOKEN": "synthetic-token",
                   "AWS_PROFILE": "production", "AWS_CONFIG_FILE": "/real/config",
                   "AWS_SHARED_CREDENTIALS_FILE": "/real/credentials",
@@ -40,11 +41,9 @@ class RenderTests(unittest.TestCase):
         with patch.dict(os.environ, caller, clear=True):
             env = render.capture_environment(Path("/tmp/demo"), Path("/tmp/demo/frames.json"))
             self.assertEqual(dict(os.environ), caller)
-        self.assertEqual(env["PATH"], "/bin")
-        self.assertEqual({k: v for k, v in env.items() if k.startswith("UNIC_")}, {
+        self.assertEqual(env, {
+            "PATH": "/bin", "TZ": "UTC", "XDG_CONFIG_HOME": "/tmp/demo/config",
             "UNIC_DEMO_FRAMES": "/tmp/demo/frames.json",
-        })
-        self.assertEqual({k: v for k, v in env.items() if k.startswith("AWS_")}, {
             "AWS_EC2_METADATA_DISABLED": "true",
             "AWS_CONFIG_FILE": "/tmp/demo/aws-config",
             "AWS_SHARED_CREDENTIALS_FILE": "/tmp/demo/aws-credentials",
