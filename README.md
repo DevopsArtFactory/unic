@@ -39,6 +39,8 @@ For a one-off session without saving a context, use the same `P` route directly 
 
 Having trouble connecting? Run `unic doctor --profile your-profile --region us-east-1` and follow its remediation. See [configuration](#configuration) for context setup and [Homebrew](#homebrew) or [source installation](#build-from-source) for other install options.
 
+Continue with a teammate or AI assistant using the [ECS, ALB-health, and SSO investigation recipes](docs/investigation-recipes.md), including read-only MCP queries and a manually reviewed handoff example.
+
 ### Use it for the work in front of you
 
 - **A deployment is stuck:** inspect ECS rollout state, task counts, image versions, and recent service events.
