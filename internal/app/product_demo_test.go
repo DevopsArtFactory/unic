@@ -83,9 +83,10 @@ func TestProductDemo(t *testing.T) {
 	}
 	capture(4, "01 / FIND THE SERVICE", "A deployment is failing. Start with the service, not another console tab.", "ECS > cluster > services", "checkout-api")
 	key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	for _, r := range "checkout" {
+	query := "checkout"
+	for i, r := range query {
 		key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
-		capture(0.15, "01 / FIND THE SERVICE", "Filter the cluster to the service you are investigating.", "/  checkout", "checkout-api")
+		capture(0.15, "01 / FIND THE SERVICE", "Filter the cluster to the service you are investigating.", "/  "+query[:i+1], "checkout-api")
 	}
 	key(tea.KeyMsg{Type: tea.KeyEnter}) // finish editing the filter
 	if len(m.ecs.filteredServices) != 1 || m.ecs.filteredServices[0].Name != "checkout-api" {

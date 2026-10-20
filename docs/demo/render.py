@@ -88,6 +88,7 @@ def draw_terminal(draw, text, font, x, y):
                             raise ValueError("SGR RGB channels must be between 0 and 255")
                         i += 4
                     else:
+                        # Fail explicitly rather than publish incorrectly colored media.
                         raise ValueError("unsupported SGR color")
                     if code == 38:
                         fg = color
