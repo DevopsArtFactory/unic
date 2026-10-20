@@ -23,6 +23,13 @@ class RenderTests(unittest.TestCase):
             with self.subTest(durations=durations), self.assertRaises(ValueError):
                 render.validate_duration([{"seconds": d} for d in durations])
 
+    def test_missing_poster_is_an_error(self):
+        poster = {"chapter": "02 / INSPECT THE ROLLOUT"}
+        self.assertIs(render.select_poster([{"chapter": "intro"}, poster]), poster)
+        for frames in ([], [{"chapter": "renamed chapter"}]):
+            with self.subTest(frames=frames), self.assertRaises(ValueError):
+                render.select_poster(frames)
+
     def test_capture_environment_does_not_forward_aws_credentials(self):
         caller = {"PATH": "/bin", "AWS_ACCESS_KEY_ID": "synthetic-key",
                   "AWS_SECRET_ACCESS_KEY": "synthetic-secret", "AWS_SESSION_TOKEN": "synthetic-token",

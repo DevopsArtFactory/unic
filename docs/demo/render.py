@@ -135,6 +135,13 @@ def validate_duration(frames):
         raise ValueError(f"expected 30 seconds of positive finite frames, got {total}")
 
 
+def select_poster(frames):
+    for frame in frames:
+        if frame["chapter"] == "02 / INSPECT THE ROLLOUT":
+            return frame
+    raise ValueError("missing rollout chapter for the still image")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "docs/assets")
@@ -156,11 +163,12 @@ def main():
                        cwd=ROOT, env=env, check=True)
         frames = json.loads(frames_path.read_text())
         validate_duration(frames)
+        poster = select_poster(frames)
         timeline = []
         for i, frame in enumerate(frames):
             image = render(frame, str(font))
             image.save(tmp / f"frame-{i:02d}.png")
-            if frame["chapter"] == "02 / INSPECT THE ROLLOUT":
+            if frame is poster:
                 image.save(out / "ecs-rollout.png")
             timeline.extend([f"file 'frame-{i:02d}.png'", f"duration {frame['seconds']}"])
         timeline.append(f"file 'frame-{len(frames) - 1:02d}.png'")

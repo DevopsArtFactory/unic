@@ -4,6 +4,7 @@ package app
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -122,7 +123,7 @@ func TestProductDemo(t *testing.T) {
 	for _, f := range frames {
 		duration += f.Seconds
 	}
-	if duration < 29.9 || duration > 30.1 {
+	if math.Abs(duration-30) >= 0.01 {
 		t.Fatalf("expected 30 seconds, got %f", duration)
 	}
 	data, err := json.MarshalIndent(frames, "", "  ")
