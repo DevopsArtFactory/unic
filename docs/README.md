@@ -5,6 +5,7 @@ If a user-facing behavior, architecture boundary, or development workflow change
 
 ## Document Map
 
+- [ECS Walkthrough and Demo Capture](demo/README.md)
 - [Project Overview (EN)](project-overview.en.md)
 - [Project Overview (KO)](project-overview.ko.md)
 - [Architecture (EN)](architecture.en.md)

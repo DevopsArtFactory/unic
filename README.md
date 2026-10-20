@@ -1,7 +1,40 @@
 # unic
 
-`unic` is a Go-based TUI for browsing and operating AWS resources from the terminal.
-It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 clients behind a context-aware authentication layer.
+Investigate AWS deployments, inspect resources, and switch accounts from your terminal.
+
+**A service is ACTIVE. Its deployment has FAILED. See the difference before opening another console tab.**
+
+![unic ECS walkthrough: filter checkout-api, inspect its failed rollout, then read the image version and service events](docs/assets/ecs-rollout.gif)
+
+[Watch the 30-second video](docs/assets/ecs-rollout.mp4) · [Still image](docs/assets/ecs-rollout.png) · [Walkthrough and recording source](docs/demo/README.md)
+
+The walkthrough uses **synthetic data rendered by the real TUI code**. It shows shipped ECS filtering, rollout details, image versions, and service events. It makes no AWS calls and is not a recording of a live incident.
+
+## Get to your first rollout
+
+Install both `unic` and its read-only MCP server:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.sh | sh
+unic --profile your-profile --region us-east-1
+```
+
+Use an existing AWS profile with access to your ECS cluster. If it uses SSO, sign in with `aws sso login --profile your-profile` first. Skip the startup splash with `Space`. From the context picker, press `P`, type `ECS Browser`, and select **ECS Browser & Exec**. This opens the browser with your CLI-selected profile and region, even before you have saved any unic contexts. Select your cluster, then your service. Press `/` to filter the service list; press `Enter` to finish filtering, then `Enter` again to open the rollout. Use `↓` or `PgDn` to reach the image versions and recent events on a shorter terminal; `?` shows help.
+
+Having trouble connecting? Run `unic doctor --profile your-profile --region us-east-1` and follow its remediation. See [configuration](#configuration) for context setup and [Homebrew](#homebrew) or [source installation](#build-from-source) for other install options.
+
+### Use it for the work in front of you
+
+- **A deployment is stuck:** inspect ECS rollout state, task counts, image versions, and recent service events.
+- **Something is unhealthy:** start from CloudWatch alarms and jump to related resources or logs where supported.
+- **You work across accounts:** switch credential, assume-role, SSO, and Okta SAML contexts; reuse favorites and saved views.
+- **You need an automated check:** run Inspector or use the [read-only CLI and MCP tools](#agent-discovery) with your local AI client.
+
+### Credentials and changes
+
+unic uses your selected AWS credential/profile or configured context; AWS permissions still control access. Keep credential values out of MCP configuration. **The TUI is not globally read-only:** it includes operations such as RDS start/stop, DNS changes, and key management, with confirmation for destructive workflows. Use a least-privilege role for inspection. The current MCP tools are read-only or preview-only. See [auth types](#auth-types), [MCP setup](#mcp-server), and the [security policy](SECURITY.md).
+
+unic is built with Go, Bubble Tea, Cobra, and the AWS SDK v2. The detailed feature and setup reference follows.
 
 ## What It Does
 
