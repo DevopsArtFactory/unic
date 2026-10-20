@@ -1,7 +1,56 @@
 # unic
 
-`unic` is a Go-based TUI for browsing and operating AWS resources from the terminal.
-It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 clients behind a context-aware authentication layer.
+Investigate AWS deployments, inspect resources, and switch accounts from your terminal.
+
+**A service is ACTIVE. Its deployment has FAILED. See the difference before opening another console tab.**
+
+![unic walkthrough: add a context, save a profile and region, then inspect a failed ECS rollout](docs/assets/ecs-rollout.gif)
+
+[Watch the 30-second video](docs/assets/ecs-rollout.mp4) · [Still image](docs/assets/ecs-rollout.png) · [Walkthrough and recording source](docs/demo/README.md)
+
+The walkthrough uses **synthetic data rendered by the real TUI code**. It starts with Add Context, saves a profile/region in a temporary config, then shows shipped ECS filtering, rollout details, image versions, and service events. Authentication and AWS results are simulated; it makes no AWS calls and is not a recording of a live incident.
+
+## Get to your first rollout
+
+Install both `unic` and its read-only MCP server:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.sh | sh
+unic --profile your-profile --region us-east-1
+```
+
+Use an existing AWS profile with access to your ECS cluster. If it uses SSO, sign in with `aws sso login --profile your-profile` first. Skip the startup splash with `Space`.
+
+### Add your first context
+
+1. In **Select Context**, press `a` to open **Add Context**. During another session, `C` opens the context picker first.
+2. Select **credential** to reuse an existing AWS profile. This path references a profile name; it does not ask you to paste access keys. For a directly configured SSO context, use **sso** instead and follow the [auth-type reference](#auth-types).
+3. Enter a **Name** (for example, `dev-readonly`), skip **Display Order** with `Enter`, and enter the **Region** (for example, `us-east-1`).
+4. Skip **Other Resource Regions** if unneeded, then enter your existing **Profile** name. Leave **Role ARN**, **External ID**, and **MFA Device ARN** blank unless your setup needs role chaining or MFA; `Enter` skips each optional field.
+5. Review the summary and press `Enter` to save. Back in the picker, select the saved context with `Enter`. Saving is local; selecting it can authenticate with AWS. The context name alone does not make access read-only—your IAM permissions do.
+
+Context creation currently uses this TUI wizard, not a `unic context add` CLI command. See [configuration](#configuration) for the config path and other auth options.
+
+### Open the rollout
+
+After selecting the context, press `P`, type `ECS Browser`, and select **ECS Browser & Exec**. Select your cluster, then your service. Press `/` to filter the service list; press `Enter` to finish filtering, then `Enter` again to open the rollout. Use `↓` or `PgDn` to reach the image versions and recent events on a shorter terminal; `?` shows help.
+
+For a one-off session without saving a context, use the same `P` route directly from the initial picker; it retains your CLI-selected profile and region.
+
+Having trouble connecting? Run `unic doctor --profile your-profile --region us-east-1` and follow its remediation. See [configuration](#configuration) for context setup and [Homebrew](#homebrew) or [source installation](#build-from-source) for other install options.
+
+### Use it for the work in front of you
+
+- **A deployment is stuck:** inspect ECS rollout state, task counts, image versions, and recent service events.
+- **Something is unhealthy:** start from CloudWatch alarms and jump to related resources or logs where supported.
+- **You work across accounts:** switch credential, assume-role, SSO, and Okta SAML contexts; reuse favorites and saved views.
+- **You need an automated check:** run Inspector or use the [read-only CLI and MCP tools](#agent-discovery) with your local AI client.
+
+### Credentials and changes
+
+unic uses your selected AWS credential/profile or configured context; AWS permissions still control access. Keep credential values out of MCP configuration. **The TUI is not globally read-only:** it includes operations such as RDS start/stop, DNS changes, and key management, with confirmation for destructive workflows. Use a least-privilege role for inspection. The current MCP tools are read-only or preview-only. See [auth types](#auth-types), [MCP setup](#mcp-server), and the [security policy](SECURITY.md).
+
+unic is built with Go, Bubble Tea, Cobra, and the AWS SDK v2. The detailed feature and setup reference follows.
 
 ## What It Does
 

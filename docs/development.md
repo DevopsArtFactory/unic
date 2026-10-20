@@ -14,6 +14,10 @@ Local builds place both executables in the repository root. Follow the [source i
 
 `make build` and `make release` build both `unic` and `unic-mcp`. The platform targets and `make build-all` build both binaries for macOS and Linux (amd64 and arm64) and Windows (amd64). `make archive` bundles each pair in a platform archive, using the executable names expected by `install.sh`. The installer validates both extracted binaries before replacing either installed executable; `make test` includes an offline regression check for incomplete archives.
 
+## Product media
+
+For reproducible product media, see the [ECS walkthrough capture](demo/README.md). It exercises production TUI views with test-only synthetic data; its tagged capture test is not part of released binaries.
+
 ## Offline ECS demo
 
 Run `go run ./cmd/unic demo` (or `./unic demo` after `make build`) without AWS
