@@ -1,0 +1,53 @@
+package aws
+
+import (
+	"context"
+	"fmt"
+
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+)
+
+// ECSServiceTargetHealth retains per-association failures alongside successful evidence.
+type ECSServiceTargetHealth struct {
+	Group   ELBTargetGroupHealth
+	Warning string
+}
+
+// ListECSServiceTargetHealth queries only target groups explicitly attached to the service.
+func (r *AwsRepository) ListECSServiceTargetHealth(ctx context.Context, clusterARN, serviceARN string) ([]ECSServiceTargetHealth, error) {
+	out, err := r.ECSClient.DescribeServices(ctx, &ecs.DescribeServicesInput{
+		Cluster: awssdk.String(clusterARN), Services: []string{serviceARN},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe ECS service: %w", err)
+	}
+	if len(out.Failures) > 0 {
+		return nil, fmt.Errorf("ECS service lookup failed: %s %s", awssdk.ToString(out.Failures[0].Reason), awssdk.ToString(out.Failures[0].Detail))
+	}
+	if len(out.Services) != 1 || awssdk.ToString(out.Services[0].ServiceArn) != serviceARN {
+		return nil, fmt.Errorf("ECS service not found: %s", serviceARN)
+	}
+	var results []ECSServiceTargetHealth
+	seen := make(map[string]bool)
+	for _, association := range out.Services[0].LoadBalancers {
+		if err := ctx.Err(); err != nil {
+			return results, err
+		}
+		arn := awssdk.ToString(association.TargetGroupArn)
+		if arn == "" {
+			results = append(results, ECSServiceTargetHealth{Warning: "Classic load balancer association has no ELBv2 target group; health lookup unsupported"})
+			continue
+		}
+		if seen[arn] {
+			continue
+		}
+		seen[arn] = true
+		item := ECSServiceTargetHealth{Group: ELBTargetGroupHealth{ARN: arn, Name: arn}}
+		if err := r.loadTargetHealth(ctx, &item.Group); err != nil {
+			item.Warning = err.Error()
+		}
+		results = append(results, item)
+	}
+	return results, nil
+}

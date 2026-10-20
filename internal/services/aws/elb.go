@@ -153,39 +153,9 @@ func (r *AwsRepository) ListTargetGroupHealth(ctx context.Context, loadBalancerA
 			group.Port = *tg.Port
 		}
 
-		health, err := r.ELBv2Client.DescribeTargetHealth(ctx, &elasticloadbalancingv2.DescribeTargetHealthInput{
-			TargetGroupArn: tg.TargetGroupArn,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to describe target health for %s: %w", group.Name, err)
+		if err := r.loadTargetHealth(ctx, &group); err != nil {
+			return nil, err
 		}
-		for _, desc := range health.TargetHealthDescriptions {
-			target := ELBTargetHealth{}
-			if desc.Target != nil {
-				target.ID = derefString(desc.Target.Id)
-				if desc.Target.Port != nil {
-					target.Port = *desc.Target.Port
-				}
-			}
-			if desc.TargetHealth != nil {
-				target.State = string(desc.TargetHealth.State)
-				target.Reason = string(desc.TargetHealth.Reason)
-				target.Description = derefString(desc.TargetHealth.Description)
-			}
-			switch target.State {
-			case "healthy":
-				group.HealthyCount++
-			case "unhealthy":
-				group.UnhealthyCount++
-			default:
-				group.OtherCount++
-			}
-			group.Targets = append(group.Targets, target)
-		}
-		// Unhealthy targets first within the group.
-		sort.SliceStable(group.Targets, func(i, j int) bool {
-			return targetStatePriority(group.Targets[i].State) < targetStatePriority(group.Targets[j].State)
-		})
 		groups = append(groups, group)
 	}
 
@@ -223,4 +193,42 @@ func targetStatePriority(state string) int {
 	default:
 		return 2
 	}
+}
+
+// loadTargetHealth is shared by the LB browser and ECS association lookup.
+func (r *AwsRepository) loadTargetHealth(ctx context.Context, group *ELBTargetGroupHealth) error {
+	health, err := r.ELBv2Client.DescribeTargetHealth(ctx, &elasticloadbalancingv2.DescribeTargetHealthInput{
+		TargetGroupArn: &group.ARN,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to describe target health for %s: %w", group.Name, err)
+	}
+	for _, desc := range health.TargetHealthDescriptions {
+		target := ELBTargetHealth{}
+		if desc.Target != nil {
+			target.ID = derefString(desc.Target.Id)
+			if desc.Target.Port != nil {
+				target.Port = *desc.Target.Port
+			}
+		}
+		if desc.TargetHealth != nil {
+			target.State = string(desc.TargetHealth.State)
+			target.Reason = string(desc.TargetHealth.Reason)
+			target.Description = derefString(desc.TargetHealth.Description)
+		}
+		switch target.State {
+		case "healthy":
+			group.HealthyCount++
+		case "unhealthy":
+			group.UnhealthyCount++
+		default:
+			group.OtherCount++
+		}
+		group.Targets = append(group.Targets, target)
+	}
+	// Unhealthy targets first within the group.
+	sort.SliceStable(group.Targets, func(i, j int) bool {
+		return targetStatePriority(group.Targets[i].State) < targetStatePriority(group.Targets[j].State)
+	})
+	return nil
 }

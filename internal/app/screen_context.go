@@ -66,6 +66,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cloudFormation = newCloudFormationModel()
 		m.resetFilter(filterCloudFormationStacks)
 		if contextChanged {
+			resetECSContextState(&m)
 			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
 			resetSNSContextState(&m)
@@ -118,6 +119,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, tea.ClearScreen, true
 
 	case regionSwitchedMsg:
+		resetECSContextState(&m)
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
 		resetStepFunctionsContextState(&m)

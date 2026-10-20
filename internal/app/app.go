@@ -79,6 +79,7 @@ const (
 	screenECSClusterList
 	screenECSServiceList
 	screenECSServiceDetail
+	screenECSTargetHealth
 	screenECSTaskList
 	screenECSContainerList
 	screenEKSClusterList

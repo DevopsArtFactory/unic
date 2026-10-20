@@ -25,6 +25,11 @@ type ecsModel struct {
 	serviceIdx       int
 	selectedService  *awsservice.ECSService
 	selectedDetail   *awsservice.ECSServiceDetail
+	healthResults    []awsservice.ECSServiceTargetHealth
+	healthError      error
+	healthObserved   time.Time
+	healthLoading    bool
+	rolloutScroll    int
 	detailScroll     int
 	tasks            []awsservice.ECSTask
 	taskIdx          int
@@ -43,6 +48,14 @@ func (em *ecsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 
 func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
+	case ecsTargetHealthLoadedMsg:
+		if !em.healthLoading {
+			return *m, nil, true
+		}
+		em.healthLoading = false
+		em.healthResults, em.healthError, em.healthObserved = msg.results, msg.err, msg.observed
+		em.detailScroll = 0
+		return *m, nil, true
 	case ecsClustersLoadedMsg:
 		em.clusters = msg.clusters
 		em.filteredClusters = msg.clusters
@@ -113,6 +126,9 @@ func (em *ecsModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, boo
 	case screenECSServiceDetail:
 		newM, cmd := em.updateServiceDetail(m, msg)
 		return newM, cmd, true
+	case screenECSTargetHealth:
+		newM, cmd := em.updateTargetHealth(m, msg)
+		return newM, cmd, true
 	case screenECSTaskList:
 		newM, cmd := em.updateTaskList(m, msg)
 		return newM, cmd, true
@@ -132,6 +148,8 @@ func (em ecsModel) View(m Model) (string, bool) {
 		return em.viewServiceList(m), true
 	case screenECSServiceDetail:
 		return em.viewServiceDetail(m), true
+	case screenECSTargetHealth:
+		return em.viewServiceDetailWithHelp(m, ecsTargetHealthHelp), true
 	case screenECSTaskList:
 		return em.viewTaskList(m), true
 	case screenECSContainerList:
@@ -308,10 +326,15 @@ func (em ecsModel) viewServiceList(m Model) string {
 
 // --- Service Detail ---
 
-const ecsServiceDetailHelp = "↑/↓: scroll • pgup/pgdn: page • W: watch • I: interval • enter: tasks • r: refresh • esc: back • H: home"
+const ecsServiceDetailHelp = "↑/↓: scroll • pgup/pgdn: page • W: watch • I: interval • t: target health • enter: tasks • r: refresh • esc: back • H: home"
 
 func (em *ecsModel) updateServiceDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "t":
+		if em.selectedCluster != nil && em.selectedDetail != nil {
+			em.rolloutScroll = em.detailScroll
+			return em.startTargetHealth(m)
+		}
 	case "q", "esc":
 		m.stopWatch()
 		m.screen = screenECSServiceList
@@ -346,6 +369,9 @@ func (em *ecsModel) scrollServiceDetail(m Model, key, help string) {
 
 func (em ecsModel) serviceDetailViewport(m Model, help string) ([]string, int) {
 	lines := em.serviceDetailLines()
+	if m.screen == screenECSTargetHealth {
+		lines = em.targetHealthLines()
+	}
 	if m.width > 0 {
 		width := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize(), 1)
 		var wrapped []string
@@ -374,7 +400,11 @@ func (em ecsModel) viewServiceDetailWithHelp(m Model, help string) string {
 	detail := em.selectedDetail
 
 	b.WriteString(m.renderStatusBar())
-	b.WriteString(titleStyle.Render(fmt.Sprintf("ECS Service Rollout — %s", detail.Name)))
+	title := "ECS Service Rollout"
+	if m.screen == screenECSTargetHealth {
+		title = "ECS Target Health"
+	}
+	b.WriteString(titleStyle.Render(fmt.Sprintf("%s — %s", title, detail.Name)))
 	b.WriteString(m.watchBadge())
 	b.WriteString("\n\n")
 

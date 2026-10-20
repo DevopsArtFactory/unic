@@ -35,13 +35,15 @@ Context creation currently uses this TUI wizard, not a `unic context add` CLI co
 
 After selecting the context, press `P`, type `ECS Browser`, and select **ECS Browser & Exec**. Select your cluster, then your service. Press `/` to filter the service list; press `Enter` to finish filtering, then `Enter` again to open the rollout. Use `↓` or `PgDn` to reach the image versions and recent events on a shorter terminal; `?` shows help.
 
+From a live service rollout, press `t` to inspect the service's associated ELBv2 target groups without re-entering identifiers. Use `r` to refresh and `Esc` to cancel or return to the rollout at its previous scroll position. This read-only lookup uses the selected account/profile and region and requires `ecs:DescribeServices` and `elasticloadbalancing:DescribeTargetHealth`. Each group's targets and failures are shown separately, including missing associations and empty groups. Results are group-wide observations (shared groups can include other services), not proof of the rollout's cause. Logs and recent-change navigation remain planned; the offline demo does not query target health.
+
 For a one-off session without saving a context, use the same `P` route directly from the initial picker; it retains your CLI-selected profile and region.
 
 Having trouble connecting? Run `unic doctor --profile your-profile --region us-east-1` and follow its remediation. See [configuration](#configuration) for context setup and [Homebrew](#homebrew) or [source installation](#build-from-source) for other install options.
 
 ### Use it for the work in front of you
 
-- **A deployment is stuck:** inspect ECS rollout state, task counts, image versions, and recent service events.
+- **A deployment is stuck:** inspect ECS rollout state, task counts, image versions, recent service events, and associated target health (`t`).
 - **Something is unhealthy:** start from CloudWatch alarms and jump to related resources or logs where supported.
 - **You work across accounts:** switch credential, assume-role, SSO, and Okta SAML contexts; reuse favorites and saved views.
 - **You need an automated check:** run Inspector or use the [read-only CLI and MCP tools](#agent-discovery) with your local AI client.

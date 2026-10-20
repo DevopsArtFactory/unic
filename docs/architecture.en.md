@@ -286,7 +286,7 @@ Current screen families include:
 - CloudWatch alarm list/detail, state filtering, watch, and related-resource/log handoff flows
 - CloudWatch metric list/detail flows
 - CloudWatch Logs group/stream/viewer flows
-- ECS cluster/service/rollout detail/task/container flows
+- ECS cluster/service/rollout detail/task/container flows. `t` on live rollout details opens a scrollable associated-target-health view; `Esc` cancels any pending lookup and restores rollout scroll. `screen_ecs_target_health.go` binds the lookup to the command generation with a 30-second deadline and snapshots the selected config, cluster ARN, and service ARN. `ListECSServiceTargetHealth` uses fresh ECS service associations, deduplicates target-group ARNs, and retains each ELBv2 failure alongside successful target health. Classic ELB associations are explicitly unsupported. Shared groups are labeled as group-wide evidence, with an observation time and no causal claim. Context/region changes clear ECS state to prevent old service ARNs being reused under a new identity. This extends the existing browser without adding a catalog feature or changing CLI/MCP contracts; logs and recent-change links remain follow-ups.
 - EKS cluster/node group/add-on status, upgrade readiness, and access helper flows
 - ECR repository/image/detail flows
 - FIS experiment template list/detail, safe-run preview, and experiment history/detail flows
