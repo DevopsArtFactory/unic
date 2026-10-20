@@ -188,3 +188,46 @@ func TestECSTargetHealthCancelInFlight(t *testing.T) {
 		t.Fatal("late cancellation result changed the rollout")
 	}
 }
+
+func TestECSTargetHealthRefreshPreservesAndClampsScroll(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenECSTargetHealth
+	m.width, m.height = 80, 24
+	m.ecs.selectedCluster = &awsservice.ECSCluster{ARN: "cluster"}
+	m.ecs.selectedDetail = &awsservice.ECSServiceDetail{ARN: "service"}
+	m.ecs.detailScroll = 3
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updated.(Model)
+	if m.ecs.detailScroll != 3 {
+		t.Fatal("refresh reset scroll before loading")
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	m = updated.(Model)
+	if m.ecs.detailScroll != 3 {
+		t.Fatal("loading viewport changed saved scroll")
+	}
+	msg := ecsTargetHealthLoadedMsg{observed: time.Now(), results: []awsservice.ECSServiceTargetHealth{{Group: awsservice.ELBTargetGroupHealth{ARN: "group", Targets: make([]awsservice.ELBTargetHealth, 30)}}}}
+	updated, _ = m.Update(msg)
+	m = updated.(Model)
+	if m.ecs.detailScroll != 3 {
+		t.Fatal("refresh completion reset scroll")
+	}
+	m.ecs.healthLoading = true
+	m.ecs.detailScroll = 100
+	updated, _ = m.Update(ecsTargetHealthLoadedMsg{observed: time.Now()})
+	m = updated.(Model)
+	if m.ecs.detailScroll != 0 {
+		t.Fatal("shortened result did not clamp scroll")
+	}
+}
+
+func TestECSTargetHealthMissingSelectionAndObservation(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	msg := m.ecs.loadTargetHealth(m)().(ecsTargetHealthLoadedMsg)
+	if msg.err == nil {
+		t.Fatal("missing selection must report error")
+	}
+	if strings.Contains(stripANSI(strings.Join(m.ecs.targetHealthLines(), "\n")), "0001-") {
+		t.Fatal("zero observation timestamp rendered")
+	}
+}

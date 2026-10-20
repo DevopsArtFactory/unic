@@ -15,6 +15,7 @@ type ECSServiceTargetHealth struct {
 }
 
 // ListECSServiceTargetHealth queries only target groups explicitly attached to the service.
+// Cancellation can return partial evidence with an error; callers must display both.
 func (r *AwsRepository) ListECSServiceTargetHealth(ctx context.Context, clusterARN, serviceARN string) ([]ECSServiceTargetHealth, error) {
 	out, err := r.ECSClient.DescribeServices(ctx, &ecs.DescribeServicesInput{
 		Cluster: awssdk.String(clusterARN), Services: []string{serviceARN},

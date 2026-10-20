@@ -24,7 +24,9 @@ func (em *ecsModel) startTargetHealth(m *Model) (tea.Model, tea.Cmd) {
 	m.stopWatch()
 	em.healthLoading = true
 	em.healthResults, em.healthError = nil, nil
-	em.detailScroll = 0
+	if m.screen != screenECSTargetHealth {
+		em.detailScroll = 0
+	}
 	m.screen = screenECSTargetHealth
 	cmd := em.loadTargetHealth(*m)
 	if m.commands != nil {
@@ -45,12 +47,19 @@ func (em *ecsModel) updateTargetHealth(m *Model, msg tea.KeyMsg) (tea.Model, tea
 	case "r":
 		return em.startTargetHealth(m)
 	case "up", "k", "down", "j", "pgup", "pgdown":
-		em.scrollServiceDetail(*m, msg.String(), ecsTargetHealthHelp)
+		if !em.healthLoading {
+			em.scrollServiceDetail(*m, msg.String(), ecsTargetHealthHelp)
+		}
 	}
 	return *m, nil
 }
 
 func (em ecsModel) loadTargetHealth(m Model) tea.Cmd {
+	if em.selectedCluster == nil || em.selectedDetail == nil || m.cfg == nil {
+		return func() tea.Msg {
+			return ecsTargetHealthLoadedMsg{err: fmt.Errorf("no cluster, service, or AWS configuration selected"), observed: time.Now().UTC()}
+		}
+	}
 	cluster, service := em.selectedCluster.ARN, em.selectedDetail.ARN
 	cfg := *m.cfg
 	return func() tea.Msg {
@@ -69,8 +78,12 @@ func (em ecsModel) targetHealthLines() []string {
 	if em.healthLoading {
 		return []string{dimStyle.Render("Loading associated target health... Esc cancels and returns to rollout.")}
 	}
+	observed := "-"
+	if !em.healthObserved.IsZero() {
+		observed = em.healthObserved.Format(time.RFC3339)
+	}
 	lines := []string{
-		renderDetailLine("Observed", em.healthObserved.Format(time.RFC3339)),
+		renderDetailLine("Observed", observed),
 		dimStyle.Render("Source: ECS service associations + ELBv2 target health."),
 		dimStyle.Render("Group-wide observations; shared groups can include other services."),
 		dimStyle.Render("Unhealthy targets alone do not establish the cause of a rollout failure."),

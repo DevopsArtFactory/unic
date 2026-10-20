@@ -82,3 +82,21 @@ func TestECSServiceTargetHealthLookupStates(t *testing.T) {
 		})
 	}
 }
+
+func TestECSServiceTargetHealthCancellationRetainsEvidence(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	repo := &AwsRepository{
+		ECSClient: &mockECSClient{describeServicesFunc: func(context.Context, *ecs.DescribeServicesInput, ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
+			return &ecs.DescribeServicesOutput{Services: []ecstypes.Service{{ServiceArn: awssdk.String("service"), LoadBalancers: []ecstypes.LoadBalancer{{TargetGroupArn: awssdk.String("first")}, {TargetGroupArn: awssdk.String("second")}}}}}, nil
+		}},
+		ELBv2Client: &mockELBv2Client{describeTargetHealthFunc: func(context.Context, *elasticloadbalancingv2.DescribeTargetHealthInput, ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
+			cancel()
+			return &elasticloadbalancingv2.DescribeTargetHealthOutput{}, nil
+		}},
+	}
+	results, err := repo.ListECSServiceTargetHealth(ctx, "cluster", "service")
+	if !errors.Is(err, context.Canceled) || len(results) != 1 || results[0].Group.ARN != "first" {
+		t.Fatalf("partial evidence lost: %+v %v", results, err)
+	}
+}

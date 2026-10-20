@@ -54,7 +54,10 @@ func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		}
 		em.healthLoading = false
 		em.healthResults, em.healthError, em.healthObserved = msg.results, msg.err, msg.observed
-		em.detailScroll = 0
+		viewport := *m
+		viewport.screen = screenECSTargetHealth
+		lines, visible := em.serviceDetailViewport(viewport, ecsTargetHealthHelp)
+		em.detailScroll = min(em.detailScroll, max(len(lines)-visible, 0))
 		return *m, nil, true
 	case ecsClustersLoadedMsg:
 		em.clusters = msg.clusters
