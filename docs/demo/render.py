@@ -111,7 +111,7 @@ def render(frame, font_path):
     draw.rounded_rectangle((56, 174, 1544, 1064), radius=16, fill="#101923", outline="#2a3b4e", width=2)
     for i, color in enumerate(("#e37478", "#e8bd6e", "#6fc1a1")):
         draw.ellipse((79 + i * 22, 195, 89 + i * 22, 205), fill=color)
-    draw.text((165, 187), "unic / ECS rollout", font=small, fill=MUTED)
+    draw.text((165, 187), "unic / context to ECS rollout", font=small, fill=MUTED)
     draw.text((1080, 187), "SYNTHETIC DATA / REAL TUI VIEWS", font=small, fill=MUTED)
     draw.line((57, 221, 1543, 221), fill="#2a3b4e", width=1)
     draw_terminal(draw, frame["ansi"], font, 84, 238)

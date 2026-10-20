@@ -20,7 +20,8 @@ import (
 )
 
 // TestProductDemo captures production views and key handling with synthetic API
-// messages. Never execute returned commands or Init: those can contact real AWS.
+// messages. Only saveContext is executed, against t.TempDir; Init, authentication,
+// and AWS commands are never executed.
 func TestProductDemo(t *testing.T) {
 	out := os.Getenv("UNIC_DEMO_FRAMES")
 	if out == "" {
@@ -29,7 +30,11 @@ func TestProductDemo(t *testing.T) {
 	previous := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	t.Cleanup(func() { lipgloss.SetColorProfile(previous) })
-	m := New(&config.Config{ContextName: "demo-readonly", Region: "us-east-1", AuthType: config.AuthTypeCredential}, filepath.Join(t.TempDir(), "config.yaml"), "demo")
+	for _, name := range []string{"UNIC_CONTEXT", "AWS_PROFILE", "AWS_DEFAULT_PROFILE"} {
+		t.Setenv(name, "")
+	}
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	m := New(&config.Config{Profile: "demo-profile", Region: "us-east-1", AuthType: config.AuthTypeCredential}, configPath, "demo")
 	m.width, m.height = 120, 36
 	// Verify the documented first-use route even without saved unic contexts.
 	entry := New(&config.Config{Profile: "demo-profile", Region: "us-east-1"}, "", "demo")
@@ -45,14 +50,6 @@ func TestProductDemo(t *testing.T) {
 		t.Fatal("documented palette entry did not retain the CLI profile")
 	}
 	entry.palette.stopIndex()
-	m.ecs.selectedCluster = &awsservice.ECSCluster{Name: "demo-platform"}
-	services := []awsservice.ECSService{
-		{Name: "catalog-api", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 3, DesiredCount: 3},
-		{Name: "checkout-api", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 1, DesiredCount: 3, PendingCount: 2},
-		{Name: "payments-worker", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 2, DesiredCount: 2},
-		{Name: "search-api", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 3, DesiredCount: 3},
-	}
-	m.ecs.HandleMessage(&m, ecsServicesLoadedMsg{services: services})
 	type frame struct {
 		Seconds float64 `json:"seconds"`
 		Chapter string  `json:"chapter"`
@@ -81,7 +78,59 @@ func TestProductDemo(t *testing.T) {
 		updated, _ := m.Update(msg)
 		m = updated.(Model)
 	}
-	capture(4, "01 / FIND THE SERVICE", "A deployment is failing. Start with the service, not another console tab.", "ECS > cluster > services", "checkout-api")
+	capture(2, "00 / ADD YOUR CONTEXT", "Start with an existing AWS profile. Save a reusable unic context.", "a: add your first context", "No contexts defined")
+	key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	if m.screen != screenContextAdd {
+		t.Fatal("a did not open Add Context")
+	}
+	key(tea.KeyMsg{Type: tea.KeyDown})
+	if authTypes[m.addAuthIdx] != "credential" {
+		t.Fatal("expected profile-backed credential auth type")
+	}
+	capture(2, "00 / ADD YOUR CONTEXT", "Choose credential to reuse a named AWS profile; no access keys are entered here.", "Down > credential > Enter", "credential")
+	key(tea.KeyMsg{Type: tea.KeyEnter})
+	values := map[string]string{"name": "demo-readonly", "region": "us-east-1", "profile": "demo-profile"}
+	for _, field := range fieldsByAuthType["credential"] {
+		value := values[field.key]
+		if value != "" {
+			key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(value)})
+			capture(2, "00 / ADD YOUR CONTEXT", "Name the context, choose its region, and reference your existing AWS profile.", field.label+": "+value+" > Enter (skip optional fields)", value)
+		}
+		key(tea.KeyMsg{Type: tea.KeyEnter})
+	}
+	if m.addStep != -1 {
+		t.Fatal("context wizard did not reach the save confirmation")
+	}
+	capture(2, "00 / ADD YOUR CONTEXT", "Review the profile and region before saving. Optional role chaining is left blank.", "Enter: save context", "Save this context?")
+	// This is the one executed command: the inspected local-file save, never auth.
+	updated, save := m.updateContextAdd(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+	if save == nil {
+		t.Fatal("Enter did not request the local context save")
+	}
+	saved, ok := save().(contextsLoadedMsg)
+	if !ok || len(saved.contexts) != 1 || saved.contexts[0].Name != "demo-readonly" || saved.contexts[0].Profile != "demo-profile" || saved.contexts[0].Region != "us-east-1" {
+		t.Fatalf("context was not persisted correctly: %+v", saved)
+	}
+	updated, _ = m.Update(saved)
+	m = updated.(Model)
+	capture(2, "00 / ADD YOUR CONTEXT", "Saved. Select the context, then open ECS Browser & Exec and choose a cluster.", "Enter: select context (AWS authentication is not run in this demo)", "demo-readonly")
+	key(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.pendingContextName != "demo-readonly" {
+		t.Fatal("saved context could not be selected")
+	}
+	// Represent the authenticated state with a synthetic message; discard AWS commands.
+	updated, _ = m.Update(contextSwitchedMsg{cfg: &config.Config{ContextName: "demo-readonly", Profile: "demo-profile", Region: "us-east-1", AuthType: config.AuthTypeCredential}})
+	m = updated.(Model)
+	m.ecs.selectedCluster = &awsservice.ECSCluster{Name: "demo-platform"}
+	services := []awsservice.ECSService{
+		{Name: "catalog-api", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 3, DesiredCount: 3},
+		{Name: "checkout-api", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 1, DesiredCount: 3, PendingCount: 2},
+		{Name: "payments-worker", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 2, DesiredCount: 2},
+		{Name: "search-api", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 3, DesiredCount: 3},
+	}
+	m.ecs.HandleMessage(&m, ecsServicesLoadedMsg{services: services})
+	capture(3, "01 / FIND THE SERVICE", "With access configured: investigate a deployment in your ECS cluster.", "ECS > ECS Browser & Exec > cluster > services", "checkout-api")
 	key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	query := "checkout"
 	for i, r := range query {
@@ -92,7 +141,7 @@ func TestProductDemo(t *testing.T) {
 	if len(m.ecs.filteredServices) != 1 || m.ecs.filteredServices[0].Name != "checkout-api" {
 		t.Fatal("filter did not isolate checkout-api")
 	}
-	capture(2.8, "01 / FIND THE SERVICE", "One running task. Three desired. Open the rollout to inspect the evidence.", "Enter", "1/4 services")
+	capture(1.8, "01 / FIND THE SERVICE", "One running task. Three desired. Open the rollout to inspect the evidence.", "Enter", "1/4 services")
 	key(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.screen != screenLoading || m.ecs.selectedService.Name != "checkout-api" {
 		t.Fatal("Enter did not request the selected service detail")
@@ -117,9 +166,9 @@ func TestProductDemo(t *testing.T) {
 		},
 	}
 	m.ecs.HandleMessage(&m, ecsServiceDetailLoadedMsg{detail: detail})
-	capture(9, "02 / INSPECT THE ROLLOUT", "ACTIVE is the service status. FAILED is the deployment state that matters here.", "Read rollout state + task counts", "FAILED")
-	capture(9, "03 / READ THE EVIDENCE", "The circuit breaker reports tasks failing to start. Check task diagnostics next.", "Image + timestamped events", "was unable to consistently start")
-	capture(4, "YOUR NEXT DEPLOYMENT", "Try it: unic --profile your-profile --region your-region", "ECS > ECS Browser & Exec > cluster > service", "Recent Service Events")
+	capture(5, "02 / INSPECT THE ROLLOUT", "ACTIVE is the service status. FAILED is the deployment state that matters here.", "Read rollout state + task counts", "FAILED")
+	capture(3, "03 / READ THE EVIDENCE", "The circuit breaker reports tasks failing to start. Check task diagnostics next.", "Image + timestamped events", "was unable to consistently start")
+	capture(2, "YOUR NEXT DEPLOYMENT", "Try it: unic --profile your-profile --region your-region", "a: save your context > ECS > cluster > service", "Recent Service Events")
 	var duration float64
 	for _, f := range frames {
 		duration += f.Seconds

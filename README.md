@@ -4,11 +4,11 @@ Investigate AWS deployments, inspect resources, and switch accounts from your te
 
 **A service is ACTIVE. Its deployment has FAILED. See the difference before opening another console tab.**
 
-![unic ECS walkthrough: filter checkout-api, inspect its failed rollout, then read the image version and service events](docs/assets/ecs-rollout.gif)
+![unic walkthrough: add a context, save a profile and region, then inspect a failed ECS rollout](docs/assets/ecs-rollout.gif)
 
 [Watch the 30-second video](docs/assets/ecs-rollout.mp4) · [Still image](docs/assets/ecs-rollout.png) · [Walkthrough and recording source](docs/demo/README.md)
 
-The walkthrough uses **synthetic data rendered by the real TUI code**. It shows shipped ECS filtering, rollout details, image versions, and service events. It makes no AWS calls and is not a recording of a live incident.
+The walkthrough uses **synthetic data rendered by the real TUI code**. It starts with Add Context, saves a profile/region in a temporary config, then shows shipped ECS filtering, rollout details, image versions, and service events. Authentication and AWS results are simulated; it makes no AWS calls and is not a recording of a live incident.
 
 ## Get to your first rollout
 
@@ -19,7 +19,23 @@ curl -sSL https://raw.githubusercontent.com/DevopsArtFactory/unic/main/install.s
 unic --profile your-profile --region us-east-1
 ```
 
-Use an existing AWS profile with access to your ECS cluster. If it uses SSO, sign in with `aws sso login --profile your-profile` first. Skip the startup splash with `Space`. From the context picker, press `P`, type `ECS Browser`, and select **ECS Browser & Exec**. This opens the browser with your CLI-selected profile and region, even before you have saved any unic contexts. Select your cluster, then your service. Press `/` to filter the service list; press `Enter` to finish filtering, then `Enter` again to open the rollout. Use `↓` or `PgDn` to reach the image versions and recent events on a shorter terminal; `?` shows help.
+Use an existing AWS profile with access to your ECS cluster. If it uses SSO, sign in with `aws sso login --profile your-profile` first. Skip the startup splash with `Space`.
+
+### Add your first context
+
+1. In **Select Context**, press `a` to open **Add Context**. During another session, `C` opens the context picker first.
+2. Select **credential** to reuse an existing AWS profile. This path references a profile name; it does not ask you to paste access keys. For a directly configured SSO context, use **sso** instead and follow the [auth-type reference](#auth-types).
+3. Enter a **Name** (for example, `dev-readonly`), skip **Display Order** with `Enter`, and enter the **Region** (for example, `us-east-1`).
+4. Skip **Other Resource Regions** if unneeded, then enter your existing **Profile** name. Leave **Role ARN**, **External ID**, and **MFA Device ARN** blank unless your setup needs role chaining or MFA; `Enter` skips each optional field.
+5. Review the summary and press `Enter` to save. Back in the picker, select the saved context with `Enter`. Saving is local; selecting it can authenticate with AWS. The context name alone does not make access read-only—your IAM permissions do.
+
+Context creation currently uses this TUI wizard, not a `unic context add` CLI command. See [configuration](#configuration) for the config path and other auth options.
+
+### Open the rollout
+
+After selecting the context, press `P`, type `ECS Browser`, and select **ECS Browser & Exec**. Select your cluster, then your service. Press `/` to filter the service list; press `Enter` to finish filtering, then `Enter` again to open the rollout. Use `↓` or `PgDn` to reach the image versions and recent events on a shorter terminal; `?` shows help.
+
+For a one-off session without saving a context, use the same `P` route directly from the initial picker; it retains your CLI-selected profile and region.
 
 Having trouble connecting? Run `unic doctor --profile your-profile --region us-east-1` and follow its remediation. See [configuration](#configuration) for context setup and [Homebrew](#homebrew) or [source installation](#build-from-source) for other install options.
 
