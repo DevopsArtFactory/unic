@@ -120,7 +120,7 @@ def render(frame, font_path):
 
 
 def capture_environment(tmp, frames_path):
-    env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("AWS_", "UNIC_"))}
     env.update(UNIC_DEMO_FRAMES=str(frames_path), TZ="UTC",
                AWS_EC2_METADATA_DISABLED="true", XDG_CONFIG_HOME=str(tmp / "config"),
                AWS_CONFIG_FILE=str(tmp / "aws-config"),
