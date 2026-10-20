@@ -28,7 +28,8 @@ class RenderTests(unittest.TestCase):
                         raise subprocess.CalledProcessError(1, command)
                     if calls == 1:
                         Path(kwargs["env"]["UNIC_DEMO_FRAMES"]).write_text(json.dumps([
-                            {"seconds": 30, "chapter": "02 / INSPECT THE ROLLOUT"}
+                            {"seconds": 30, "chapter": "02 / INSPECT THE ROLLOUT",
+                             "caption": "test caption", "keys": "test keys", "ansi": ""}
                         ]), encoding="utf-8")
                     else:
                         Path(command[-1]).write_bytes(b"new encoded asset")
