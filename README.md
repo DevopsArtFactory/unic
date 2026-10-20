@@ -14,6 +14,15 @@ It combines a Bubble Tea application, Cobra-based CLI commands, and AWS SDK v2 c
 - Perform operational workflows such as EC2 inventory inspection, SSM sessions, RDS control, Route53 record changes, DynamoDB table and keyed-item inspection, ECS rollout inspection/exec, EKS cluster and node group review, IAM access key rotation, and Bedrock API key management
 - Press `i` from the service picker to enter Inspector mode, then run either the Security Inspector workflow for built-in security and cost/waste findings or the Checklist Inspector workflow for YAML-driven readiness checks across databases, network resources, DNS, logging, secrets, and baseline posture. Checklist files can be loaded from the in-TUI picker or preloaded with `--checklist <path>`
 
+## Try Without AWS
+
+Run `unic demo` for a synthetic ECS deployment failure without credentials, SSO,
+network access, or existing configuration. Select `checkout-demo` with **Enter**,
+then scroll through the failed rollout and recent service events to find the
+image-pull error. Press **?** for guided steps, **Esc** to go back, and **q** to exit.
+The demo uses fixed sample data and never reads or changes your AWS/unic config.
+See [reproducible demo steps](docs/development.md#offline-ecs-demo).
+
 ## Documentation Map
 
 This is the closest structure to a "harness-like" doc hub in this repository: one entry document with focused reference docs behind it.

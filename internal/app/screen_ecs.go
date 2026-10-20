@@ -342,6 +342,10 @@ func (em *ecsModel) updateServiceDetail(m *Model, msg tea.KeyMsg) (tea.Model, te
 }
 
 func (em ecsModel) viewServiceDetail(m Model) string {
+	return em.viewServiceDetailWithHelp(m, "↑/↓: scroll • pgup/pgdn: page • W: watch • I: interval • enter: tasks • r: refresh • esc: back • H: home")
+}
+
+func (em ecsModel) viewServiceDetailWithHelp(m Model, help string) string {
 	if em.selectedDetail == nil {
 		return ""
 	}
@@ -380,7 +384,7 @@ func (em ecsModel) viewServiceDetail(m Model) string {
 
 	b.WriteString(m.renderListPanel(panel.String()))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderHelpBar("↑/↓: scroll • pgup/pgdn: page • W: watch • I: interval • enter: tasks • r: refresh • esc: back • H: home"))
+	b.WriteString(m.renderHelpBar(help))
 	return b.String()
 }
 
