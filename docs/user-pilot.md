@@ -44,9 +44,11 @@ or publication. Before starting, explain:
 > no AWS credentials or production access. Participation is optional; you can
 > skip a task or stop at any time. May we keep anonymized task timings and notes?
 > May we contact you once next week about repeat use and sharing?
+> May we publish anonymized study findings in the #389 synthesis and community
+> write-up?
 
-Record separate answers for session notes and follow-up. Default to written,
-anonymized notes without audio/video recording. Agree on a deletion date and
+Record separate answers for session notes, follow-up, and publication. Default to
+written, anonymized notes without audio/video recording. Agree on a deletion date and
 withdrawal method before collecting notes. Do not request account IDs, resource
 ARNs, credentials, SSO caches, private logs, or production screens. Ask participants
 to close sensitive windows before any screen sharing. Stop capture if sensitive
@@ -110,7 +112,7 @@ Use one private record per participant with a random study ID:
 
 | Field | Record |
 | --- | --- |
-| Consent | Notes yes/no; follow-up yes/no; agreed deletion date |
+| Consent | Notes yes/no; follow-up yes/no; publication yes/no; agreed deletion date |
 | Background | Broad role/experience categories; prior unic exposure |
 | Environment | Build SHA/version, protocol revision, OS, terminal size |
 | First impression | Anonymized interpretation; understood use case yes/partial/no with reason |
