@@ -46,6 +46,8 @@ def draw_terminal(draw, text, font, x, y):
         parts = SGR.split(line)
         for index, part in enumerate(parts):
             if index % 2 == 0:
+                if "\x1b" in part:
+                    raise ValueError("unsupported terminal escape sequence")
                 for char in part:
                     px, py = x + column * cell, y + row * 22
                     if bg is not None:
@@ -89,7 +91,7 @@ def draw_terminal(draw, text, font, x, y):
                         if i + 4 >= len(codes):
                             raise ValueError("truncated SGR RGB color")
                         color = tuple(codes[i + 2:i + 5])
-                        if any(channel > 255 for channel in color):
+                        if any(not 0 <= channel <= 255 for channel in color):
                             raise ValueError("SGR RGB channels must be between 0 and 255")
                         i += 4
                     else:

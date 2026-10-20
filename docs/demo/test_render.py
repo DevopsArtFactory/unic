@@ -52,7 +52,7 @@ class RenderTests(unittest.TestCase):
         draw = ImageDraw.Draw(Image.new("RGB", (40, 30)))
         font = ImageFont.load_default()
         render.draw_terminal(draw, "\x1b[38;5;123mX\x1b[48;2;1;2;3mY", font, 0, 0)
-        for codes in ("38", "48", "38;5", "48;2;1;2", "38;5;256", "48;2;256;0;0", "38;1", "48;3"):
+        for codes in ("38", "48", "38;5", "48;2;1;2", "38;5;256", "48;2;256;0;0", "48;2;-1;0;0", "38;1", "48;3"):
             with self.subTest(codes=codes), self.assertRaises(ValueError):
                 render.draw_terminal(draw, f"\x1b[{codes}mX", font, 0, 0)
 
@@ -85,6 +85,7 @@ class RenderTests(unittest.TestCase):
                   "AWS_PROFILE": "production", "AWS_CONFIG_FILE": "/real/config",
                   "AWS_SHARED_CREDENTIALS_FILE": "/real/credentials",
                   "AWS_CONTAINER_CREDENTIALS_FULL_URI": "http://example.invalid",
+                  "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/synthetic/credentials",
                   "UNIC_CONTEXT": "production", "UNIC_DEMO_FRAMES": "/stale/frames.json"}
         with patch.dict(os.environ, caller, clear=True):
             env = render.capture_environment(Path("/tmp/demo"), Path("/tmp/demo/frames.json"))
