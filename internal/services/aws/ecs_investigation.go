@@ -161,10 +161,10 @@ func (r *AwsRepository) collectECSLogs(ctx context.Context, result *ECSInvestiga
 			result.Warnings = append(result.Warnings, "Log collection limited to five associated groups.")
 			break
 		}
-		seen[group] = true
 		if ctx.Err() != nil {
 			return
 		}
+		seen[group] = true
 		item := ECSInvestigationLog{Group: group}
 		// Group-wide evidence may include other services; never infer task ownership from its name.
 		page, err := r.CloudWatchLogsClient.FilterLogEvents(ctx, &cloudwatchlogs.FilterLogEventsInput{LogGroupName: &group, StartTime: awssdk.Int64(result.ObservedAt.Add(-6 * time.Hour).UnixMilli()), EndTime: awssdk.Int64(result.ObservedAt.UnixMilli()), Limit: awssdk.Int32(50)})
