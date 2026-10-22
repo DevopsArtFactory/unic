@@ -47,7 +47,7 @@ func (r *AwsRepository) InvestigateECSService(ctx context.Context, cluster, serv
 	var err error
 	result.Rollout, err = r.DescribeServiceDetail(ctx, cluster, service)
 	if err != nil {
-		result.Warnings = append(result.Warnings, "Rollout unavailable: "+err.Error())
+		result.Warnings = append(result.Warnings, "Rollout unavailable or incomplete: "+err.Error())
 	}
 	if ctx.Err() == nil {
 		result.Health, err = r.ListECSServiceTargetHealth(ctx, cluster, service)
@@ -66,7 +66,7 @@ func (r *AwsRepository) InvestigateECSService(ctx context.Context, cluster, serv
 		result.Changes, complete, err = r.LookupEventsWithStatus(ctx, CloudTrailLookup{Since: 6 * time.Hour, ResourceName: service, MutationsOnly: true})
 		result.ChangesCollected = err == nil
 		if err != nil {
-			result.Warnings = append(result.Warnings, "CloudTrail unavailable: "+err.Error())
+			result.Warnings = append(result.Warnings, "CloudTrail unavailable or incomplete: "+err.Error())
 		} else if !complete {
 			result.Warnings = append(result.Warnings, "CloudTrail truncated at 100 events; narrow the query in CloudTrail Event Lookup.")
 		}
@@ -137,7 +137,11 @@ func (r *AwsRepository) collectECSLogs(ctx context.Context, result *ECSInvestiga
 	seen := map[string]bool{}
 	for _, container := range out.TaskDefinition.ContainerDefinitions {
 		cfg := container.LogConfiguration
-		if cfg == nil || cfg.LogDriver != ecstypes.LogDriverAwslogs {
+		if cfg == nil {
+			result.Warnings = append(result.Warnings, "Container logging not configured; no associated logs can be collected.")
+			continue
+		}
+		if cfg.LogDriver != ecstypes.LogDriverAwslogs {
 			result.Warnings = append(result.Warnings, "A container has no supported awslogs association.")
 			continue
 		}

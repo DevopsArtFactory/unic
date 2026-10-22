@@ -116,3 +116,33 @@ func TestECSInvestigationCancellationAndSectionFailures(t *testing.T) {
 		}
 	}
 }
+
+func TestECSInvestigationRetainsRolloutAndCloudTrailPagesOnEnrichmentFailure(t *testing.T) {
+	repo := &AwsRepository{ECSClient: &mockECSClient{
+		describeServicesFunc: func(context.Context, *ecs.DescribeServicesInput, ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
+			return &ecs.DescribeServicesOutput{Services: []ecstypes.Service{{ServiceArn: awssdk.String("service"), TaskDefinition: awssdk.String("taskdef"), Events: []ecstypes.ServiceEvent{{Message: awssdk.String("deployment failed")}}}}}, nil
+		},
+		describeTaskDefFunc: func(context.Context, *ecs.DescribeTaskDefinitionInput, ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
+			return nil, errors.New("AccessDenied")
+		},
+		listTasksFunc: func(context.Context, *ecs.ListTasksInput, ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
+			return &ecs.ListTasksOutput{}, nil
+		},
+	}}
+	pages := 0
+	repo.CloudTrailClient = &mockCloudTrailEventsClient{lookupEventsFunc: func(context.Context, *cloudtrail.LookupEventsInput, ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+		pages++
+		if pages == 1 {
+			return &cloudtrail.LookupEventsOutput{Events: []cttypes.Event{{EventName: awssdk.String("UpdateService"), ReadOnly: awssdk.String("false")}}, NextToken: awssdk.String("next")}, nil
+		}
+		return nil, errors.New("throttled")
+	}}
+	result := repo.InvestigateECSService(context.Background(), "cluster", "service")
+	if result.Rollout == nil || len(result.Rollout.Events) != 1 || len(result.Changes) != 1 || result.ChangesCollected {
+		t.Fatalf("partial evidence discarded: %+v", result)
+	}
+	warnings := strings.Join(result.Warnings, " ")
+	if !strings.Contains(warnings, "AccessDenied") || !strings.Contains(warnings, "throttled") {
+		t.Fatalf("partial warnings discarded: %s", warnings)
+	}
+}

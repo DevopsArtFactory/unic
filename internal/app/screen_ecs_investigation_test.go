@@ -115,6 +115,9 @@ func TestECSInvestigationEvidenceAndWrapping(t *testing.T) {
 			t.Fatal("multiline evidence was not expanded before viewport counting")
 		}
 	}
+	if strings.Contains(strings.Join(m.ecs.investigationLines(), " "), "0001-") {
+		t.Fatal("missing stopped time rendered as an observation")
+	}
 	if !strings.Contains(strings.Join(m.ecs.investigationLines(), " "), "CloudTrail unavailable or not collected") {
 		t.Fatal("skipped CloudTrail not distinguished")
 	}

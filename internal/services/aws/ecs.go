@@ -111,6 +111,7 @@ func (r *AwsRepository) ListServices(ctx context.Context, clusterARN string) ([]
 }
 
 // DescribeServiceDetail returns rollout, task definition, and recent event detail for one ECS service.
+// A task-definition error returns the fetched service detail alongside the enrichment error.
 func (r *AwsRepository) DescribeServiceDetail(ctx context.Context, clusterARN, serviceARN string) (*ECSServiceDetail, error) {
 	uniclog.Debug("aws", "DescribeServiceDetail called", "cluster", clusterARN, "service", serviceARN)
 
@@ -198,7 +199,7 @@ func (r *AwsRepository) DescribeServiceDetail(ctx context.Context, clusterARN, s
 			TaskDefinition: awssdk.String(detail.TaskDefinitionARN),
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to describe ECS task definition %s: %w", detail.TaskDefinitionARN, err)
+			return detail, fmt.Errorf("failed to describe ECS task definition %s: %w", detail.TaskDefinitionARN, err)
 		}
 		if taskDefOut.TaskDefinition != nil {
 			taskDef := taskDefOut.TaskDefinition

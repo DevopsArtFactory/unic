@@ -27,10 +27,10 @@ func (em *ecsModel) startInvestigation(m *Model) (tea.Model, tea.Cmd) {
 	em.investigation = awsservice.ECSInvestigation{}
 	m.screen = screenECSInvestigation
 	cfg, cluster, service := *m.cfg, em.selectedCluster.ARN, em.selectedDetail.ARN
-	generation := 0
-	if m.commands != nil {
-		generation = m.commands.Renew()
+	if m.commands == nil {
+		m.commands = newCommandLifecycle()
 	}
+	generation := m.commands.Renew()
 	baseCtx := m.commandContext()
 	cmd := func() tea.Msg {
 		ctx, cancel := context.WithTimeout(baseCtx, ecsAPITimeout)
@@ -41,10 +41,7 @@ func (em *ecsModel) startInvestigation(m *Model) (tea.Model, tea.Cmd) {
 		}
 		return ecsInvestigationLoadedMsg{repo.InvestigateECSService(ctx, cluster, service)}
 	}
-	if m.commands != nil {
-		return *m, m.commands.BindCmd(generation, cmd)
-	}
-	return *m, cmd
+	return *m, m.commands.BindCmd(generation, cmd)
 }
 
 func (em *ecsModel) updateInvestigation(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -101,7 +98,8 @@ func (em ecsModel) investigationLines() []string {
 		lines = append(lines, "No stopped-task evidence returned. Check warnings; ECS retention is limited.")
 	}
 	for _, task := range result.StoppedTasks {
-		lines = append(lines, task.ARN, fmt.Sprintf("  %s %s: %s", task.StoppedAt.UTC().Format(time.RFC3339), task.StopCode, task.Reason))
+		stoppedAt := ecsEvidenceTime(task.StoppedAt)
+		lines = append(lines, task.ARN, fmt.Sprintf("  %s %s: %s", stoppedAt, task.StopCode, task.Reason))
 		lines = append(lines, task.Containers...)
 	}
 	lines = append(lines, "", titleStyle.Render("Associated awslogs groups (group-wide sample)"))
@@ -117,13 +115,13 @@ func (em ecsModel) investigationLines() []string {
 			lines = append(lines, "  No events in returned page; this does not prove no logs exist.")
 		}
 		for _, event := range log.Events {
-			lines = append(lines, event.Timestamp.UTC().Format(time.RFC3339)+" "+event.Message)
+			lines = append(lines, ecsEvidenceTime(event.Timestamp)+" "+event.Message)
 		}
 	}
 	lines = append(lines, "", titleStyle.Render("CloudTrail writes (exact service ARN lookup, preceding 6h)"),
 		"Resource indexing may omit relevant changes. Empty results do not prove no changes occurred.")
 	if !result.ChangesCollected {
-		lines = append(lines, "CloudTrail unavailable or not collected; see warnings.")
+		lines = append(lines, "CloudTrail unavailable or not collected completely; any fetched events remain below. See warnings.")
 	} else if len(result.Changes) == 0 {
 		lines = append(lines, "No indexed writes returned for this service ARN and time window.")
 	}
@@ -134,4 +132,11 @@ func (em ecsModel) investigationLines() []string {
 		"Inspect logs and change details in their owning browsers; the evidence above does not establish root cause.")
 	// Expand multiline AWS text before the shared viewport wraps and counts physical lines.
 	return strings.Split(strings.Join(lines, "\n"), "\n")
+}
+
+func ecsEvidenceTime(value time.Time) string {
+	if value.IsZero() {
+		return "not reported"
+	}
+	return value.UTC().Format(time.RFC3339)
 }
