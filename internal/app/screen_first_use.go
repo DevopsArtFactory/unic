@@ -18,21 +18,24 @@ type firstUseGuide struct {
 	identity *awsservice.CallerIdentity
 	err      string
 	scroll   int
+	commands *commandLifecycle
 }
 
 type firstUseIdentityMsg struct {
-	identity *awsservice.CallerIdentity
-	err      error
+	identity   *awsservice.CallerIdentity
+	err        error
+	commands   *commandLifecycle
+	generation int
 }
 
 var firstUseRepository = awsservice.NewAwsRepository
 
 func (m Model) openFirstUseGuide() (tea.Model, tea.Cmd) {
 	m.helpVisible = false
-	if m.guide.loading && m.commands != nil {
-		m.commands.CancelAll()
+	if m.guide.commands != nil {
+		m.guide.commands.CancelAll()
 	}
-	m.guide = firstUseGuide{previous: m.screen}
+	m.guide = firstUseGuide{previous: m.screen, commands: newCommandLifecycle()}
 	m.screen = screenFirstUse
 	return m, nil
 }
@@ -40,8 +43,8 @@ func (m Model) openFirstUseGuide() (tea.Model, tea.Cmd) {
 func (m Model) updateFirstUseGuide(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
-		if m.guide.loading && m.commands != nil {
-			m.commands.CancelAll()
+		if m.guide.commands != nil {
+			m.guide.commands.CancelAll()
 		}
 		m.guide.loading = false
 		m.screen = m.guide.previous
@@ -55,22 +58,25 @@ func (m Model) updateFirstUseGuide(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.guide.identity = nil
 		m.guide.err = ""
 		cfg := *m.cfg
-		if m.commands == nil {
-			m.commands = newCommandLifecycle()
+		if m.guide.commands == nil {
+			m.guide.commands = newCommandLifecycle()
 		}
-		generation := m.commands.Renew()
-		baseCtx := m.commandContext()
+		commands := m.guide.commands
+		generation := commands.Renew()
+		baseCtx := commands.Current()
 		cmd := func() tea.Msg {
+			if commands.CurrentGen() != generation {
+				return nil
+			}
 			ctx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
 			defer cancel()
 			repo, err := firstUseRepository(ctx, &cfg)
 			if err != nil {
-				return firstUseIdentityMsg{err: err}
+				return firstUseIdentityMsg{err: err, commands: commands, generation: generation}
 			}
 			identity, err := repo.GetCallerIdentity(ctx)
-			return firstUseIdentityMsg{identity: identity, err: err}
+			return firstUseIdentityMsg{identity: identity, err: err, commands: commands, generation: generation}
 		}
-		cmd = m.commands.BindCmd(generation, cmd)
 		return m, cmd
 	case "e":
 		if m.guide.identity == nil || m.guide.loading {

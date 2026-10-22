@@ -605,7 +605,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.callerIdentity = msg.identity
 		return m, nil
 	case firstUseIdentityMsg:
-		if !m.guide.loading {
+		if !m.guide.loading || msg.commands != m.guide.commands || (msg.commands != nil && msg.generation != msg.commands.CurrentGen()) {
 			return m, nil
 		}
 		m.guide.loading = false

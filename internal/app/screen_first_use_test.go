@@ -149,3 +149,22 @@ func TestFirstUseScrollAndRejectedIdentity(t *testing.T) {
 		t.Fatal("invalid identity retained or result not brought into view")
 	}
 }
+
+func TestFirstUseCancellationPreservesUnrelatedLoad(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenContextPicker
+	generation := m.commands.Renew()
+	parent := m.commands.Current()
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	m = updated.(Model)
+	updated, lookup := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.commands.CurrentGen() != generation || parent.Err() != nil {
+		t.Fatal("guide cancelled an unrelated resource lookup")
+	}
+	if lookup() != nil {
+		t.Fatal("cancelled guide lookup still ran")
+	}
+}

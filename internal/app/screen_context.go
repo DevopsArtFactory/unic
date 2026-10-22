@@ -59,6 +59,9 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, m.finalizeContextSwitch(), true
 
 	case contextSwitchedMsg:
+		if m.guide.commands != nil {
+			m.guide.commands.CancelAll()
+		}
 		m.guide = firstUseGuide{previous: screenServiceList}
 		contextChanged := m.cfg == nil || msg.cfg == nil || m.cfg.ContextName != msg.cfg.ContextName || m.cfg.Region != msg.cfg.Region
 		m.cfg = msg.cfg
@@ -120,6 +123,9 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, tea.ClearScreen, true
 
 	case regionSwitchedMsg:
+		if m.guide.commands != nil {
+			m.guide.commands.CancelAll()
+		}
 		m.guide = firstUseGuide{previous: screenServiceList}
 		resetECSContextState(&m)
 		m.cfg.Region = msg.region
