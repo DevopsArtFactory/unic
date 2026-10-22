@@ -59,6 +59,29 @@ func TestSaveECSSummaryExclusivePrivateFile(t *testing.T) {
 	}
 }
 
+func TestSaveECSSummaryRemovesPartialWrite(t *testing.T) {
+	original := ecsSummaryWriteString
+	t.Cleanup(func() { ecsSummaryWriteString = original })
+	ecsSummaryWriteString = func(file *os.File, content string) (int, error) {
+		_, err := file.WriteString(content[:1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		return 1, errors.New("disk full")
+	}
+	path := filepath.Join(t.TempDir(), "partial.md")
+	if err := saveECSSummary(path, "preview"); err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Fatal("write error hidden")
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("partial artifact blocks retry")
+	}
+	ecsSummaryWriteString = original
+	if err := saveECSSummary(path, "preview"); err != nil {
+		t.Fatal("retry blocked:", err)
+	}
+}
+
 func TestECSSummaryPreviewActionsAndReturn(t *testing.T) {
 	originalCopy, originalSave := ecsSummaryCopy, ecsSummarySave
 	t.Cleanup(func() { ecsSummaryCopy, ecsSummarySave = originalCopy, originalSave })

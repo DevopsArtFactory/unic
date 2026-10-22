@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -98,17 +99,28 @@ func safeSummaryWarning(value string) string {
 	}
 }
 
+var ecsSummaryWriteString = (*os.File).WriteString
+
 func saveECSSummary(path, content string) error {
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
 	}
-	_, writeErr := file.WriteString(content)
+	written, writeErr := ecsSummaryWriteString(file, content)
+	if writeErr == nil && written != len(content) {
+		writeErr = io.ErrShortWrite
+	}
 	closeErr := file.Close()
+	if writeErr == nil {
+		writeErr = closeErr
+	}
 	if writeErr != nil {
+		if cleanupErr := os.Remove(path); cleanupErr != nil {
+			return fmt.Errorf("export failed: %w; partial file cleanup failed: %v", writeErr, cleanupErr)
+		}
 		return writeErr
 	}
-	return closeErr
+	return nil
 }
 
 func ecsSummaryFilename(now time.Time) string {

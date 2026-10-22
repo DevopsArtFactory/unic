@@ -55,11 +55,12 @@ func (em *ecsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case ecsSummaryActionMsg:
-		if m.screen == screenECSSummary {
-			em.summaryNotice = msg.notice
-			if msg.err != nil {
-				em.summaryNotice = "Copy/save failed: " + msg.err.Error()
-			}
+		if m.screen != screenECSSummary {
+			return *m, nil, false
+		}
+		em.summaryNotice = msg.notice
+		if msg.err != nil {
+			em.summaryNotice = "Copy/save failed: " + msg.err.Error()
 		}
 		return *m, nil, true
 	case ecsInvestigationLoadedMsg:
