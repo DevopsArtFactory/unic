@@ -60,7 +60,7 @@ func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bo
 		}
 		em.summaryNotice = msg.notice
 		if msg.err != nil {
-			em.summaryNotice = "Copy/save failed: " + msg.err.Error()
+			em.summaryNotice = summaryActionFailure(msg.err)
 		}
 		return *m, nil, true
 	case ecsInvestigationLoadedMsg:

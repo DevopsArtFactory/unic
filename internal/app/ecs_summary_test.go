@@ -89,7 +89,7 @@ func TestECSSummaryPreviewActionsAndReturn(t *testing.T) {
 	originalCopy, originalSave := ecsSummaryCopy, ecsSummarySave
 	t.Cleanup(func() { ecsSummaryCopy, ecsSummarySave = originalCopy, originalSave })
 	var copied, saved string
-	ecsSummaryCopy = func(text string) error { copied = text; return errors.New("clipboard unavailable") }
+	ecsSummaryCopy = func(text string) error { copied = text; return errors.New("clipboard unavailable: private-host-path") }
 	ecsSummarySave = func(path, text string) error { saved = text; return os.ErrPermission }
 	m := New(testConfig(), "", "dev")
 	m.screen = screenECSInvestigation
@@ -110,6 +110,9 @@ func TestECSSummaryPreviewActionsAndReturn(t *testing.T) {
 	m = updated.(Model)
 	if copied == "" || strings.Contains(copied, "target-service") || !strings.Contains(m.ecs.summaryNotice, "failed") {
 		t.Fatal("copy leaked identifiers or hid failure")
+	}
+	if strings.Contains(m.ecs.summaryNotice, "private-host-path") {
+		t.Fatal("raw operation failure leaked into preview")
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m = updated.(Model)

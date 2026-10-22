@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -126,4 +127,15 @@ func saveECSSummary(path, content string) error {
 
 func ecsSummaryFilename(now time.Time) string {
 	return "unic-investigation-" + now.UTC().Format("20060102T150405.000000000Z") + ".md"
+}
+
+func summaryActionFailure(err error) string {
+	switch {
+	case errors.Is(err, os.ErrExist):
+		return "Save failed: file already exists. Reopen the preview to choose a new filename."
+	case errors.Is(err, os.ErrPermission):
+		return "Copy/save failed: permission denied. Check clipboard access and working-directory write permissions."
+	default:
+		return "Copy/save failed. Check the clipboard utility and working-directory write access; raw error details are omitted."
+	}
 }
