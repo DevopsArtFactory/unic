@@ -4,11 +4,11 @@ Investigate AWS deployments, inspect resources, and switch accounts from your te
 
 **A service is ACTIVE. Its deployment has FAILED. See the difference before opening another console tab.**
 
-![unic walkthrough: add a context, save a profile and region, then inspect a failed ECS rollout](docs/assets/ecs-rollout.gif)
+![unic walkthrough: add a context, investigate a failed ECS rollout, and preview a sanitized handoff](docs/assets/ecs-rollout.gif)
 
 [Watch the 30-second video](docs/assets/ecs-rollout.mp4) · [Still image](docs/assets/ecs-rollout.png) · [Walkthrough and recording source](docs/demo/README.md)
 
-The walkthrough uses **synthetic data rendered by the real TUI code**. It starts with Add Context, saves a profile/region in a temporary config, then shows shipped ECS filtering, rollout details, image versions, and service events. Authentication and AWS results are simulated; it makes no AWS calls and is not a recording of a live incident.
+The walkthrough uses **synthetic data rendered by the real TUI code**. It starts with Add Context, saves a profile/region in a temporary config, then follows a failed rollout to target health, stopped tasks, unavailable logs, nearby changes, and a sanitized Markdown preview. Authentication and AWS results are simulated; it makes no AWS calls and is not a recording of a live incident. Copy/save controls are shown but not executed.
 
 ## Get to your first rollout
 
