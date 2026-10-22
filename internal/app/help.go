@@ -415,7 +415,9 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"q / esc", "Go back to the service list"},
 		}
 	case screenECSInvestigation:
-		return []helpShortcut{{"↑/↓, j/k, pgup / pgdn", "Scroll investigation evidence and warnings"}, {"r", "Refresh the bounded evidence collection"}, {"q / esc", "Cancel and return to rollout"}}
+		return []helpShortcut{{"↑/↓, j/k, pgup / pgdn", "Scroll investigation evidence and warnings"}, {"m", "Preview sanitized Markdown for local copy/save"}, {"r", "Refresh the bounded evidence collection"}, {"q / esc", "Cancel and return to rollout"}}
+	case screenECSSummary:
+		return []helpShortcut{{"c / s", "Copy preview / save a new local Markdown file"}, {"d", "Preview optional target identifier disclosure"}, {"↑/↓, pgup/pgdn", "Scroll preview"}, {"q / esc", "Return to investigation"}}
 	case screenECSTargetHealth:
 		return []helpShortcut{
 			{"↑/↓, j/k, pgup / pgdn", "Scroll target health and per-group warnings"},
@@ -971,6 +973,8 @@ func (m Model) helpScreenTitle() string {
 		return "ECS Target Health"
 	case screenECSInvestigation:
 		return "ECS Investigation"
+	case screenECSSummary:
+		return "Investigation Markdown preview"
 	case screenECSTaskList:
 		return "ECS Tasks"
 	case screenECSContainerList:

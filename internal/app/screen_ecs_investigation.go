@@ -10,7 +10,7 @@ import (
 	awsservice "unic/internal/services/aws"
 )
 
-const ecsInvestigationHelp = "↑/↓: scroll • pgup/pgdn: page • r: refresh • esc/q: rollout • H: home"
+const ecsInvestigationHelp = "↑/↓: scroll • pgup/pgdn: page • m: Markdown summary • r: refresh • esc/q: rollout • H: home"
 
 type ecsInvestigationLoadedMsg struct{ result awsservice.ECSInvestigation }
 
@@ -46,6 +46,8 @@ func (em *ecsModel) startInvestigation(m *Model) (tea.Model, tea.Cmd) {
 
 func (em *ecsModel) updateInvestigation(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "m":
+		return em.openSummary(m)
 	case "esc", "q":
 		if m.commands != nil {
 			m.commands.CancelAll()

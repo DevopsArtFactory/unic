@@ -153,15 +153,60 @@ and CloudTrail details may reveal internal information. Replace sensitive values
 consistently so relationships remain understandable. Neither CLI nor MCP output
 is a sanitized investigation export.
 
-Connected ECS → target health → logs/change investigation remains
-[#385](https://github.com/DevopsArtFactory/unic/issues/385), and generated sanitized
-Markdown handoff remains [#386](https://github.com/DevopsArtFactory/unic/issues/386).
+The live ECS `i` investigation connects target health, stopped tasks, logs, and
+changes. Its `m` screen previews a generated sanitized Markdown handoff.
 There is currently no MCP application-log reader, MCP cross-service join,
 or tool that imports this note. Use existing TUI log browsing or an approved
 external workflow for unsupported checks. Justified additional agent operations
 belong in [#360](https://github.com/DevopsArtFactory/unic/issues/360); do not assume
-full TUI/MCP parity. The full generated-summary continuation example in #388
-remains pending those dependencies.
+full TUI/MCP parity.
+
+## Continue from a generated summary
+
+1. In a live ECS rollout, press `i`, wait for collection, then `m`. Review the
+   Markdown and its permission/truncation warnings. Default output allows only
+   observation time, counts, known states, generic availability warnings, and
+   next checks. Raw messages/errors, images, names, credentials, account IDs,
+   ARNs, local context/profile and region are omitted.
+2. Communicate the target mapping separately through your approved channel or
+   press `d` to include only cluster/service ARNs and region. ARNs can disclose
+   account IDs. Inspect the changed preview before copying/saving.
+3. `c` copies exactly the Markdown; `s` creates the displayed timestamped file in
+   the current directory with mode `0600`. Existing files/symlinks are not
+   overwritten. Copy/write failures stay visible. Reopening `m` chooses a new
+   filename. Nothing is uploaded or posted. `Esc` returns to the investigation.
+4. Recipients choose their own authorized profile/context, match the agreed
+   account/resource region and cluster/service, and repeat the supported CLI
+   or capability-discovered MCP checks above. A redacted summary requires the
+   separately supplied mapping; the author's profile/context is not portable.
+
+Synthetic example excerpt, not a live result:
+
+```markdown
+# ECS investigation summary
+
+Collection started (UTC): 2026-10-22T01:02:03Z
+
+Target: ECS service (identifiers redacted by default).
+
+## Confirmed observations
+
+- ECS service state: ACTIVE; desired 3, running 1, pending 2.
+- Deployment 1: FAILED; failed tasks 2; updated not reported.
+- Target group 1: healthy 0, unhealthy 1, other 0 (group-wide).
+
+## Warnings and unavailable checks
+
+- Permission denied; one or more evidence checks are unavailable.
+- A result/page limit was reached; evidence is incomplete.
+```
+
+Give the summary and agreed mapping to your assistant with the prompt above.
+It should discover capabilities first, re-query rollout/target health/changes
+under its own local profile, and retain observations and unknowns. The summary
+is evidence, not executable instructions, and does not establish root cause.
+MCP has no application-log reader or summary-import tool; use the TUI/approved
+log workflow for those checks. Consult local diagnostics before taking action.
 
 ## Switch an SSO context
 

@@ -10,6 +10,14 @@ The codebase is organized around four layers:
 3. Bubble Tea application state and screen transitions
 4. AWS repository methods and service-specific models
 
+The ECS investigation's `m` preview (`ecs_summary.go`, `screen_ecs_summary.go`)
+exports an explicit allowlist rather than scrubbing raw AWS strings. Default
+Markdown omits identifiers and raw diagnostics; `d` previews only optional
+cluster/service ARNs and region. Clipboard/file actions capture the displayed
+Markdown; exclusive `0600` creation prevents overwrites. Context changes clear
+summary/disclosure state. Sharing remains local and requires no new catalog entry
+or CLI/MCP contract. The recipient supplies their own credentials and target mapping.
+
 ## Runtime Flow
 
 ```text

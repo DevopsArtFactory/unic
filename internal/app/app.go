@@ -82,6 +82,7 @@ const (
 	screenECSServiceDetail
 	screenECSTargetHealth
 	screenECSInvestigation
+	screenECSSummary
 	screenECSTaskList
 	screenECSContainerList
 	screenEKSClusterList
