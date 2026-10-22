@@ -80,6 +80,42 @@ func TestContextsLoadedSyncsContextTable(t *testing.T) {
 	}
 }
 
+func TestContextPickerOfflineGuidanceOnlyWithoutContexts(t *testing.T) {
+	for _, size := range []struct{ width, height int }{{80, 24}, {60, 14}} {
+		for _, state := range []string{"empty", "configured", "no filter matches"} {
+			t.Run(fmt.Sprintf("%s/%dx%d", state, size.width, size.height), func(t *testing.T) {
+				m := New(testConfig(), "", "dev")
+				m.width, m.height = size.width, size.height
+				var contexts []config.ContextInfo
+				if state != "empty" {
+					contexts = testContexts()
+				}
+				updated, _ := m.Update(contextsLoadedMsg{contexts: contexts})
+				m = updated.(Model)
+				if state == "no filter matches" {
+					m.storeFilterValue(filterContexts, "nonexistent")
+					m.applyFilterTarget(filterContexts)
+					m.syncContextTable()
+				}
+				view := stripANSI(m.View())
+				if got := strings.Contains(view, "unic demo"); got != (state == "empty") {
+					t.Fatalf("unexpected offline guidance in %s: %s", state, view)
+				}
+				if state == "empty" {
+					for _, want := range []string{"Press 'a'", "Press 'q'", "Synthetic ECS incident", "no credentials needed", "q: quit"} {
+						if !strings.Contains(view, want) {
+							t.Fatalf("missing %q: %s", want, view)
+						}
+					}
+				}
+				if state == "no filter matches" && !strings.Contains(view, "No matching contexts") {
+					t.Fatalf("expected filtered empty state: %s", view)
+				}
+			})
+		}
+	}
+}
+
 func TestContextPickerFavoritesSortFirstAndRenderWithoutMarker(t *testing.T) {
 	cfg := testConfig()
 	cfg.FavoriteContexts = []string{"staging"}

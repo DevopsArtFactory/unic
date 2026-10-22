@@ -418,6 +418,10 @@ func (m Model) viewContextPicker() string {
 		panel.WriteString(normalStyle.Render("  No contexts defined."))
 		panel.WriteString("\n\n")
 		panel.WriteString(dimStyle.Render("  Press 'a' to add your first context."))
+		panel.WriteString("\n\n")
+		panel.WriteString(dimStyle.Render("  No AWS access? Press 'q', then run 'unic demo'."))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  Synthetic ECS incident; no credentials needed."))
 		panel.WriteString("\n")
 	} else if len(m.filteredCtxList) == 0 {
 		panel.WriteString(dimStyle.Render("  No matching contexts"))
