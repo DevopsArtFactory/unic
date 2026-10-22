@@ -32,6 +32,22 @@ The TUI also offers mutations; stay in the inspection screens for this recipe.
 
 ## ECS deployment failure
 
+In a live service rollout, press `i` to collect related evidence without retyping
+identifiers. The selected profile/account and region are retained. The scrollable
+view includes fresh rollout/events, associated target health, up to 20 stopped
+tasks, one page of up to 50 log events from each of up to five associated awslogs
+groups, and six-hour CloudTrail writes indexed by the exact service ARN. It uses
+a 30-second deadline and displays unavailable sections and pagination warnings.
+`Esc` cancels/returns to the rollout; `r` refreshes. Log samples are group-wide,
+not necessarily this service's messages. Cross-region log groups are skipped.
+Missing CloudTrail results or stopped tasks do not prove no change/failure occurred.
+See the README for permissions. This TUI collection does not add MCP log tools.
+
+For a credential-free relationship/partial-failure rehearsal from source, run
+`go test ./internal/services/aws -run '^TestECSInvestigation' -count=1` and
+`go test ./internal/app -run '^TestECSInvestigation' -count=1`. These use synthetic
+mock clients; they are tests, not additional live evidence in `unic demo`.
+
 Query the selected service without starting the TUI:
 
 ```bash
@@ -140,7 +156,7 @@ is a sanitized investigation export.
 Connected ECS → target health → logs/change investigation remains
 [#385](https://github.com/DevopsArtFactory/unic/issues/385), and generated sanitized
 Markdown handoff remains [#386](https://github.com/DevopsArtFactory/unic/issues/386).
-There is currently no MCP application-log reader, automatic cross-service join,
+There is currently no MCP application-log reader, MCP cross-service join,
 or tool that imports this note. Use existing TUI log browsing or an approved
 external workflow for unsupported checks. Justified additional agent operations
 belong in [#360](https://github.com/DevopsArtFactory/unic/issues/360); do not assume

@@ -286,7 +286,7 @@ UNIC은 현재 다섯 가지 인증 모드를 지원한다.
 - CloudWatch alarm list/detail, 상태 filtering, watch, 관련 resource/log handoff
 - CloudWatch metric list/detail
 - CloudWatch Logs group/stream/viewer
-- ECS cluster/service/rollout detail/task/container. 라이브 rollout 상세에서 `t`를 누르면 연결된 타깃 그룹 상태를 스크롤하며 볼 수 있다. `Esc`는 조회를 취소하고 이전 rollout 스크롤 위치로 돌아간다. `screen_ecs_target_health.go`는 선택한 config·cluster ARN·service ARN을 고정하고 command generation 및 30초 deadline으로 조회를 제한한다. `ListECSServiceTargetHealth`는 최신 ECS 서비스 연결 정보를 사용하고 중복 타깃 그룹 ARN을 제거하며, 성공한 상태와 그룹별 ELBv2 실패를 함께 보존한다. Classic ELB 연결은 미지원으로 표시한다. 공유 그룹은 다른 서비스의 타깃도 포함할 수 있음을 명시하며, 조회 시각을 표시하고 장애 원인을 단정하지 않는다. 컨텍스트·리전 변경 시 ECS 상태를 초기화하여 이전 서비스 ARN이 새 identity에서 사용되지 않도록 한다. 타깃 상태 조회 중 현재 컨텍스트를 다시 선택하면 Settings 등 overlay 복귀 경로에서도 command generation을 유지하고 컨텍스트 선택기를 연 화면으로 돌아간다. 새 catalog 항목이나 CLI/MCP 계약 변경은 없으며 로그·최근 변경 연결은 후속 작업이다.
+- ECS cluster/service/rollout detail/task/container. `t`는 연결된 타깃 상태, `i`는 `screen_ecs_investigation.go`의 통합 조사 화면을 연다. 선택한 config와 ARN을 고정하고 command generation 및 30초 deadline을 적용한다. `Esc`는 취소 후 기존 rollout 스크롤로 돌아가며, 같은 컨텍스트 재선택은 overlay 경로에서도 진행 중 명령을 유지한다. 컨텍스트·리전 변경은 ECS 상태와 복귀 대상을 초기화한다. `InvestigateECSService`는 최신 rollout/events, ELBv2 상태, 중지 태스크 한 페이지(최대 20), 같은 리전의 연결된 awslogs 그룹 최대 5개(각 한 페이지·최대 50개 이벤트), 정확한 서비스 ARN으로 최근 6시간 CloudTrail 쓰기를 수집한다. 부분 실패와 페이지 제한을 표시하며 공유 그룹·순차 조회·태스크 보존 기간·CloudTrail 인덱싱의 한계를 명시한다. 원인을 단정하지 않으며 새 catalog나 CLI/MCP 계약 변경은 없다.
 - EKS cluster/node group/add-on status, upgrade readiness, access helper
 - ECR repository/image/detail
 - FIS experiment template list/detail, safe-run preview 및 experiment history/detail

@@ -75,6 +75,7 @@ func (r *AwsRepository) LookupEvents(ctx context.Context, lookup CloudTrailLooku
 }
 
 // LookupEventsWithStatus also reports whether the 100-event cap truncated results.
+// A later page error retains earlier events with complete=false and the error.
 func (r *AwsRepository) LookupEventsWithStatus(ctx context.Context, lookup CloudTrailLookup) ([]CloudTrailEvent, bool, error) {
 	uniclog.Debug("aws", "LookupEvents called", "since", lookup.Since.String(), "resource", lookup.ResourceName, "mutations_only", lookup.MutationsOnly)
 
@@ -99,7 +100,7 @@ func (r *AwsRepository) LookupEventsWithStatus(ctx context.Context, lookup Cloud
 	for paginator.HasMorePages() && len(events) < cloudTrailMaxEvents {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to look up CloudTrail events: %w", err)
+			return events, false, fmt.Errorf("failed to look up CloudTrail events: %w", err)
 		}
 		for _, event := range page.Events {
 			mapped := CloudTrailEvent{
