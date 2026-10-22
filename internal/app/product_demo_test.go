@@ -122,7 +122,7 @@ func TestProductDemo(t *testing.T) {
 	// Represent the authenticated state with a synthetic message; discard AWS commands.
 	updated, _ = m.Update(contextSwitchedMsg{cfg: &config.Config{ContextName: "demo-readonly", Profile: "demo-profile", Region: "us-east-1", AuthType: config.AuthTypeCredential}})
 	m = updated.(Model)
-	m.ecs.selectedCluster = &awsservice.ECSCluster{Name: "demo-platform"}
+	m.ecs.selectedCluster = &awsservice.ECSCluster{Name: "demo-platform", ARN: "arn:aws:ecs:us-east-1:000000000000:cluster/demo-platform"}
 	services := []awsservice.ECSService{
 		{Name: "catalog-api", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 3, DesiredCount: 3},
 		{Name: "checkout-api", Status: "ACTIVE", LaunchType: "FARGATE", RunningCount: 1, DesiredCount: 3, PendingCount: 2},
@@ -148,6 +148,7 @@ func TestProductDemo(t *testing.T) {
 	}
 	at := time.Date(2026, 10, 20, 9, 41, 0, 0, time.UTC)
 	detail := &awsservice.ECSServiceDetail{
+		ARN:  "arn:aws:ecs:us-east-1:000000000000:service/demo-platform/checkout-api",
 		Name: "checkout-api", Status: "ACTIVE", LaunchType: "FARGATE",
 		RunningCount: 1, DesiredCount: 3, PendingCount: 2,
 		DeploymentControllerType: "ECS", SchedulingStrategy: "REPLICA",
@@ -166,9 +167,43 @@ func TestProductDemo(t *testing.T) {
 		},
 	}
 	m.ecs.HandleMessage(&m, ecsServiceDetailLoadedMsg{detail: detail})
-	capture(5, "02 / INSPECT THE ROLLOUT", "ACTIVE is the service status. FAILED is the deployment state that matters here.", "Read rollout state + task counts", "FAILED")
-	capture(3, "03 / READ THE EVIDENCE", "The circuit breaker reports tasks failing to start. Check task diagnostics next.", "Image + timestamped events", "was unable to consistently start")
-	capture(2, "YOUR NEXT DEPLOYMENT", "Try it: unic --profile your-profile --region your-region", "a: save your context > ECS > cluster > service", "Recent Service Events")
+	capture(3, "02 / INSPECT THE ROLLOUT", "ACTIVE is the service status. FAILED is the deployment state that matters here.", "Read rollout state + task counts", "FAILED")
+	key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")}) // Discard the live collection command.
+	if m.screen != screenECSInvestigation || !m.ecs.investigationLoading {
+		t.Fatal("i did not open the investigation")
+	}
+	updated, _ = m.Update(ecsInvestigationLoadedMsg{result: awsservice.ECSInvestigation{
+		ObservedAt: at, Rollout: detail, ChangesCollected: true,
+		Health:       []awsservice.ECSServiceTargetHealth{{Group: awsservice.ELBTargetGroupHealth{ARN: "synthetic-target-group", UnhealthyCount: 1, Targets: []awsservice.ELBTargetHealth{{ID: "192.0.2.10", Port: 8080, State: "unhealthy", Reason: "Target.Timeout"}}}}},
+		StoppedTasks: []awsservice.ECSStoppedTask{{ARN: "synthetic-stopped-task", StoppedAt: at, StopCode: "TaskFailedToStart", Reason: "CannotPullContainerError: image manifest not found for release-42."}},
+		Logs:         []awsservice.ECSInvestigationLog{{Group: "/synthetic/checkout", Warning: "No application log sample; tasks failed before application startup."}},
+		Changes:      []awsservice.CloudTrailEvent{{Time: at.Add(-3 * time.Minute), Name: "UpdateService", Source: "ecs.amazonaws.com"}},
+		Warnings:     []string{"Synthetic scenario: group-wide target health does not establish the image-pull failure cause."},
+	}})
+	m = updated.(Model)
+	scrollTo := func(expected string) {
+		t.Helper()
+		for range 12 {
+			if strings.Contains(ansiEscapePattern.ReplaceAllString(m.View(), ""), expected) {
+				return
+			}
+			key(tea.KeyMsg{Type: tea.KeyPgDown})
+		}
+		t.Fatalf("evidence %q not reachable", expected)
+	}
+	scrollTo("healthy:0 unhealthy:1 other:0")
+	capture(3, "03 / CONNECT THE EVIDENCE", "One key follows target health and stopped tasks. Shared-group observations are not a root cause.", "i: investigate > PgDn: related evidence", "healthy:0 unhealthy:1 other:0")
+	scrollTo("UpdateService")
+	capture(2, "04 / RETAIN THE UNKNOWNS", "Read the task failure, unavailable logs, and nearby change. Correlation is not causation.", "PgDn: logs, changes, limits, and next checks", "UpdateService")
+	key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+	if m.screen != screenECSSummary || m.ecs.summaryIdentifiers {
+		t.Fatal("summary did not default to redacted preview")
+	}
+	m.ecs.summaryPath = "/synthetic/unic-investigation-preview.md"
+	if strings.Contains(m.ecs.summaryMarkdown(m), "checkout-api") || strings.Contains(m.ecs.summaryMarkdown(m), "000000000000") {
+		t.Fatal("default export leaked fixture identifiers")
+	}
+	capture(2, "05 / HAND OFF THE FINDINGS", "Preview a redacted Markdown handoff. Copy or save locally only when you choose.", "m: preview > c: copy / s: new file (not executed in this recording)", "Identifiers: OFF")
 	var duration float64
 	for _, f := range frames {
 		duration += f.Seconds
