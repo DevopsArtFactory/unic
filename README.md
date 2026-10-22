@@ -33,6 +33,18 @@ Context creation currently uses this TUI wizard, not a `unic context add` CLI co
 
 When no contexts exist, the picker also shows an offline option: press `q`, then run `unic demo` to inspect a synthetic ECS incident without AWS credentials.
 
+For a skippable first-use path, press `G` from the context picker, service catalog,
+feature list, or error screen. Use `a` for the existing Add Context wizard or `C`
+to select a context, then reopen `G`. Press `r` to resolve the selected AWS identity
+(10-second limit), review the account, principal/role, profile and resource region,
+then press `e` to open ECS clusters and select a cluster/service with `Enter`.
+The guide retains CLI profile/region overrides and saves no configuration itself.
+`Esc`/`q` skips it. It never opens automatically for established users.
+Expired SSO, denied access, and missing configuration have distinct recovery hints;
+successful empty ECS lists ask you to verify scope instead of implying a permission error.
+Read-only ECS cluster/service discovery uses the SDK and does not require the
+AWS CLI executable; SSO login and interactive exec workflows retain their own prerequisites.
+
 ### Open the rollout
 
 After selecting the context, press `P`, type `ECS Browser`, and select **ECS Browser & Exec**. Select your cluster, then your service. Press `/` to filter the service list; press `Enter` to finish filtering, then `Enter` again to open the rollout. Use `↓` or `PgDn` to reach the image versions and recent events on a shorter terminal; `?` shows help.

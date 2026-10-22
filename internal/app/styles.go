@@ -384,6 +384,9 @@ func (m Model) viewError() string {
 	b.WriteString("\n\n")
 	b.WriteString(normalStyle.Render(m.errMsg))
 	b.WriteString("\n\n")
+	b.WriteString(dimStyle.Render(recoveryGuidance(m.errMsg)))
+	b.WriteString("\nG: setup and recovery guide")
+	b.WriteString("\n\n")
 	b.WriteString(m.renderHelpBar("enter/esc: go back • q: quit"))
 	return b.String()
 }

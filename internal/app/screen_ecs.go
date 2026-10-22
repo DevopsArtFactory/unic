@@ -237,6 +237,7 @@ func (em ecsModel) viewClusterList(m Model) string {
 
 	if len(em.filteredClusters) == 0 {
 		panel.WriteString(dimStyle.Render("  No clusters found"))
+		panel.WriteString("\n" + dimStyle.Render("  Verify account/region (C/R) and ecs:ListClusters access; G opens setup guidance from the catalog."))
 		panel.WriteString("\n")
 	} else {
 		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 10
@@ -314,6 +315,7 @@ func (em ecsModel) viewServiceList(m Model) string {
 
 	if len(em.filteredServices) == 0 {
 		panel.WriteString(dimStyle.Render("  No services found"))
+		panel.WriteString("\n" + dimStyle.Render("  Verify the selected cluster/account/region and ecs:ListServices access."))
 		panel.WriteString("\n")
 	} else {
 		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 10
@@ -667,9 +669,6 @@ func (em ecsModel) viewContainerList(m Model) string {
 
 func (em ecsModel) loadClusters(m Model) tea.Cmd {
 	return func() tea.Msg {
-		if err := awsservice.CheckAWSCLIInstalled(); err != nil {
-			return errMsg{err: err}
-		}
 		ctx, cancel := context.WithTimeout(m.commandContext(), ecsAPITimeout)
 		defer cancel()
 		repo, err := awsservice.NewAwsRepository(ctx, m.cfg)
@@ -679,9 +678,6 @@ func (em ecsModel) loadClusters(m Model) tea.Cmd {
 		clusters, err := repo.ListClusters(ctx)
 		if err != nil {
 			return errMsg{err: err}
-		}
-		if len(clusters) == 0 {
-			return errMsg{err: fmt.Errorf("no ECS clusters found in region %s", m.cfg.Region)}
 		}
 		return ecsClustersLoadedMsg{clusters: clusters}
 	}
@@ -701,9 +697,6 @@ func (em ecsModel) loadServices(m Model) tea.Cmd {
 		services, err := repo.ListServices(ctx, em.selectedCluster.ARN)
 		if err != nil {
 			return errMsg{err: err}
-		}
-		if len(services) == 0 {
-			return errMsg{err: fmt.Errorf("no services found in cluster %s", em.selectedCluster.Name)}
 		}
 		return ecsServicesLoadedMsg{services: services}
 	}

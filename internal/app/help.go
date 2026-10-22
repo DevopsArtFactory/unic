@@ -66,6 +66,9 @@ func (m Model) helpSections() []helpSection {
 
 func (m Model) globalHelpShortcuts() []helpShortcut {
 	var shortcuts []helpShortcut
+	if m.screen == screenContextPicker || m.screen == screenServiceList || m.screen == screenFeatureList || m.screen == screenError {
+		shortcuts = append(shortcuts, helpShortcut{"G", "Open the skippable setup and first-resource guide"})
+	}
 	if m.screen != screenServiceList && m.screen != screenContextPicker &&
 		m.screen != screenAutoScalingCapacityInput && m.screen != screenAutoScalingConfirm &&
 		m.screen != screenSecurityGroupAddRule && m.screen != screenSecurityGroupDeleteConfirm &&
@@ -784,6 +787,8 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"enter / esc", "Return to the service list"},
 			{"q", "Quit unic"},
 		}
+	case screenFirstUse:
+		return []helpShortcut{{"r", "Resolve and review AWS identity"}, {"e", "Open ECS after verification"}, {"a / C", "Add/select context"}, {"↑/↓, pgup/pgdn", "Scroll guidance"}, {"esc / q", "Skip the guide"}}
 	case screenExitNotice:
 		return []helpShortcut{
 			{"any key", "Close the exit notice and return to the terminal"},

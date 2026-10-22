@@ -28,6 +28,7 @@ Reference for service-level shortcuts and operational workflows. Global navigati
 | Security Inspector | `r` run/rescan, `1`-`5` severity filter, `Enter` finding detail |
 | Checklist Inspector | `l` load or switch checklist files, `a` add a check through type-specific prompts, `r` run/rerun the loaded checklist, `Enter` result detail |
 | Settings | `Enter`/`Space` toggle selected setting, `Esc`/`q` back |
+| First-use guide | `G` from context picker/catalog/feature list/error, `a` add context, `C` select context, `r` resolve account/principal/region, `e` open ECS after verification, `Esc/q` skip; no automatic interruption or config writes |
 | Context Picker | `a` add context, `f` favorite/unfavorite selected context, type or `/` filter, `s` setup selected context and quit, `y` copy selected exports and quit, filter-mode `Ctrl+S` setup selected filtered context, filter-mode `Ctrl+Y` copy selected filtered exports, `u` clear shell context and quit with a final confirmation message |
 | ECR | `Enter` images, `d` repository detail, `/` filter, `r` refresh, image detail `c` copy digest, `t` copy tag |
 | SNS | `/` filter, `r` refresh, `Enter` topic detail with attributes and subscription counts, detail `↑`/`↓` scroll, `PgUp`/`PgDn` page, detail `Enter` subscriptions, subscription list `/` filter |

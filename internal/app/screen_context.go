@@ -59,6 +59,10 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, m.finalizeContextSwitch(), true
 
 	case contextSwitchedMsg:
+		if m.guide.commands != nil {
+			m.guide.commands.CancelAll()
+		}
+		m.guide = firstUseGuide{previous: screenServiceList}
 		contextChanged := m.cfg == nil || msg.cfg == nil || m.cfg.ContextName != msg.cfg.ContextName || m.cfg.Region != msg.cfg.Region
 		m.cfg = msg.cfg
 		m.callerIdentity = msg.identity
@@ -119,6 +123,10 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, tea.ClearScreen, true
 
 	case regionSwitchedMsg:
+		if m.guide.commands != nil {
+			m.guide.commands.CancelAll()
+		}
+		m.guide = firstUseGuide{previous: screenServiceList}
 		resetECSContextState(&m)
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
@@ -428,6 +436,8 @@ func (m Model) viewContextPicker() string {
 		panel.WriteString(normalStyle.Render("  No contexts defined."))
 		panel.WriteString("\n\n")
 		panel.WriteString(dimStyle.Render("  Press 'a' to add your first context."))
+		panel.WriteString("\n")
+		panel.WriteString(dimStyle.Render("  Press 'G' for setup, identity, and first-resource guidance."))
 		panel.WriteString("\n\n")
 		panel.WriteString(dimStyle.Render("  No AWS access? Press 'q', then run 'unic demo'."))
 		panel.WriteString("\n")
