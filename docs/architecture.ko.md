@@ -10,6 +10,13 @@ UNIC은 Go로 만든 터미널 중심 AWS 운영 콘솔이다.
 3. Bubble Tea 앱 상태와 화면 전환
 4. AWS repository와 서비스별 구현
 
+ECS 조사 화면의 `m` 미리보기(`ecs_summary.go`, `screen_ecs_summary.go`)는
+원문을 정규식으로 지우는 대신 명시적 허용 필드만 Markdown으로 내보낸다.
+기본값은 식별자·원문 진단을 제외하고 `d`로 cluster/service ARN과 리전만
+선택적으로 미리 본다. 복사·저장은 표시된 Markdown을 사용하며 `0600` 파일을
+배타 생성하여 덮어쓰기를 막는다. 컨텍스트 변경은 공개 상태를 초기화한다.
+업로드나 새 catalog·CLI/MCP 계약은 없고 수신자는 자신의 인증과 대상 매핑을 쓴다.
+
 ## 실행 흐름
 
 ```text

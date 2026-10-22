@@ -31,6 +31,10 @@ type ecsModel struct {
 	healthLoading        bool
 	investigation        awsservice.ECSInvestigation
 	investigationLoading bool
+	summaryIdentifiers   bool
+	summaryNotice        string
+	summaryPath          string
+	investigationScroll  int
 	rolloutScroll        int
 	detailScroll         int
 	tasks                []awsservice.ECSTask
@@ -50,6 +54,14 @@ func (em *ecsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 
 func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
+	case ecsSummaryActionMsg:
+		if m.screen == screenECSSummary {
+			em.summaryNotice = msg.notice
+			if msg.err != nil {
+				em.summaryNotice = "Copy/save failed: " + msg.err.Error()
+			}
+		}
+		return *m, nil, true
 	case ecsInvestigationLoadedMsg:
 		if !em.investigationLoading {
 			return *m, nil, true
@@ -148,6 +160,9 @@ func (em *ecsModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, boo
 	case screenECSInvestigation:
 		newM, cmd := em.updateInvestigation(m, msg)
 		return newM, cmd, true
+	case screenECSSummary:
+		newM, cmd := em.updateSummary(m, msg)
+		return newM, cmd, true
 	case screenECSTaskList:
 		newM, cmd := em.updateTaskList(m, msg)
 		return newM, cmd, true
@@ -171,6 +186,8 @@ func (em ecsModel) View(m Model) (string, bool) {
 		return em.viewServiceDetailWithHelp(m, ecsTargetHealthHelp), true
 	case screenECSInvestigation:
 		return em.viewServiceDetailWithHelp(m, ecsInvestigationHelp), true
+	case screenECSSummary:
+		return em.viewServiceDetailWithHelp(m, ecsSummaryHelp), true
 	case screenECSTaskList:
 		return em.viewTaskList(m), true
 	case screenECSContainerList:
@@ -396,6 +413,8 @@ func (em ecsModel) serviceDetailViewport(m Model, help string) ([]string, int) {
 		lines = em.targetHealthLines()
 	} else if m.screen == screenECSInvestigation {
 		lines = em.investigationLines()
+	} else if m.screen == screenECSSummary {
+		lines = em.summaryLines(m)
 	}
 	if m.width > 0 {
 		width := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize(), 1)
@@ -430,6 +449,8 @@ func (em ecsModel) viewServiceDetailWithHelp(m Model, help string) string {
 		title = "ECS Target Health"
 	} else if m.screen == screenECSInvestigation {
 		title = "ECS Investigation"
+	} else if m.screen == screenECSSummary {
+		title = "Review investigation Markdown"
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s — %s", title, detail.Name)))
 	b.WriteString(m.watchBadge())

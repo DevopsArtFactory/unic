@@ -41,6 +41,16 @@ From a live service rollout, press `t` to inspect the service's associated ELBv2
 
 Press `i` on the live rollout for a connected investigation: fresh rollout/events, associated target health, one page of stopped tasks (up to 20), samples from up to five associated `awslogs` groups (one page, up to 50 events each), and a six-hour CloudTrail write lookup using the exact service ARN. Collection is sequential and limited to 30 seconds; `Esc` cancels, `r` refreshes, and returning preserves rollout scroll. Permission failures, pagination limits, unsupported/missing log associations, and skipped cross-region log groups remain visible alongside successful evidence. Log groups may contain other services, stopped-task retention is limited, and CloudTrail resource indexing can omit relevant changes. Empty results and nearby writes do not establish health or cause. Additional permissions are `ecs:DescribeTaskDefinition`, `ecs:ListTasks`, `ecs:DescribeTasks`, `logs:FilterLogEvents`, and `cloudtrail:LookupEvents`. The offline demo remains rollout-only.
 
+From the completed investigation, press `m` to preview a sanitized Markdown handoff.
+`c` copies exactly that Markdown; `s` creates the displayed local file with owner-only
+permissions and never overwrites an existing file. The default allowlist includes
+timestamps, counts, known ECS states, and sanitized permission/incompleteness warnings.
+It omits raw logs/errors/events, images, credentials, account IDs, ARNs, names,
+local context/profile, and resource region. Press `d` to preview optional cluster/service
+ARNs and region before copying/saving. No upload or automatic message is sent.
+Recipients choose their own local profile/context; see the
+[summary continuation recipe](docs/investigation-recipes.md#continue-from-a-generated-summary).
+
 For a one-off session without saving a context, use the same `P` route directly from the initial picker; it retains your CLI-selected profile and region.
 
 Having trouble connecting? Run `unic doctor --profile your-profile --region us-east-1` and follow its remediation. See [configuration](#configuration) for context setup and [Homebrew](#homebrew) or [source installation](#build-from-source) for other install options.
