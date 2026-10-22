@@ -3,6 +3,9 @@ package app
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -166,5 +169,43 @@ func TestFirstUseCancellationPreservesUnrelatedLoad(t *testing.T) {
 	}
 	if lookup() != nil {
 		t.Fatal("cancelled guide lookup still ran")
+	}
+}
+
+func TestFirstUseEmptyECSLoadersReachEmptyGuidance(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		switch r.Header.Get("X-Amz-Target") {
+		case "AmazonEC2ContainerServiceV20141113.ListClusters":
+			_, _ = w.Write([]byte(`{"clusterArns":[]}`))
+		case "AmazonEC2ContainerServiceV20141113.ListServices":
+			_, _ = w.Write([]byte(`{"serviceArns":[]}`))
+		default:
+			t.Errorf("unexpected AWS operation: %s", r.Header.Get("X-Amz-Target"))
+			w.WriteHeader(400)
+		}
+	}))
+	defer server.Close()
+	for name, value := range map[string]string{"AWS_ENDPOINT_URL_ECS": server.URL, "AWS_ACCESS_KEY_ID": "synthetic-test", "AWS_SECRET_ACCESS_KEY": "synthetic-test", "AWS_SESSION_TOKEN": "", "AWS_PROFILE": "", "AWS_DEFAULT_PROFILE": "", "AWS_EC2_METADATA_DISABLED": "true", "AWS_CONFIG_FILE": filepath.Join(t.TempDir(), "absent-config"), "AWS_SHARED_CREDENTIALS_FILE": filepath.Join(t.TempDir(), "absent-credentials")} {
+		t.Setenv(name, value)
+	}
+	for _, services := range []bool{false, true} {
+		m := New(&config.Config{Region: "us-east-1", AuthType: config.AuthTypeCredential}, "", "dev")
+		m.ecs.selectedCluster = &awsservice.ECSCluster{ARN: "cluster", Name: "cluster"}
+		var cmd tea.Cmd
+		if services {
+			cmd = m.ecs.loadServices(m)
+		} else {
+			cmd = m.ecs.loadClusters(m)
+		}
+		updated, _ := m.Update(cmd())
+		m = updated.(Model)
+		want := screenECSClusterList
+		if services {
+			want = screenECSServiceList
+		}
+		if m.screen != want || !strings.Contains(stripANSI(m.View()), "Verify") {
+			t.Fatalf("successful empty query did not reach guidance: screen=%v view=%s", m.screen, m.View())
+		}
 	}
 }

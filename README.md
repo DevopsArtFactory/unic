@@ -42,6 +42,8 @@ The guide retains CLI profile/region overrides and saves no configuration itself
 `Esc`/`q` skips it. It never opens automatically for established users.
 Expired SSO, denied access, and missing configuration have distinct recovery hints;
 successful empty ECS lists ask you to verify scope instead of implying a permission error.
+Read-only ECS cluster/service discovery uses the SDK and does not require the
+AWS CLI executable; SSO login and interactive exec workflows retain their own prerequisites.
 
 ### Open the rollout
 
