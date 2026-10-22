@@ -167,6 +167,7 @@ Ownership boundary:
 - App-shell flows are root-owned when they select global application context, choose a feature, coordinate shared chrome, launch a subprocess/session, or represent cross-feature transition state.
 - Feature submodels own AWS resource browser flows that start from a feature-list choice and can keep their state, messages, filters, key handling, commands, and views feature-local.
 - Context picker/add/SSO flows remain app-shell because they mutate or choose the AWS context used by all features.
+- The empty context picker offers the existing add-context action and a quit-then-run `unic demo` hint. This guidance is absent when contexts exist, including when a filter has no matches; the offline demo remains a separate entry point.
 - The EC2 SSM session picker remains app-shell because it launches an external session workflow rather than browsing a feature-local resource graph.
 - Loading, error, exit, service list, feature list, global help, home navigation, and context switching remain root-owned shared infrastructure.
 

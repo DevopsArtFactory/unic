@@ -31,6 +31,8 @@ Use an existing AWS profile with access to your ECS cluster. If it uses SSO, sig
 
 Context creation currently uses this TUI wizard, not a `unic context add` CLI command. See [configuration](#configuration) for the config path and other auth options.
 
+When no contexts exist, the picker also shows an offline option: press `q`, then run `unic demo` to inspect a synthetic ECS incident without AWS credentials.
+
 ### Open the rollout
 
 After selecting the context, press `P`, type `ECS Browser`, and select **ECS Browser & Exec**. Select your cluster, then your service. Press `/` to filter the service list; press `Enter` to finish filtering, then `Enter` again to open the rollout. Use `↓` or `PgDn` to reach the image versions and recent events on a shorter terminal; `?` shows help.
