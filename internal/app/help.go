@@ -406,8 +406,15 @@ func (m Model) currentScreenShortcuts() []helpShortcut {
 			{"r", "Refresh the service rollout detail"},
 			{"W", "Toggle automatic rollout refresh"},
 			{"I", "Cycle the watch interval (5s/15s/30s)"},
+			{"t", "Inspect associated target-group health"},
 			{"enter", "Open running tasks for the selected service"},
 			{"q / esc", "Go back to the service list"},
+		}
+	case screenECSTargetHealth:
+		return []helpShortcut{
+			{"↑/↓, j/k, pgup / pgdn", "Scroll target health and per-group warnings"},
+			{"r", "Refresh associated target health"},
+			{"q / esc", "Cancel loading and return to the service rollout"},
 		}
 	case screenECSTaskList:
 		return []helpShortcut{
@@ -952,6 +959,8 @@ func (m Model) helpScreenTitle() string {
 		return "ECS Services"
 	case screenECSServiceDetail:
 		return "ECS Service Detail"
+	case screenECSTargetHealth:
+		return "ECS Target Health"
 	case screenECSTaskList:
 		return "ECS Tasks"
 	case screenECSContainerList:

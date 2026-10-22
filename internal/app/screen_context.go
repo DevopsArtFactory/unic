@@ -66,6 +66,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cloudFormation = newCloudFormationModel()
 		m.resetFilter(filterCloudFormationStacks)
 		if contextChanged {
+			resetECSContextState(&m)
 			resetStepFunctionsContextState(&m)
 			normalizeStepFunctionsContextReturn(&m)
 			resetSNSContextState(&m)
@@ -118,6 +119,7 @@ func (m Model) handleContextMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, tea.ClearScreen, true
 
 	case regionSwitchedMsg:
+		resetECSContextState(&m)
 		m.cfg.Region = msg.region
 		m.awsRepo = msg.repo
 		resetStepFunctionsContextState(&m)
@@ -245,6 +247,14 @@ func (m Model) updateContextPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filteredCtxList) > 0 && cursor >= 0 && cursor < len(m.filteredCtxList) {
 			selected := m.filteredCtxList[cursor]
 			if m.cfg != nil && m.cfg.ContextName == selected.Name {
+				if m.ecs.healthLoading && overlayChainMatches(m, m.ctxPrevScreen, func(current screen) bool {
+					return current == screenECSTargetHealth
+				}) {
+					// Keep the active lookup's generation when no context switch is needed.
+					m.resetFilter(filterContexts)
+					m.screen = m.ctxPrevScreen
+					return m, nil
+				}
 				snsReturn := snsContextReturn(&m)
 				if snsReturn != nil && *snsReturn == screenLoading {
 					m.ctxPrevWasLoading = false
