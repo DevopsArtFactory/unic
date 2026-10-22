@@ -168,6 +168,7 @@ Ownership boundary:
 - Feature submodels own AWS resource browser flows that start from a feature-list choice and can keep their state, messages, filters, key handling, commands, and views feature-local.
 - Context picker/add/SSO flows remain app-shell because they mutate or choose the AWS context used by all features.
 - The empty context picker offers the existing add-context action and a quit-then-run `unic demo` hint. This guidance is absent when contexts exist, including when a filter has no matches; the offline demo remains a separate entry point.
+- `screen_first_use.go` owns the opt-in `G` guide from the context picker, catalog, feature list, and error screen. It reuses Add Context and context selection, verifies STS identity under the resolved config with a cancellable 10-second command generation, and offers ECS entry only after displaying account/principal and region. Context/region changes invalidate verification. Skipping returns to the originating screen; nothing is persisted and existing users are not interrupted. Error recovery distinguishes credential/SSO failures, access denial, and missing setup; empty ECS lists retain their separate scope guidance.
 - The EC2 SSM session picker remains app-shell because it launches an external session workflow rather than browsing a feature-local resource graph.
 - Loading, error, exit, service list, feature list, global help, home navigation, and context switching remain root-owned shared infrastructure.
 

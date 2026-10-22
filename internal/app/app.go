@@ -21,6 +21,7 @@ type screen int
 
 const (
 	screenBootup screen = iota
+	screenFirstUse
 	screenServiceList
 	screenFeatureList
 	screenInstanceList
@@ -282,6 +283,7 @@ type Model struct {
 
 	// Caller identity (loaded at startup)
 	callerIdentity *awsservice.CallerIdentity
+	guide          firstUseGuide
 
 	// Update check
 	currentVersion  string
@@ -602,6 +604,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case callerIdentityMsg:
 		m.callerIdentity = msg.identity
 		return m, nil
+	case firstUseIdentityMsg:
+		if !m.guide.loading {
+			return m, nil
+		}
+		m.guide.loading = false
+		m.guide.identity = msg.identity
+		if msg.err == nil && (msg.identity == nil || msg.identity.Account == "" || msg.identity.Arn == "") {
+			m.guide.err = "Identity could not be resolved; run unic doctor and reselect the context."
+			m.guide.identity = nil
+		}
+		if msg.err != nil {
+			m.guide.err = msg.err.Error()
+			m.guide.identity = nil
+		}
+		return m, nil
 	case screenReadyMsg:
 		m.screen = screenContextPicker
 		return m, nil
@@ -688,6 +705,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Key messages — screen dispatch
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		// Global quit
+		if msg.String() == "G" && !m.filterTI.Focused() && (m.screen == screenContextPicker || m.screen == screenServiceList || m.screen == screenFeatureList || m.screen == screenError) {
+			return m.openFirstUseGuide()
+		}
 		if msg.String() == "ctrl+c" {
 			m.stopWatch()
 			m.quitting = true
@@ -846,6 +866,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSettings(msg)
 		case screenError:
 			return m.updateError(msg)
+		case screenFirstUse:
+			return m.updateFirstUseGuide(msg)
 		}
 	}
 
@@ -1056,6 +1078,8 @@ func (m Model) View() string {
 		v = m.viewLoading()
 	case screenError:
 		v = m.viewError()
+	case screenFirstUse:
+		v = m.viewFirstUseGuide()
 	case screenExitNotice:
 		v = m.viewExitNotice()
 	}

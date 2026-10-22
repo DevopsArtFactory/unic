@@ -219,6 +219,7 @@ func (em ecsModel) viewClusterList(m Model) string {
 
 	if len(em.filteredClusters) == 0 {
 		panel.WriteString(dimStyle.Render("  No clusters found"))
+		panel.WriteString("\n" + dimStyle.Render("  Verify account/region (C/R) and ecs:ListClusters access; G opens setup guidance from the catalog."))
 		panel.WriteString("\n")
 	} else {
 		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 10
@@ -296,6 +297,7 @@ func (em ecsModel) viewServiceList(m Model) string {
 
 	if len(em.filteredServices) == 0 {
 		panel.WriteString(dimStyle.Render("  No services found"))
+		panel.WriteString("\n" + dimStyle.Render("  Verify the selected cluster/account/region and ecs:ListServices access."))
 		panel.WriteString("\n")
 	} else {
 		// overhead: status bar (2) + title (1) + filter line (1) + blank (1) + list panel (2) + blank (1) + footer (1) = 10

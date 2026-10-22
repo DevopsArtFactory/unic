@@ -167,6 +167,7 @@ Bubble Tea 앱의 상태, 화면 전환, 렌더링을 담당한다.
 - Feature submodel은 feature list에서 시작하고 상태, 메시지, 필터, 키 처리, command, view를 기능 내부에 둘 수 있는 AWS resource browser flow를 소유한다.
 - Context picker/add/SSO flow는 모든 feature가 사용하는 AWS context를 선택하거나 변경하므로 app-shell로 남긴다.
 - Context가 하나도 없을 때 picker는 기존 추가 동작과 종료 후 `unic demo`를 실행하는 안내를 표시한다. Context가 있으면 검색 결과가 비어 있어도 이 안내는 표시하지 않으며, 오프라인 demo는 별도 진입점을 유지한다.
+- `screen_first_use.go`의 선택적 `G` 안내는 context picker·catalog·feature list·오류 화면에서 열고 기존 context 추가/선택을 재사용한다. 10초 제한 STS 조회 후 계정·principal/role·리전을 표시하고 ECS 진입을 제공한다. 컨텍스트·리전 변경은 검증을 무효화하며 `Esc/q`는 원래 화면으로 돌아간다. 설정을 저장하거나 기존 사용자에게 자동 표시하지 않는다. SSO 만료·권한 거부·설정 누락 복구 안내와 성공한 빈 ECS 목록을 구분한다.
 - EC2 SSM session picker는 feature-local resource graph 탐색이 아니라 외부 session workflow를 실행하므로 app-shell로 남긴다.
 - Loading, error, exit, service list, feature list, global help, home navigation, context switching은 루트가 소유하는 공통 infrastructure로 남긴다.
 
