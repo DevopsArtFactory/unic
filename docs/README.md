@@ -7,6 +7,7 @@ If a user-facing behavior, architecture boundary, or development workflow change
 
 - [ECS Walkthrough and Demo Capture](demo/README.md)
 - [Team and MCP Investigation Recipes](investigation-recipes.md)
+- [Small User Pilot Protocol](user-pilot.md)
 - [Project Overview (EN)](project-overview.en.md)
 - [Project Overview (KO)](project-overview.ko.md)
 - [Architecture (EN)](architecture.en.md)

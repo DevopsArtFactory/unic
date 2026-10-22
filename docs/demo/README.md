@@ -54,4 +54,4 @@ The five-reader check in #384 requires real first-time participants. No response
 2. What would you do first after installing it?
 3. Was the difference between service status and deployment state clear?
 
-Record anonymized observations and points of confusion in #384, not AWS details or personal information. Keep #384 open until this check is completed. The broader repeat-use and sharing study remains #389.
+Record anonymized observations and points of confusion in #384, not AWS details or personal information. Keep #384 open until this check is completed. The broader repeat-use and sharing study remains #389; use the [pilot protocol](../user-pilot.md) for consent, task scoring, and follow-up. No participant results have been collected here.
