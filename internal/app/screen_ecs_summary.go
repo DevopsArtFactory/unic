@@ -59,11 +59,13 @@ func (em *ecsModel) updateSummary(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		em.detailScroll = 0
 		em.summaryNotice = ""
 	case "c":
+		em.summaryNotice = ""
 		text := em.summaryMarkdown(*m)
 		return *m, func() tea.Msg {
 			return ecsSummaryActionMsg{notice: "Copied the previewed Markdown.", err: ecsSummaryCopy(text)}
 		}
 	case "s":
+		em.summaryNotice = ""
 		text, path := em.summaryMarkdown(*m), em.summaryPath
 		return *m, func() tea.Msg { return ecsSummaryActionMsg{notice: "Saved " + path, err: ecsSummarySave(path, text)} }
 	case "up", "k", "down", "j", "pgup", "pgdown":

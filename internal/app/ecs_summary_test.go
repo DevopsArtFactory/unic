@@ -19,7 +19,7 @@ func TestECSSummaryAllowlistAndWarnings(t *testing.T) {
 		StoppedTasks: []awsservice.ECSStoppedTask{{ARN: privateMarker, Reason: privateMarker, Containers: []string{privateMarker}}},
 		Logs:         []awsservice.ECSInvestigationLog{{Group: privateMarker, Events: []awsservice.LogEvent{{Message: privateMarker}}, Warning: "AccessDenied " + privateMarker}},
 		Health:       []awsservice.ECSServiceTargetHealth{{Group: awsservice.ELBTargetGroupHealth{ARN: privateMarker, Name: privateMarker, UnhealthyCount: 1}}},
-		Changes:      []awsservice.CloudTrailEvent{{Name: privateMarker, RawJSON: privateMarker, Username: privateMarker, SourceIP: privateMarker}}, Warnings: []string{"CloudTrail truncated " + privateMarker, "deadline exceeded " + privateMarker},
+		Changes:      []awsservice.CloudTrailEvent{{Name: privateMarker, RawJSON: privateMarker, Username: privateMarker, SourceIP: privateMarker}}, Warnings: []string{"CloudTrail truncated at 100 events; " + privateMarker, "context deadline exceeded " + privateMarker},
 	}
 	text := ecsSummary(result, "private-cluster", "private-service", "private-region", false)
 	for _, forbidden := range []string{privateMarker, "private-cluster", "private-service", "private-region"} {
@@ -33,8 +33,11 @@ func TestECSSummaryAllowlistAndWarnings(t *testing.T) {
 		}
 	}
 	text = ecsSummary(result, "private-cluster", "private-service", "private-region", true)
-	if !strings.Contains(text, "private-cluster") || !strings.Contains(text, "private-service") || strings.Contains(text, privateMarker) {
+	if !strings.Contains(text, "private-cluster") || !strings.Contains(text, "private-service") || !strings.Contains(text, "private-region") || strings.Contains(text, privateMarker) {
 		t.Fatal("optional disclosure scope incorrect")
+	}
+	if got := safeSummaryWarning("lookup failed for arn:aws:resource/cancel-limit-association"); got != "Some evidence is unavailable or incomplete; review the local investigation for details." {
+		t.Fatalf("resource name misclassified: %s", got)
 	}
 }
 

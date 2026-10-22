@@ -18,6 +18,7 @@ func ecsSummary(result awsservice.ECSInvestigation, cluster, service, region str
 	out.WriteString("Target: ECS service (identifiers redacted by default).\n\n")
 	if identifiers {
 		// JSON quoting prevents target identifiers from becoming shell or Markdown instructions.
+		// This fixed map of string values has no JSON marshaling error cases.
 		data, _ := json.MarshalIndent(map[string]string{"cluster": cluster, "service": service, "region": region}, "", "  ")
 		out.WriteString("Identifiers explicitly included after preview:\n\n```json\n" + string(data) + "\n```\n\n")
 	}
@@ -86,13 +87,13 @@ func safeSummaryWarning(value string) string {
 	switch {
 	case strings.Contains(lower, "accessdenied") || strings.Contains(lower, "access denied") || strings.Contains(lower, "unauthorized") || strings.Contains(lower, "not authorized"):
 		return "Permission denied; one or more evidence checks are unavailable."
-	case strings.Contains(lower, "deadline") || strings.Contains(lower, "cancel"):
+	case strings.Contains(lower, "context deadline exceeded") || strings.Contains(lower, "context canceled") || strings.Contains(lower, "context cancelled"):
 		return "Collection timed out or was cancelled; some checks may not have run."
-	case strings.Contains(lower, "page") || strings.Contains(lower, "truncat") || strings.Contains(lower, "limit"):
+	case strings.HasPrefix(lower, "cloudtrail truncated at") || strings.HasPrefix(lower, "stopped tasks limited to") || strings.HasPrefix(lower, "log collection limited to") || strings.HasPrefix(lower, "one page only"):
 		return "A result/page limit was reached; evidence is incomplete."
-	case strings.Contains(lower, "region"):
+	case strings.HasPrefix(lower, "logs skipped: awslogs-region"):
 		return "An associated log group was skipped because its region differs."
-	case strings.Contains(lower, "logging not configured") || strings.Contains(lower, "unsupported") || strings.Contains(lower, "association") || strings.Contains(lower, "awslogs"):
+	case strings.HasPrefix(lower, "container logging not configured") || strings.HasPrefix(lower, "a container has no supported awslogs association") || strings.HasPrefix(lower, "logs unavailable:") || strings.HasPrefix(lower, "log associations unavailable:") || strings.HasPrefix(lower, "classic load balancer association"):
 		return "A log/load-balancer association is missing, unsupported, or unavailable."
 	default:
 		return "Some evidence is unavailable or incomplete; review the local investigation for details."
