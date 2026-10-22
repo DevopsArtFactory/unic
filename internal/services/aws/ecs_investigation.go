@@ -151,11 +151,11 @@ func (r *AwsRepository) collectECSLogs(ctx context.Context, result *ECSInvestiga
 		if seen[group] {
 			continue
 		}
-		seen[group] = true
 		if len(result.Logs) >= 5 {
 			result.Warnings = append(result.Warnings, "Log collection limited to five associated groups.")
 			break
 		}
+		seen[group] = true
 		if ctx.Err() != nil {
 			return
 		}

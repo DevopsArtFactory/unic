@@ -27,8 +27,13 @@ func (em *ecsModel) startInvestigation(m *Model) (tea.Model, tea.Cmd) {
 	em.investigation = awsservice.ECSInvestigation{}
 	m.screen = screenECSInvestigation
 	cfg, cluster, service := *m.cfg, em.selectedCluster.ARN, em.selectedDetail.ARN
+	generation := 0
+	if m.commands != nil {
+		generation = m.commands.Renew()
+	}
+	baseCtx := m.commandContext()
 	cmd := func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.commandContext(), ecsAPITimeout)
+		ctx, cancel := context.WithTimeout(baseCtx, ecsAPITimeout)
 		defer cancel()
 		repo, err := newECSTargetHealthRepository(ctx, &cfg)
 		if err != nil {
@@ -37,7 +42,7 @@ func (em *ecsModel) startInvestigation(m *Model) (tea.Model, tea.Cmd) {
 		return ecsInvestigationLoadedMsg{repo.InvestigateECSService(ctx, cluster, service)}
 	}
 	if m.commands != nil {
-		return *m, m.commands.BindCmd(m.commands.Renew(), cmd)
+		return *m, m.commands.BindCmd(generation, cmd)
 	}
 	return *m, cmd
 }
