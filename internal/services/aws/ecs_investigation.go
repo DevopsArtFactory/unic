@@ -14,13 +14,14 @@ import (
 
 // ECSInvestigation is a bounded collection, not an atomic snapshot or root-cause diagnosis.
 type ECSInvestigation struct {
-	ObservedAt   time.Time
-	Rollout      *ECSServiceDetail
-	Health       []ECSServiceTargetHealth
-	StoppedTasks []ECSStoppedTask
-	Logs         []ECSInvestigationLog
-	Changes      []CloudTrailEvent
-	Warnings     []string
+	ObservedAt       time.Time
+	Rollout          *ECSServiceDetail
+	Health           []ECSServiceTargetHealth
+	StoppedTasks     []ECSStoppedTask
+	Logs             []ECSInvestigationLog
+	Changes          []CloudTrailEvent
+	ChangesCollected bool
+	Warnings         []string
 }
 
 type ECSStoppedTask struct {
@@ -63,6 +64,7 @@ func (r *AwsRepository) InvestigateECSService(ctx context.Context, cluster, serv
 	if ctx.Err() == nil {
 		var complete bool
 		result.Changes, complete, err = r.LookupEventsWithStatus(ctx, CloudTrailLookup{Since: 6 * time.Hour, ResourceName: service, MutationsOnly: true})
+		result.ChangesCollected = err == nil
 		if err != nil {
 			result.Warnings = append(result.Warnings, "CloudTrail unavailable: "+err.Error())
 		} else if !complete {

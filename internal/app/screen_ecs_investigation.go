@@ -122,10 +122,16 @@ func (em ecsModel) investigationLines() []string {
 	}
 	lines = append(lines, "", titleStyle.Render("CloudTrail writes (exact service ARN lookup, preceding 6h)"),
 		"Resource indexing may omit relevant changes. Empty results do not prove no changes occurred.")
+	if !result.ChangesCollected {
+		lines = append(lines, "CloudTrail unavailable or not collected; see warnings.")
+	} else if len(result.Changes) == 0 {
+		lines = append(lines, "No indexed writes returned for this service ARN and time window.")
+	}
 	for _, change := range result.Changes {
 		lines = append(lines, change.Time.UTC().Format(time.RFC3339)+" "+change.Name+" "+change.Source)
 	}
 	lines = append(lines, "", "Next checks: compare deployment/task timestamps, verify image availability and target-health reasons.",
 		"Inspect logs and change details in their owning browsers; the evidence above does not establish root cause.")
+	// Expand multiline AWS text before the shared viewport wraps and counts physical lines.
 	return strings.Split(strings.Join(lines, "\n"), "\n")
 }

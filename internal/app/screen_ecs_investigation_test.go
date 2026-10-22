@@ -90,7 +90,7 @@ func TestECSInvestigationEvidenceAndWrapping(t *testing.T) {
 	m.screen = screenECSInvestigation
 	m.ecs.selectedDetail = &awsservice.ECSServiceDetail{Name: "checkout"}
 	m.ecs.investigationLoading = true
-	result := awsservice.ECSInvestigation{ObservedAt: time.Now(), Warnings: []string{"partial AccessDenied"}, Logs: []awsservice.ECSInvestigationLog{{Group: "group", Events: []awsservice.LogEvent{{Message: strings.Repeat("evidence ", 50) + "FINAL"}}}}}
+	result := awsservice.ECSInvestigation{ObservedAt: time.Now(), Warnings: []string{"partial AccessDenied"}, Logs: []awsservice.ECSInvestigationLog{{Group: "group", Events: []awsservice.LogEvent{{Message: strings.Repeat("evidence\n", 50) + "FINAL"}}}}, StoppedTasks: []awsservice.ECSStoppedTask{{Reason: "reason\nsecond reason", Containers: []string{"container\nexit reason"}}}}
 	updated, _ := m.Update(ecsInvestigationLoadedMsg{result})
 	m = updated.(Model)
 	views := ""
@@ -109,5 +109,17 @@ func TestECSInvestigationEvidenceAndWrapping(t *testing.T) {
 		if !strings.Contains(strings.Join(m.ecs.investigationLines(), " "), want) {
 			t.Fatalf("missing evidence limitation %q", want)
 		}
+	}
+	for _, line := range m.ecs.investigationLines() {
+		if strings.Contains(line, "\n") {
+			t.Fatal("multiline evidence was not expanded before viewport counting")
+		}
+	}
+	if !strings.Contains(strings.Join(m.ecs.investigationLines(), " "), "CloudTrail unavailable or not collected") {
+		t.Fatal("skipped CloudTrail not distinguished")
+	}
+	m.ecs.investigation.ChangesCollected = true
+	if !strings.Contains(strings.Join(m.ecs.investigationLines(), " "), "No indexed writes returned") {
+		t.Fatal("empty successful CloudTrail query not distinguished")
 	}
 }
