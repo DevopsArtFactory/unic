@@ -13,16 +13,16 @@ import (
 )
 
 func TestECSSummaryAllowlistAndWarnings(t *testing.T) {
-	const secret = "DO_NOT_EXPORT_credential_value"
+	const privateMarker = "fixture-only-private-marker"
 	result := awsservice.ECSInvestigation{ObservedAt: time.Date(2026, 10, 22, 1, 2, 3, 0, time.UTC),
-		Rollout:      &awsservice.ECSServiceDetail{Name: secret, ARN: secret, Status: secret, DesiredCount: 3, RunningCount: 1, TaskDefinitionARN: secret, ContainerImages: []awsservice.ECSContainerImage{{Image: secret}}, Events: []awsservice.ECSServiceEvent{{Message: secret}}, Deployments: []awsservice.ECSDeployment{{RolloutState: "FAILED", RolloutStateReason: secret, FailedTasks: 2}}},
-		StoppedTasks: []awsservice.ECSStoppedTask{{ARN: secret, Reason: secret, Containers: []string{secret}}},
-		Logs:         []awsservice.ECSInvestigationLog{{Group: secret, Events: []awsservice.LogEvent{{Message: secret}}, Warning: "AccessDenied " + secret}},
-		Health:       []awsservice.ECSServiceTargetHealth{{Group: awsservice.ELBTargetGroupHealth{ARN: secret, Name: secret, UnhealthyCount: 1}}},
-		Changes:      []awsservice.CloudTrailEvent{{Name: secret, RawJSON: secret, Username: secret, SourceIP: secret}}, Warnings: []string{"CloudTrail truncated " + secret, "deadline exceeded " + secret},
+		Rollout:      &awsservice.ECSServiceDetail{Name: privateMarker, ARN: privateMarker, Status: privateMarker, DesiredCount: 3, RunningCount: 1, TaskDefinitionARN: privateMarker, ContainerImages: []awsservice.ECSContainerImage{{Image: privateMarker}}, Events: []awsservice.ECSServiceEvent{{Message: privateMarker}}, Deployments: []awsservice.ECSDeployment{{RolloutState: "FAILED", RolloutStateReason: privateMarker, FailedTasks: 2}}},
+		StoppedTasks: []awsservice.ECSStoppedTask{{ARN: privateMarker, Reason: privateMarker, Containers: []string{privateMarker}}},
+		Logs:         []awsservice.ECSInvestigationLog{{Group: privateMarker, Events: []awsservice.LogEvent{{Message: privateMarker}}, Warning: "AccessDenied " + privateMarker}},
+		Health:       []awsservice.ECSServiceTargetHealth{{Group: awsservice.ELBTargetGroupHealth{ARN: privateMarker, Name: privateMarker, UnhealthyCount: 1}}},
+		Changes:      []awsservice.CloudTrailEvent{{Name: privateMarker, RawJSON: privateMarker, Username: privateMarker, SourceIP: privateMarker}}, Warnings: []string{"CloudTrail truncated " + privateMarker, "deadline exceeded " + privateMarker},
 	}
 	text := ecsSummary(result, "private-cluster", "private-service", "private-region", false)
-	for _, forbidden := range []string{secret, "private-cluster", "private-service", "private-region"} {
+	for _, forbidden := range []string{privateMarker, "private-cluster", "private-service", "private-region"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("leaked %s", forbidden)
 		}
@@ -33,7 +33,7 @@ func TestECSSummaryAllowlistAndWarnings(t *testing.T) {
 		}
 	}
 	text = ecsSummary(result, "private-cluster", "private-service", "private-region", true)
-	if !strings.Contains(text, "private-cluster") || !strings.Contains(text, "private-service") || strings.Contains(text, secret) {
+	if !strings.Contains(text, "private-cluster") || !strings.Contains(text, "private-service") || strings.Contains(text, privateMarker) {
 		t.Fatal("optional disclosure scope incorrect")
 	}
 }
