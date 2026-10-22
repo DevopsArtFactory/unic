@@ -16,26 +16,28 @@ import (
 const ecsAPITimeout = 30 * time.Second
 
 type ecsModel struct {
-	clusters         []awsservice.ECSCluster
-	filteredClusters []awsservice.ECSCluster
-	clusterIdx       int
-	selectedCluster  *awsservice.ECSCluster
-	services         []awsservice.ECSService
-	filteredServices []awsservice.ECSService
-	serviceIdx       int
-	selectedService  *awsservice.ECSService
-	selectedDetail   *awsservice.ECSServiceDetail
-	healthResults    []awsservice.ECSServiceTargetHealth
-	healthError      error
-	healthObserved   time.Time
-	healthLoading    bool
-	rolloutScroll    int
-	detailScroll     int
-	tasks            []awsservice.ECSTask
-	taskIdx          int
-	selectedTask     *awsservice.ECSTask
-	containers       []awsservice.ECSContainer
-	containerIdx     int
+	clusters             []awsservice.ECSCluster
+	filteredClusters     []awsservice.ECSCluster
+	clusterIdx           int
+	selectedCluster      *awsservice.ECSCluster
+	services             []awsservice.ECSService
+	filteredServices     []awsservice.ECSService
+	serviceIdx           int
+	selectedService      *awsservice.ECSService
+	selectedDetail       *awsservice.ECSServiceDetail
+	healthResults        []awsservice.ECSServiceTargetHealth
+	healthError          error
+	healthObserved       time.Time
+	healthLoading        bool
+	investigation        awsservice.ECSInvestigation
+	investigationLoading bool
+	rolloutScroll        int
+	detailScroll         int
+	tasks                []awsservice.ECSTask
+	taskIdx              int
+	selectedTask         *awsservice.ECSTask
+	containers           []awsservice.ECSContainer
+	containerIdx         int
 }
 
 func newECSModel() ecsModel {
@@ -48,6 +50,17 @@ func (em *ecsModel) Start(m *Model) (tea.Model, tea.Cmd) {
 
 func (em *ecsModel) HandleMessage(m *Model, msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
+	case ecsInvestigationLoadedMsg:
+		if !em.investigationLoading {
+			return *m, nil, true
+		}
+		em.investigationLoading = false
+		em.investigation = msg.result
+		viewport := *m
+		viewport.screen = screenECSInvestigation
+		lines, visible := em.serviceDetailViewport(viewport, ecsInvestigationHelp)
+		em.detailScroll = min(em.detailScroll, max(len(lines)-visible, 0))
+		return *m, nil, true
 	case ecsTargetHealthLoadedMsg:
 		if !em.healthLoading {
 			return *m, nil, true
@@ -132,6 +145,9 @@ func (em *ecsModel) HandleKey(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd, boo
 	case screenECSTargetHealth:
 		newM, cmd := em.updateTargetHealth(m, msg)
 		return newM, cmd, true
+	case screenECSInvestigation:
+		newM, cmd := em.updateInvestigation(m, msg)
+		return newM, cmd, true
 	case screenECSTaskList:
 		newM, cmd := em.updateTaskList(m, msg)
 		return newM, cmd, true
@@ -153,6 +169,8 @@ func (em ecsModel) View(m Model) (string, bool) {
 		return em.viewServiceDetail(m), true
 	case screenECSTargetHealth:
 		return em.viewServiceDetailWithHelp(m, ecsTargetHealthHelp), true
+	case screenECSInvestigation:
+		return em.viewServiceDetailWithHelp(m, ecsInvestigationHelp), true
 	case screenECSTaskList:
 		return em.viewTaskList(m), true
 	case screenECSContainerList:
@@ -329,10 +347,12 @@ func (em ecsModel) viewServiceList(m Model) string {
 
 // --- Service Detail ---
 
-const ecsServiceDetailHelp = "↑/↓: scroll • pgup/pgdn: page • W: watch • I: interval • t: target health • enter: tasks • r: refresh • esc: back • H: home"
+const ecsServiceDetailHelp = "↑/↓: scroll • pgup/pgdn: page • i: investigate • W: watch • I: interval • t: target health • enter: tasks • r: refresh • esc: back • H: home"
 
 func (em *ecsModel) updateServiceDetail(m *Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "i":
+		return em.startInvestigation(m)
 	case "t":
 		if em.selectedCluster != nil && em.selectedDetail != nil {
 			em.rolloutScroll = em.detailScroll
@@ -374,6 +394,8 @@ func (em ecsModel) serviceDetailViewport(m Model, help string) ([]string, int) {
 	lines := em.serviceDetailLines()
 	if m.screen == screenECSTargetHealth {
 		lines = em.targetHealthLines()
+	} else if m.screen == screenECSInvestigation {
+		lines = em.investigationLines()
 	}
 	if m.width > 0 {
 		width := max(m.width-m.currentListPanelStyle().GetHorizontalFrameSize(), 1)
@@ -406,6 +428,8 @@ func (em ecsModel) viewServiceDetailWithHelp(m Model, help string) string {
 	title := "ECS Service Rollout"
 	if m.screen == screenECSTargetHealth {
 		title = "ECS Target Health"
+	} else if m.screen == screenECSInvestigation {
+		title = "ECS Investigation"
 	}
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s — %s", title, detail.Name)))
 	b.WriteString(m.watchBadge())

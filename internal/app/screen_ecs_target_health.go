@@ -122,7 +122,7 @@ func resetECSContextState(m *Model) {
 	m.ecs = newECSModel()
 	for _, previous := range []*screen{&m.ctxPrevScreen, &m.settingsPrevScreen, &m.views.prevScreen, &m.palette.prevScreen, &m.regionPrevScreen} {
 		switch *previous {
-		case screenECSClusterList, screenECSServiceList, screenECSServiceDetail, screenECSTargetHealth, screenECSTaskList, screenECSContainerList:
+		case screenECSClusterList, screenECSServiceList, screenECSServiceDetail, screenECSTargetHealth, screenECSInvestigation, screenECSTaskList, screenECSContainerList:
 			*previous = screenFeatureList
 		}
 	}
