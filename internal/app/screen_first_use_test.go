@@ -126,3 +126,26 @@ func TestFirstUseIdentityResetAndEmptyResources(t *testing.T) {
 		t.Fatal("empty identity marked verified")
 	}
 }
+
+func TestFirstUseScrollAndRejectedIdentity(t *testing.T) {
+	m := New(testConfig(), "", "dev")
+	m.screen = screenFirstUse
+	m.width = 60
+	m.height = 14
+	for range 100 {
+		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+		m = updated.(Model)
+	}
+	bottom := m.guide.scroll
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updated.(Model)
+	if m.guide.scroll != bottom-1 {
+		t.Fatal("one up key did not move from the visible bottom")
+	}
+	m.guide.loading = true
+	updated, _ = m.Update(firstUseIdentityMsg{identity: &awsservice.CallerIdentity{Account: "bad", Arn: "bad"}, err: errors.New("expired")})
+	m = updated.(Model)
+	if m.guide.identity != nil || m.guide.err != "expired" || m.guide.scroll != 0 {
+		t.Fatal("invalid identity retained or result not brought into view")
+	}
+}

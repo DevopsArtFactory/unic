@@ -29,6 +29,9 @@ var firstUseRepository = awsservice.NewAwsRepository
 
 func (m Model) openFirstUseGuide() (tea.Model, tea.Cmd) {
 	m.helpVisible = false
+	if m.guide.loading && m.commands != nil {
+		m.commands.CancelAll()
+	}
 	m.guide = firstUseGuide{previous: m.screen}
 	m.screen = screenFirstUse
 	return m, nil
@@ -52,10 +55,10 @@ func (m Model) updateFirstUseGuide(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.guide.identity = nil
 		m.guide.err = ""
 		cfg := *m.cfg
-		generation := 0
-		if m.commands != nil {
-			generation = m.commands.Renew()
+		if m.commands == nil {
+			m.commands = newCommandLifecycle()
 		}
+		generation := m.commands.Renew()
 		baseCtx := m.commandContext()
 		cmd := func() tea.Msg {
 			ctx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
@@ -67,9 +70,7 @@ func (m Model) updateFirstUseGuide(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			identity, err := repo.GetCallerIdentity(ctx)
 			return firstUseIdentityMsg{identity: identity, err: err}
 		}
-		if m.commands != nil {
-			cmd = m.commands.BindCmd(generation, cmd)
-		}
+		cmd = m.commands.BindCmd(generation, cmd)
 		return m, cmd
 	case "e":
 		if m.guide.identity == nil || m.guide.loading {
@@ -86,6 +87,10 @@ func (m Model) updateFirstUseGuide(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.guide.scroll = max(m.guide.scroll-max(m.height-7, 5), 0)
 	case "pgdown":
 		m.guide.scroll += max(m.height-7, 5)
+	}
+	if m.screen == screenFirstUse {
+		lines, visible := m.firstUseViewport()
+		m.guide.scroll = min(m.guide.scroll, max(len(lines)-visible, 0))
 	}
 	return m, nil
 }
@@ -128,13 +133,18 @@ func (m Model) firstUseLines() []string {
 	return lines
 }
 
-func (m Model) viewFirstUseGuide() string {
+func (m Model) firstUseViewport() ([]string, int) {
 	var lines []string
 	width := max(m.width-4, 20)
 	for _, line := range m.firstUseLines() {
 		lines = append(lines, strings.Split(ansi.Hardwrap(line, width, true), "\n")...)
 	}
 	visibleLines := max(m.height-7, 5)
+	return lines, visibleLines
+}
+
+func (m Model) viewFirstUseGuide() string {
+	lines, visibleLines := m.firstUseViewport()
 	start := min(m.guide.scroll, max(len(lines)-visibleLines, 0))
 	end := min(start+visibleLines, len(lines))
 	return titleStyle.Render("First useful AWS result") + "\n\n" + strings.Join(lines[start:end], "\n") + fmt.Sprintf("\n\n%d-%d/%d\n", start+1, end, len(lines)) + m.renderHelpBar("↑/↓: scroll • r: verify • e: ECS • a: add context • C: contexts • esc/q: skip")

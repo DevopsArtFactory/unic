@@ -609,15 +609,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.guide.loading = false
-		m.guide.identity = msg.identity
-		if msg.err == nil && (msg.identity == nil || msg.identity.Account == "" || msg.identity.Arn == "") {
-			m.guide.err = "Identity could not be resolved; run unic doctor and reselect the context."
-			m.guide.identity = nil
-		}
+		m.guide.identity = nil
 		if msg.err != nil {
 			m.guide.err = msg.err.Error()
-			m.guide.identity = nil
+		} else if msg.identity == nil || msg.identity.Account == "" || msg.identity.Arn == "" {
+			m.guide.err = "Identity could not be resolved; run unic doctor and reselect the context."
+		} else {
+			m.guide.identity = msg.identity
+			m.guide.err = ""
 		}
+		m.guide.scroll = 0
 		return m, nil
 	case screenReadyMsg:
 		m.screen = screenContextPicker
